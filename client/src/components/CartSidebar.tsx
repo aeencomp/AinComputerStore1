@@ -43,7 +43,7 @@ const imageMap: Record<string, string> = {
 
 function formatPrice(price: string | number): string {
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  return numPrice.toLocaleString('ar-SA', {
+  return numPrice.toLocaleString('ar-IQ', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -171,7 +171,7 @@ export function CartSidebar({
                           </Button>
                         </div>
                         <span className="font-bold text-primary" data-testid={`text-cart-price-${item.product.id}`}>
-                          {formatPrice(parseFloat(item.product.price) * item.quantity)} ريال
+                          {formatPrice(parseFloat(item.product.price) * item.quantity)} د.ع
                         </span>
                       </div>
                     </div>
@@ -185,18 +185,18 @@ export function CartSidebar({
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground" data-testid="text-subtotal-label">المجموع الفرعي</span>
-                  <span className="font-medium" data-testid="text-subtotal">{formatPrice(subtotal)} ريال</span>
+                  <span className="font-medium" data-testid="text-subtotal">{formatPrice(subtotal)} د.ع</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground" data-testid="text-shipping-label">الشحن</span>
                   <span className="font-medium text-primary" data-testid="text-shipping">
-                    {shipping === 0 ? 'مجاني' : `${formatPrice(shipping)} ريال`}
+                    {shipping === 0 ? 'مجاني' : `${formatPrice(shipping)} د.ع`}
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg">
                   <span className="font-bold" data-testid="text-total-label">الإجمالي</span>
-                  <span className="font-bold text-primary" data-testid="text-total">{formatPrice(total)} ريال</span>
+                  <span className="font-bold text-primary" data-testid="text-total">{formatPrice(total)} د.ع</span>
                 </div>
               </div>
               <Button className="w-full" size="lg" data-testid="button-checkout">

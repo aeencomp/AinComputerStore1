@@ -34,7 +34,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch }: HeaderProps) {
         <div className="flex items-center justify-between h-16 gap-4">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center border-2 border-border rounded-md h-14 px-4 min-w-[120px]" data-testid="logo-placeholder">
-              <span className="text-sm font-bold text-muted-foreground text-center">شعار العين</span>
+              <span className="text-sm font-bold text-muted-foreground text-center">العين لتجارة الحاسبات</span>
             </div>
           </div>
 

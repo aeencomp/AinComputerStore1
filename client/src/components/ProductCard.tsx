@@ -26,7 +26,7 @@ const imageMap: Record<string, string> = {
 
 function formatPrice(price: string | number): string {
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  return numPrice.toLocaleString('ar-SA', {
+  return numPrice.toLocaleString('ar-IQ', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -77,11 +77,11 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
         <div className="w-full flex items-baseline gap-2">
           {product.oldPrice && (
             <span className="text-sm text-muted-foreground line-through" data-testid={`text-old-price-${product.id}`}>
-              {formatPrice(product.oldPrice)} ريال
+              {formatPrice(product.oldPrice)} د.ع
             </span>
           )}
           <span className="text-2xl font-bold text-primary" data-testid={`text-price-${product.id}`}>
-            {formatPrice(product.price)} ريال
+            {formatPrice(product.price)} د.ع
           </span>
         </div>
         <Button
