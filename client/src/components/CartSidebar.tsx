@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CartItem } from "@shared/schema";
 import { Minus, Plus, X, ShoppingBag, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
+import { useLanguage } from "@/contexts/LanguageContext";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -42,9 +43,9 @@ const imageMap: Record<string, string> = {
   "gaming_headset_product_photo.png": headsetImage,
 };
 
-function formatPrice(price: string | number): string {
+function formatPrice(price: string | number, locale: string): string {
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  return numPrice.toLocaleString('ar-IQ', {
+  return numPrice.toLocaleString(locale === 'ar' ? 'ar-IQ' : 'en-IQ', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
@@ -60,6 +61,7 @@ export function CartSidebar({
   isError = false,
 }: CartSidebarProps) {
   const [, setLocation] = useLocation();
+  const { language, t } = useLanguage();
   const subtotal = items.reduce(
     (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
     0
@@ -72,8 +74,8 @@ export function CartSidebar({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-full sm:max-w-lg flex flex-col" data-testid="sheet-cart">
         <SheetHeader>
-          <SheetTitle className="text-2xl" data-testid="text-cart-title">سلة التسوق</SheetTitle>
-          <SheetDescription>إدارة منتجات سلة التسوق الخاصة بك</SheetDescription>
+          <SheetTitle className="text-2xl" data-testid="text-cart-title">{t('cart.title')}</SheetTitle>
+          <SheetDescription>{language === 'ar' ? 'إدارة منتجات سلة التسوق الخاصة بك' : 'Manage your shopping cart items'}</SheetDescription>
         </SheetHeader>
 
         {isLoading ? (
@@ -94,18 +96,18 @@ export function CartSidebar({
           <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12">
             <AlertCircle className="h-16 w-16 text-destructive" />
             <p className="text-lg text-destructive text-center" data-testid="text-cart-error">
-              حدث خطأ أثناء تحميل السلة
+              {language === 'ar' ? 'حدث خطأ أثناء تحميل السلة' : 'An error occurred while loading the cart'}
             </p>
             <Button variant="outline" onClick={() => window.location.reload()} data-testid="button-retry-cart">
-              إعادة المحاولة
+              {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
             </Button>
           </div>
         ) : items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12">
             <ShoppingBag className="h-16 w-16 text-muted-foreground" />
-            <p className="text-lg text-muted-foreground" data-testid="text-empty-cart">السلة فارغة</p>
+            <p className="text-lg text-muted-foreground" data-testid="text-empty-cart">{t('cart.empty')}</p>
             <Button onClick={() => onOpenChange(false)} data-testid="button-continue-shopping">
-              تصفح المنتجات
+              {language === 'ar' ? 'تصفح المنتجات' : 'Browse Products'}
             </Button>
           </div>
         ) : (
@@ -123,7 +125,7 @@ export function CartSidebar({
                     <div className="h-20 w-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
                       <img
                         src={imageSrc}
-                        alt={item.product.nameAr}
+                        alt={language === 'ar' ? item.product.nameAr : item.product.nameEn}
                         className="w-full h-full object-cover"
                         data-testid={`img-cart-${item.product.id}`}
                       />
@@ -131,7 +133,7 @@ export function CartSidebar({
                     <div className="flex-1 space-y-2">
                       <div className="flex items-start justify-between gap-2">
                         <h4 className="font-medium text-sm line-clamp-2" data-testid={`text-cart-name-${item.product.id}`}>
-                          {item.product.nameAr}
+                          {language === 'ar' ? item.product.nameAr : item.product.nameEn}
                         </h4>
                         <Button
                           size="icon"
@@ -173,7 +175,7 @@ export function CartSidebar({
                           </Button>
                         </div>
                         <span className="font-bold text-primary" data-testid={`text-cart-price-${item.product.id}`}>
-                          {formatPrice(parseFloat(item.product.price) * item.quantity)} د.ع
+                          {formatPrice(parseFloat(item.product.price) * item.quantity, language)} {t('common.currency')}
                         </span>
                       </div>
                     </div>
@@ -186,19 +188,21 @@ export function CartSidebar({
               <Separator />
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground" data-testid="text-subtotal-label">المجموع الفرعي</span>
-                  <span className="font-medium" data-testid="text-subtotal">{formatPrice(subtotal)} د.ع</span>
+                  <span className="text-muted-foreground" data-testid="text-subtotal-label">{t('cart.subtotal')}</span>
+                  <span className="font-medium" data-testid="text-subtotal">{formatPrice(subtotal, language)} {t('common.currency')}</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground" data-testid="text-shipping-label">الشحن</span>
+                  <span className="text-muted-foreground" data-testid="text-shipping-label">{t('cart.shipping')}</span>
                   <span className="font-medium text-primary" data-testid="text-shipping">
-                    {shipping === 0 ? 'مجاني' : `${formatPrice(shipping)} د.ع`}
+                    {shipping === 0 
+                      ? (language === 'ar' ? 'مجاني' : 'Free')
+                      : `${formatPrice(shipping, language)} ${t('common.currency')}`}
                   </span>
                 </div>
                 <Separator />
                 <div className="flex justify-between text-lg">
-                  <span className="font-bold" data-testid="text-total-label">الإجمالي</span>
-                  <span className="font-bold text-primary" data-testid="text-total">{formatPrice(total)} د.ع</span>
+                  <span className="font-bold" data-testid="text-total-label">{t('cart.total')}</span>
+                  <span className="font-bold text-primary" data-testid="text-total">{formatPrice(total, language)} {t('common.currency')}</span>
                 </div>
               </div>
               <Button 
@@ -210,7 +214,7 @@ export function CartSidebar({
                   onOpenChange(false);
                 }}
               >
-                إتمام الطلب
+                {t('cart.checkout')}
               </Button>
               <Button
                 variant="outline"
@@ -218,7 +222,7 @@ export function CartSidebar({
                 onClick={() => onOpenChange(false)}
                 data-testid="button-continue-shopping-bottom"
               >
-                متابعة التسوق
+                {language === 'ar' ? 'متابعة التسوق' : 'Continue Shopping'}
               </Button>
             </SheetFooter>
           </>
