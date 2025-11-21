@@ -59,6 +59,7 @@ export function CartSidebar({
   isLoading = false,
   isError = false,
 }: CartSidebarProps) {
+  const [, setLocation] = useLocation();
   const subtotal = items.reduce(
     (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
     0
@@ -205,8 +206,8 @@ export function CartSidebar({
                 size="lg" 
                 data-testid="button-checkout"
                 onClick={() => {
-                  const newPath = '/checkout';
-                  window.location.href = newPath;
+                  setLocation('/checkout');
+                  onOpenChange(false);
                 }}
               >
                 إتمام الطلب

@@ -9,10 +9,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CartItem, Product } from "@shared/schema";
+import { Banknote, CreditCard } from "lucide-react";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -25,6 +28,7 @@ const checkoutSchema = z.object({
   customerAddress: z.string().min(5, "العنوان مطلوب"),
   customerCity: z.string().min(2, "المدينة مطلوبة"),
   customerPostal: z.string().min(2, "الرمز البريدي مطلوب"),
+  paymentMethod: z.string().min(1, "طريقة الدفع مطلوبة"),
 });
 
 type CheckoutFormValues = z.infer<typeof checkoutSchema>;
@@ -46,6 +50,7 @@ export default function Checkout() {
       customerAddress: "",
       customerCity: "",
       customerPostal: "",
+      paymentMethod: "cash_on_delivery",
     },
   });
 
@@ -55,22 +60,29 @@ export default function Checkout() {
         (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
         0
       );
-      const items = cartItems.map(item => ({
+      const items = cartItems.map(item => JSON.stringify({
         productId: item.product.id,
         quantity: item.quantity,
         price: item.product.price,
       }));
 
-      return await apiRequest('POST', '/api/orders', {
-        ...data,
-        items: JSON.stringify(items),
+      const response = await apiRequest('POST', '/api/orders', {
+        customerName: data.customerName,
+        customerEmail: data.customerEmail,
+        customerPhone: data.customerPhone,
+        customerAddress: data.customerAddress,
+        customerCity: data.customerCity,
+        customerPostal: data.customerPostal,
+        paymentMethod: data.paymentMethod,
+        items: items,
         subtotal: subtotal.toString(),
         shipping: "0",
         total: subtotal.toString(),
         status: "pending",
       });
+      return await response.json();
     },
-    onSuccess: (order) => {
+    onSuccess: (order: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
       toast({
         title: "تم إنشاء الطلب بنجاح!",
@@ -204,6 +216,48 @@ export default function Checkout() {
                           <FormLabel>الرمز البريدي</FormLabel>
                           <FormControl>
                             <Input placeholder="10001" {...field} data-testid="input-postal" />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <Separator className="my-6" />
+
+                    <FormField
+                      control={form.control}
+                      name="paymentMethod"
+                      render={({ field }) => (
+                        <FormItem className="space-y-3">
+                          <FormLabel className="text-lg font-semibold">طريقة الدفع</FormLabel>
+                          <FormControl>
+                            <RadioGroup
+                              onValueChange={field.onChange}
+                              defaultValue={field.value}
+                              className="space-y-3"
+                              data-testid="radio-payment-method"
+                            >
+                              <div className="flex items-center space-x-2 space-x-reverse border rounded-lg p-4 hover-elevate cursor-pointer">
+                                <RadioGroupItem value="cash_on_delivery" id="cash" data-testid="radio-cash-on-delivery" />
+                                <Label htmlFor="cash" className="flex items-center gap-3 cursor-pointer flex-1">
+                                  <Banknote className="w-5 h-5 text-primary" />
+                                  <div>
+                                    <div className="font-medium">الدفع عند الاستلام</div>
+                                    <div className="text-sm text-muted-foreground">ادفع نقداً عند استلام الطلب</div>
+                                  </div>
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2 space-x-reverse border rounded-lg p-4 opacity-50 cursor-not-allowed">
+                                <RadioGroupItem value="online" id="online" disabled />
+                                <Label htmlFor="online" className="flex items-center gap-3 flex-1">
+                                  <CreditCard className="w-5 h-5" />
+                                  <div>
+                                    <div className="font-medium">الدفع الإلكتروني</div>
+                                    <div className="text-sm text-muted-foreground">قريباً</div>
+                                  </div>
+                                </Label>
+                              </div>
+                            </RadioGroup>
                           </FormControl>
                           <FormMessage />
                         </FormItem>
