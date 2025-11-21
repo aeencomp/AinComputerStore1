@@ -107,7 +107,7 @@ function generateOrderConfirmationHTML(data: OrderEmailData): string {
     <!-- Payment Info -->
     <div style="padding: 30px 20px; background-color: #fef3c7; border-top: 1px solid #e5e7eb;">
       <p style="margin: 0; color: #92400e; font-size: 15px; line-height: 1.6;">
-        <strong>طريقة الدفع:</strong> الدفع عند الاستلام 💵<br>
+        <strong>طريقة الدفع:</strong> الدفع عند الاستلام<br>
         سيتم التواصل معك قريباً لتأكيد التوصيل.
       </p>
     </div>

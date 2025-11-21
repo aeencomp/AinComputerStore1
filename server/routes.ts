@@ -148,7 +148,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       try {
-        const orderItems = JSON.parse(order.items[0]);
+        const allOrderItems = order.items.map(itemStr => JSON.parse(itemStr));
+        const total = Number(order.total);
+        
+        if (isNaN(total)) {
+          throw new Error("Invalid order total");
+        }
+        
+        const itemsWithProducts = await Promise.all(
+          allOrderItems.map(async (item: any) => {
+            const product = await storage.getProduct(item.productId);
+            if (!product) {
+              throw new Error(`Product not found: ${item.productId}`);
+            }
+            const price = Number(item.price);
+            if (isNaN(price)) {
+              throw new Error(`Invalid price for product ${product.nameAr}`);
+            }
+            return {
+              name: product.nameAr,
+              quantity: item.quantity,
+              price: price,
+            };
+          })
+        );
+        
         const emailData = {
           orderNumber: order.orderNumber,
           customerName: order.customerName,
@@ -157,12 +181,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           customerAddress: order.customerAddress,
           customerCity: order.customerCity,
           customerPostalCode: order.customerPostal,
-          items: orderItems.map((item: any) => ({
-            name: item.product.nameAr,
-            quantity: item.quantity,
-            price: parseFloat(item.product.price),
-          })),
-          total: parseFloat(order.total),
+          items: itemsWithProducts,
+          total: total,
         };
         
         await sendOrderConfirmationEmail(emailData);
