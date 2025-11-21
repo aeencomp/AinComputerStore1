@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Product } from "@shared/schema";
 import { ShoppingCart } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { formatPrice } from "@/lib/formatters";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -24,14 +25,6 @@ const imageMap: Record<string, string> = {
   "gaming_mouse_product_photo.png": mouseImage,
   "gaming_headset_product_photo.png": headsetImage,
 };
-
-function formatPrice(price: string | number, locale: string): string {
-  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  return numPrice.toLocaleString(locale === 'ar' ? 'ar-IQ' : 'en-IQ', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const { language, t } = useLanguage();

@@ -21,6 +21,7 @@ const translations: Record<Language, Record<string, string>> = {
     'header.login': 'تسجيل الدخول',
     'header.profile': 'الملف الشخصي',
     'header.logout': 'تسجيل الخروج',
+    'header.searchPlaceholder': 'ابحث عن المنتجات...',
     
     // Categories
     'category.all': 'جميع المنتجات',
@@ -64,11 +65,17 @@ const translations: Record<Language, Record<string, string>> = {
     'checkout.title': 'إتمام الطلب',
     'checkout.customerInfo': 'معلومات العميل',
     'checkout.name': 'الاسم الكامل',
+    'checkout.namePlaceholder': 'أدخل الاسم الكامل',
     'checkout.email': 'البريد الإلكتروني',
+    'checkout.emailPlaceholder': 'example@email.com',
     'checkout.phone': 'رقم الهاتف',
+    'checkout.phonePlaceholder': '+٩٦٤...',
     'checkout.address': 'العنوان',
+    'checkout.addressPlaceholder': 'أدخل عنوانك',
     'checkout.city': 'المدينة',
+    'checkout.cityPlaceholder': 'بغداد',
     'checkout.postal': 'الرمز البريدي',
+    'checkout.postalPlaceholder': '١٠٠٠١',
     'checkout.payment': 'طريقة الدفع',
     'checkout.cashOnDelivery': 'الدفع عند الاستلام',
     'checkout.placeOrder': 'تأكيد الطلب',
@@ -96,6 +103,7 @@ const translations: Record<Language, Record<string, string>> = {
     'register.name': 'الاسم الكامل',
     'register.email': 'البريد الإلكتروني',
     'register.phone': 'رقم الهاتف',
+    'register.phonePlaceholder': '٠٧٩٠٠٠٠٠٠٠٠',
     'register.password': 'كلمة المرور',
     'register.passwordHint': 'يجب أن تكون 6 أحرف على الأقل',
     'register.submit': 'إنشاء حساب',
@@ -111,6 +119,7 @@ const translations: Record<Language, Record<string, string>> = {
     // Admin
     'admin.login.title': 'تسجيل دخول المسؤول',
     'admin.login.password': 'كلمة المرور',
+    'admin.login.passwordPlaceholder': 'أدخل كلمة المرور',
     'admin.login.submit': 'تسجيل الدخول',
     'admin.dashboard.title': 'لوحة التحكم',
     'admin.dashboard.orders': 'الطلبات',
@@ -124,6 +133,9 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.dashboard.processing': 'قيد المعالجة',
     'admin.dashboard.shipped': 'تم الشحن',
     'admin.dashboard.delivered': 'تم التوصيل',
+    
+    // Footer
+    'footer.newsletterPlaceholder': 'بريدك الإلكتروني',
     
     // Common
     'common.currency': 'د.ع',
@@ -140,6 +152,7 @@ const translations: Record<Language, Record<string, string>> = {
     'header.login': 'Login',
     'header.profile': 'Profile',
     'header.logout': 'Logout',
+    'header.searchPlaceholder': 'Search for products...',
     
     // Categories
     'category.all': 'All Products',

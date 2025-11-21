@@ -134,7 +134,7 @@ export default function Register() {
               onClick={() => navigate("/")}
               data-testid="button-back-home"
             >
-              العودة للرئيسية
+              {t('register.backToHome')}
             </Button>
           </CardFooter>
         </form>
