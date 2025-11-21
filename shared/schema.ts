@@ -23,7 +23,9 @@ export type User = typeof users.$inferSelect;
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en").notNull(),
   descriptionAr: text("description_ar").notNull(),
+  descriptionEn: text("description_en").notNull(),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   oldPrice: decimal("old_price", { precision: 10, scale: 2 }),
   category: text("category").notNull(),

@@ -5,7 +5,9 @@ async function seedProducts() {
   const sampleProducts = [
     {
       nameAr: "لابتوب ألعاب ROG Zephyrus",
+      nameEn: "ROG Zephyrus Gaming Laptop",
       descriptionAr: "لابتوب ألعاب قوي بمعالج Intel Core i9 وكرت شاشة RTX 4080",
+      descriptionEn: "Powerful gaming laptop with Intel Core i9 processor and RTX 4080 graphics card",
       price: "7999.00",
       oldPrice: "9499.00",
       category: "laptops",
@@ -16,7 +18,9 @@ async function seedProducts() {
     },
     {
       nameAr: "جهاز كمبيوتر مكتبي للألعاب",
+      nameEn: "Gaming Desktop PC",
       descriptionAr: "جهاز كمبيوتر مكتبي عالي الأداء بإضاءة RGB",
+      descriptionEn: "High-performance desktop computer with RGB lighting",
       price: "5499.00",
       oldPrice: null,
       category: "desktops",
@@ -27,7 +31,9 @@ async function seedProducts() {
     },
     {
       nameAr: "شاشة ألعاب منحنية 34 بوصة",
+      nameEn: "34-inch Curved Gaming Monitor",
       descriptionAr: "شاشة ألعاب فائقة العرض بتقنية UWQHD",
+      descriptionEn: "Ultrawide gaming monitor with UWQHD resolution",
       price: "2299.00",
       oldPrice: "2799.00",
       category: "monitors",
@@ -38,7 +44,9 @@ async function seedProducts() {
     },
     {
       nameAr: "لوحة مفاتيح ميكانيكية RGB",
+      nameEn: "RGB Mechanical Keyboard",
       descriptionAr: "لوحة مفاتيح ميكانيكية احترافية للألعاب",
+      descriptionEn: "Professional mechanical gaming keyboard",
       price: "449.00",
       oldPrice: null,
       category: "accessories",
@@ -49,7 +57,9 @@ async function seedProducts() {
     },
     {
       nameAr: "ماوس ألعاب لاسلكي",
+      nameEn: "Wireless Gaming Mouse",
       descriptionAr: "ماوس ألعاب عالي الدقة مع إضاءة RGB",
+      descriptionEn: "High-precision gaming mouse with RGB lighting",
       price: "299.00",
       oldPrice: "399.00",
       category: "accessories",
@@ -60,7 +70,9 @@ async function seedProducts() {
     },
     {
       nameAr: "سماعة ألعاب احترافية",
+      nameEn: "Professional Gaming Headset",
       descriptionAr: "سماعة محيطية 7.1 مع ميكروفون قابل للفصل",
+      descriptionEn: "7.1 surround sound headset with detachable microphone",
       price: "549.00",
       oldPrice: null,
       category: "accessories",
@@ -71,7 +83,9 @@ async function seedProducts() {
     },
     {
       nameAr: "لابتوب عمل وإنتاجية",
+      nameEn: "Work & Productivity Laptop",
       descriptionAr: "لابتوب خفيف الوزن مثالي للعمل والدراسة",
+      descriptionEn: "Lightweight laptop perfect for work and study",
       price: "3299.00",
       oldPrice: null,
       category: "laptops",
@@ -82,7 +96,9 @@ async function seedProducts() {
     },
     {
       nameAr: "جهاز كمبيوتر مكتبي للمكاتب",
+      nameEn: "Office Desktop Computer",
       descriptionAr: "جهاز كمبيوتر مكتبي كامل للاستخدام المكتبي",
+      descriptionEn: "Complete desktop computer for office use",
       price: "2499.00",
       oldPrice: null,
       category: "desktops",
