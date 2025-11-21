@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, User, LogOut } from "lucide-react";
+import { ShoppingCart, Search, Menu, User, LogOut, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -20,6 +20,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUser, useLogout } from "@/hooks/use-user";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -31,6 +32,7 @@ interface HeaderProps {
 export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect }: HeaderProps) {
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useUser();
+  const { language, setLanguage, t } = useLanguage();
   const logoutMutation = useLogout();
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -53,7 +55,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
         <div className="flex items-center justify-between h-16 gap-4">
           <div className="flex items-center gap-2">
             <div className="flex items-center justify-center border-2 border-border rounded-md h-14 px-4 min-w-[120px]" data-testid="logo-placeholder">
-              <span className="text-sm font-bold text-muted-foreground text-center">العين لتجارة الحاسبات</span>
+              <span className="text-sm font-bold text-muted-foreground text-center">{t('header.title')}</span>
             </div>
           </div>
 
@@ -61,7 +63,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             <div className="relative w-full">
               <Input
                 type="search"
-                placeholder="ابحث عن المنتجات..."
+                placeholder={t('product.loading')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pr-10"
@@ -80,6 +82,15 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           </form>
 
           <div className="flex items-center gap-2">
+            <Button
+              size="icon"
+              variant="ghost"
+              onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+              data-testid="button-language-toggle"
+            >
+              <Languages className="h-5 w-5" />
+            </Button>
+
             <Button
               size="icon"
               variant="ghost"
@@ -114,7 +125,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                     data-testid="button-logout"
                   >
                     <LogOut className="ml-2 h-4 w-4" />
-                    تسجيل الخروج
+                    {t('header.logout')}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -160,50 +171,35 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
         </div>
 
         <nav className="hidden md:flex items-center justify-center gap-6 py-3 border-t">
-          <Button variant="ghost" onClick={() => { onSearch(""); }} data-testid="link-home">الرئيسية</Button>
-          <Button variant="ghost" onClick={() => onCategorySelect?.("laptops")} data-testid="link-computers">أجهزة كمبيوتر</Button>
-          <Button variant="ghost" onClick={() => onCategorySelect?.("accessories")} data-testid="link-accessories">ملحقات</Button>
-          <Button variant="ghost" onClick={() => onCategorySelect?.("monitors")} data-testid="link-monitors">الشاشات</Button>
-          <Button variant="ghost" onClick={() => onSearch("عرض")} data-testid="link-offers">العروض</Button>
+          <Button variant="ghost" onClick={() => { onSearch(""); }} data-testid="link-home">{t('header.home')}</Button>
+          <Button variant="ghost" onClick={() => onCategorySelect?.("laptops")} data-testid="link-computers">{t('category.laptops')}</Button>
+          <Button variant="ghost" onClick={() => onCategorySelect?.("accessories")} data-testid="link-accessories">{t('category.accessories')}</Button>
+          <Button variant="ghost" onClick={() => onCategorySelect?.("monitors")} data-testid="link-monitors">{t('category.monitors')}</Button>
+          <Button variant="ghost" onClick={() => onCategorySelect?.("desktops")} data-testid="link-desktops">{t('category.desktops')}</Button>
         </nav>
 
         {mobileMenuOpen && (
           <nav className="md:hidden flex flex-col gap-2 py-3 border-t">
-            <Button variant="ghost" className="justify-start" onClick={() => { onSearch(""); setMobileMenuOpen(false); }} data-testid="link-home-mobile">الرئيسية</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("laptops"); setMobileMenuOpen(false); }} data-testid="link-computers-mobile">أجهزة كمبيوتر</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("accessories"); setMobileMenuOpen(false); }} data-testid="link-accessories-mobile">ملحقات</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("monitors"); setMobileMenuOpen(false); }} data-testid="link-monitors-mobile">الشاشات</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onSearch("عرض"); setMobileMenuOpen(false); }} data-testid="link-offers-mobile">العروض</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onSearch(""); setMobileMenuOpen(false); }} data-testid="link-home-mobile">{t('header.home')}</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("laptops"); setMobileMenuOpen(false); }} data-testid="link-computers-mobile">{t('category.laptops')}</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("accessories"); setMobileMenuOpen(false); }} data-testid="link-accessories-mobile">{t('category.accessories')}</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("monitors"); setMobileMenuOpen(false); }} data-testid="link-monitors-mobile">{t('category.monitors')}</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("desktops"); setMobileMenuOpen(false); }} data-testid="link-desktops-mobile">{t('category.desktops')}</Button>
           </nav>
         )}
-
-        <div className="hidden md:flex items-center justify-center gap-8 py-2 border-t text-sm text-muted-foreground">
-          <div className="flex items-center gap-2" data-testid="trust-shipping">
-            <span>✓</span>
-            <span>شحن مجاني</span>
-          </div>
-          <div className="flex items-center gap-2" data-testid="trust-warranty">
-            <span>✓</span>
-            <span>ضمان سنتين</span>
-          </div>
-          <div className="flex items-center gap-2" data-testid="trust-support">
-            <span>✓</span>
-            <span>خدمة العملاء 24/7</span>
-          </div>
-        </div>
       </div>
 
       <Sheet open={mobileSearchOpen} onOpenChange={setMobileSearchOpen}>
         <SheetContent side="top" className="h-auto" data-testid="sheet-mobile-search">
           <SheetHeader>
-            <SheetTitle>البحث</SheetTitle>
-            <SheetDescription>ابحث عن منتجات الحواسيب والملحقات</SheetDescription>
+            <SheetTitle>{language === 'ar' ? 'البحث' : 'Search'}</SheetTitle>
+            <SheetDescription>{language === 'ar' ? 'ابحث عن منتجات الحواسيب والملحقات' : 'Search for computers and accessories'}</SheetDescription>
           </SheetHeader>
           <form onSubmit={handleSearch} className="mt-4">
             <div className="relative">
               <Input
                 type="search"
-                placeholder="ابحث عن المنتجات..."
+                placeholder={language === 'ar' ? 'ابحث عن المنتجات...' : 'Search for products...'}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pr-10"
