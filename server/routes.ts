@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema } from "@shared/schema";
 import { z } from "zod";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -128,6 +128,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error clearing cart:", error);
       return res.status(500).json({ error: "Failed to clear cart" });
+    }
+  });
+
+  app.post("/api/orders", async (req, res) => {
+    try {
+      const validatedData = insertOrderSchema.parse(req.body);
+      const order = await storage.createOrder(validatedData);
+      await storage.clearCart();
+      return res.json(order);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid order data", details: error.errors });
+      }
+      console.error("Error creating order:", error);
+      return res.status(500).json({ error: "Failed to create order" });
+    }
+  });
+
+  app.get("/api/orders", async (req, res) => {
+    try {
+      const allOrders = await storage.getOrders();
+      return res.json(allOrders);
+    } catch (error) {
+      console.error("Error fetching orders:", error);
+      return res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
 

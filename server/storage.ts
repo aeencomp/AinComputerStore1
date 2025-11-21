@@ -1,5 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder } from "@shared/schema";
 
 export interface IStorage {
   getProducts(): Promise<Product[]>;
@@ -12,6 +11,8 @@ export interface IStorage {
   updateCartItemQuantity(id: string, quantity: number): Promise<CartItemRecord | undefined>;
   removeFromCart(id: string): Promise<void>;
   clearCart(): Promise<void>;
+  createOrder(order: InsertOrder): Promise<Order>;
+  getOrders(): Promise<Order[]>;
 }
 
 export class MemStorage implements IStorage {
@@ -190,4 +191,6 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+import { DrizzleStorage } from "./db-storage";
+
+export const storage = new DrizzleStorage();
