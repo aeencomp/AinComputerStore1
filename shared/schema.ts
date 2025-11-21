@@ -43,6 +43,7 @@ export interface CartItem {
 
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orderNumber: text("order_number").notNull().unique(),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
   customerPhone: text("customer_phone").notNull(),
@@ -60,6 +61,7 @@ export const orders = pgTable("orders", {
 
 export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
+  orderNumber: true,
   createdAt: true,
 });
 

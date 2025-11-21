@@ -11,6 +11,7 @@ import { LogOut } from "lucide-react";
 
 interface Order {
   id: string;
+  orderNumber: string;
   customerName: string;
   customerEmail: string;
   customerPhone: string;
@@ -124,8 +125,8 @@ export default function AdminDashboard() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-lg">{order.customerName}</CardTitle>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        رقم الطلب: {order.id.slice(0, 8)}...
+                      <p className="text-sm font-semibold text-primary mt-1" data-testid={`text-order-number-${order.id}`}>
+                        رقم الطلب: {order.orderNumber}
                       </p>
                     </div>
                     <div className="text-right">

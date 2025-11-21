@@ -1,6 +1,6 @@
 import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, products, cartItems, orders } from "@shared/schema";
 import { db } from "./db.js";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
 export class DrizzleStorage implements IStorage {
@@ -67,7 +67,14 @@ export class DrizzleStorage implements IStorage {
   }
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
-    const result = await db.insert(orders).values(insertOrder).returning();
+    const sequenceResult = await db.execute(sql`SELECT nextval('order_number_seq') as next_num`);
+    const nextNumber = (sequenceResult.rows[0] as any).next_num;
+    const orderNumber = `ORD-${String(nextNumber).padStart(5, '0')}`;
+    
+    const result = await db.insert(orders).values({
+      ...insertOrder,
+      orderNumber,
+    }).returning();
     return result[0];
   }
 

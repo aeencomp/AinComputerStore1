@@ -99,13 +99,13 @@ export default function Checkout() {
       
       toast({
         title: "✅ تم إنشاء الطلب بنجاح!",
-        description: `رقم طلبك: ${order.id.substring(0, 8)}...\nسيتم التواصل معك قريباً`,
-        duration: 5000,
+        description: `رقم طلبك: ${order.orderNumber}\nسيتم التواصل معك قريباً لتأكيد الطلب`,
+        duration: 6000,
       });
       
       setTimeout(() => {
         setLocation("/");
-      }, 1500);
+      }, 2000);
     },
     onError: (error: any) => {
       console.error("Order creation error:", error);
