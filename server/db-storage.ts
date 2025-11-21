@@ -1,5 +1,5 @@
 import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, products, cartItems, orders } from "@shared/schema";
-import { db } from "./db";
+import { db } from "./db.js";
 import { eq } from "drizzle-orm";
 import type { IStorage } from "./storage";
 
@@ -24,7 +24,7 @@ export class DrizzleStorage implements IStorage {
 
   async getCategories(): Promise<string[]> {
     const allProducts = await db.select().from(products);
-    const categories = new Set(allProducts.map(p => p.category));
+    const categories = new Set<string>(allProducts.map((p: Product) => p.category));
     return Array.from(categories);
   }
 
@@ -37,13 +37,16 @@ export class DrizzleStorage implements IStorage {
     
     if (existing.length > 0) {
       const updated = await db.update(cartItems)
-        .set({ quantity: existing[0].quantity + insertItem.quantity })
+        .set({ quantity: existing[0].quantity + (insertItem.quantity ?? 1) })
         .where(eq(cartItems.id, existing[0].id))
         .returning();
       return updated[0];
     }
 
-    const result = await db.insert(cartItems).values(insertItem).returning();
+    const result = await db.insert(cartItems).values({
+      ...insertItem,
+      quantity: insertItem.quantity ?? 1
+    }).returning();
     return result[0];
   }
 

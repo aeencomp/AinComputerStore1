@@ -1,4 +1,5 @@
 import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder } from "@shared/schema";
+import { randomUUID } from "crypto";
 
 export interface IStorage {
   getProducts(): Promise<Product[]>;
@@ -120,7 +121,14 @@ export class MemStorage implements IStorage {
 
     for (const product of sampleProducts) {
       const id = randomUUID();
-      this.products.set(id, { ...product, id });
+      this.products.set(id, { 
+        ...product, 
+        id,
+        oldPrice: product.oldPrice ?? null,
+        specs: product.specs ?? null,
+        badge: product.badge ?? null,
+        inStock: product.inStock ?? 1
+      });
     }
   }
 
@@ -140,14 +148,22 @@ export class MemStorage implements IStorage {
 
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
     const id = randomUUID();
-    const product: Product = { ...insertProduct, id };
+    const product: Product = { 
+      ...insertProduct, 
+      id,
+      oldPrice: insertProduct.oldPrice ?? null,
+      specs: insertProduct.specs ?? null,
+      badge: insertProduct.badge ?? null,
+      inStock: insertProduct.inStock ?? 1
+    };
     this.products.set(id, product);
     return product;
   }
 
   async getCategories(): Promise<string[]> {
     const categories = new Set<string>();
-    for (const product of this.products.values()) {
+    const productsArray = Array.from(this.products.values());
+    for (const product of productsArray) {
       categories.add(product.category);
     }
     return Array.from(categories);
@@ -163,13 +179,17 @@ export class MemStorage implements IStorage {
     );
 
     if (existing) {
-      existing.quantity += insertItem.quantity;
+      existing.quantity += (insertItem.quantity ?? 1);
       this.cartItems.set(existing.id, existing);
       return existing;
     }
 
     const id = randomUUID();
-    const cartItem: CartItemRecord = { ...insertItem, id };
+    const cartItem: CartItemRecord = { 
+      ...insertItem, 
+      id,
+      quantity: insertItem.quantity ?? 1
+    };
     this.cartItems.set(id, cartItem);
     return cartItem;
   }
