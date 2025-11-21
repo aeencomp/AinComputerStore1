@@ -27,7 +27,11 @@ const categories = [
   },
 ];
 
-export function CategorySection() {
+interface CategorySectionProps {
+  onCategoryClick?: (categoryId: string) => void;
+}
+
+export function CategorySection({ onCategoryClick }: CategorySectionProps) {
   return (
     <section className="py-12 md:py-16" data-testid="section-categories">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
@@ -39,6 +43,7 @@ export function CategorySection() {
             <Card
               key={category.id}
               className="overflow-hidden group cursor-pointer hover-elevate active-elevate-2"
+              onClick={() => onCategoryClick?.(category.id)}
               data-testid={`card-category-${category.id}`}
             >
               <CardContent className="p-0 relative">

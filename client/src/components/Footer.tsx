@@ -22,16 +22,16 @@ export function Footer() {
           <div className="space-y-4">
             <h3 className="font-bold text-lg" data-testid="text-footer-links">روابط سريعة</h3>
             <div className="flex flex-col gap-2">
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-about-us">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-about-us">
                 من نحن
               </Button>
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-contact">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-contact">
                 اتصل بنا
               </Button>
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-branches">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-branches">
                 فروعنا
               </Button>
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-careers">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-careers">
                 الوظائف
               </Button>
             </div>
@@ -40,16 +40,16 @@ export function Footer() {
           <div className="space-y-4">
             <h3 className="font-bold text-lg" data-testid="text-footer-support">خدمة العملاء</h3>
             <div className="flex flex-col gap-2">
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-shipping">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-shipping">
                 سياسة الشحن
               </Button>
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-returns">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-returns">
                 الاستبدال والاسترجاع
               </Button>
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-warranty">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-warranty">
                 الضمان
               </Button>
-              <Button variant="link" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-faq">
+              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-faq">
                 الأسئلة الشائعة
               </Button>
             </div>
@@ -80,10 +80,10 @@ export function Footer() {
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
           <p data-testid="text-copyright">© ٢٠٢٥ العين لتجارة الحاسبات. جميع الحقوق محفوظة.</p>
           <div className="flex gap-4">
-            <Button variant="link" className="p-0 h-auto text-muted-foreground" data-testid="link-privacy">
+            <Button variant="ghost" className="p-0 h-auto text-muted-foreground" data-testid="link-privacy">
               سياسة الخصوصية
             </Button>
-            <Button variant="link" className="p-0 h-auto text-muted-foreground" data-testid="link-terms">
+            <Button variant="ghost" className="p-0 h-auto text-muted-foreground" data-testid="link-terms">
               الشروط والأحكام
             </Button>
           </div>

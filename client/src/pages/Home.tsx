@@ -9,7 +9,18 @@ import { Product, CartItem } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+
+function getCategoryNameAr(categoryId: string): string {
+  const categories: Record<string, string> = {
+    'laptops': 'أجهزة كمبيوتر محمولة',
+    'desktops': 'أجهزة مكتبية',
+    'monitors': 'شاشات',
+    'accessories': 'ملحقات الألعاب',
+  };
+  return categories[categoryId] || 'المنتجات';
+}
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -18,10 +29,19 @@ interface CartItemWithId extends CartItem {
 export default function Home() {
   const [cartOpen, setCartOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();
 
   const { data: products = [], isLoading, isError: productsError } = useQuery<Product[]>({
-    queryKey: ['/api/products'],
+    queryKey: ['/api/products', selectedCategory],
+    queryFn: async () => {
+      const url = selectedCategory 
+        ? `/api/products?category=${selectedCategory}`
+        : '/api/products';
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Failed to fetch products');
+      return response.json();
+    },
   });
 
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({
@@ -66,6 +86,17 @@ export default function Home() {
           p.category.includes(searchQuery)
       )
     : products;
+
+  const handleCategorySelect = (category: string) => {
+    setSelectedCategory(category);
+    setSearchQuery("");
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSearch = (query: string) => {
+    setSearchQuery(query);
+    setSelectedCategory("");
+  };
 
   const handleAddToCart = async (product: Product) => {
     try {
@@ -122,19 +153,33 @@ export default function Home() {
       <Header
         cartItemsCount={cartItemsCount}
         onCartClick={() => setCartOpen(true)}
-        onSearch={setSearchQuery}
+        onSearch={handleSearch}
+        onCategorySelect={handleCategorySelect}
       />
 
       <main className="flex-1">
-        {!searchQuery && <HeroSection />}
-        {!searchQuery && <CategorySection />}
+        {!searchQuery && !selectedCategory && <HeroSection />}
+        {!searchQuery && !selectedCategory && <CategorySection onCategoryClick={handleCategorySelect} />}
 
         <section className="py-12 md:py-16" data-testid="section-products">
           <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-3xl md:text-4xl font-bold" data-testid="text-products-title">
-                {searchQuery ? `نتائج البحث: "${searchQuery}"` : 'المنتجات المميزة'}
+                {searchQuery 
+                  ? `نتائج البحث: "${searchQuery}"` 
+                  : selectedCategory 
+                    ? getCategoryNameAr(selectedCategory)
+                    : 'المنتجات المميزة'}
               </h2>
+              {(searchQuery || selectedCategory) && (
+                <Button 
+                  variant="outline" 
+                  onClick={() => { setSearchQuery(""); setSelectedCategory(""); }}
+                  data-testid="button-clear-filter"
+                >
+                  عرض الكل
+                </Button>
+              )}
             </div>
 
             {isLoading ? (

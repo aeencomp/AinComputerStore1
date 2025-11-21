@@ -15,9 +15,10 @@ interface HeaderProps {
   cartItemsCount: number;
   onCartClick: () => void;
   onSearch: (query: string) => void;
+  onCategorySelect?: (category: string) => void;
 }
 
-export function Header({ cartItemsCount, onCartClick, onSearch }: HeaderProps) {
+export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect }: HeaderProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -110,20 +111,20 @@ export function Header({ cartItemsCount, onCartClick, onSearch }: HeaderProps) {
         </div>
 
         <nav className="hidden md:flex items-center justify-center gap-6 py-3 border-t">
-          <Button variant="ghost" data-testid="link-home">الرئيسية</Button>
-          <Button variant="ghost" data-testid="link-computers">أجهزة كمبيوتر</Button>
-          <Button variant="ghost" data-testid="link-accessories">ملحقات</Button>
-          <Button variant="ghost" data-testid="link-monitors">الشاشات</Button>
-          <Button variant="ghost" data-testid="link-offers">العروض</Button>
+          <Button variant="ghost" onClick={() => { onSearch(""); }} data-testid="link-home">الرئيسية</Button>
+          <Button variant="ghost" onClick={() => onCategorySelect?.("laptops")} data-testid="link-computers">أجهزة كمبيوتر</Button>
+          <Button variant="ghost" onClick={() => onCategorySelect?.("accessories")} data-testid="link-accessories">ملحقات</Button>
+          <Button variant="ghost" onClick={() => onCategorySelect?.("monitors")} data-testid="link-monitors">الشاشات</Button>
+          <Button variant="ghost" onClick={() => onSearch("عرض")} data-testid="link-offers">العروض</Button>
         </nav>
 
         {mobileMenuOpen && (
           <nav className="md:hidden flex flex-col gap-2 py-3 border-t">
-            <Button variant="ghost" className="justify-start" data-testid="link-home-mobile">الرئيسية</Button>
-            <Button variant="ghost" className="justify-start" data-testid="link-computers-mobile">أجهزة كمبيوتر</Button>
-            <Button variant="ghost" className="justify-start" data-testid="link-accessories-mobile">ملحقات</Button>
-            <Button variant="ghost" className="justify-start" data-testid="link-monitors-mobile">الشاشات</Button>
-            <Button variant="ghost" className="justify-start" data-testid="link-offers-mobile">العروض</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onSearch(""); setMobileMenuOpen(false); }} data-testid="link-home-mobile">الرئيسية</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("laptops"); setMobileMenuOpen(false); }} data-testid="link-computers-mobile">أجهزة كمبيوتر</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("accessories"); setMobileMenuOpen(false); }} data-testid="link-accessories-mobile">ملحقات</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("monitors"); setMobileMenuOpen(false); }} data-testid="link-monitors-mobile">الشاشات</Button>
+            <Button variant="ghost" className="justify-start" onClick={() => { onSearch("عرض"); setMobileMenuOpen(false); }} data-testid="link-offers-mobile">العروض</Button>
           </nav>
         )}
 
