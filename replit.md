@@ -2,7 +2,7 @@
 
 This is an Arabic e-commerce platform called "العين لتجارة الحاسبات" (Al-Ain Computer Trading) - a computer and accessories store. The application is a full-stack web application built with React on the frontend and Express.js on the backend, designed specifically for right-to-left (RTL) Arabic language support.
 
-The platform enables customers to browse computer products (laptops, desktops, monitors, gaming accessories), add items to a shopping cart, and view product details. The design follows modern Arabic e-commerce patterns inspired by platforms like Noon and Souq, with a focus on clean product presentation and user-friendly navigation.
+The platform enables customers to browse computer products (laptops, desktops, monitors, gaming accessories), add items to a shopping cart, complete checkout with customer information, and receive order confirmations via email. Administrators can manage orders through a password-protected dashboard. The design follows modern Arabic e-commerce patterns inspired by platforms like Noon and Souq, with a focus on clean product presentation and user-friendly navigation.
 
 # User Preferences
 
@@ -117,10 +117,20 @@ Preferred communication style: Simple, everyday language.
 
 ## Authentication & Authorization
 
-Not currently implemented. The application is configured for future session-based authentication with:
-- Express session middleware prepared in dependencies
-- PostgreSQL session store (connect-pg-simple) ready for use
-- No current user authentication or authorization logic
+Admin authentication implemented:
+- Password-protected admin panel (password: "admin123")
+- Client-side authentication using localStorage
+- Admin routes: /admin/login and /admin/dashboard
+- No customer authentication - guest checkout only
+
+## Email Notifications
+
+Order confirmation emails via Gmail SMTP:
+- Automated emails sent after each successful order
+- Arabic RTL HTML email template with complete order details
+- Includes: order number, customer info, item list with IQD pricing, payment method
+- Non-blocking: email failures are logged but don't break order creation
+- Configured with nodemailer using GMAIL_USER and GMAIL_APP_PASSWORD secrets
 
 ## Design System Principles
 
