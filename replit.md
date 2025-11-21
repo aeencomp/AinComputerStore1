@@ -117,11 +117,23 @@ Preferred communication style: Simple, everyday language.
 
 ## Authentication & Authorization
 
-Admin authentication implemented:
+**Customer Authentication (Session-Based)**
+- Full user registration and login system with bcrypt password hashing
+- Required fields: name, email, phone number, password
+- Session-based authentication using express-session with PostgreSQL store
+- 30-day session cookie expiry, httpOnly cookies for security
+- Authentication routes: POST /api/auth/register, /api/auth/login, /api/auth/logout, GET /api/auth/me
+- Frontend pages: /login and /register with Arabic RTL forms
+- Protected checkout: requires user authentication before placing orders
+- User profile dropdown in header showing name and email when logged in
+- Auto-fill customer information in checkout from authenticated user account
+- Orders linked to user accounts via userId foreign key
+
+**Admin Authentication**
 - Password-protected admin panel (password: "admin123")
 - Client-side authentication using localStorage
 - Admin routes: /admin/login and /admin/dashboard
-- No customer authentication - guest checkout only
+- Separate from customer authentication system
 
 ## Email Notifications
 
