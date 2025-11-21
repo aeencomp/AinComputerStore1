@@ -6,8 +6,18 @@ import express, {
   Response,
   NextFunction,
 } from "express";
+import session from "express-session";
+import connectPgSimple from "connect-pg-simple";
 
 import { registerRoutes } from "./routes";
+
+const PgStore = connectPgSimple(session);
+
+declare module "express-session" {
+  interface SessionData {
+    userId?: string;
+  }
+}
 
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
@@ -27,6 +37,22 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+app.use(session({
+  store: new PgStore({
+    conString: process.env.DATABASE_URL,
+    createTableIfMissing: true,
+  }),
+  secret: process.env.SESSION_SECRET || 'default-secret-please-change-in-production',
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+  },
+}));
+
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;

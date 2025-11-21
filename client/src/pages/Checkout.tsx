@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,6 +16,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CartItem, Product } from "@shared/schema";
 import { Banknote, CreditCard } from "lucide-react";
+import { useUser } from "@/hooks/use-user";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -36,6 +37,18 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { user, isAuthenticated, isLoading: userLoading } = useUser();
+
+  useEffect(() => {
+    if (!userLoading && !isAuthenticated) {
+      toast({
+        title: "يجب تسجيل الدخول",
+        description: "يرجى تسجيل الدخول أو إنشاء حساب للمتابعة",
+        variant: "destructive",
+      });
+      setLocation("/login");
+    }
+  }, [isAuthenticated, userLoading, setLocation, toast]);
 
   const { data: cartItems = [] } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
@@ -44,15 +57,23 @@ export default function Checkout() {
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      customerName: "",
-      customerEmail: "",
-      customerPhone: "",
+      customerName: user?.name || "",
+      customerEmail: user?.email || "",
+      customerPhone: user?.phone || "",
       customerAddress: "",
       customerCity: "",
       customerPostal: "",
       paymentMethod: "cash_on_delivery",
     },
   });
+
+  useEffect(() => {
+    if (user) {
+      form.setValue("customerName", user.name);
+      form.setValue("customerEmail", user.email);
+      form.setValue("customerPhone", user.phone);
+    }
+  }, [user, form]);
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues) => {
@@ -123,6 +144,17 @@ export default function Checkout() {
     (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
     0
   );
+
+  if (userLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">جاري التحقق من تسجيل الدخول...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (cartItems.length === 0) {
     return (

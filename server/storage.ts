@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -12,18 +12,28 @@ export interface IStorage {
   updateCartItemQuantity(id: string, quantity: number): Promise<CartItemRecord | undefined>;
   removeFromCart(id: string): Promise<void>;
   clearCart(): Promise<void>;
-  createOrder(order: InsertOrder): Promise<any>;
+  createUser(user: InsertUser): Promise<User>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  getUserById(id: string): Promise<User | undefined>;
+  createOrder(order: InsertOrder, userId: string): Promise<any>;
   getOrders(): Promise<any[]>;
+  getOrdersByUserId(userId: string): Promise<any[]>;
   updateOrderStatus(id: string, status: string): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
   private products: Map<string, Product>;
   private cartItems: Map<string, CartItemRecord>;
+  private users: Map<string, User>;
+  private orders: Map<string, any>;
+  private orderCounter: number;
 
   constructor() {
     this.products = new Map();
     this.cartItems = new Map();
+    this.users = new Map();
+    this.orders = new Map();
+    this.orderCounter = 1;
     this.seedProducts();
   }
 
@@ -211,16 +221,56 @@ export class MemStorage implements IStorage {
     this.cartItems.clear();
   }
 
-  async createOrder(): Promise<any> {
-    throw new Error("Not implemented for MemStorage");
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const id = randomUUID();
+    const user: User = {
+      ...insertUser,
+      id,
+      createdAt: new Date(),
+    };
+    this.users.set(id, user);
+    return user;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    return Array.from(this.users.values()).find(u => u.email === email);
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    return this.users.get(id);
+  }
+
+  async createOrder(insertOrder: InsertOrder, userId: string): Promise<any> {
+    const id = randomUUID();
+    const orderNumber = `ORD-${String(this.orderCounter).padStart(5, '0')}`;
+    this.orderCounter++;
+    
+    const order = {
+      ...insertOrder,
+      id,
+      userId,
+      orderNumber,
+      createdAt: new Date(),
+    };
+    this.orders.set(id, order);
+    return order;
   }
 
   async getOrders(): Promise<any[]> {
-    throw new Error("Not implemented for MemStorage");
+    return Array.from(this.orders.values());
   }
 
-  async updateOrderStatus(): Promise<any> {
-    throw new Error("Not implemented for MemStorage");
+  async getOrdersByUserId(userId: string): Promise<any[]> {
+    return Array.from(this.orders.values()).filter(o => o.userId === userId);
+  }
+
+  async updateOrderStatus(id: string, status: string): Promise<any> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    
+    order.status = status;
+    this.orders.set(id, order);
+    return order;
   }
 }
 

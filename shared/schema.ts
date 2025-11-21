@@ -3,6 +3,23 @@ import { pgTable, text, varchar, integer, decimal, timestamp } from "drizzle-orm
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone").notNull(),
+  password: text("password").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertUserSchema = createInsertSchema(users).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nameAr: text("name_ar").notNull(),
@@ -43,6 +60,7 @@ export interface CartItem {
 
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
   orderNumber: text("order_number").notNull().unique(),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
@@ -63,6 +81,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   orderNumber: true,
   createdAt: true,
+  userId: true,
 });
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;

@@ -1,8 +1,9 @@
-import { ShoppingCart, Search, Menu, User } from "lucide-react";
+import { ShoppingCart, Search, Menu, User, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import { useLocation } from "wouter";
 import {
   Sheet,
   SheetContent,
@@ -10,6 +11,15 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { useUser, useLogout } from "@/hooks/use-user";
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -19,6 +29,9 @@ interface HeaderProps {
 }
 
 export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect }: HeaderProps) {
+  const [, navigate] = useLocation();
+  const { user, isAuthenticated } = useUser();
+  const logoutMutation = useLogout();
   const [searchQuery, setSearchQuery] = useState("");
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
@@ -27,6 +40,11 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
     e.preventDefault();
     onSearch(searchQuery);
     setMobileSearchOpen(false);
+  };
+
+  const handleLogout = async () => {
+    await logoutMutation.mutateAsync();
+    navigate("/");
   };
 
   return (
@@ -72,13 +90,44 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               <Search className="h-5 w-5" />
             </Button>
 
-            <Button
-              size="icon"
-              variant="ghost"
-              data-testid="button-user-account"
-            >
-              <User className="h-5 w-5" />
-            </Button>
+            {isAuthenticated ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    data-testid="button-user-menu"
+                  >
+                    <User className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>
+                    <div className="flex flex-col gap-1">
+                      <p className="font-medium">{user?.name}</p>
+                      <p className="text-sm text-muted-foreground">{user?.email}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={handleLogout}
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="ml-2 h-4 w-4" />
+                    تسجيل الخروج
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Button
+                size="icon"
+                variant="ghost"
+                onClick={() => navigate("/login")}
+                data-testid="button-login"
+              >
+                <User className="h-5 w-5" />
+              </Button>
+            )}
 
             <Button
               size="icon"

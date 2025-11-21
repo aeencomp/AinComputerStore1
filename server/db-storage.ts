@@ -1,7 +1,8 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, products, cartItems, orders } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, products, cartItems, orders, users } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql } from "drizzle-orm";
 import type { IStorage } from "./storage";
+import bcrypt from "bcrypt";
 
 export class DrizzleStorage implements IStorage {
   async getProducts(): Promise<Product[]> {
@@ -66,13 +67,33 @@ export class DrizzleStorage implements IStorage {
     await db.delete(cartItems);
   }
 
-  async createOrder(insertOrder: InsertOrder): Promise<Order> {
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    const result = await db.insert(users).values({
+      ...insertUser,
+      password: hashedPassword,
+    }).returning();
+    return result[0];
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    return result[0];
+  }
+
+  async getUserById(id: string): Promise<User | undefined> {
+    const result = await db.select().from(users).where(eq(users.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createOrder(insertOrder: InsertOrder, userId: string): Promise<Order> {
     const sequenceResult = await db.execute(sql`SELECT nextval('order_number_seq') as next_num`);
     const nextNumber = (sequenceResult.rows[0] as any).next_num;
     const orderNumber = `ORD-${String(nextNumber).padStart(5, '0')}`;
     
     const result = await db.insert(orders).values({
       ...insertOrder,
+      userId,
       orderNumber,
     }).returning();
     return result[0];
@@ -80,6 +101,10 @@ export class DrizzleStorage implements IStorage {
 
   async getOrders(): Promise<Order[]> {
     return await db.select().from(orders);
+  }
+
+  async getOrdersByUserId(userId: string): Promise<Order[]> {
+    return await db.select().from(orders).where(eq(orders.userId, userId));
   }
 
   async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {

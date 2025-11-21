@@ -1,9 +1,10 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
+import bcrypt from "bcrypt";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products", async (req, res) => {
@@ -46,6 +47,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching categories:", error);
       return res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  app.post("/api/auth/register", async (req, res) => {
+    try {
+      const registerSchema = insertUserSchema.extend({
+        email: z.string().email("البريد الإلكتروني غير صحيح"),
+        password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+        name: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
+        phone: z.string().min(10, "رقم الهاتف يجب أن يكون 10 أرقام على الأقل"),
+      });
+
+      const validatedData = registerSchema.parse(req.body);
+      
+      const existingUser = await storage.getUserByEmail(validatedData.email);
+      if (existingUser) {
+        return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
+      }
+
+      const user = await storage.createUser(validatedData);
+      
+      req.session.userId = user.id;
+      
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error registering user:", error);
+      return res.status(500).json({ error: "خطأ في إنشاء الحساب" });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const loginSchema = z.object({
+        email: z.string().email("البريد الإلكتروني غير صحيح"),
+        password: z.string().min(1, "كلمة المرور مطلوبة"),
+      });
+
+      const validatedData = loginSchema.parse(req.body);
+      
+      const user = await storage.getUserByEmail(validatedData.email);
+      if (!user) {
+        return res.status(401).json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
+      }
+
+      const isPasswordValid = await bcrypt.compare(validatedData.password, user.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
+      }
+
+      req.session.userId = user.id;
+      
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error logging in:", error);
+      return res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/auth/logout", async (req, res) => {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error("Error logging out:", err);
+        return res.status(500).json({ error: "خطأ في تسجيل الخروج" });
+      }
+      res.clearCookie('connect.sid');
+      return res.json({ success: true });
+    });
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "غير مسجل الدخول" });
+      }
+
+      const user = await storage.getUserById(req.session.userId);
+      if (!user) {
+        return res.status(401).json({ error: "المستخدم غير موجود" });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error fetching current user:", error);
+      return res.status(500).json({ error: "خطأ في جلب بيانات المستخدم" });
     }
   });
 
@@ -134,11 +228,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/orders", async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول لإكمال الطلب" });
+      }
+
       console.log("Received order data:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
       console.log("Validated order data:", JSON.stringify(validatedData, null, 2));
       
-      const order = await storage.createOrder(validatedData);
+      const order = await storage.createOrder(validatedData, req.session.userId);
       console.log("Created order:", order.id);
       
       try {
