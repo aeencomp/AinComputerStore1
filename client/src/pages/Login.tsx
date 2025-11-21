@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Login() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { language, t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -24,14 +26,14 @@ export default function Login() {
       await apiRequest('POST', '/api/auth/login', formData);
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       toast({
-        title: "تم تسجيل الدخول بنجاح",
-        description: "مرحباً بك مرة أخرى",
+        title: language === 'ar' ? "تم تسجيل الدخول بنجاح" : "Login successful",
+        description: language === 'ar' ? "مرحباً بك مرة أخرى" : "Welcome back",
       });
       navigate("/");
     } catch (error: any) {
       toast({
-        title: "خطأ في تسجيل الدخول",
-        description: error.message || "البريد الإلكتروني أو كلمة المرور غير صحيحة",
+        title: language === 'ar' ? "خطأ في تسجيل الدخول" : "Login error",
+        description: error.message || (language === 'ar' ? "البريد الإلكتروني أو كلمة المرور غير صحيحة" : "Invalid email or password"),
         variant: "destructive",
       });
     } finally {
@@ -43,15 +45,15 @@ export default function Login() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl font-bold text-center">تسجيل الدخول</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">{t('login.title')}</CardTitle>
           <CardDescription className="text-center">
-            سجل دخولك للمتابعة في الشراء
+            {language === 'ar' ? 'سجل دخولك للمتابعة في الشراء' : 'Login to continue shopping'}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="email">البريد الإلكتروني</Label>
+              <Label htmlFor="email">{t('login.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -62,7 +64,7 @@ export default function Login() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">كلمة المرور</Label>
+              <Label htmlFor="password">{t('login.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -81,10 +83,10 @@ export default function Login() {
               disabled={isLoading}
               data-testid="button-login"
             >
-              {isLoading ? "جارٍ تسجيل الدخول..." : "تسجيل الدخول"}
+              {isLoading ? t('login.loggingIn') : t('login.submit')}
             </Button>
             <div className="text-sm text-center text-muted-foreground">
-              ليس لديك حساب؟{" "}
+              {t('login.noAccount')}{" "}
               <Button 
                 type="button"
                 variant="ghost" 
@@ -92,7 +94,7 @@ export default function Login() {
                 onClick={() => navigate("/register")}
                 data-testid="link-register"
               >
-                إنشاء حساب جديد
+                {t('login.register')}
               </Button>
             </div>
             <Button 
@@ -102,7 +104,7 @@ export default function Login() {
               onClick={() => navigate("/")}
               data-testid="button-back-home"
             >
-              العودة للرئيسية
+              {language === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
             </Button>
           </CardFooter>
         </form>

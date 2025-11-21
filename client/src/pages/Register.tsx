@@ -6,10 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 export default function Register() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
+  const { language, t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -26,14 +28,14 @@ export default function Register() {
       await apiRequest('POST', '/api/auth/register', formData);
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       toast({
-        title: "تم إنشاء الحساب بنجاح",
-        description: "مرحباً بك في العين لتجارة الحاسبات",
+        title: language === 'ar' ? "تم إنشاء الحساب بنجاح" : "Account created successfully",
+        description: language === 'ar' ? "مرحباً بك في العين لتجارة الحاسبات" : "Welcome to Al-Ain Computer Trading",
       });
       navigate("/");
     } catch (error: any) {
       toast({
-        title: "خطأ في إنشاء الحساب",
-        description: error.message || "حدث خطأ، يرجى المحاولة مرة أخرى",
+        title: language === 'ar' ? "خطأ في إنشاء الحساب" : "Error creating account",
+        description: error.message || (language === 'ar' ? "حدث خطأ، يرجى المحاولة مرة أخرى" : "An error occurred, please try again"),
         variant: "destructive",
       });
     } finally {
@@ -45,15 +47,15 @@ export default function Register() {
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
-          <CardTitle className="text-2xl font-bold text-center">إنشاء حساب جديد</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">{t('register.title')}</CardTitle>
           <CardDescription className="text-center">
-            أنشئ حسابك للبدء في التسوق
+            {language === 'ar' ? 'أنشئ حسابك للبدء في التسوق' : 'Create your account to start shopping'}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="name">الاسم الكامل</Label>
+              <Label htmlFor="name">{t('register.name')}</Label>
               <Input
                 id="name"
                 type="text"
@@ -65,7 +67,7 @@ export default function Register() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="email">البريد الإلكتروني</Label>
+              <Label htmlFor="email">{t('register.email')}</Label>
               <Input
                 id="email"
                 type="email"
@@ -76,7 +78,7 @@ export default function Register() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="phone">رقم الهاتف</Label>
+              <Label htmlFor="phone">{t('register.phone')}</Label>
               <Input
                 id="phone"
                 type="tel"
@@ -84,12 +86,12 @@ export default function Register() {
                 minLength={10}
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                placeholder="٠٧٩٠٠٠٠٠٠٠٠"
+                placeholder={language === 'ar' ? '٠٧٩٠٠٠٠٠٠٠٠' : '07900000000'}
                 data-testid="input-phone"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">كلمة المرور</Label>
+              <Label htmlFor="password">{t('register.password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -99,7 +101,9 @@ export default function Register() {
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 data-testid="input-password"
               />
-              <p className="text-sm text-muted-foreground">يجب أن تكون 6 أحرف على الأقل</p>
+              <p className="text-sm text-muted-foreground">
+                {language === 'ar' ? 'يجب أن تكون 6 أحرف على الأقل' : 'Must be at least 6 characters'}
+              </p>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
@@ -109,10 +113,10 @@ export default function Register() {
               disabled={isLoading}
               data-testid="button-register"
             >
-              {isLoading ? "جارٍ إنشاء الحساب..." : "إنشاء حساب"}
+              {isLoading ? t('register.registering') : t('register.submit')}
             </Button>
             <div className="text-sm text-center text-muted-foreground">
-              لديك حساب بالفعل؟{" "}
+              {t('register.hasAccount')}{" "}
               <Button 
                 type="button"
                 variant="ghost" 
@@ -120,7 +124,7 @@ export default function Register() {
                 onClick={() => navigate("/login")}
                 data-testid="link-login"
               >
-                تسجيل الدخول
+                {t('register.login')}
               </Button>
             </div>
             <Button 
