@@ -28,14 +28,14 @@ export default function Register() {
       await apiRequest('POST', '/api/auth/register', formData);
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       toast({
-        title: language === 'ar' ? "تم إنشاء الحساب بنجاح" : "Account created successfully",
-        description: language === 'ar' ? "مرحباً بك في العين لتجارة الحاسبات" : "Welcome to Al-Ain Computer Trading",
+        title: t('register.success.title'),
+        description: t('register.success.description'),
       });
       navigate("/");
     } catch (error: any) {
       toast({
-        title: language === 'ar' ? "خطأ في إنشاء الحساب" : "Error creating account",
-        description: error.message || (language === 'ar' ? "حدث خطأ، يرجى المحاولة مرة أخرى" : "An error occurred, please try again"),
+        title: t('register.error.title'),
+        description: error.message || t('register.error.description'),
         variant: "destructive",
       });
     } finally {
@@ -49,7 +49,7 @@ export default function Register() {
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl font-bold text-center">{t('register.title')}</CardTitle>
           <CardDescription className="text-center">
-            {language === 'ar' ? 'أنشئ حسابك للبدء في التسوق' : 'Create your account to start shopping'}
+            {t('register.description')}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -102,7 +102,7 @@ export default function Register() {
                 data-testid="input-password"
               />
               <p className="text-sm text-muted-foreground">
-                {language === 'ar' ? 'يجب أن تكون 6 أحرف على الأقل' : 'Must be at least 6 characters'}
+                {t('register.passwordHint')}
               </p>
             </div>
           </CardContent>

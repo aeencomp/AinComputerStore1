@@ -46,8 +46,10 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Cart
     'cart.title': 'سلة التسوق',
+    'cart.description': 'إدارة منتجات سلة التسوق الخاصة بك',
     'cart.empty': 'سلة التسوق فارغة',
     'cart.continueShopping': 'متابعة التسوق',
+    'cart.browsProducts': 'تصفح المنتجات',
     'cart.remove': 'إزالة',
     'cart.subtotal': 'المجموع الفرعي',
     'cart.shipping': 'الشحن',
@@ -55,6 +57,8 @@ const translations: Record<Language, Record<string, string>> = {
     'cart.checkout': 'إتمام الطلب',
     'cart.free': 'مجاني',
     'cart.quantity': 'الكمية',
+    'cart.error': 'حدث خطأ أثناء تحميل السلة',
+    'cart.retry': 'إعادة المحاولة',
     
     // Checkout
     'checkout.title': 'إتمام الطلب',
@@ -73,23 +77,36 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Login
     'login.title': 'تسجيل الدخول',
+    'login.description': 'سجل دخولك للمتابعة في الشراء',
     'login.email': 'البريد الإلكتروني',
     'login.password': 'كلمة المرور',
     'login.submit': 'تسجيل الدخول',
     'login.noAccount': 'ليس لديك حساب؟',
     'login.register': 'إنشاء حساب',
     'login.loggingIn': 'جاري تسجيل الدخول...',
+    'login.success.title': 'تم تسجيل الدخول بنجاح',
+    'login.success.description': 'مرحباً بك مرة أخرى',
+    'login.error.title': 'خطأ في تسجيل الدخول',
+    'login.error.description': 'البريد الإلكتروني أو كلمة المرور غير صحيحة',
+    'login.backToHome': 'العودة للرئيسية',
     
     // Register
     'register.title': 'إنشاء حساب جديد',
+    'register.description': 'أنشئ حسابك للبدء في التسوق',
     'register.name': 'الاسم الكامل',
     'register.email': 'البريد الإلكتروني',
     'register.phone': 'رقم الهاتف',
     'register.password': 'كلمة المرور',
+    'register.passwordHint': 'يجب أن تكون 6 أحرف على الأقل',
     'register.submit': 'إنشاء حساب',
     'register.hasAccount': 'لديك حساب بالفعل؟',
     'register.login': 'تسجيل الدخول',
     'register.registering': 'جاري إنشاء الحساب...',
+    'register.success.title': 'تم إنشاء الحساب بنجاح',
+    'register.success.description': 'مرحباً بك في العين لتجارة الحاسبات',
+    'register.error.title': 'خطأ في إنشاء الحساب',
+    'register.error.description': 'حدث خطأ، يرجى المحاولة مرة أخرى',
+    'register.backToHome': 'العودة للرئيسية',
     
     // Admin
     'admin.login.title': 'تسجيل دخول المسؤول',
@@ -148,8 +165,10 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Cart
     'cart.title': 'Shopping Cart',
+    'cart.description': 'Manage your shopping cart items',
     'cart.empty': 'Your cart is empty',
     'cart.continueShopping': 'Continue Shopping',
+    'cart.browsProducts': 'Browse Products',
     'cart.remove': 'Remove',
     'cart.subtotal': 'Subtotal',
     'cart.shipping': 'Shipping',
@@ -157,6 +176,8 @@ const translations: Record<Language, Record<string, string>> = {
     'cart.checkout': 'Checkout',
     'cart.free': 'Free',
     'cart.quantity': 'Quantity',
+    'cart.error': 'An error occurred while loading the cart',
+    'cart.retry': 'Retry',
     
     // Checkout
     'checkout.title': 'Checkout',
@@ -175,23 +196,36 @@ const translations: Record<Language, Record<string, string>> = {
     
     // Login
     'login.title': 'Login',
+    'login.description': 'Login to continue shopping',
     'login.email': 'Email',
     'login.password': 'Password',
     'login.submit': 'Login',
     'login.noAccount': "Don't have an account?",
     'login.register': 'Create Account',
     'login.loggingIn': 'Logging in...',
+    'login.success.title': 'Login successful',
+    'login.success.description': 'Welcome back',
+    'login.error.title': 'Login error',
+    'login.error.description': 'Invalid email or password',
+    'login.backToHome': 'Back to Home',
     
     // Register
     'register.title': 'Create New Account',
+    'register.description': 'Create your account to start shopping',
     'register.name': 'Full Name',
     'register.email': 'Email',
     'register.phone': 'Phone Number',
     'register.password': 'Password',
+    'register.passwordHint': 'Must be at least 6 characters',
     'register.submit': 'Create Account',
     'register.hasAccount': 'Already have an account?',
     'register.login': 'Login',
     'register.registering': 'Creating account...',
+    'register.success.title': 'Account created successfully',
+    'register.success.description': 'Welcome to Al-Ain Computer Trading',
+    'register.error.title': 'Error creating account',
+    'register.error.description': 'An error occurred, please try again',
+    'register.backToHome': 'Back to Home',
     
     // Admin
     'admin.login.title': 'Admin Login',

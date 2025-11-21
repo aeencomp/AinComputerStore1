@@ -13,6 +13,7 @@ import { CartItem } from "@shared/schema";
 import { Minus, Plus, X, ShoppingBag, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { formatPrice } from "@/lib/formatters";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -43,14 +44,6 @@ const imageMap: Record<string, string> = {
   "gaming_headset_product_photo.png": headsetImage,
 };
 
-function formatPrice(price: string | number, locale: string): string {
-  const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  return numPrice.toLocaleString(locale === 'ar' ? 'ar-IQ' : 'en-IQ', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-}
-
 export function CartSidebar({
   open,
   onOpenChange,
@@ -75,7 +68,7 @@ export function CartSidebar({
       <SheetContent side="left" className="w-full sm:max-w-lg flex flex-col" data-testid="sheet-cart">
         <SheetHeader>
           <SheetTitle className="text-2xl" data-testid="text-cart-title">{t('cart.title')}</SheetTitle>
-          <SheetDescription>{language === 'ar' ? 'إدارة منتجات سلة التسوق الخاصة بك' : 'Manage your shopping cart items'}</SheetDescription>
+          <SheetDescription>{t('cart.description')}</SheetDescription>
         </SheetHeader>
 
         {isLoading ? (
@@ -96,10 +89,10 @@ export function CartSidebar({
           <div className="flex-1 flex flex-col items-center justify-center gap-4 py-12">
             <AlertCircle className="h-16 w-16 text-destructive" />
             <p className="text-lg text-destructive text-center" data-testid="text-cart-error">
-              {language === 'ar' ? 'حدث خطأ أثناء تحميل السلة' : 'An error occurred while loading the cart'}
+              {t('cart.error')}
             </p>
             <Button variant="outline" onClick={() => window.location.reload()} data-testid="button-retry-cart">
-              {language === 'ar' ? 'إعادة المحاولة' : 'Retry'}
+              {t('cart.retry')}
             </Button>
           </div>
         ) : items.length === 0 ? (
@@ -107,7 +100,7 @@ export function CartSidebar({
             <ShoppingBag className="h-16 w-16 text-muted-foreground" />
             <p className="text-lg text-muted-foreground" data-testid="text-empty-cart">{t('cart.empty')}</p>
             <Button onClick={() => onOpenChange(false)} data-testid="button-continue-shopping">
-              {language === 'ar' ? 'تصفح المنتجات' : 'Browse Products'}
+              {t('cart.browsProducts')}
             </Button>
           </div>
         ) : (
@@ -195,7 +188,7 @@ export function CartSidebar({
                   <span className="text-muted-foreground" data-testid="text-shipping-label">{t('cart.shipping')}</span>
                   <span className="font-medium text-primary" data-testid="text-shipping">
                     {shipping === 0 
-                      ? (language === 'ar' ? 'مجاني' : 'Free')
+                      ? t('cart.free')
                       : `${formatPrice(shipping, language)} ${t('common.currency')}`}
                   </span>
                 </div>
@@ -222,7 +215,7 @@ export function CartSidebar({
                 onClick={() => onOpenChange(false)}
                 data-testid="button-continue-shopping-bottom"
               >
-                {language === 'ar' ? 'متابعة التسوق' : 'Continue Shopping'}
+                {t('cart.continueShopping')}
               </Button>
             </SheetFooter>
           </>

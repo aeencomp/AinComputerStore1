@@ -26,14 +26,14 @@ export default function Login() {
       await apiRequest('POST', '/api/auth/login', formData);
       queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
       toast({
-        title: language === 'ar' ? "تم تسجيل الدخول بنجاح" : "Login successful",
-        description: language === 'ar' ? "مرحباً بك مرة أخرى" : "Welcome back",
+        title: t('login.success.title'),
+        description: t('login.success.description'),
       });
       navigate("/");
     } catch (error: any) {
       toast({
-        title: language === 'ar' ? "خطأ في تسجيل الدخول" : "Login error",
-        description: error.message || (language === 'ar' ? "البريد الإلكتروني أو كلمة المرور غير صحيحة" : "Invalid email or password"),
+        title: t('login.error.title'),
+        description: error.message || t('login.error.description'),
         variant: "destructive",
       });
     } finally {
@@ -47,7 +47,7 @@ export default function Login() {
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl font-bold text-center">{t('login.title')}</CardTitle>
           <CardDescription className="text-center">
-            {language === 'ar' ? 'سجل دخولك للمتابعة في الشراء' : 'Login to continue shopping'}
+            {t('login.description')}
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -104,7 +104,7 @@ export default function Login() {
               onClick={() => navigate("/")}
               data-testid="button-back-home"
             >
-              {language === 'ar' ? 'العودة للرئيسية' : 'Back to Home'}
+              {t('login.backToHome')}
             </Button>
           </CardFooter>
         </form>
