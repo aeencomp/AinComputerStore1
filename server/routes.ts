@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCartItemSchema, insertOrderSchema } from "@shared/schema";
 import { z } from "zod";
+import { sendOrderConfirmationEmail } from "./utils/email";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products", async (req, res) => {
@@ -144,6 +145,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.clearCart();
       } catch (clearError) {
         console.error("Warning: Failed to clear cart after order creation:", clearError);
+      }
+      
+      try {
+        const orderItems = JSON.parse(order.items[0]);
+        const emailData = {
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          customerEmail: order.customerEmail,
+          customerPhone: order.customerPhone,
+          customerAddress: order.customerAddress,
+          customerCity: order.customerCity,
+          customerPostalCode: order.customerPostal,
+          items: orderItems.map((item: any) => ({
+            name: item.product.nameAr,
+            quantity: item.quantity,
+            price: parseFloat(item.product.price),
+          })),
+          total: parseFloat(order.total),
+        };
+        
+        await sendOrderConfirmationEmail(emailData);
+      } catch (emailError) {
+        console.error("Warning: Failed to send order confirmation email:", emailError);
       }
       
       return res.json(order);
