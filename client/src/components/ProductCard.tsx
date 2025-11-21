@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Product } from "@shared/schema";
 import { ShoppingCart } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -24,16 +25,19 @@ const imageMap: Record<string, string> = {
   "gaming_headset_product_photo.png": headsetImage,
 };
 
-function formatPrice(price: string | number): string {
+function formatPrice(price: string | number, locale: string): string {
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-  return numPrice.toLocaleString('ar-IQ', {
+  return numPrice.toLocaleString(locale === 'ar' ? 'ar-IQ' : 'en-IQ', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });
 }
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
+  const { language, t } = useLanguage();
   const imageSrc = imageMap[product.image] || laptopImage;
+  const productName = language === 'ar' ? product.nameAr : product.nameEn;
+  const productDescription = language === 'ar' ? product.descriptionAr : product.descriptionEn;
   
   return (
     <Card className="overflow-hidden group hover-elevate" data-testid={`card-product-${product.id}`}>
@@ -50,7 +54,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
         <div className="aspect-square overflow-hidden bg-muted">
           <img
             src={imageSrc}
-            alt={product.nameAr}
+            alt={productName}
             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
             data-testid={`img-product-${product.id}`}
           />
@@ -58,10 +62,10 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
       </CardContent>
       <CardContent className="p-4 space-y-2">
         <h3 className="font-bold text-lg line-clamp-1" data-testid={`text-name-${product.id}`}>
-          {product.nameAr}
+          {productName}
         </h3>
         <p className="text-sm text-muted-foreground line-clamp-2" data-testid={`text-description-${product.id}`}>
-          {product.descriptionAr}
+          {productDescription}
         </p>
         {product.specs && product.specs.length > 0 && (
           <div className="space-y-1">
@@ -77,11 +81,11 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
         <div className="w-full flex items-baseline gap-2">
           {product.oldPrice && (
             <span className="text-sm text-muted-foreground line-through" data-testid={`text-old-price-${product.id}`}>
-              {formatPrice(product.oldPrice)} د.ع
+              {formatPrice(product.oldPrice, language)} {t('common.currency')}
             </span>
           )}
           <span className="text-2xl font-bold text-primary" data-testid={`text-price-${product.id}`}>
-            {formatPrice(product.price)} د.ع
+            {formatPrice(product.price, language)} {t('common.currency')}
           </span>
         </div>
         <Button
@@ -91,7 +95,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
           data-testid={`button-add-to-cart-${product.id}`}
         >
           <ShoppingCart className="h-4 w-4" />
-          {product.inStock ? 'أضف للسلة' : 'غير متوفر'}
+          {product.inStock ? t('product.addToCart') : t('product.outOfStock')}
         </Button>
       </CardFooter>
     </Card>

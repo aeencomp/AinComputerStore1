@@ -11,16 +11,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-
-function getCategoryNameAr(categoryId: string): string {
-  const categories: Record<string, string> = {
-    'laptops': 'أجهزة كمبيوتر محمولة',
-    'desktops': 'أجهزة مكتبية',
-    'monitors': 'شاشات',
-    'accessories': 'ملحقات الألعاب',
-  };
-  return categories[categoryId] || 'المنتجات';
-}
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -31,6 +22,7 @@ export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();
+  const { language, t } = useLanguage();
 
   const queryKey = selectedCategory 
     ? `/api/products?category=${selectedCategory}`
@@ -77,8 +69,8 @@ export default function Home() {
   const filteredProducts = searchQuery
     ? products.filter(
         (p) =>
-          p.nameAr.includes(searchQuery) ||
-          p.descriptionAr.includes(searchQuery) ||
+          (language === 'ar' ? p.nameAr : p.nameEn).toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (language === 'ar' ? p.descriptionAr : p.descriptionEn).toLowerCase().includes(searchQuery.toLowerCase()) ||
           p.category.includes(searchQuery)
       )
     : products;
@@ -96,14 +88,19 @@ export default function Home() {
   const handleAddToCart = async (product: Product) => {
     try {
       await addToCartMutation.mutateAsync(product.id);
+      const productName = language === 'ar' ? product.nameAr : product.nameEn;
       toast({
-        title: "تمت الإضافة للسلة",
-        description: `تم إضافة ${product.nameAr} إلى سلة التسوق`,
+        title: language === 'ar' ? "تمت الإضافة للسلة" : "Added to Cart",
+        description: language === 'ar' 
+          ? `تم إضافة ${productName} إلى سلة التسوق`
+          : `${productName} has been added to your cart`,
       });
     } catch (error) {
       toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء إضافة المنتج للسلة",
+        title: language === 'ar' ? "خطأ" : "Error",
+        description: language === 'ar' 
+          ? "حدث خطأ أثناء إضافة المنتج للسلة"
+          : "An error occurred while adding the product",
         variant: "destructive",
       });
     }
@@ -118,8 +115,10 @@ export default function Home() {
       await updateQuantityMutation.mutateAsync({ id, quantity });
     } catch (error) {
       toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء تحديث الكمية",
+        title: language === 'ar' ? "خطأ" : "Error",
+        description: language === 'ar' 
+          ? "حدث خطأ أثناء تحديث الكمية"
+          : "An error occurred while updating quantity",
         variant: "destructive",
       });
     }
@@ -129,13 +128,17 @@ export default function Home() {
     try {
       await removeItemMutation.mutateAsync(id);
       toast({
-        title: "تم الحذف",
-        description: "تم حذف المنتج من السلة",
+        title: language === 'ar' ? "تم الحذف" : "Removed",
+        description: language === 'ar' 
+          ? "تم حذف المنتج من السلة"
+          : "Product removed from cart",
       });
     } catch (error) {
       toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حذف المنتج",
+        title: language === 'ar' ? "خطأ" : "Error",
+        description: language === 'ar' 
+          ? "حدث خطأ أثناء حذف المنتج"
+          : "An error occurred while removing the product",
         variant: "destructive",
       });
     }
@@ -161,10 +164,10 @@ export default function Home() {
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-3xl md:text-4xl font-bold" data-testid="text-products-title">
                 {searchQuery 
-                  ? `نتائج البحث: "${searchQuery}"` 
+                  ? (language === 'ar' ? `نتائج البحث: "${searchQuery}"` : `Search results: "${searchQuery}"`)
                   : selectedCategory 
-                    ? getCategoryNameAr(selectedCategory)
-                    : 'المنتجات المميزة'}
+                    ? t(`category.${selectedCategory}`)
+                    : t('home.featured.title')}
               </h2>
               {(searchQuery || selectedCategory) && (
                 <Button 
@@ -172,7 +175,7 @@ export default function Home() {
                   onClick={() => { setSearchQuery(""); setSelectedCategory(""); }}
                   data-testid="button-clear-filter"
                 >
-                  عرض الكل
+                  {language === 'ar' ? 'عرض الكل' : 'Show All'}
                 </Button>
               )}
             </div>
@@ -191,13 +194,17 @@ export default function Home() {
             ) : productsError ? (
               <div className="text-center py-12">
                 <p className="text-lg text-destructive" data-testid="text-error-products">
-                  حدث خطأ أثناء تحميل المنتجات. يرجى المحاولة مرة أخرى.
+                  {language === 'ar' 
+                    ? 'حدث خطأ أثناء تحميل المنتجات. يرجى المحاولة مرة أخرى.'
+                    : 'An error occurred while loading products. Please try again.'}
                 </p>
               </div>
             ) : filteredProducts.length === 0 ? (
               <div className="text-center py-12">
                 <p className="text-lg text-muted-foreground" data-testid="text-no-products">
-                  {searchQuery ? 'لا توجد منتجات تطابق البحث' : 'لا توجد منتجات متاحة'}
+                  {searchQuery 
+                    ? (language === 'ar' ? 'لا توجد منتجات تطابق البحث' : 'No products match your search')
+                    : (language === 'ar' ? 'لا توجد منتجات متاحة' : 'No products available')}
                 </p>
               </div>
             ) : (
