@@ -1,18 +1,42 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
-export const users = pgTable("users", {
+export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
+  nameAr: text("name_ar").notNull(),
+  descriptionAr: text("description_ar").notNull(),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  oldPrice: decimal("old_price", { precision: 10, scale: 2 }),
+  category: text("category").notNull(),
+  image: text("image").notNull(),
+  specs: text("specs").array(),
+  badge: text("badge"),
+  inStock: integer("in_stock").notNull().default(1),
 });
 
-export const insertUserSchema = createInsertSchema(users).pick({
-  username: true,
-  password: true,
+export const insertProductSchema = createInsertSchema(products).omit({
+  id: true,
 });
 
-export type InsertUser = z.infer<typeof insertUserSchema>;
-export type User = typeof users.$inferSelect;
+export type InsertProduct = z.infer<typeof insertProductSchema>;
+export type Product = typeof products.$inferSelect;
+
+export const cartItems = pgTable("cart_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+});
+
+export const insertCartItemSchema = createInsertSchema(cartItems).omit({
+  id: true,
+});
+
+export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
+export type CartItemRecord = typeof cartItems.$inferSelect;
+
+export interface CartItem {
+  product: Product;
+  quantity: number;
+}
