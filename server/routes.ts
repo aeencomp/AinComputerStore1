@@ -133,16 +133,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/orders", async (req, res) => {
     try {
+      console.log("Received order data:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
+      console.log("Validated order data:", JSON.stringify(validatedData, null, 2));
+      
       const order = await storage.createOrder(validatedData);
-      await storage.clearCart();
+      console.log("Created order:", order.id);
+      
+      try {
+        await storage.clearCart();
+      } catch (clearError) {
+        console.error("Warning: Failed to clear cart after order creation:", clearError);
+      }
+      
       return res.json(order);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        console.error("Validation error:", JSON.stringify(error.errors, null, 2));
         return res.status(400).json({ error: "Invalid order data", details: error.errors });
       }
       console.error("Error creating order:", error);
-      return res.status(500).json({ error: "Failed to create order" });
+      return res.status(500).json({ error: "Failed to create order", message: error instanceof Error ? error.message : String(error) });
     }
   });
 

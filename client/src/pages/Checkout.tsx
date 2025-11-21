@@ -56,45 +56,65 @@ export default function Checkout() {
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues) => {
-      const subtotal = cartItems.reduce(
-        (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
-        0
-      );
-      const items = cartItems.map(item => JSON.stringify({
-        productId: item.product.id,
-        quantity: item.quantity,
-        price: item.product.price,
-      }));
+      try {
+        const subtotal = cartItems.reduce(
+          (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+          0
+        );
+        const items = cartItems.map(item => JSON.stringify({
+          productId: item.product.id,
+          quantity: item.quantity,
+          price: item.product.price,
+        }));
 
-      const response = await apiRequest('POST', '/api/orders', {
-        customerName: data.customerName,
-        customerEmail: data.customerEmail,
-        customerPhone: data.customerPhone,
-        customerAddress: data.customerAddress,
-        customerCity: data.customerCity,
-        customerPostal: data.customerPostal,
-        paymentMethod: data.paymentMethod,
-        items: items,
-        subtotal: subtotal.toString(),
-        shipping: "0",
-        total: subtotal.toString(),
-        status: "pending",
-      });
-      return await response.json();
+        const orderPayload = {
+          customerName: data.customerName,
+          customerEmail: data.customerEmail,
+          customerPhone: data.customerPhone,
+          customerAddress: data.customerAddress,
+          customerCity: data.customerCity,
+          customerPostal: data.customerPostal,
+          paymentMethod: data.paymentMethod,
+          items: items,
+          subtotal: subtotal.toString(),
+          shipping: "0",
+          total: subtotal.toString(),
+          status: "pending",
+        };
+
+        console.log("Submitting order:", orderPayload);
+        const response = await apiRequest('POST', '/api/orders', orderPayload);
+        const result = await response.json();
+        console.log("Order created successfully:", result);
+        return result;
+      } catch (error) {
+        console.error("Error in mutationFn:", error);
+        throw error;
+      }
     },
     onSuccess: (order: any) => {
+      console.log("Order success handler:", order);
+      
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      
       toast({
-        title: "تم إنشاء الطلب بنجاح!",
-        description: `رقم الطلب: ${order.id}`,
+        title: "✅ تم إنشاء الطلب بنجاح!",
+        description: `رقم طلبك: ${order.id.substring(0, 8)}...\nسيتم التواصل معك قريباً`,
+        duration: 5000,
       });
-      setLocation("/");
+      
+      setTimeout(() => {
+        setLocation("/");
+      }, 1500);
     },
-    onError: () => {
+    onError: (error: any) => {
+      console.error("Order creation error:", error);
+      const errorMessage = error?.message || "فشل إنشاء الطلب. يرجى المحاولة مرة أخرى.";
       toast({
-        title: "خطأ",
-        description: "فشل إنشاء الطلب. حاول مرة أخرى.",
+        title: "❌ حدث خطأ",
+        description: errorMessage,
         variant: "destructive",
+        duration: 6000,
       });
     },
   });
