@@ -156,6 +156,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { status } = req.body;
+      
+      if (!status || !['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const updated = await storage.updateOrderStatus(id, status);
+      if (!updated) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      return res.json(updated);
+    } catch (error) {
+      console.error("Error updating order:", error);
+      return res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

@@ -11,8 +11,9 @@ export interface IStorage {
   updateCartItemQuantity(id: string, quantity: number): Promise<CartItemRecord | undefined>;
   removeFromCart(id: string): Promise<void>;
   clearCart(): Promise<void>;
-  createOrder(order: InsertOrder): Promise<Order>;
-  getOrders(): Promise<Order[]>;
+  createOrder(order: InsertOrder): Promise<any>;
+  getOrders(): Promise<any[]>;
+  updateOrderStatus(id: string, status: string): Promise<any>;
 }
 
 export class MemStorage implements IStorage {
@@ -188,6 +189,18 @@ export class MemStorage implements IStorage {
 
   async clearCart(): Promise<void> {
     this.cartItems.clear();
+  }
+
+  async createOrder(): Promise<any> {
+    throw new Error("Not implemented for MemStorage");
+  }
+
+  async getOrders(): Promise<any[]> {
+    throw new Error("Not implemented for MemStorage");
+  }
+
+  async updateOrderStatus(): Promise<any> {
+    throw new Error("Not implemented for MemStorage");
   }
 }
 

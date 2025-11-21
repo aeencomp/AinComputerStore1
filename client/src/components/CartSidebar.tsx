@@ -199,7 +199,15 @@ export function CartSidebar({
                   <span className="font-bold text-primary" data-testid="text-total">{formatPrice(total)} د.ع</span>
                 </div>
               </div>
-              <Button className="w-full" size="lg" data-testid="button-checkout">
+              <Button 
+                className="w-full" 
+                size="lg" 
+                data-testid="button-checkout"
+                onClick={() => {
+                  const newPath = '/checkout';
+                  window.location.href = newPath;
+                }}
+              >
                 إتمام الطلب
               </Button>
               <Button
