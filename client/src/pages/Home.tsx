@@ -32,16 +32,12 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();
 
+  const queryKey = selectedCategory 
+    ? `/api/products?category=${selectedCategory}`
+    : '/api/products';
+
   const { data: products = [], isLoading, isError: productsError } = useQuery<Product[]>({
-    queryKey: ['/api/products', selectedCategory],
-    queryFn: async () => {
-      const url = selectedCategory 
-        ? `/api/products?category=${selectedCategory}`
-        : '/api/products';
-      const response = await fetch(url);
-      if (!response.ok) throw new Error('Failed to fetch products');
-      return response.json();
-    },
+    queryKey: [queryKey],
   });
 
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({
@@ -90,7 +86,6 @@ export default function Home() {
   const handleCategorySelect = (category: string) => {
     setSelectedCategory(category);
     setSearchQuery("");
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleSearch = (query: string) => {
