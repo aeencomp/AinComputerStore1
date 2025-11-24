@@ -88,3 +88,30 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
 export type Order = typeof orders.$inferSelect;
+
+export const storeSettings = pgTable("store_settings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  storeNameAr: text("store_name_ar").notNull().default("العين لتجارة الحاسبات"),
+  storeNameEn: text("store_name_en").notNull().default("Al-Ain Computer Trading"),
+  descriptionAr: text("description_ar").notNull().default("متجرك الموثوق لأحدث الحواسيب والملحقات بأفضل الأسعار وأعلى جودة."),
+  descriptionEn: text("description_en").notNull().default("Your trusted store for the latest computers and accessories at the best prices and highest quality."),
+  email: text("email").notNull().default("info@alain-computers.com"),
+  phone: text("phone").notNull().default("920001234"),
+  phoneAr: text("phone_ar").notNull().default("٩٢٠٠٠١٢٣٤"),
+  addressAr: text("address_ar").notNull().default("بغداد، العراق"),
+  addressEn: text("address_en").notNull().default("Baghdad, Iraq"),
+  hoursAr: text("hours_ar").notNull().default("السبت - الخميس ٩ص - ٩م"),
+  hoursEn: text("hours_en").notNull().default("Saturday - Thursday 9am - 9pm"),
+  facebookUrl: text("facebook_url").default(""),
+  twitterUrl: text("twitter_url").default(""),
+  instagramUrl: text("instagram_url").default(""),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertStoreSettingsSchema = createInsertSchema(storeSettings).omit({
+  id: true,
+  updatedAt: true,
+});
+
+export type InsertStoreSettings = z.infer<typeof insertStoreSettingsSchema>;
+export type StoreSettings = typeof storeSettings.$inferSelect;

@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import bcrypt from "bcrypt";
@@ -92,6 +92,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting product:", error);
       return res.status(500).json({ error: "Failed to delete product" });
+    }
+  });
+
+  app.get("/api/store-settings", async (req, res) => {
+    try {
+      const settings = await storage.getStoreSettings();
+      
+      if (!settings) {
+        return res.status(404).json({ error: "Store settings not found" });
+      }
+      
+      return res.json(settings);
+    } catch (error) {
+      console.error("Error fetching store settings:", error);
+      return res.status(500).json({ error: "Failed to fetch store settings" });
+    }
+  });
+
+  app.put("/api/admin/store-settings", async (req, res) => {
+    try {
+      const validatedData = insertStoreSettingsSchema.partial().parse(req.body);
+      const settings = await storage.updateStoreSettings(validatedData);
+      return res.json(settings);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating store settings:", error);
+      return res.status(500).json({ error: "Failed to update store settings" });
     }
   });
 

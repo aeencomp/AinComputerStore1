@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -21,6 +21,8 @@ export interface IStorage {
   getOrders(): Promise<any[]>;
   getOrdersByUserId(userId: string): Promise<any[]>;
   updateOrderStatus(id: string, status: string): Promise<any>;
+  getStoreSettings(): Promise<StoreSettings | undefined>;
+  updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
 }
 
 export class MemStorage implements IStorage {
@@ -292,6 +294,32 @@ export class MemStorage implements IStorage {
     order.status = status;
     this.orders.set(id, order);
     return order;
+  }
+
+  async getStoreSettings(): Promise<StoreSettings | undefined> {
+    return undefined;
+  }
+
+  async updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings> {
+    const defaultSettings: StoreSettings = {
+      id: randomUUID(),
+      storeNameAr: "العين لتجارة الحاسبات",
+      storeNameEn: "Al-Ain Computer Trading",
+      descriptionAr: "متجرك الموثوق لأحدث الحواسيب والملحقات بأفضل الأسعار وأعلى جودة.",
+      descriptionEn: "Your trusted store for the latest computers and accessories at the best prices and highest quality.",
+      email: "info@alain-computers.com",
+      phone: "920001234",
+      phoneAr: "٩٢٠٠٠١٢٣٤",
+      addressAr: "بغداد، العراق",
+      addressEn: "Baghdad, Iraq",
+      hoursAr: "السبت - الخميس ٩ص - ٩م",
+      hoursEn: "Saturday - Thursday 9am - 9pm",
+      facebookUrl: "",
+      twitterUrl: "",
+      instagramUrl: "",
+      updatedAt: new Date(),
+    };
+    return { ...defaultSettings, ...settings };
   }
 }
 

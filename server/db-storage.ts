@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, products, cartItems, orders, users } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, products, cartItems, orders, users, storeSettings } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -125,5 +125,27 @@ export class DrizzleStorage implements IStorage {
       .where(eq(orders.id, id))
       .returning();
     return result[0];
+  }
+
+  async getStoreSettings(): Promise<StoreSettings | undefined> {
+    const result = await db.select().from(storeSettings).limit(1);
+    return result[0];
+  }
+
+  async updateStoreSettings(updates: Partial<InsertStoreSettings>): Promise<StoreSettings> {
+    const existing = await this.getStoreSettings();
+    
+    if (existing) {
+      const result = await db.update(storeSettings)
+        .set({ ...updates, updatedAt: new Date() })
+        .where(eq(storeSettings.id, existing.id))
+        .returning();
+      return result[0];
+    } else {
+      const result = await db.insert(storeSettings)
+        .values(updates as InsertStoreSettings)
+        .returning();
+      return result[0];
+    }
   }
 }
