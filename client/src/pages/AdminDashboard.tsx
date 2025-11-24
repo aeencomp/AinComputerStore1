@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
+import { useLocation, Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut } from "lucide-react";
+import { LogOut, Package } from "lucide-react";
 
 interface Order {
   id: string;
@@ -91,15 +91,23 @@ export default function AdminDashboard() {
       <header className="border-b sticky top-0 z-50 bg-background">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold">لوحة التحكم</h1>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleLogout}
-            data-testid="button-admin-logout"
-          >
-            <LogOut className="w-4 h-4 ms-2" />
-            تسجيل خروج
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/admin/products">
+              <Button variant="outline" size="sm" data-testid="link-admin-products">
+                <Package className="w-4 h-4 ms-2" />
+                إدارة المنتجات
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              data-testid="button-admin-logout"
+            >
+              <LogOut className="w-4 h-4 ms-2" />
+              تسجيل خروج
+            </Button>
+          </div>
         </div>
       </header>
 

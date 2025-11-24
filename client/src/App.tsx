@@ -10,6 +10,7 @@ import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
+import AdminProducts from "@/pages/AdminProducts";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/register" component={Register}/>
       <Route path="/admin/login" component={AdminLogin}/>
       <Route path="/admin/dashboard" component={AdminDashboard}/>
+      <Route path="/admin/products" component={AdminProducts}/>
       <Route component={NotFound} />
     </Switch>
   );
