@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, products, cartItems, orders, users, storeSettings } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, products, cartItems, orders, users, storeSettings, repairTickets } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -147,5 +147,39 @@ export class DrizzleStorage implements IStorage {
         .returning();
       return result[0];
     }
+  }
+
+  async createRepairTicket(insertTicket: InsertRepairTicket): Promise<RepairTicket> {
+    const sequenceResult = await db.execute(sql`SELECT nextval(pg_get_serial_sequence('repair_tickets', 'id')) as next_num`);
+    const nextNumber = (sequenceResult.rows[0] as any)?.next_num || Math.floor(Math.random() * 10000);
+    const ticketNumber = `REP-${String(nextNumber).padStart(5, '0')}`;
+    
+    const result = await db.insert(repairTickets).values({
+      ...insertTicket,
+      ticketNumber,
+    }).returning();
+    return result[0];
+  }
+
+  async getRepairTickets(): Promise<RepairTicket[]> {
+    return await db.select().from(repairTickets);
+  }
+
+  async getRepairTicket(id: string): Promise<RepairTicket | undefined> {
+    const result = await db.select().from(repairTickets).where(eq(repairTickets.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getRepairTicketByNumber(ticketNumber: string): Promise<RepairTicket | undefined> {
+    const result = await db.select().from(repairTickets).where(eq(repairTickets.ticketNumber, ticketNumber)).limit(1);
+    return result[0];
+  }
+
+  async updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined> {
+    const result = await db.update(repairTickets)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(repairTickets.id, id))
+      .returning();
+    return result[0];
   }
 }

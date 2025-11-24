@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -23,6 +23,11 @@ export interface IStorage {
   updateOrderStatus(id: string, status: string): Promise<any>;
   getStoreSettings(): Promise<StoreSettings | undefined>;
   updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
+  createRepairTicket(ticket: InsertRepairTicket): Promise<RepairTicket>;
+  getRepairTickets(): Promise<RepairTicket[]>;
+  getRepairTicket(id: string): Promise<RepairTicket | undefined>;
+  getRepairTicketByNumber(ticketNumber: string): Promise<RepairTicket | undefined>;
+  updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined>;
 }
 
 export class MemStorage implements IStorage {

@@ -115,3 +115,35 @@ export const insertStoreSettingsSchema = createInsertSchema(storeSettings).omit(
 
 export type InsertStoreSettings = z.infer<typeof insertStoreSettingsSchema>;
 export type StoreSettings = typeof storeSettings.$inferSelect;
+
+export const repairTickets = pgTable("repair_tickets", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ticketNumber: text("ticket_number").notNull().unique(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  customerEmail: text("customer_email"),
+  deviceType: text("device_type").notNull(), // laptop, desktop, monitor, etc.
+  deviceBrand: text("device_brand").notNull(),
+  deviceModel: text("device_model").notNull(),
+  issueDescriptionAr: text("issue_description_ar").notNull(),
+  issueDescriptionEn: text("issue_description_en"),
+  status: text("status").notNull().default("pending"), // pending, in-progress, waiting-parts, completed, delivered
+  priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
+  technicianNotes: text("technician_notes").default(""),
+  estimatedCompletion: timestamp("estimated_completion"),
+  costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
+  finalCost: decimal("final_cost", { precision: 10, scale: 2 }),
+  userId: varchar("user_id"), // optional - if customer has account
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertRepairTicketSchema = createInsertSchema(repairTickets).omit({
+  id: true,
+  ticketNumber: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertRepairTicket = z.infer<typeof insertRepairTicketSchema>;
+export type RepairTicket = typeof repairTickets.$inferSelect;
