@@ -12,29 +12,30 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { ArrowRight, Save } from "lucide-react";
 import { Link } from "wouter";
 import type { StoreSettings } from "@shared/schema";
-
-const storeSettingsFormSchema = z.object({
-  storeNameAr: z.string().min(1, "اسم المتجر بالعربية مطلوب"),
-  storeNameEn: z.string().min(1, "Store name in English is required"),
-  descriptionAr: z.string().min(1, "الوصف بالعربية مطلوب"),
-  descriptionEn: z.string().min(1, "Description in English is required"),
-  email: z.string().email("البريد الإلكتروني غير صحيح"),
-  phone: z.string().min(1, "رقم الهاتف مطلوب"),
-  phoneAr: z.string().min(1, "رقم الهاتف بالعربية مطلوب"),
-  addressAr: z.string().min(1, "العنوان بالعربية مطلوب"),
-  addressEn: z.string().min(1, "Address in English is required"),
-  hoursAr: z.string().min(1, "ساعات العمل بالعربية مطلوبة"),
-  hoursEn: z.string().min(1, "Working hours in English are required"),
-  facebookUrl: z.string().optional(),
-  twitterUrl: z.string().optional(),
-  instagramUrl: z.string().optional(),
-});
-
-type StoreSettingsForm = z.infer<typeof storeSettingsFormSchema>;
+import { useMemo } from "react";
 
 export default function AdminSettings() {
   const { language, t } = useLanguage();
   const { toast } = useToast();
+
+  const storeSettingsFormSchema = useMemo(() => z.object({
+    storeNameAr: z.string().min(1, t("admin.settings.validation.storeNameArRequired")),
+    storeNameEn: z.string().min(1, t("admin.settings.validation.storeNameEnRequired")),
+    descriptionAr: z.string().min(1, t("admin.settings.validation.descriptionArRequired")),
+    descriptionEn: z.string().min(1, t("admin.settings.validation.descriptionEnRequired")),
+    email: z.string().email(t("admin.settings.validation.emailInvalid")),
+    phone: z.string().min(1, t("admin.settings.validation.phoneRequired")),
+    phoneAr: z.string().min(1, t("admin.settings.validation.phoneArRequired")),
+    addressAr: z.string().min(1, t("admin.settings.validation.addressArRequired")),
+    addressEn: z.string().min(1, t("admin.settings.validation.addressEnRequired")),
+    hoursAr: z.string().min(1, t("admin.settings.validation.hoursArRequired")),
+    hoursEn: z.string().min(1, t("admin.settings.validation.hoursEnRequired")),
+    facebookUrl: z.string().optional(),
+    twitterUrl: z.string().optional(),
+    instagramUrl: z.string().optional(),
+  }), [t]);
+
+  type StoreSettingsForm = z.infer<typeof storeSettingsFormSchema>;
 
   const { data: settings, isLoading } = useQuery<StoreSettings>({
     queryKey: ["/api/store-settings"],
