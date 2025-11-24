@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import bcrypt from "bcrypt";
@@ -47,6 +47,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching categories:", error);
       return res.status(500).json({ error: "Failed to fetch categories" });
+    }
+  });
+
+  app.post("/api/admin/products", async (req, res) => {
+    try {
+      const validatedData = insertProductSchema.parse(req.body);
+      const product = await storage.createProduct(validatedData);
+      return res.json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating product:", error);
+      return res.status(500).json({ error: "Failed to create product" });
+    }
+  });
+
+  app.put("/api/admin/products/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertProductSchema.partial().parse(req.body);
+      const product = await storage.updateProduct(id, validatedData);
+      
+      if (!product) {
+        return res.status(404).json({ error: "Product not found" });
+      }
+      
+      return res.json(product);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating product:", error);
+      return res.status(500).json({ error: "Failed to update product" });
+    }
+  });
+
+  app.delete("/api/admin/products/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteProduct(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting product:", error);
+      return res.status(500).json({ error: "Failed to delete product" });
     }
   });
 
