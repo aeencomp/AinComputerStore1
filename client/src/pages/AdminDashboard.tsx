@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package } from "lucide-react";
+import { LogOut, Package, Settings } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Order {
@@ -98,6 +98,12 @@ export default function AdminDashboard() {
               <Button variant="outline" size="sm" data-testid="link-admin-products">
                 <Package className="w-4 h-4 ms-2" />
                 {t('admin.products.manageProducts')}
+              </Button>
+            </Link>
+            <Link href="/admin/settings">
+              <Button variant="outline" size="sm" data-testid="link-admin-settings">
+                <Settings className="w-4 h-4 ms-2" />
+                {t('admin.settings.manageSettings')}
               </Button>
             </Link>
             <Button
