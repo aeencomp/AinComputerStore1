@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LogOut, Package } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Order {
   id: string;
@@ -25,6 +26,7 @@ interface Order {
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [selectedOrders, setSelectedOrders] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
@@ -45,14 +47,14 @@ export default function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
       toast({
-        title: "تم التحديث بنجاح",
-        description: "تم تحديث حالة الطلب",
+        title: t('admin.dashboard.updateSuccess'),
+        description: t('admin.dashboard.updateSuccessDesc'),
       });
     },
     onError: () => {
       toast({
-        title: "خطأ",
-        description: "فشل تحديث الطلب",
+        title: t('admin.dashboard.updateError'),
+        description: t('admin.dashboard.updateErrorDesc'),
         variant: "destructive",
       });
     },
@@ -61,8 +63,8 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     localStorage.removeItem("adminAuth");
     toast({
-      title: "تسجيل الخروج",
-      description: "تم تسجيل خروجك بنجاح",
+      title: t('admin.dashboard.logoutSuccess'),
+      description: t('admin.dashboard.logoutSuccessDesc'),
     });
     setLocation("/admin/login");
   };
@@ -81,7 +83,7 @@ export default function AdminDashboard() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>جاري التحميل...</p>
+        <p>{t('common.loading')}</p>
       </div>
     );
   }
@@ -90,12 +92,12 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 z-50 bg-background">
         <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold">لوحة التحكم</h1>
+          <h1 className="text-2xl font-bold">{t('admin.dashboard.title')}</h1>
           <div className="flex items-center gap-2">
             <Link href="/admin/products">
               <Button variant="outline" size="sm" data-testid="link-admin-products">
                 <Package className="w-4 h-4 ms-2" />
-                إدارة المنتجات
+                {t('admin.products.manageProducts')}
               </Button>
             </Link>
             <Button
@@ -105,7 +107,7 @@ export default function AdminDashboard() {
               data-testid="button-admin-logout"
             >
               <LogOut className="w-4 h-4 ms-2" />
-              تسجيل خروج
+              {t('admin.dashboard.logout')}
             </Button>
           </div>
         </div>
@@ -113,16 +115,16 @@ export default function AdminDashboard() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold mb-2">إدارة الطلبات</h2>
+          <h2 className="text-3xl font-bold mb-2">{t('admin.dashboard.ordersTitle')}</h2>
           <p className="text-muted-foreground">
-            عدد الطلبات: {orders.length}
+            {t('admin.dashboard.ordersCount')}: {orders.length}
           </p>
         </div>
 
         {orders.length === 0 ? (
           <Card>
             <CardContent className="py-8">
-              <p className="text-center text-muted-foreground">لا توجد طلبات حالياً</p>
+              <p className="text-center text-muted-foreground">{t('admin.dashboard.noOrders')}</p>
             </CardContent>
           </Card>
         ) : (
@@ -134,12 +136,12 @@ export default function AdminDashboard() {
                     <div>
                       <CardTitle className="text-lg">{order.customerName}</CardTitle>
                       <p className="text-sm font-semibold text-primary mt-1" data-testid={`text-order-number-${order.id}`}>
-                        رقم الطلب: {order.orderNumber}
+                        {t('admin.dashboard.orderNumber')}: {order.orderNumber}
                       </p>
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-lg">
-                        {parseFloat(order.total).toLocaleString('ar-IQ', { minimumFractionDigits: 2 })} د.ع
+                        {parseFloat(order.total).toLocaleString('ar-IQ', { minimumFractionDigits: 2 })} {t('common.currency')}
                       </p>
                       <p className="text-sm text-muted-foreground mt-1">
                         {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
@@ -150,20 +152,20 @@ export default function AdminDashboard() {
                 <CardContent className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
-                      <p className="text-sm text-muted-foreground">البريد الإلكتروني</p>
+                      <p className="text-sm text-muted-foreground">{t('admin.dashboard.email')}</p>
                       <p>{order.customerEmail}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">رقم الهاتف</p>
+                      <p className="text-sm text-muted-foreground">{t('admin.dashboard.phone')}</p>
                       <p>{order.customerPhone}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">المدينة</p>
+                      <p className="text-sm text-muted-foreground">{t('admin.dashboard.city')}</p>
                       <p>{order.customerCity}</p>
                     </div>
                     <div>
-                      <p className="text-sm text-muted-foreground">عدد العناصر</p>
-                      <p>{order.items.length} عنصر</p>
+                      <p className="text-sm text-muted-foreground">{t('admin.dashboard.itemsCount')}</p>
+                      <p>{order.items.length} {t('admin.dashboard.item')}</p>
                     </div>
                   </div>
 
@@ -178,11 +180,11 @@ export default function AdminDashboard() {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="pending">قيد الانتظار</SelectItem>
-                        <SelectItem value="processing">قيد المعالجة</SelectItem>
-                        <SelectItem value="shipped">تم الشحن</SelectItem>
-                        <SelectItem value="delivered">تم التسليم</SelectItem>
-                        <SelectItem value="cancelled">ملغاة</SelectItem>
+                        <SelectItem value="pending">{t('admin.dashboard.pending')}</SelectItem>
+                        <SelectItem value="processing">{t('admin.dashboard.processing')}</SelectItem>
+                        <SelectItem value="shipped">{t('admin.dashboard.shipped')}</SelectItem>
+                        <SelectItem value="delivered">{t('admin.dashboard.delivered')}</SelectItem>
+                        <SelectItem value="cancelled">{t('admin.dashboard.cancelled')}</SelectItem>
                       </SelectContent>
                     </Select>
                     <Button
@@ -190,7 +192,7 @@ export default function AdminDashboard() {
                       disabled={!selectedOrders[order.id] || updateMutation.isPending}
                       data-testid={`button-update-order-${order.id}`}
                     >
-                      حفظ
+                      {updateMutation.isPending ? t('admin.dashboard.updating') : t('admin.dashboard.update')}
                     </Button>
                   </div>
                 </CardContent>

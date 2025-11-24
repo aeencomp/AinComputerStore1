@@ -181,7 +181,7 @@ export default function AdminProducts() {
                 <TableHead>{t('admin.products.category')}</TableHead>
                 <TableHead>{t('admin.products.price')}</TableHead>
                 <TableHead>{t('admin.products.inStock')}</TableHead>
-                <TableHead className="text-end">Actions</TableHead>
+                <TableHead className="text-end">{t('admin.products.actions')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -324,10 +324,10 @@ export default function AdminProducts() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="laptops">Laptops</SelectItem>
-                    <SelectItem value="desktops">Desktops</SelectItem>
-                    <SelectItem value="monitors">Monitors</SelectItem>
-                    <SelectItem value="accessories">Accessories</SelectItem>
+                    <SelectItem value="laptops">{t('categories.laptops')}</SelectItem>
+                    <SelectItem value="desktops">{t('categories.desktops')}</SelectItem>
+                    <SelectItem value="monitors">{t('categories.monitors')}</SelectItem>
+                    <SelectItem value="accessories">{t('categories.accessories')}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -348,7 +348,7 @@ export default function AdminProducts() {
                 id="image"
                 value={formData.image}
                 onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder="product_image.png"
+                placeholder={t('admin.products.imagePlaceholder')}
                 required
                 data-testid="input-image"
               />
