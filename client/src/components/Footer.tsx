@@ -99,20 +99,49 @@ export function Footer() {
               <Button data-testid="button-newsletter-subscribe">{t('footer.subscribe')}</Button>
               <Input placeholder={t('footer.newsletterPlaceholder')} className="flex-1" data-testid="input-newsletter" />
             </div>
-            <div className="pt-4">
-              <p className="text-sm font-medium mb-2">{t('footer.followUs')}</p>
-              <div className="flex gap-2">
-                <Button size="icon" variant="outline" data-testid="button-social-twitter">
-                  <Twitter className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="outline" data-testid="button-social-instagram">
-                  <Instagram className="h-4 w-4" />
-                </Button>
-                <Button size="icon" variant="outline" data-testid="button-social-facebook">
-                  <Facebook className="h-4 w-4" />
-                </Button>
+            {(settings?.twitterUrl || settings?.instagramUrl || settings?.facebookUrl) && (
+              <div className="pt-4">
+                <p className="text-sm font-medium mb-2">{t('footer.followUs')}</p>
+                <div className="flex gap-2">
+                  {settings?.twitterUrl && (
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      data-testid="button-social-twitter"
+                      asChild
+                    >
+                      <a href={settings.twitterUrl} target="_blank" rel="noopener noreferrer">
+                        <Twitter className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
+                  {settings?.instagramUrl && (
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      data-testid="button-social-instagram"
+                      asChild
+                    >
+                      <a href={settings.instagramUrl} target="_blank" rel="noopener noreferrer">
+                        <Instagram className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
+                  {settings?.facebookUrl && (
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      data-testid="button-social-facebook"
+                      asChild
+                    >
+                      <a href={settings.facebookUrl} target="_blank" rel="noopener noreferrer">
+                        <Facebook className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
 
