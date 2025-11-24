@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import bcrypt from "bcrypt";
@@ -400,6 +400,82 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating order:", error);
       return res.status(500).json({ error: "Failed to update order" });
+    }
+  });
+
+  app.post("/api/repair-tickets", async (req, res) => {
+    try {
+      const validatedData = insertRepairTicketSchema.parse(req.body);
+      const ticket = await storage.createRepairTicket(validatedData);
+      return res.json(ticket);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating repair ticket:", error);
+      return res.status(500).json({ error: "Failed to create repair ticket" });
+    }
+  });
+
+  app.get("/api/repair-tickets", async (req, res) => {
+    try {
+      const tickets = await storage.getRepairTickets();
+      return res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching repair tickets:", error);
+      return res.status(500).json({ error: "Failed to fetch repair tickets" });
+    }
+  });
+
+  app.get("/api/repair-tickets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.getRepairTicket(id);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Repair ticket not found" });
+      }
+      
+      return res.json(ticket);
+    } catch (error) {
+      console.error("Error fetching repair ticket:", error);
+      return res.status(500).json({ error: "Failed to fetch repair ticket" });
+    }
+  });
+
+  app.get("/api/repair-tickets/lookup/:ticketNumber", async (req, res) => {
+    try {
+      const { ticketNumber } = req.params;
+      const ticket = await storage.getRepairTicketByNumber(ticketNumber);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Repair ticket not found" });
+      }
+      
+      return res.json(ticket);
+    } catch (error) {
+      console.error("Error looking up repair ticket:", error);
+      return res.status(500).json({ error: "Failed to lookup repair ticket" });
+    }
+  });
+
+  app.patch("/api/admin/repair-tickets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const validatedData = insertRepairTicketSchema.partial().parse(req.body);
+      const ticket = await storage.updateRepairTicket(id, validatedData);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Repair ticket not found" });
+      }
+      
+      return res.json(ticket);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating repair ticket:", error);
+      return res.status(500).json({ error: "Failed to update repair ticket" });
     }
   });
 
