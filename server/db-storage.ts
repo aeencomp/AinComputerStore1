@@ -23,6 +23,18 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
+  async updateProduct(id: string, updates: Partial<InsertProduct>): Promise<Product | undefined> {
+    const result = await db.update(products)
+      .set(updates)
+      .where(eq(products.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    await db.delete(products).where(eq(products.id, id));
+  }
+
   async getCategories(): Promise<string[]> {
     const allProducts = await db.select().from(products);
     const categories = new Set<string>(allProducts.map((p: Product) => p.category));

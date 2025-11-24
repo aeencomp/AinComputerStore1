@@ -172,6 +172,25 @@ export class MemStorage implements IStorage {
     return product;
   }
 
+  async updateProduct(id: string, updates: Partial<InsertProduct>): Promise<Product | undefined> {
+    const existing = this.products.get(id);
+    if (!existing) {
+      return undefined;
+    }
+    
+    const updated: Product = {
+      ...existing,
+      ...updates,
+      id: existing.id,
+    };
+    this.products.set(id, updated);
+    return updated;
+  }
+
+  async deleteProduct(id: string): Promise<void> {
+    this.products.delete(id);
+  }
+
   async getCategories(): Promise<string[]> {
     const categories = new Set<string>();
     const productsArray = Array.from(this.products.values());
