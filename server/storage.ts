@@ -6,6 +6,8 @@ export interface IStorage {
   getProduct(id: string): Promise<Product | undefined>;
   getProductsByCategory(category: string): Promise<Product[]>;
   createProduct(product: InsertProduct): Promise<Product>;
+  updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
+  deleteProduct(id: string): Promise<void>;
   getCategories(): Promise<string[]>;
   getCartItems(): Promise<CartItemRecord[]>;
   addToCart(item: InsertCartItem): Promise<CartItemRecord>;
