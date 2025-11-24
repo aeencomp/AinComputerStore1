@@ -317,8 +317,14 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.deviceType.other': 'أخرى',
     
     'repair.technician.login.title': 'دخول الفني',
+    'repair.technician.login.description': 'أدخل كلمة المرور للوصول إلى لوحة الفني',
     'repair.technician.login.password': 'كلمة المرور',
+    'repair.technician.login.passwordPlaceholder': 'أدخل كلمة المرور',
     'repair.technician.login.submit': 'تسجيل الدخول',
+    'repair.technician.login.successTitle': 'تم تسجيل الدخول',
+    'repair.technician.login.successDescription': 'مرحباً بك مرة أخرى',
+    'repair.technician.login.errorTitle': 'خطأ',
+    'repair.technician.login.errorDescription': 'كلمة المرور غير صحيحة',
     'repair.technician.dashboard.title': 'لوحة الفني',
     'repair.technician.dashboard.allTickets': 'جميع التذاكر',
     'repair.technician.dashboard.newTicket': 'تذكرة جديدة',
@@ -344,6 +350,8 @@ const translations: Record<Language, Record<string, string>> = {
     'common.loading': 'جاري التحميل...',
     'common.error': 'حدث خطأ',
     'common.success': 'تم بنجاح',
+    'common.ok': 'حسناً',
+    'common.back': 'رجوع',
   },
   en: {
     // Header
@@ -642,8 +650,14 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.deviceType.other': 'Other',
     
     'repair.technician.login.title': 'Technician Login',
+    'repair.technician.login.description': 'Enter your password to access the technician dashboard',
     'repair.technician.login.password': 'Password',
+    'repair.technician.login.passwordPlaceholder': 'Enter password',
     'repair.technician.login.submit': 'Login',
+    'repair.technician.login.successTitle': 'Logged In',
+    'repair.technician.login.successDescription': 'Welcome back',
+    'repair.technician.login.errorTitle': 'Error',
+    'repair.technician.login.errorDescription': 'Incorrect password',
     'repair.technician.dashboard.title': 'Technician Dashboard',
     'repair.technician.dashboard.allTickets': 'All Tickets',
     'repair.technician.dashboard.newTicket': 'New Ticket',
@@ -669,6 +683,8 @@ const translations: Record<Language, Record<string, string>> = {
     'common.loading': 'Loading...',
     'common.error': 'An error occurred',
     'common.success': 'Success',
+    'common.ok': 'OK',
+    'common.back': 'Back',
   },
 };
 
