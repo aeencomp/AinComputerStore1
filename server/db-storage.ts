@@ -1,6 +1,6 @@
 import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, products, cartItems, orders, users, storeSettings, repairTickets } from "@shared/schema";
 import { db } from "./db.js";
-import { eq, sql } from "drizzle-orm";
+import { eq, sql, and } from "drizzle-orm";
 import type { IStorage } from "./storage";
 import bcrypt from "bcrypt";
 
@@ -41,12 +41,14 @@ export class DrizzleStorage implements IStorage {
     return Array.from(categories);
   }
 
-  async getCartItems(): Promise<CartItemRecord[]> {
-    return await db.select().from(cartItems);
+  async getCartItems(userId: string): Promise<CartItemRecord[]> {
+    return await db.select().from(cartItems).where(eq(cartItems.userId, userId));
   }
 
-  async addToCart(insertItem: InsertCartItem): Promise<CartItemRecord> {
-    const existing = await db.select().from(cartItems).where(eq(cartItems.productId, insertItem.productId)).limit(1);
+  async addToCart(userId: string, insertItem: InsertCartItem): Promise<CartItemRecord> {
+    const existing = await db.select().from(cartItems)
+      .where(and(eq(cartItems.userId, userId), eq(cartItems.productId, insertItem.productId)))
+      .limit(1);
     
     if (existing.length > 0) {
       const updated = await db.update(cartItems)
@@ -58,25 +60,26 @@ export class DrizzleStorage implements IStorage {
 
     const result = await db.insert(cartItems).values({
       ...insertItem,
+      userId,
       quantity: insertItem.quantity ?? 1
     }).returning();
     return result[0];
   }
 
-  async updateCartItemQuantity(id: string, quantity: number): Promise<CartItemRecord | undefined> {
+  async updateCartItemQuantity(id: string, userId: string, quantity: number): Promise<CartItemRecord | undefined> {
     const result = await db.update(cartItems)
       .set({ quantity })
-      .where(eq(cartItems.id, id))
+      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)))
       .returning();
     return result[0];
   }
 
-  async removeFromCart(id: string): Promise<void> {
-    await db.delete(cartItems).where(eq(cartItems.id, id));
+  async removeFromCart(id: string, userId: string): Promise<void> {
+    await db.delete(cartItems).where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)));
   }
 
-  async clearCart(): Promise<void> {
-    await db.delete(cartItems);
+  async clearCart(userId: string): Promise<void> {
+    await db.delete(cartItems).where(eq(cartItems.userId, userId));
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {

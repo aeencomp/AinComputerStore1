@@ -44,12 +44,14 @@ export type Product = typeof products.$inferSelect;
 
 export const cartItems = pgTable("cart_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
   productId: varchar("product_id").notNull(),
   quantity: integer("quantity").notNull().default(1),
 });
 
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({
   id: true,
+  userId: true,
 });
 
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;

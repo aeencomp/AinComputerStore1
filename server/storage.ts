@@ -9,11 +9,11 @@ export interface IStorage {
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<void>;
   getCategories(): Promise<string[]>;
-  getCartItems(): Promise<CartItemRecord[]>;
-  addToCart(item: InsertCartItem): Promise<CartItemRecord>;
-  updateCartItemQuantity(id: string, quantity: number): Promise<CartItemRecord | undefined>;
-  removeFromCart(id: string): Promise<void>;
-  clearCart(): Promise<void>;
+  getCartItems(userId: string): Promise<CartItemRecord[]>;
+  addToCart(userId: string, item: InsertCartItem): Promise<CartItemRecord>;
+  updateCartItemQuantity(id: string, userId: string, quantity: number): Promise<CartItemRecord | undefined>;
+  removeFromCart(id: string, userId: string): Promise<void>;
+  clearCart(userId: string): Promise<void>;
   createUser(user: InsertUser): Promise<User>;
   getUserByEmail(email: string): Promise<User | undefined>;
   getUserById(id: string): Promise<User | undefined>;

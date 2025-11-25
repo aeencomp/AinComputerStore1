@@ -45,33 +45,33 @@ Preferred communication style: Simple, everyday language.
 - `GET /api/products` - Retrieve all products or filter by category
 - `GET /api/products/:id` - Retrieve single product details
 - `GET /api/categories` - Retrieve available product categories
-- `GET /api/cart` - Retrieve cart items with product details
-- `POST /api/cart` - Add item to cart
-- `PATCH /api/cart/:id` - Update cart item quantity
-- `DELETE /api/cart/:id` - Remove item from cart
-- `DELETE /api/cart` - Clear entire cart
+- `GET /api/cart` - Retrieve user's cart items (requires authentication, returns [] if not logged in)
+- `POST /api/cart` - Add item to cart (requires authentication)
+- `PATCH /api/cart/:id` - Update cart item quantity (requires authentication)
+- `DELETE /api/cart/:id` - Remove item from cart (requires authentication)
+- `DELETE /api/cart` - Clear entire cart (requires authentication)
 
 **Data Layer**
-- Currently using in-memory storage (`MemStorage` class) for development/prototyping
-- Designed with interface-based abstraction (`IStorage`) to enable easy database migration
-- Data models defined using Drizzle ORM schema for future PostgreSQL integration
+- PostgreSQL database with Neon serverless driver for full persistence
+- DrizzleStorage class implements the IStorage interface for all database operations
+- Data models defined using Drizzle ORM schema in `/shared/schema.ts`
 
 ## Database Strategy
 
 **Schema Design (Drizzle ORM)**
 - `products` table: Stores product information with Arabic text fields, pricing, categories, images, specifications, and inventory
-- `cart_items` table: Stores shopping cart state with product references and quantities
+- `cart_items` table: Stores shopping cart state with userId, productId, and quantity - each user has their own cart
+- `users` table: Stores user accounts with hashed passwords for authentication
+- `orders` table: Stores completed orders linked to user accounts
+- `store_settings` table: Stores configurable store information (name, contact, social links)
+- `repair_tickets` table: Stores repair service tickets with customer info, device details, and status tracking
 
-**Current vs. Planned State**
-- Current: In-memory storage with seed data for rapid development
-- Planned: PostgreSQL database with Neon serverless driver
-- Drizzle Kit configured for schema migrations in `/migrations` directory
-- Connection ready via `DATABASE_URL` environment variable
-
-**Rationale for In-Memory Storage**
-- Enables rapid prototyping without database setup
-- Easy to seed with sample data for UI development
-- Clean migration path via the `IStorage` interface abstraction
+**Current State**
+- PostgreSQL database (Neon serverless) with full data persistence
+- DrizzleStorage class handles all database operations
+- Session-based authentication with PostgreSQL session store
+- User-specific shopping carts stored in database with userId foreign key
+- Drizzle Kit configured for schema migrations via `npm run db:push`
 
 ## External Dependencies
 

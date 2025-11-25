@@ -59,6 +59,10 @@ const translations: Record<Language, Record<string, string>> = {
     'cart.free': 'مجاني',
     'cart.quantity': 'الكمية',
     'cart.error': 'حدث خطأ أثناء تحميل السلة',
+    'cart.loginRequired': 'يجب تسجيل الدخول أولاً',
+    'cart.loginRequiredDesc': 'قم بتسجيل الدخول لإضافة المنتجات إلى سلة التسوق',
+    'cart.addedToCart': 'تمت الإضافة للسلة',
+    'cart.addError': 'حدث خطأ أثناء إضافة المنتج للسلة',
     'cart.retry': 'إعادة المحاولة',
     
     // Checkout
@@ -400,6 +404,10 @@ const translations: Record<Language, Record<string, string>> = {
     'cart.free': 'Free',
     'cart.quantity': 'Quantity',
     'cart.error': 'An error occurred while loading the cart',
+    'cart.loginRequired': 'Login Required',
+    'cart.loginRequiredDesc': 'Please login to add products to your shopping cart',
+    'cart.addedToCart': 'Added to Cart',
+    'cart.addError': 'An error occurred while adding the product',
     'cart.retry': 'Retry',
     
     // Checkout

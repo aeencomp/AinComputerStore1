@@ -144,8 +144,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       req.session.userId = user.id;
       
-      const { password: _, ...userWithoutPassword } = user;
-      return res.json(userWithoutPassword);
+      return new Promise((resolve) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+          }
+          const { password: _, ...userWithoutPassword } = user;
+          resolve(res.json(userWithoutPassword));
+        });
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
@@ -176,8 +183,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       req.session.userId = user.id;
       
-      const { password: _, ...userWithoutPassword } = user;
-      return res.json(userWithoutPassword);
+      return new Promise((resolve) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+          }
+          const { password: _, ...userWithoutPassword } = user;
+          resolve(res.json(userWithoutPassword));
+        });
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
@@ -219,7 +233,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/cart", async (req, res) => {
     try {
-      const cartItems = await storage.getCartItems();
+      if (!req.session.userId) {
+        return res.json([]);
+      }
+      
+      const cartItems = await storage.getCartItems(req.session.userId);
       const itemsWithProducts = await Promise.all(
         cartItems.map(async (item) => {
           const product = await storage.getProduct(item.productId);
@@ -237,6 +255,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cart", async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول لإضافة منتجات للسلة" });
+      }
+      
       const validatedData = insertCartItemSchema.parse(req.body);
       const product = await storage.getProduct(validatedData.productId);
       
@@ -244,7 +266,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
 
-      const cartItem = await storage.addToCart(validatedData);
+      const cartItem = await storage.addToCart(req.session.userId, validatedData);
       return res.json({ ...cartItem, product });
     } catch (error) {
       console.error("Error adding to cart:", error);
@@ -254,6 +276,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/cart/:id", async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول" });
+      }
+      
       const { id } = req.params;
       
       const quantitySchema = z.object({
@@ -262,7 +288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = quantitySchema.parse(req.body);
       
-      const updatedItem = await storage.updateCartItemQuantity(id, validatedData.quantity);
+      const updatedItem = await storage.updateCartItemQuantity(id, req.session.userId, validatedData.quantity);
       
       if (!updatedItem) {
         return res.status(404).json({ error: "Cart item not found" });
@@ -281,8 +307,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart/:id", async (req, res) => {
     try {
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول" });
+      }
+      
       const { id } = req.params;
-      await storage.removeFromCart(id);
+      await storage.removeFromCart(id, req.session.userId);
       return res.json({ success: true });
     } catch (error) {
       console.error("Error removing from cart:", error);
@@ -292,7 +322,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart", async (req, res) => {
     try {
-      await storage.clearCart();
+      if (!req.session.userId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول" });
+      }
+      
+      await storage.clearCart(req.session.userId);
       return res.json({ success: true });
     } catch (error) {
       console.error("Error clearing cart:", error);
@@ -314,7 +348,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Created order:", order.id);
       
       try {
-        await storage.clearCart();
+        await storage.clearCart(req.session.userId);
       } catch (clearError) {
         console.error("Warning: Failed to clear cart after order creation:", clearError);
       }
