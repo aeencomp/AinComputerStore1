@@ -166,3 +166,37 @@ Order confirmation emails via Gmail SMTP:
 - Light mode optimized (dark mode tokens present but not actively used)
 - Primary color: Blue (199° 89% 55%)
 - Neutral grays for backgrounds and borders
+
+## Internationalization (i18n)
+
+**Translation System**
+- LanguageContext provides t() function for all UI text translation
+- Template interpolation support: t('key', { variable: 'value' }) replaces {{variable}} in translation strings
+- All UI text strictly uses t() function - no hardcoded strings in components
+- Translation keys follow namespace.category.specific pattern (e.g., 'home.searchResultsFor', 'cart.addedDescription')
+
+**Bilingual Settings Pattern**
+- Store settings use separate Arabic/English fields (storeNameAr/storeNameEn, aboutTextAr/En, etc.)
+- Components select appropriate language version based on current language context
+- Dynamic content (hero title, about text, copyright) is admin-customizable per language
+
+**Language Toggle**
+- Language toggle in header switches between Arabic (ar) and English (en)
+- RTL/LTR direction automatically adjusts based on selected language
+- User language preference persisted in localStorage
+
+## Admin Settings System
+
+**Comprehensive Customization (6 Tabs)**
+1. Store: Basic info (name, logo, contact, social links) - bilingual
+2. Theme: Primary/accent colors (future expansion)
+3. SEO: Meta title, description, keywords - bilingual
+4. Homepage: Hero banner, categories toggle, featured products count
+5. Footer: About text, copyright text - bilingual
+6. Shipping: Free shipping threshold, shipping cost
+
+**Dynamic Frontend Integration**
+- Header: Dynamic store name, logo from settings
+- HeroSection: Dynamic title, subtitle, image from settings
+- Home: Conditional categories section, configurable featured products count
+- Footer: Dynamic about text, copyright, social links from settings
