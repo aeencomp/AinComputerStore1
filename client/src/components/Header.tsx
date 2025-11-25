@@ -2,7 +2,7 @@ import { ShoppingCart, Search, Menu, Languages } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Sheet,
   SheetContent,
@@ -11,19 +11,36 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useQuery } from "@tanstack/react-query";
+import type { StoreSettings } from "@shared/schema";
 
 interface HeaderProps {
   cartItemsCount: number;
   onCartClick: () => void;
   onSearch: (query: string) => void;
   onCategorySelect?: (category: string) => void;
+  searchValue?: string;
 }
 
-export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect }: HeaderProps) {
+export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect, searchValue = "" }: HeaderProps) {
   const { language, setLanguage, t } = useLanguage();
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState(searchValue);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+
+  useEffect(() => {
+    setSearchQuery(searchValue);
+  }, [searchValue]);
+
+  const { data: storeSettings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
+  const storeName = storeSettings 
+    ? (language === 'ar' ? storeSettings.storeNameAr : storeSettings.storeNameEn)
+    : t('header.title');
+
+  const logoUrl = storeSettings?.logoUrl;
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,16 +53,25 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           <div className="flex items-center gap-2">
-            <div className="flex items-center justify-center border-2 border-border rounded-md h-14 px-4 min-w-[120px]" data-testid="logo-placeholder">
-              <span className="text-sm font-bold text-muted-foreground text-center">{t('header.title')}</span>
-            </div>
+            {logoUrl ? (
+              <img 
+                src={logoUrl} 
+                alt={storeName} 
+                className="h-12 max-w-[180px] object-contain"
+                data-testid="logo-image"
+              />
+            ) : (
+              <div className="flex items-center justify-center border-2 border-border rounded-md h-14 px-4 min-w-[120px]" data-testid="logo-placeholder">
+                <span className="text-sm font-bold text-muted-foreground text-center">{storeName}</span>
+              </div>
+            )}
           </div>
 
           <form onSubmit={handleSearch} className="flex-1 max-w-2xl hidden md:flex">
             <div className="relative w-full">
               <Input
                 type="search"
-                placeholder={t('product.loading')}
+                placeholder={t('header.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pr-10"
@@ -135,14 +161,14 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
       <Sheet open={mobileSearchOpen} onOpenChange={setMobileSearchOpen}>
         <SheetContent side="top" className="h-auto" data-testid="sheet-mobile-search">
           <SheetHeader>
-            <SheetTitle>{language === 'ar' ? 'البحث' : 'Search'}</SheetTitle>
-            <SheetDescription>{language === 'ar' ? 'ابحث عن منتجات الحواسيب والملحقات' : 'Search for computers and accessories'}</SheetDescription>
+            <SheetTitle>{t('header.searchTitle')}</SheetTitle>
+            <SheetDescription>{t('header.searchDescription')}</SheetDescription>
           </SheetHeader>
           <form onSubmit={handleSearch} className="mt-4">
             <div className="relative">
               <Input
                 type="search"
-                placeholder={language === 'ar' ? 'ابحث عن المنتجات...' : 'Search for products...'}
+                placeholder={t('header.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pr-10"

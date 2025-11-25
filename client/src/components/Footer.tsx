@@ -30,6 +30,14 @@ export function Footer() {
     ? (language === 'ar' ? settings.hoursAr : settings.hoursEn)
     : t('footer.defaultHours');
 
+  const aboutText = settings
+    ? (language === 'ar' ? settings.aboutTextAr : settings.aboutTextEn)
+    : null;
+
+  const copyrightText = settings
+    ? (language === 'ar' ? settings.copyrightTextAr : settings.copyrightTextEn)
+    : null;
+
   return (
     <footer className="bg-muted mt-12 md:mt-16" data-testid="footer">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-12">
@@ -39,7 +47,7 @@ export function Footer() {
               {t('footer.about')} {storeName}
             </h3>
             <p className="text-sm text-muted-foreground">
-              {description}
+              {aboutText || description}
             </p>
             <div className="text-sm text-muted-foreground space-y-1">
               <p data-testid="text-footer-email">
@@ -148,7 +156,7 @@ export function Footer() {
         <Separator className="my-8" />
 
         <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
-          <p data-testid="text-copyright">{t('footer.copyright')}</p>
+          <p data-testid="text-copyright">{copyrightText || t('footer.copyright')}</p>
           <div className="flex gap-4">
             <Button variant="ghost" className="p-0 h-auto text-muted-foreground" data-testid="link-privacy">
               {t('footer.privacy')}

@@ -107,6 +107,51 @@ export const storeSettings = pgTable("store_settings", {
   facebookUrl: text("facebook_url").default(""),
   twitterUrl: text("twitter_url").default(""),
   instagramUrl: text("instagram_url").default(""),
+  
+  // Theme & Branding
+  logoUrl: text("logo_url").default(""),
+  faviconUrl: text("favicon_url").default(""),
+  primaryColor: text("primary_color").default("#3B82F6"),
+  accentColor: text("accent_color").default("#10B981"),
+  
+  // SEO Settings
+  metaTitleAr: text("meta_title_ar").default("العين لتجارة الحاسبات - أفضل متجر للكمبيوتر في العراق"),
+  metaTitleEn: text("meta_title_en").default("Al-Ain Computer Trading - Best Computer Store in Iraq"),
+  metaDescriptionAr: text("meta_description_ar").default("تسوق أحدث أجهزة الكمبيوتر والملحقات بأفضل الأسعار مع توصيل سريع في جميع أنحاء العراق"),
+  metaDescriptionEn: text("meta_description_en").default("Shop the latest computers and accessories at the best prices with fast delivery across Iraq"),
+  metaKeywordsAr: text("meta_keywords_ar").default("كمبيوتر، لابتوب، بغداد، العراق، ألعاب، قطع كمبيوتر"),
+  metaKeywordsEn: text("meta_keywords_en").default("computer, laptop, Baghdad, Iraq, gaming, computer parts"),
+  
+  // Homepage Settings
+  heroTitleAr: text("hero_title_ar").default("مرحباً بك في متجرنا"),
+  heroTitleEn: text("hero_title_en").default("Welcome to Our Store"),
+  heroSubtitleAr: text("hero_subtitle_ar").default("أفضل أجهزة الكمبيوتر والملحقات بأسعار منافسة"),
+  heroSubtitleEn: text("hero_subtitle_en").default("Best computers and accessories at competitive prices"),
+  heroImageUrl: text("hero_image_url").default(""),
+  showHeroBanner: integer("show_hero_banner").notNull().default(1),
+  showFeaturedProducts: integer("show_featured_products").notNull().default(1),
+  showCategories: integer("show_categories").notNull().default(1),
+  featuredProductsCount: integer("featured_products_count").notNull().default(8),
+  
+  // Footer Settings
+  copyrightTextAr: text("copyright_text_ar").default("جميع الحقوق محفوظة"),
+  copyrightTextEn: text("copyright_text_en").default("All Rights Reserved"),
+  aboutTextAr: text("about_text_ar").default("متجر العين لتجارة الحاسبات يقدم أفضل الأجهزة والملحقات بأسعار منافسة"),
+  aboutTextEn: text("about_text_en").default("Al-Ain Computer Trading offers the best devices and accessories at competitive prices"),
+  
+  // Shipping Settings
+  shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("5000"),
+  freeShippingThreshold: decimal("free_shipping_threshold", { precision: 10, scale: 2 }).default("100000"),
+  enableFreeShipping: integer("enable_free_shipping").notNull().default(1),
+  
+  // Payment Settings
+  enableCashOnDelivery: integer("enable_cash_on_delivery").notNull().default(1),
+  enableElectronicPayment: integer("enable_electronic_payment").notNull().default(0),
+  
+  // Currency Settings
+  currencySymbolAr: text("currency_symbol_ar").default("د.ع"),
+  currencySymbolEn: text("currency_symbol_en").default("IQD"),
+  
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

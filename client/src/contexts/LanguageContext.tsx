@@ -6,7 +6,7 @@ interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
   isRTL: boolean;
-  t: (key: string) => string;
+  t: (key: string, vars?: Record<string, string>) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -22,6 +22,8 @@ const translations: Record<Language, Record<string, string>> = {
     'header.profile': 'الملف الشخصي',
     'header.logout': 'تسجيل الخروج',
     'header.searchPlaceholder': 'ابحث عن المنتجات...',
+    'header.searchTitle': 'البحث',
+    'header.searchDescription': 'ابحث عن منتجات الحواسيب والملحقات',
     
     // Categories
     'category.all': 'جميع المنتجات',
@@ -34,8 +36,14 @@ const translations: Record<Language, Record<string, string>> = {
     'home.hero.title': 'أفضل أجهزة الحاسوب والملحقات',
     'home.hero.subtitle': 'اكتشف أحدث التقنيات بأفضل الأسعار',
     'home.hero.cta': 'تسوق الآن',
+    'home.hero.imageAlt': 'صورة إعلانية للمتجر',
     'home.categories.title': 'تصفح حسب الفئة',
     'home.featured.title': 'المنتجات المميزة',
+    'home.searchResultsFor': 'نتائج البحث عن: {query}',
+    'home.showAll': 'عرض الكل',
+    'home.noProducts': 'لا توجد منتجات متاحة',
+    'home.noSearchResults': 'لا توجد منتجات تطابق البحث',
+    'home.loadError': 'حدث خطأ أثناء تحميل المنتجات. يرجى المحاولة مرة أخرى.',
     
     // Product
     'product.specifications': 'المواصفات',
@@ -62,8 +70,13 @@ const translations: Record<Language, Record<string, string>> = {
     'cart.loginRequired': 'يجب تسجيل الدخول أولاً',
     'cart.loginRequiredDesc': 'قم بتسجيل الدخول لإضافة المنتجات إلى سلة التسوق',
     'cart.addedToCart': 'تمت الإضافة للسلة',
+    'cart.addedDescription': 'تم إضافة المنتج إلى سلة التسوق',
     'cart.addError': 'حدث خطأ أثناء إضافة المنتج للسلة',
     'cart.retry': 'إعادة المحاولة',
+    'cart.removed': 'تم الحذف',
+    'cart.removedDescription': 'تم حذف المنتج من السلة',
+    'cart.removeError': 'حدث خطأ أثناء حذف المنتج',
+    'cart.quantityUpdateError': 'حدث خطأ أثناء تحديث الكمية',
     
     // Checkout
     'checkout.title': 'إتمام الطلب',
@@ -224,6 +237,86 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.settings.validation.hoursArRequired': 'ساعات العمل بالعربية مطلوبة',
     'admin.settings.validation.hoursEnRequired': 'ساعات العمل بالإنجليزية مطلوبة',
     
+    // Admin Settings Tabs
+    'admin.settings.tabs.store': 'المتجر',
+    'admin.settings.tabs.theme': 'المظهر',
+    'admin.settings.tabs.seo': 'SEO',
+    'admin.settings.tabs.homepage': 'الصفحة الرئيسية',
+    'admin.settings.tabs.footer': 'التذييل',
+    'admin.settings.tabs.shipping': 'الشحن والدفع',
+    
+    // Theme Settings
+    'admin.settings.theme.branding': 'العلامة التجارية',
+    'admin.settings.theme.brandingDesc': 'قم بتحميل شعار المتجر والأيقونة',
+    'admin.settings.theme.logoUrl': 'رابط الشعار',
+    'admin.settings.theme.logoUrlHint': 'رابط صورة شعار المتجر',
+    'admin.settings.theme.faviconUrl': 'رابط الأيقونة',
+    'admin.settings.theme.faviconUrlHint': 'رابط أيقونة المتجر (favicon)',
+    'admin.settings.theme.colors': 'الألوان',
+    'admin.settings.theme.colorsDesc': 'اختر ألوان المتجر الأساسية',
+    'admin.settings.theme.primaryColor': 'اللون الأساسي',
+    'admin.settings.theme.accentColor': 'اللون الثانوي',
+    'admin.settings.theme.currency': 'العملة',
+    'admin.settings.theme.currencyDesc': 'إعدادات عرض العملة',
+    'admin.settings.theme.currencySymbolAr': 'رمز العملة بالعربية',
+    'admin.settings.theme.currencySymbolEn': 'رمز العملة بالإنجليزية',
+    
+    // SEO Settings
+    'admin.settings.seo.metaTitle': 'عنوان الصفحة',
+    'admin.settings.seo.metaTitleDesc': 'العنوان الذي يظهر في نتائج البحث',
+    'admin.settings.seo.metaTitleAr': 'عنوان الصفحة بالعربية',
+    'admin.settings.seo.metaTitleEn': 'عنوان الصفحة بالإنجليزية',
+    'admin.settings.seo.metaDescription': 'وصف الصفحة',
+    'admin.settings.seo.metaDescriptionDesc': 'الوصف الذي يظهر في نتائج البحث',
+    'admin.settings.seo.metaDescriptionAr': 'وصف الصفحة بالعربية',
+    'admin.settings.seo.metaDescriptionEn': 'وصف الصفحة بالإنجليزية',
+    'admin.settings.seo.keywords': 'الكلمات المفتاحية',
+    'admin.settings.seo.keywordsDesc': 'الكلمات المفتاحية لمحركات البحث',
+    'admin.settings.seo.keywordsAr': 'الكلمات المفتاحية بالعربية',
+    'admin.settings.seo.keywordsEn': 'الكلمات المفتاحية بالإنجليزية',
+    'admin.settings.seo.keywordsPlaceholder': 'كلمة1، كلمة2، كلمة3',
+    
+    // Homepage Settings
+    'admin.settings.homepage.hero': 'البانر الرئيسي',
+    'admin.settings.homepage.heroDesc': 'إعدادات البانر في الصفحة الرئيسية',
+    'admin.settings.homepage.showHeroBanner': 'إظهار البانر الرئيسي',
+    'admin.settings.homepage.heroTitleAr': 'عنوان البانر بالعربية',
+    'admin.settings.homepage.heroTitleEn': 'عنوان البانر بالإنجليزية',
+    'admin.settings.homepage.heroSubtitleAr': 'العنوان الفرعي بالعربية',
+    'admin.settings.homepage.heroSubtitleEn': 'العنوان الفرعي بالإنجليزية',
+    'admin.settings.homepage.heroImageUrl': 'رابط صورة البانر',
+    'admin.settings.homepage.heroImageHint': 'يفضل صورة بحجم 1920x600 بكسل',
+    'admin.settings.homepage.sections': 'أقسام الصفحة الرئيسية',
+    'admin.settings.homepage.sectionsDesc': 'تحكم في الأقسام المعروضة',
+    'admin.settings.homepage.showCategories': 'إظهار قسم الفئات',
+    'admin.settings.homepage.showFeaturedProducts': 'إظهار المنتجات المميزة',
+    'admin.settings.homepage.featuredProductsCount': 'عدد المنتجات المميزة',
+    
+    // Footer Settings
+    'admin.settings.footer.about': 'نص عن المتجر',
+    'admin.settings.footer.aboutDesc': 'النص الذي يظهر في تذييل الصفحة',
+    'admin.settings.footer.aboutTextAr': 'نص عن المتجر بالعربية',
+    'admin.settings.footer.aboutTextEn': 'نص عن المتجر بالإنجليزية',
+    'admin.settings.footer.copyright': 'حقوق النشر',
+    'admin.settings.footer.copyrightDesc': 'نص حقوق النشر في التذييل',
+    'admin.settings.footer.copyrightTextAr': 'نص حقوق النشر بالعربية',
+    'admin.settings.footer.copyrightTextEn': 'نص حقوق النشر بالإنجليزية',
+    
+    // Shipping Settings
+    'admin.settings.shipping.title': 'إعدادات الشحن',
+    'admin.settings.shipping.description': 'تحكم في تكاليف الشحن والتوصيل',
+    'admin.settings.shipping.cost': 'تكلفة الشحن',
+    'admin.settings.shipping.costHint': 'تكلفة الشحن بالدينار العراقي',
+    'admin.settings.shipping.freeThreshold': 'حد الشحن المجاني',
+    'admin.settings.shipping.freeThresholdHint': 'الحد الأدنى للطلب للحصول على شحن مجاني',
+    'admin.settings.shipping.enableFreeShipping': 'تفعيل الشحن المجاني',
+    
+    // Payment Settings
+    'admin.settings.payment.title': 'طرق الدفع',
+    'admin.settings.payment.description': 'تحكم في طرق الدفع المتاحة',
+    'admin.settings.payment.cashOnDelivery': 'الدفع عند الاستلام',
+    'admin.settings.payment.electronicPayment': 'الدفع الإلكتروني',
+    
     // Categories
     'categories.laptops': 'أجهزة لابتوب',
     'categories.desktops': 'أجهزة مكتبية',
@@ -371,6 +464,8 @@ const translations: Record<Language, Record<string, string>> = {
     'header.profile': 'Profile',
     'header.logout': 'Logout',
     'header.searchPlaceholder': 'Search for products...',
+    'header.searchTitle': 'Search',
+    'header.searchDescription': 'Search for computers and accessories',
     
     // Categories
     'category.all': 'All Products',
@@ -385,6 +480,12 @@ const translations: Record<Language, Record<string, string>> = {
     'home.hero.cta': 'Shop Now',
     'home.categories.title': 'Browse by Category',
     'home.featured.title': 'Featured Products',
+    'home.hero.imageAlt': 'Store promotional banner',
+    'home.searchResultsFor': 'Search results for: {query}',
+    'home.showAll': 'Show All',
+    'home.noProducts': 'No products available',
+    'home.noSearchResults': 'No products match your search',
+    'home.loadError': 'An error occurred while loading products. Please try again.',
     
     // Product
     'product.specifications': 'Specifications',
@@ -411,8 +512,13 @@ const translations: Record<Language, Record<string, string>> = {
     'cart.loginRequired': 'Login Required',
     'cart.loginRequiredDesc': 'Please login to add products to your shopping cart',
     'cart.addedToCart': 'Added to Cart',
+    'cart.addedDescription': 'Product has been added to your cart',
     'cart.addError': 'An error occurred while adding the product',
     'cart.retry': 'Retry',
+    'cart.removed': 'Removed',
+    'cart.removedDescription': 'Product removed from cart',
+    'cart.removeError': 'An error occurred while removing the product',
+    'cart.quantityUpdateError': 'An error occurred while updating quantity',
     
     // Checkout
     'checkout.title': 'Checkout',
@@ -571,6 +677,86 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.settings.validation.hoursArRequired': 'Working hours in Arabic are required',
     'admin.settings.validation.hoursEnRequired': 'Working hours in English are required',
     
+    // Admin Settings Tabs
+    'admin.settings.tabs.store': 'Store',
+    'admin.settings.tabs.theme': 'Theme',
+    'admin.settings.tabs.seo': 'SEO',
+    'admin.settings.tabs.homepage': 'Homepage',
+    'admin.settings.tabs.footer': 'Footer',
+    'admin.settings.tabs.shipping': 'Shipping & Payment',
+    
+    // Theme Settings
+    'admin.settings.theme.branding': 'Branding',
+    'admin.settings.theme.brandingDesc': 'Upload your store logo and favicon',
+    'admin.settings.theme.logoUrl': 'Logo URL',
+    'admin.settings.theme.logoUrlHint': 'URL to your store logo image',
+    'admin.settings.theme.faviconUrl': 'Favicon URL',
+    'admin.settings.theme.faviconUrlHint': 'URL to your store favicon',
+    'admin.settings.theme.colors': 'Colors',
+    'admin.settings.theme.colorsDesc': 'Choose your store primary colors',
+    'admin.settings.theme.primaryColor': 'Primary Color',
+    'admin.settings.theme.accentColor': 'Accent Color',
+    'admin.settings.theme.currency': 'Currency',
+    'admin.settings.theme.currencyDesc': 'Currency display settings',
+    'admin.settings.theme.currencySymbolAr': 'Currency Symbol (Arabic)',
+    'admin.settings.theme.currencySymbolEn': 'Currency Symbol (English)',
+    
+    // SEO Settings
+    'admin.settings.seo.metaTitle': 'Page Title',
+    'admin.settings.seo.metaTitleDesc': 'Title that appears in search results',
+    'admin.settings.seo.metaTitleAr': 'Page Title (Arabic)',
+    'admin.settings.seo.metaTitleEn': 'Page Title (English)',
+    'admin.settings.seo.metaDescription': 'Page Description',
+    'admin.settings.seo.metaDescriptionDesc': 'Description that appears in search results',
+    'admin.settings.seo.metaDescriptionAr': 'Page Description (Arabic)',
+    'admin.settings.seo.metaDescriptionEn': 'Page Description (English)',
+    'admin.settings.seo.keywords': 'Keywords',
+    'admin.settings.seo.keywordsDesc': 'Keywords for search engines',
+    'admin.settings.seo.keywordsAr': 'Keywords (Arabic)',
+    'admin.settings.seo.keywordsEn': 'Keywords (English)',
+    'admin.settings.seo.keywordsPlaceholder': 'keyword1, keyword2, keyword3',
+    
+    // Homepage Settings
+    'admin.settings.homepage.hero': 'Hero Banner',
+    'admin.settings.homepage.heroDesc': 'Homepage hero banner settings',
+    'admin.settings.homepage.showHeroBanner': 'Show Hero Banner',
+    'admin.settings.homepage.heroTitleAr': 'Hero Title (Arabic)',
+    'admin.settings.homepage.heroTitleEn': 'Hero Title (English)',
+    'admin.settings.homepage.heroSubtitleAr': 'Hero Subtitle (Arabic)',
+    'admin.settings.homepage.heroSubtitleEn': 'Hero Subtitle (English)',
+    'admin.settings.homepage.heroImageUrl': 'Hero Image URL',
+    'admin.settings.homepage.heroImageHint': 'Recommended size: 1920x600 pixels',
+    'admin.settings.homepage.sections': 'Homepage Sections',
+    'admin.settings.homepage.sectionsDesc': 'Control which sections are displayed',
+    'admin.settings.homepage.showCategories': 'Show Categories Section',
+    'admin.settings.homepage.showFeaturedProducts': 'Show Featured Products',
+    'admin.settings.homepage.featuredProductsCount': 'Number of Featured Products',
+    
+    // Footer Settings
+    'admin.settings.footer.about': 'About Text',
+    'admin.settings.footer.aboutDesc': 'Text displayed in the footer',
+    'admin.settings.footer.aboutTextAr': 'About Text (Arabic)',
+    'admin.settings.footer.aboutTextEn': 'About Text (English)',
+    'admin.settings.footer.copyright': 'Copyright',
+    'admin.settings.footer.copyrightDesc': 'Copyright text in footer',
+    'admin.settings.footer.copyrightTextAr': 'Copyright Text (Arabic)',
+    'admin.settings.footer.copyrightTextEn': 'Copyright Text (English)',
+    
+    // Shipping Settings
+    'admin.settings.shipping.title': 'Shipping Settings',
+    'admin.settings.shipping.description': 'Manage shipping and delivery costs',
+    'admin.settings.shipping.cost': 'Shipping Cost',
+    'admin.settings.shipping.costHint': 'Shipping cost in Iraqi Dinar',
+    'admin.settings.shipping.freeThreshold': 'Free Shipping Threshold',
+    'admin.settings.shipping.freeThresholdHint': 'Minimum order amount for free shipping',
+    'admin.settings.shipping.enableFreeShipping': 'Enable Free Shipping',
+    
+    // Payment Settings
+    'admin.settings.payment.title': 'Payment Methods',
+    'admin.settings.payment.description': 'Manage available payment methods',
+    'admin.settings.payment.cashOnDelivery': 'Cash on Delivery',
+    'admin.settings.payment.electronicPayment': 'Electronic Payment',
+    
     // Categories
     'categories.laptops': 'Laptops',
     'categories.desktops': 'Desktops',
@@ -726,8 +912,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     setLanguageState(lang);
   };
 
-  const t = (key: string): string => {
-    return translations[language][key] || key;
+  const t = (key: string, vars?: Record<string, string>): string => {
+    let text = translations[language][key] || key;
+    if (vars) {
+      Object.entries(vars).forEach(([varKey, value]) => {
+        text = text.replace(`{${varKey}}`, value);
+      });
+    }
+    return text;
   };
 
   const isRTL = language === 'ar';
