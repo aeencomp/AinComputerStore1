@@ -252,7 +252,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cart", async (req, res) => {
     try {
-      const sessionId = req.session.id;
       const validatedData = insertCartItemSchema.parse(req.body);
       const product = await storage.getProduct(validatedData.productId);
       
@@ -260,8 +259,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
 
-      const cartItem = await storage.addToCart(sessionId, validatedData);
-      return res.json({ ...cartItem, product });
+      req.session.cartInitialized = true;
+      
+      return new Promise((resolve, reject) => {
+        req.session.save(async (err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            reject(err);
+            return;
+          }
+          
+          try {
+            const sessionId = req.session.id;
+            const cartItem = await storage.addToCart(sessionId, validatedData);
+            resolve(res.json({ ...cartItem, product }));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
     } catch (error) {
       console.error("Error adding to cart:", error);
       return res.status(500).json({ error: "Failed to add to cart" });

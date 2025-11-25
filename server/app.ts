@@ -16,6 +16,7 @@ const PgStore = connectPgSimple(session);
 declare module "express-session" {
   interface SessionData {
     userId?: string;
+    cartInitialized?: boolean;
   }
 }
 
