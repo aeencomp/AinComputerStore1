@@ -1,5 +1,4 @@
-import { useState, useEffect } from "react";
-import { useLocation } from "wouter";
+import { useState } from "react";
 import { Header } from "@/components/Header";
 import { HeroSection } from "@/components/HeroSection";
 import { CategorySection } from "@/components/CategorySection";
@@ -13,7 +12,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useUser } from "@/hooks/use-user";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -25,8 +23,6 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();
   const { language, t } = useLanguage();
-  const { isAuthenticated } = useUser();
-  const [, setLocation] = useLocation();
 
   const queryKey = selectedCategory 
     ? `/api/products?category=${selectedCategory}`
@@ -90,16 +86,6 @@ export default function Home() {
   };
 
   const handleAddToCart = async (product: Product) => {
-    if (!isAuthenticated) {
-      toast({
-        title: t('cart.loginRequired'),
-        description: t('cart.loginRequiredDesc'),
-        variant: "destructive",
-      });
-      setLocation('/login');
-      return;
-    }
-    
     try {
       await addToCartMutation.mutateAsync(product.id);
       const productName = language === 'ar' ? product.nameAr : product.nameEn;
@@ -110,20 +96,11 @@ export default function Home() {
           : `${productName} has been added to your cart`,
       });
     } catch (error: any) {
-      if (error?.message?.includes('401')) {
-        toast({
-          title: t('cart.loginRequired'),
-          description: t('cart.loginRequiredDesc'),
-          variant: "destructive",
-        });
-        setLocation('/login');
-      } else {
-        toast({
-          title: t('common.error'),
-          description: t('cart.addError'),
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: t('common.error'),
+        description: t('cart.addError'),
+        variant: "destructive",
+      });
     }
   };
 

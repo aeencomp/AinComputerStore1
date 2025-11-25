@@ -41,13 +41,13 @@ export class DrizzleStorage implements IStorage {
     return Array.from(categories);
   }
 
-  async getCartItems(userId: string): Promise<CartItemRecord[]> {
-    return await db.select().from(cartItems).where(eq(cartItems.userId, userId));
+  async getCartItems(sessionId: string): Promise<CartItemRecord[]> {
+    return await db.select().from(cartItems).where(eq(cartItems.sessionId, sessionId));
   }
 
-  async addToCart(userId: string, insertItem: InsertCartItem): Promise<CartItemRecord> {
+  async addToCart(sessionId: string, insertItem: InsertCartItem): Promise<CartItemRecord> {
     const existing = await db.select().from(cartItems)
-      .where(and(eq(cartItems.userId, userId), eq(cartItems.productId, insertItem.productId)))
+      .where(and(eq(cartItems.sessionId, sessionId), eq(cartItems.productId, insertItem.productId)))
       .limit(1);
     
     if (existing.length > 0) {
@@ -60,26 +60,26 @@ export class DrizzleStorage implements IStorage {
 
     const result = await db.insert(cartItems).values({
       ...insertItem,
-      userId,
+      sessionId,
       quantity: insertItem.quantity ?? 1
     }).returning();
     return result[0];
   }
 
-  async updateCartItemQuantity(id: string, userId: string, quantity: number): Promise<CartItemRecord | undefined> {
+  async updateCartItemQuantity(id: string, sessionId: string, quantity: number): Promise<CartItemRecord | undefined> {
     const result = await db.update(cartItems)
       .set({ quantity })
-      .where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)))
+      .where(and(eq(cartItems.id, id), eq(cartItems.sessionId, sessionId)))
       .returning();
     return result[0];
   }
 
-  async removeFromCart(id: string, userId: string): Promise<void> {
-    await db.delete(cartItems).where(and(eq(cartItems.id, id), eq(cartItems.userId, userId)));
+  async removeFromCart(id: string, sessionId: string): Promise<void> {
+    await db.delete(cartItems).where(and(eq(cartItems.id, id), eq(cartItems.sessionId, sessionId)));
   }
 
-  async clearCart(userId: string): Promise<void> {
-    await db.delete(cartItems).where(eq(cartItems.userId, userId));
+  async clearCart(sessionId: string): Promise<void> {
+    await db.delete(cartItems).where(eq(cartItems.sessionId, sessionId));
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -101,14 +101,14 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
-  async createOrder(insertOrder: InsertOrder, userId: string): Promise<Order> {
+  async createOrder(insertOrder: InsertOrder, sessionId: string): Promise<Order> {
     const sequenceResult = await db.execute(sql`SELECT nextval('order_number_seq') as next_num`);
     const nextNumber = (sequenceResult.rows[0] as any).next_num;
     const orderNumber = `ORD-${String(nextNumber).padStart(5, '0')}`;
     
     const result = await db.insert(orders).values({
       ...insertOrder,
-      userId,
+      sessionId,
       orderNumber,
     }).returning();
     return result[0];
@@ -116,10 +116,6 @@ export class DrizzleStorage implements IStorage {
 
   async getOrders(): Promise<Order[]> {
     return await db.select().from(orders);
-  }
-
-  async getOrdersByUserId(userId: string): Promise<Order[]> {
-    return await db.select().from(orders).where(eq(orders.userId, userId));
   }
 
   async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {

@@ -9,17 +9,13 @@ export interface IStorage {
   updateProduct(id: string, product: Partial<InsertProduct>): Promise<Product | undefined>;
   deleteProduct(id: string): Promise<void>;
   getCategories(): Promise<string[]>;
-  getCartItems(userId: string): Promise<CartItemRecord[]>;
-  addToCart(userId: string, item: InsertCartItem): Promise<CartItemRecord>;
-  updateCartItemQuantity(id: string, userId: string, quantity: number): Promise<CartItemRecord | undefined>;
-  removeFromCart(id: string, userId: string): Promise<void>;
-  clearCart(userId: string): Promise<void>;
-  createUser(user: InsertUser): Promise<User>;
-  getUserByEmail(email: string): Promise<User | undefined>;
-  getUserById(id: string): Promise<User | undefined>;
-  createOrder(order: InsertOrder, userId: string): Promise<any>;
+  getCartItems(sessionId: string): Promise<CartItemRecord[]>;
+  addToCart(sessionId: string, item: InsertCartItem): Promise<CartItemRecord>;
+  updateCartItemQuantity(id: string, sessionId: string, quantity: number): Promise<CartItemRecord | undefined>;
+  removeFromCart(id: string, sessionId: string): Promise<void>;
+  clearCart(sessionId: string): Promise<void>;
+  createOrder(order: InsertOrder, sessionId: string): Promise<any>;
   getOrders(): Promise<any[]>;
-  getOrdersByUserId(userId: string): Promise<any[]>;
   updateOrderStatus(id: string, status: string): Promise<any>;
   getStoreSettings(): Promise<StoreSettings | undefined>;
   updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
@@ -207,13 +203,13 @@ export class MemStorage implements IStorage {
     return Array.from(categories);
   }
 
-  async getCartItems(): Promise<CartItemRecord[]> {
-    return Array.from(this.cartItems.values());
+  async getCartItems(sessionId: string): Promise<CartItemRecord[]> {
+    return Array.from(this.cartItems.values()).filter(item => item.sessionId === sessionId);
   }
 
-  async addToCart(insertItem: InsertCartItem): Promise<CartItemRecord> {
+  async addToCart(sessionId: string, insertItem: InsertCartItem): Promise<CartItemRecord> {
     const existing = Array.from(this.cartItems.values()).find(
-      (item) => item.productId === insertItem.productId
+      (item) => item.productId === insertItem.productId && item.sessionId === sessionId
     );
 
     if (existing) {
@@ -226,27 +222,35 @@ export class MemStorage implements IStorage {
     const cartItem: CartItemRecord = { 
       ...insertItem, 
       id,
+      sessionId,
       quantity: insertItem.quantity ?? 1
     };
     this.cartItems.set(id, cartItem);
     return cartItem;
   }
 
-  async updateCartItemQuantity(id: string, quantity: number): Promise<CartItemRecord | undefined> {
+  async updateCartItemQuantity(id: string, sessionId: string, quantity: number): Promise<CartItemRecord | undefined> {
     const item = this.cartItems.get(id);
-    if (!item) return undefined;
+    if (!item || item.sessionId !== sessionId) return undefined;
 
     item.quantity = quantity;
     this.cartItems.set(id, item);
     return item;
   }
 
-  async removeFromCart(id: string): Promise<void> {
-    this.cartItems.delete(id);
+  async removeFromCart(id: string, sessionId: string): Promise<void> {
+    const item = this.cartItems.get(id);
+    if (item && item.sessionId === sessionId) {
+      this.cartItems.delete(id);
+    }
   }
 
-  async clearCart(): Promise<void> {
-    this.cartItems.clear();
+  async clearCart(sessionId: string): Promise<void> {
+    for (const [id, item] of this.cartItems.entries()) {
+      if (item.sessionId === sessionId) {
+        this.cartItems.delete(id);
+      }
+    }
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
@@ -268,7 +272,7 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async createOrder(insertOrder: InsertOrder, userId: string): Promise<any> {
+  async createOrder(insertOrder: InsertOrder, sessionId: string): Promise<any> {
     const id = randomUUID();
     const orderNumber = `ORD-${String(this.orderCounter).padStart(5, '0')}`;
     this.orderCounter++;
@@ -276,7 +280,7 @@ export class MemStorage implements IStorage {
     const order = {
       ...insertOrder,
       id,
-      userId,
+      sessionId,
       orderNumber,
       createdAt: new Date(),
     };
@@ -286,10 +290,6 @@ export class MemStorage implements IStorage {
 
   async getOrders(): Promise<any[]> {
     return Array.from(this.orders.values());
-  }
-
-  async getOrdersByUserId(userId: string): Promise<any[]> {
-    return Array.from(this.orders.values()).filter(o => o.userId === userId);
   }
 
   async updateOrderStatus(id: string, status: string): Promise<any> {

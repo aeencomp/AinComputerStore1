@@ -44,14 +44,14 @@ export type Product = typeof products.$inferSelect;
 
 export const cartItems = pgTable("cart_items", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
+  sessionId: varchar("session_id").notNull(),
   productId: varchar("product_id").notNull(),
   quantity: integer("quantity").notNull().default(1),
 });
 
 export const insertCartItemSchema = createInsertSchema(cartItems).omit({
   id: true,
-  userId: true,
+  sessionId: true,
 });
 
 export type InsertCartItem = z.infer<typeof insertCartItemSchema>;
@@ -64,7 +64,7 @@ export interface CartItem {
 
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull(),
+  sessionId: varchar("session_id"),
   orderNumber: text("order_number").notNull().unique(),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
@@ -85,7 +85,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   id: true,
   orderNumber: true,
   createdAt: true,
-  userId: true,
+  sessionId: true,
 });
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;

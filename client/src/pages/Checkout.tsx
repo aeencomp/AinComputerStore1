@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -14,9 +13,9 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CartItem, Product } from "@shared/schema";
+import { CartItem } from "@shared/schema";
 import { Banknote, CreditCard } from "lucide-react";
-import { useUser } from "@/hooks/use-user";
+import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -37,43 +36,24 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { user, isAuthenticated, isLoading: userLoading } = useUser();
+  const { language, t } = useLanguage();
 
-  useEffect(() => {
-    if (!userLoading && !isAuthenticated) {
-      toast({
-        title: "يجب تسجيل الدخول",
-        description: "يرجى تسجيل الدخول أو إنشاء حساب للمتابعة",
-        variant: "destructive",
-      });
-      setLocation("/login");
-    }
-  }, [isAuthenticated, userLoading, setLocation, toast]);
-
-  const { data: cartItems = [] } = useQuery<CartItemWithId[]>({
+  const { data: cartItems = [], isLoading: cartLoading } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
   });
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      customerName: user?.name || "",
-      customerEmail: user?.email || "",
-      customerPhone: user?.phone || "",
+      customerName: "",
+      customerEmail: "",
+      customerPhone: "",
       customerAddress: "",
       customerCity: "",
       customerPostal: "",
       paymentMethod: "cash_on_delivery",
     },
   });
-
-  useEffect(() => {
-    if (user) {
-      form.setValue("customerName", user.name);
-      form.setValue("customerEmail", user.email);
-      form.setValue("customerPhone", user.phone);
-    }
-  }, [user, form]);
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues) => {
@@ -119,8 +99,10 @@ export default function Checkout() {
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
       
       toast({
-        title: "✅ تم إنشاء الطلب بنجاح!",
-        description: `رقم طلبك: ${order.orderNumber}\nسيتم التواصل معك قريباً لتأكيد الطلب`,
+        title: t('checkout.orderSuccess'),
+        description: language === 'ar' 
+          ? `رقم طلبك: ${order.orderNumber}\nسيتم التواصل معك قريباً لتأكيد الطلب`
+          : `Your order number: ${order.orderNumber}\nWe will contact you soon to confirm your order`,
         duration: 6000,
       });
       
@@ -130,10 +112,9 @@ export default function Checkout() {
     },
     onError: (error: any) => {
       console.error("Order creation error:", error);
-      const errorMessage = error?.message || "فشل إنشاء الطلب. يرجى المحاولة مرة أخرى.";
       toast({
-        title: "❌ حدث خطأ",
-        description: errorMessage,
+        title: t('common.error'),
+        description: t('checkout.orderError'),
         variant: "destructive",
         duration: 6000,
       });
@@ -145,12 +126,12 @@ export default function Checkout() {
     0
   );
 
-  if (userLoading) {
+  if (cartLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">جاري التحقق من تسجيل الدخول...</p>
+          <p className="text-muted-foreground">{t('checkout.loading')}</p>
         </div>
       </div>
     );
@@ -161,12 +142,12 @@ export default function Checkout() {
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
-            <CardTitle>سلة التسوق فارغة</CardTitle>
+            <CardTitle>{t('cart.empty')}</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="mb-4">يرجى إضافة منتجات قبل المتابعة إلى الدفع</p>
-            <Button onClick={() => setLocation("/")} className="w-full">
-              العودة للمتجر
+            <p className="mb-4">{t('checkout.addProductsFirst')}</p>
+            <Button onClick={() => setLocation("/")} className="w-full" data-testid="button-back-to-store">
+              {t('checkout.backToStore')}
             </Button>
           </CardContent>
         </Card>
@@ -177,13 +158,13 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-8">
-        <h1 className="text-4xl font-bold mb-8">إتمام الطلب</h1>
+        <h1 className="text-4xl font-bold mb-8" data-testid="text-checkout-title">{t('checkout.title')}</h1>
 
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2">
             <Card>
               <CardHeader>
-                <CardTitle>معلومات التسليم</CardTitle>
+                <CardTitle>{t('checkout.customerInfo')}</CardTitle>
               </CardHeader>
               <CardContent>
                 <Form {...form}>
@@ -194,9 +175,9 @@ export default function Checkout() {
                         name="customerName"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>الاسم الكامل</FormLabel>
+                            <FormLabel>{t('checkout.fullName')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="أدخل الاسم الكامل" {...field} data-testid="input-name" />
+                              <Input placeholder={t('checkout.fullNamePlaceholder')} {...field} data-testid="input-name" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -207,7 +188,7 @@ export default function Checkout() {
                         name="customerEmail"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>البريد الإلكتروني</FormLabel>
+                            <FormLabel>{t('checkout.email')}</FormLabel>
                             <FormControl>
                               <Input type="email" placeholder="example@email.com" {...field} data-testid="input-email" />
                             </FormControl>
@@ -223,7 +204,7 @@ export default function Checkout() {
                         name="customerPhone"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>رقم الهاتف</FormLabel>
+                            <FormLabel>{t('checkout.phone')}</FormLabel>
                             <FormControl>
                               <Input placeholder="+964..." {...field} data-testid="input-phone" />
                             </FormControl>
@@ -236,9 +217,9 @@ export default function Checkout() {
                         name="customerCity"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>المدينة</FormLabel>
+                            <FormLabel>{t('checkout.city')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="بغداد" {...field} data-testid="input-city" />
+                              <Input placeholder={language === 'ar' ? 'بغداد' : 'Baghdad'} {...field} data-testid="input-city" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -251,9 +232,9 @@ export default function Checkout() {
                       name="customerAddress"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>العنوان</FormLabel>
+                          <FormLabel>{t('checkout.address')}</FormLabel>
                           <FormControl>
-                            <Textarea placeholder="أدخل عنوانك" {...field} data-testid="input-address" />
+                            <Textarea placeholder={t('checkout.addressPlaceholder')} {...field} data-testid="input-address" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -265,7 +246,7 @@ export default function Checkout() {
                       name="customerPostal"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>الرمز البريدي</FormLabel>
+                          <FormLabel>{t('checkout.postalCode')}</FormLabel>
                           <FormControl>
                             <Input placeholder="10001" {...field} data-testid="input-postal" />
                           </FormControl>
@@ -281,7 +262,7 @@ export default function Checkout() {
                       name="paymentMethod"
                       render={({ field }) => (
                         <FormItem className="space-y-3">
-                          <FormLabel className="text-lg font-semibold">طريقة الدفع</FormLabel>
+                          <FormLabel className="text-lg font-semibold">{t('checkout.paymentMethod')}</FormLabel>
                           <FormControl>
                             <RadioGroup
                               onValueChange={field.onChange}
@@ -294,8 +275,8 @@ export default function Checkout() {
                                 <Label htmlFor="cash" className="flex items-center gap-3 cursor-pointer flex-1">
                                   <Banknote className="w-5 h-5 text-primary" />
                                   <div>
-                                    <div className="font-medium">الدفع عند الاستلام</div>
-                                    <div className="text-sm text-muted-foreground">ادفع نقداً عند استلام الطلب</div>
+                                    <div className="font-medium">{t('checkout.cashOnDelivery')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('checkout.cashOnDeliveryDesc')}</div>
                                   </div>
                                 </Label>
                               </div>
@@ -304,8 +285,8 @@ export default function Checkout() {
                                 <Label htmlFor="online" className="flex items-center gap-3 flex-1">
                                   <CreditCard className="w-5 h-5" />
                                   <div>
-                                    <div className="font-medium">الدفع الإلكتروني</div>
-                                    <div className="text-sm text-muted-foreground">قريباً</div>
+                                    <div className="font-medium">{t('checkout.onlinePayment')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('checkout.comingSoon')}</div>
                                   </div>
                                 </Label>
                               </div>
@@ -317,7 +298,7 @@ export default function Checkout() {
                     />
 
                     <Button type="submit" className="w-full" disabled={createOrderMutation.isPending} data-testid="button-place-order">
-                      {createOrderMutation.isPending ? "جاري إنشاء الطلب..." : "تأكيد الطلب"}
+                      {createOrderMutation.isPending ? t('checkout.processing') : t('checkout.confirmOrder')}
                     </Button>
                   </form>
                 </Form>
@@ -328,24 +309,24 @@ export default function Checkout() {
           <div>
             <Card>
               <CardHeader>
-                <CardTitle>ملخص الطلب</CardTitle>
+                <CardTitle>{t('checkout.orderSummary')}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 {cartItems.map((item) => (
-                  <div key={item.id} className="space-y-2">
+                  <div key={item.id} className="space-y-2" data-testid={`cart-item-${item.id}`}>
                     <div className="flex justify-between">
-                      <span>{item.product.nameAr}</span>
+                      <span>{language === 'ar' ? item.product.nameAr : item.product.nameEn}</span>
                       <span>x{item.quantity}</span>
                     </div>
                     <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>{parseFloat(item.product.price).toLocaleString('ar-IQ', { minimumFractionDigits: 2 })} د.ع</span>
+                      <span>{parseFloat(item.product.price).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 2 })} {t('common.currency')}</span>
                     </div>
                   </div>
                 ))}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
-                  <span>الإجمالي</span>
-                  <span>{subtotal.toLocaleString('ar-IQ', { minimumFractionDigits: 2 })} د.ع</span>
+                  <span>{t('cart.total')}</span>
+                  <span data-testid="text-order-total">{subtotal.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 2 })} {t('common.currency')}</span>
                 </div>
               </CardContent>
             </Card>

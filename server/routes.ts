@@ -233,11 +233,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/cart", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.json([]);
-      }
-      
-      const cartItems = await storage.getCartItems(req.session.userId);
+      const sessionId = req.session.id;
+      const cartItems = await storage.getCartItems(sessionId);
       const itemsWithProducts = await Promise.all(
         cartItems.map(async (item) => {
           const product = await storage.getProduct(item.productId);
@@ -255,10 +252,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cart", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "يجب تسجيل الدخول لإضافة منتجات للسلة" });
-      }
-      
+      const sessionId = req.session.id;
       const validatedData = insertCartItemSchema.parse(req.body);
       const product = await storage.getProduct(validatedData.productId);
       
@@ -266,7 +260,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
 
-      const cartItem = await storage.addToCart(req.session.userId, validatedData);
+      const cartItem = await storage.addToCart(sessionId, validatedData);
       return res.json({ ...cartItem, product });
     } catch (error) {
       console.error("Error adding to cart:", error);
@@ -276,10 +270,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/cart/:id", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "يجب تسجيل الدخول" });
-      }
-      
+      const sessionId = req.session.id;
       const { id } = req.params;
       
       const quantitySchema = z.object({
@@ -288,7 +279,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const validatedData = quantitySchema.parse(req.body);
       
-      const updatedItem = await storage.updateCartItemQuantity(id, req.session.userId, validatedData.quantity);
+      const updatedItem = await storage.updateCartItemQuantity(id, sessionId, validatedData.quantity);
       
       if (!updatedItem) {
         return res.status(404).json({ error: "Cart item not found" });
@@ -307,12 +298,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart/:id", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "يجب تسجيل الدخول" });
-      }
-      
+      const sessionId = req.session.id;
       const { id } = req.params;
-      await storage.removeFromCart(id, req.session.userId);
+      await storage.removeFromCart(id, sessionId);
       return res.json({ success: true });
     } catch (error) {
       console.error("Error removing from cart:", error);
@@ -322,11 +310,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "يجب تسجيل الدخول" });
-      }
-      
-      await storage.clearCart(req.session.userId);
+      const sessionId = req.session.id;
+      await storage.clearCart(sessionId);
       return res.json({ success: true });
     } catch (error) {
       console.error("Error clearing cart:", error);
@@ -336,19 +321,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/orders", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "يجب تسجيل الدخول لإكمال الطلب" });
-      }
+      const sessionId = req.session.id;
 
       console.log("Received order data:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
       console.log("Validated order data:", JSON.stringify(validatedData, null, 2));
       
-      const order = await storage.createOrder(validatedData, req.session.userId);
+      const order = await storage.createOrder(validatedData, sessionId);
       console.log("Created order:", order.id);
       
       try {
-        await storage.clearCart(req.session.userId);
+        await storage.clearCart(sessionId);
       } catch (clearError) {
         console.error("Warning: Failed to clear cart after order creation:", clearError);
       }
