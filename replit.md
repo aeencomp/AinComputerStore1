@@ -233,6 +233,38 @@ Order confirmation emails via Gmail SMTP:
 - Free shipping threshold configurable (default: 100,000 IQD)
 - Shipping cost displayed at checkout
 
+## PC Builder Feature
+
+**Step-by-Step Component Selection**
+- 8 component types in logical order: CPU, Motherboard, RAM, GPU, Storage, PSU, Case, Cooler
+- Step indicators showing current progress and completed selections
+- Navigation buttons (Previous/Next) to move between steps
+- Components filtered by componentType field
+
+**Compatibility Checking**
+- Real-time validation between selected components:
+  - CPU ↔ Motherboard: Socket matching (LGA1700, AM5)
+  - Motherboard ↔ RAM: DDR type and slot count
+  - GPU ↔ Case: Length compatibility (maxGpuLengthMm)
+  - Cooler ↔ CPU: Socket support validation
+  - Cooler ↔ Case: Height (air) or radiator size (AIO) compatibility
+  - Case ↔ Motherboard: Form factor support (ATX, Micro-ATX, Mini-ITX)
+  - PSU ↔ Case: Form factor compatibility (ATX, SFX)
+- Power consumption estimates and PSU sufficiency warnings
+
+**Build Summary Sidebar**
+- Live-updating list of selected components
+- Total power consumption estimate
+- Recommended PSU wattage with 40% headroom
+- Running total price in IQD
+- "Add to Cart" button for complete build
+- "Clear All" button to reset selections
+
+**Database Schema**
+- products.componentType: 'cpu' | 'motherboard' | 'ram' | 'gpu' | 'storage' | 'psu' | 'case' | 'cooler'
+- products.compatibility: JSONB with component-specific fields
+- Batch cart API: POST /api/cart/batch for adding all components at once
+
 **Order Number System**
 - Uses PostgreSQL sequence (order_number_seq) for auto-increment
 - Format: ORD-XXXXX (e.g., ORD-01001)
