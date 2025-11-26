@@ -397,7 +397,7 @@ export default function AdminSettings() {
                     <Input
                       id="whatsappNumber"
                       {...form.register("whatsappNumber")}
-                      placeholder="07XX XXX XXXX"
+                      placeholder="07XXXXXXXXX"
                       data-testid="input-whatsapp"
                     />
                     <p className="text-sm text-muted-foreground">{t("admin.settings.whatsappNumberHint")}</p>

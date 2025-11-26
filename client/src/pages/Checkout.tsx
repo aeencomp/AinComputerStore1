@@ -250,7 +250,7 @@ export default function Checkout() {
                           <FormItem>
                             <FormLabel>{t('checkout.phone')}</FormLabel>
                             <FormControl>
-                              <Input placeholder="07XX XXX XXXX" {...field} data-testid="input-phone" />
+                              <Input placeholder="07XXXXXXXXX" {...field} data-testid="input-phone" />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
