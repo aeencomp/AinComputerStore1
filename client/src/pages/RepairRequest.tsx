@@ -59,8 +59,8 @@ export default function RepairRequest() {
 
   const createMutation = useMutation({
     mutationFn: async (data: z.infer<typeof formSchema>) => {
-      const result = await apiRequest('/api/repair-tickets', 'POST', data);
-      return result as any;
+      const result = await apiRequest('POST', '/api/repair-tickets', data);
+      return result.json();
     },
     onSuccess: (data: any) => {
       setTicketNumber(data.ticketNumber);

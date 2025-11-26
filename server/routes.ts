@@ -460,22 +460,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/repair-tickets/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const ticket = await storage.getRepairTicket(id);
-      
-      if (!ticket) {
-        return res.status(404).json({ error: "Repair ticket not found" });
-      }
-      
-      return res.json(ticket);
-    } catch (error) {
-      console.error("Error fetching repair ticket:", error);
-      return res.status(500).json({ error: "Failed to fetch repair ticket" });
-    }
-  });
-
   app.get("/api/repair-tickets/lookup/:ticketNumber", async (req, res) => {
     try {
       const { ticketNumber } = req.params;
@@ -489,6 +473,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error looking up repair ticket:", error);
       return res.status(500).json({ error: "Failed to lookup repair ticket" });
+    }
+  });
+
+  app.get("/api/repair-tickets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.getRepairTicket(id);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Repair ticket not found" });
+      }
+      
+      return res.json(ticket);
+    } catch (error) {
+      console.error("Error fetching repair ticket:", error);
+      return res.status(500).json({ error: "Failed to fetch repair ticket" });
     }
   });
 

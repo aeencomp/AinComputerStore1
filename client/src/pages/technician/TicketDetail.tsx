@@ -74,7 +74,7 @@ export default function TicketDetail() {
   const updateMutation = useMutation({
     mutationFn: async (data: z.infer<typeof updateSchema>) => {
       if (!params?.id) throw new Error('No ticket ID');
-      return await apiRequest(`/api/admin/repair-tickets/${params.id}`, 'PATCH', {
+      return await apiRequest('PATCH', `/api/admin/repair-tickets/${params.id}`, {
         ...data,
         estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
       });

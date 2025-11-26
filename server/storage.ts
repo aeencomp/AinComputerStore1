@@ -326,6 +326,26 @@ export class MemStorage implements IStorage {
     };
     return { ...defaultSettings, ...settings };
   }
+
+  async createRepairTicket(ticket: InsertRepairTicket): Promise<RepairTicket> {
+    throw new Error("MemStorage does not support repair tickets");
+  }
+
+  async getRepairTickets(): Promise<RepairTicket[]> {
+    return [];
+  }
+
+  async getRepairTicket(id: string): Promise<RepairTicket | undefined> {
+    return undefined;
+  }
+
+  async getRepairTicketByNumber(ticketNumber: string): Promise<RepairTicket | undefined> {
+    return undefined;
+  }
+
+  async updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined> {
+    return undefined;
+  }
 }
 
 import { DrizzleStorage } from "./db-storage";

@@ -11,9 +11,10 @@ export class DrizzleStorage implements IStorage {
     if (this.sequenceInitialized) return;
     try {
       await db.execute(sql`CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1001 INCREMENT BY 1`);
+      await db.execute(sql`CREATE SEQUENCE IF NOT EXISTS repair_ticket_seq START WITH 1001 INCREMENT BY 1`);
       this.sequenceInitialized = true;
     } catch (error) {
-      console.error('Failed to create order sequence:', error);
+      console.error('Failed to create sequences:', error);
     }
   }
 
@@ -162,8 +163,9 @@ export class DrizzleStorage implements IStorage {
   }
 
   async createRepairTicket(insertTicket: InsertRepairTicket): Promise<RepairTicket> {
-    const sequenceResult = await db.execute(sql`SELECT nextval(pg_get_serial_sequence('repair_tickets', 'id')) as next_num`);
-    const nextNumber = (sequenceResult.rows[0] as any)?.next_num || Math.floor(Math.random() * 10000);
+    await this.ensureOrderSequence();
+    const sequenceResult = await db.execute(sql`SELECT nextval('repair_ticket_seq') as next_num`);
+    const nextNumber = (sequenceResult.rows[0] as any).next_num;
     const ticketNumber = `REP-${String(nextNumber).padStart(5, '0')}`;
     
     const result = await db.insert(repairTickets).values({
