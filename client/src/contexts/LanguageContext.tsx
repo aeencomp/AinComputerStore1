@@ -451,6 +451,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.technician.dashboard.filterPriority': 'تصفية حسب الأولوية',
     'repair.technician.dashboard.searchPhone': 'البحث برقم الهاتف...',
     'repair.technician.dashboard.searchNameOrPhone': 'البحث بالاسم أو رقم الهاتف...',
+    'repair.technician.dashboard.searchAll': 'البحث بالاسم أو الهاتف أو رقم التذكرة...',
     'repair.technician.dashboard.noTickets': 'لا توجد تذاكر',
     
     'repair.edit.title': 'تحديث التذكرة',
@@ -921,6 +922,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.technician.dashboard.filterPriority': 'Filter by Priority',
     'repair.technician.dashboard.searchPhone': 'Search by phone number...',
     'repair.technician.dashboard.searchNameOrPhone': 'Search by name or phone...',
+    'repair.technician.dashboard.searchAll': 'Search by name, phone, or ticket #...',
     'repair.technician.dashboard.noTickets': 'No tickets found',
     
     'repair.edit.title': 'Update Ticket',

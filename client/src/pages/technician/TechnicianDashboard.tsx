@@ -43,7 +43,8 @@ export default function TechnicianDashboard() {
       const normalizedPhone = ticket.customerPhone.replace(/[\s\-\+]/g, '');
       const nameMatch = ticket.customerName.toLowerCase().includes(query);
       const phoneMatch = normalizedPhone.includes(normalizedQuery);
-      if (!nameMatch && !phoneMatch) return false;
+      const ticketNumberMatch = ticket.ticketNumber.toLowerCase().includes(query);
+      if (!nameMatch && !phoneMatch && !ticketNumberMatch) return false;
     }
     return true;
   });
@@ -92,7 +93,7 @@ export default function TechnicianDashboard() {
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
               type="text"
-              placeholder={t('repair.technician.dashboard.searchNameOrPhone')}
+              placeholder={t('repair.technician.dashboard.searchAll')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="ps-10"
