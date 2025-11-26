@@ -495,7 +495,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/repair-tickets/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      const validatedData = insertRepairTicketSchema.partial().parse(req.body);
+      
+      // Convert empty strings to null for numeric fields
+      const cleanedBody = { ...req.body };
+      if (cleanedBody.costEstimate === '' || cleanedBody.costEstimate === undefined) {
+        cleanedBody.costEstimate = null;
+      }
+      if (cleanedBody.finalCost === '' || cleanedBody.finalCost === undefined) {
+        cleanedBody.finalCost = null;
+      }
+      
+      const validatedData = insertRepairTicketSchema.partial().parse(cleanedBody);
       const ticket = await storage.updateRepairTicket(id, validatedData);
       
       if (!ticket) {
