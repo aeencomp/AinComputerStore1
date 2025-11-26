@@ -5,9 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/contexts/LanguageContext';
 import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench } from 'lucide-react';
+import { LogOut, Wrench, Search, Phone } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function TechnicianDashboard() {
@@ -15,6 +16,7 @@ export default function TechnicianDashboard() {
   const { t, language } = useLanguage();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [searchPhone, setSearchPhone] = useState<string>('');
 
   useEffect(() => {
     const isAuth = localStorage.getItem('technicianAuth');
@@ -35,6 +37,11 @@ export default function TechnicianDashboard() {
   const filteredTickets = tickets?.filter((ticket) => {
     if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
     if (filterPriority !== 'all' && ticket.priority !== filterPriority) return false;
+    if (searchPhone) {
+      const normalizedSearch = searchPhone.replace(/[\s\-\+]/g, '');
+      const normalizedPhone = ticket.customerPhone.replace(/[\s\-\+]/g, '');
+      if (!normalizedPhone.includes(normalizedSearch)) return false;
+    }
     return true;
   });
 
@@ -78,6 +85,18 @@ export default function TechnicianDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex flex-col md:flex-row gap-4 mb-6">
+          <div className="relative flex-1 md:max-w-[300px]">
+            <Phone className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="tel"
+              placeholder={t('repair.technician.dashboard.searchPhone')}
+              value={searchPhone}
+              onChange={(e) => setSearchPhone(e.target.value)}
+              className="ps-10"
+              data-testid="input-search-phone"
+            />
+          </div>
+
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-full md:w-[200px]" data-testid="select-filter-status">
               <SelectValue placeholder={t('repair.technician.dashboard.filterStatus')} />
