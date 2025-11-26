@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
+import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -440,6 +441,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const validatedData = insertRepairTicketSchema.parse(req.body);
       const ticket = await storage.createRepairTicket(validatedData);
+      
+      // Send WhatsApp notification (non-blocking)
+      sendTicketCreatedMessage(
+        ticket.customerPhone,
+        ticket.customerName,
+        ticket.ticketNumber,
+        ticket.deviceType,
+        ticket.deviceBrand
+      ).catch(err => console.error('WhatsApp notification failed:', err));
+      
       return res.json(ticket);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -511,6 +522,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!ticket) {
         return res.status(404).json({ error: "Repair ticket not found" });
       }
+      
+      // Send WhatsApp update notification (non-blocking)
+      sendTicketUpdatedMessage(
+        ticket.customerPhone,
+        ticket.customerName,
+        ticket.ticketNumber,
+        ticket.status,
+        ticket.technicianNotes,
+        ticket.costEstimate,
+        ticket.finalCost
+      ).catch(err => console.error('WhatsApp update notification failed:', err));
       
       return res.json(ticket);
     } catch (error) {
