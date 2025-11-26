@@ -465,6 +465,16 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.edit.successMessage': 'تم تحديث التذكرة بنجاح',
     'repair.edit.errorMessage': 'فشل تحديث التذكرة',
     
+    'repair.delete.button': 'حذف التذكرة',
+    'repair.delete.title': 'حذف التذكرة',
+    'repair.delete.description': 'هل أنت متأكد من حذف هذه التذكرة؟ لا يمكن التراجع عن هذا الإجراء.',
+    'repair.delete.confirm': 'نعم، حذف',
+    'repair.delete.cancel': 'إلغاء',
+    'repair.delete.deleting': 'جاري الحذف...',
+    'repair.delete.successTitle': 'تم الحذف',
+    'repair.delete.successMessage': 'تم حذف التذكرة بنجاح',
+    'repair.delete.errorMessage': 'فشل حذف التذكرة',
+    
     // Common
     'common.currency': 'د.ع',
     'common.loading': 'جاري التحميل...',
@@ -923,6 +933,16 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.edit.successTitle': 'Updated',
     'repair.edit.successMessage': 'Ticket updated successfully',
     'repair.edit.errorMessage': 'Failed to update ticket',
+    
+    'repair.delete.button': 'Delete Ticket',
+    'repair.delete.title': 'Delete Ticket',
+    'repair.delete.description': 'Are you sure you want to delete this ticket? This action cannot be undone.',
+    'repair.delete.confirm': 'Yes, Delete',
+    'repair.delete.cancel': 'Cancel',
+    'repair.delete.deleting': 'Deleting...',
+    'repair.delete.successTitle': 'Deleted',
+    'repair.delete.successMessage': 'Ticket deleted successfully',
+    'repair.delete.errorMessage': 'Failed to delete ticket',
     
     // Common
     'common.currency': 'IQD',

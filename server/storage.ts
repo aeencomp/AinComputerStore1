@@ -24,6 +24,7 @@ export interface IStorage {
   getRepairTicket(id: string): Promise<RepairTicket | undefined>;
   getRepairTicketByNumber(ticketNumber: string): Promise<RepairTicket | undefined>;
   updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined>;
+  deleteRepairTicket(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -345,6 +346,10 @@ export class MemStorage implements IStorage {
 
   async updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined> {
     return undefined;
+  }
+
+  async deleteRepairTicket(id: string): Promise<void> {
+    // MemStorage does not support repair tickets
   }
 }
 

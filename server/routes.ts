@@ -522,6 +522,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/admin/repair-tickets/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteRepairTicket(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting repair ticket:", error);
+      return res.status(500).json({ error: "Failed to delete repair ticket" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

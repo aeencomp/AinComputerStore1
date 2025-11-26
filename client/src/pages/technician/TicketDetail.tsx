@@ -11,13 +11,24 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket } from '@shared/schema';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Trash2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function TicketDetail() {
   const [, params] = useRoute('/technician/tickets/:id');
@@ -91,6 +102,28 @@ export default function TicketDetail() {
       toast({
         title: t('common.error'),
         description: t('repair.edit.errorMessage'),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!params?.id) throw new Error('No ticket ID');
+      return await apiRequest('DELETE', `/api/admin/repair-tickets/${params.id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      toast({
+        title: t('repair.delete.successTitle'),
+        description: t('repair.delete.successMessage'),
+      });
+      setLocation('/technician/dashboard');
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('repair.delete.errorMessage'),
         variant: 'destructive',
       });
     },
@@ -288,9 +321,45 @@ export default function TicketDetail() {
                   )}
                 />
 
-                <Button type="submit" disabled={updateMutation.isPending} data-testid="button-save-ticket">
-                  {updateMutation.isPending ? t('repair.edit.saving') : t('repair.edit.save')}
-                </Button>
+                <div className="flex items-center gap-4 justify-between">
+                  <Button type="submit" disabled={updateMutation.isPending} data-testid="button-save-ticket">
+                    {updateMutation.isPending ? t('repair.edit.saving') : t('repair.edit.save')}
+                  </Button>
+                  
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button 
+                        type="button" 
+                        variant="destructive" 
+                        disabled={deleteMutation.isPending}
+                        data-testid="button-delete-ticket"
+                      >
+                        <Trash2 className="h-4 w-4 ltr:mr-2 rtl:ml-2" />
+                        {deleteMutation.isPending ? t('repair.delete.deleting') : t('repair.delete.button')}
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>{t('repair.delete.title')}</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          {t('repair.delete.description')}
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel data-testid="button-cancel-delete">
+                          {t('repair.delete.cancel')}
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={() => deleteMutation.mutate()}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          data-testid="button-confirm-delete"
+                        >
+                          {t('repair.delete.confirm')}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </form>
             </Form>
           </CardContent>
