@@ -5,6 +5,18 @@ import type { IStorage } from "./storage";
 import bcrypt from "bcrypt";
 
 export class DrizzleStorage implements IStorage {
+  private sequenceInitialized = false;
+
+  private async ensureOrderSequence(): Promise<void> {
+    if (this.sequenceInitialized) return;
+    try {
+      await db.execute(sql`CREATE SEQUENCE IF NOT EXISTS order_number_seq START WITH 1001 INCREMENT BY 1`);
+      this.sequenceInitialized = true;
+    } catch (error) {
+      console.error('Failed to create order sequence:', error);
+    }
+  }
+
   async getProducts(): Promise<Product[]> {
     return await db.select().from(products);
   }
@@ -102,6 +114,7 @@ export class DrizzleStorage implements IStorage {
   }
 
   async createOrder(insertOrder: InsertOrder, sessionId: string): Promise<Order> {
+    await this.ensureOrderSequence();
     const sequenceResult = await db.execute(sql`SELECT nextval('order_number_seq') as next_num`);
     const nextNumber = (sequenceResult.rows[0] as any).next_num;
     const orderNumber = `ORD-${String(nextNumber).padStart(5, '0')}`;

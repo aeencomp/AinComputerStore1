@@ -11,23 +11,46 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CartItem } from "@shared/schema";
-import { Banknote, CreditCard } from "lucide-react";
+import { CartItem, StoreSettings } from "@shared/schema";
+import { Banknote, Smartphone, Truck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CartItemWithId extends CartItem {
   id: string;
 }
 
+// Iraqi governorates (provinces) with Arabic and English names
+const iraqiGovernorates = [
+  { value: "baghdad", ar: "بغداد", en: "Baghdad" },
+  { value: "basra", ar: "البصرة", en: "Basra" },
+  { value: "nineveh", ar: "نينوى", en: "Nineveh" },
+  { value: "erbil", ar: "أربيل", en: "Erbil" },
+  { value: "sulaymaniyah", ar: "السليمانية", en: "Sulaymaniyah" },
+  { value: "duhok", ar: "دهوك", en: "Duhok" },
+  { value: "kirkuk", ar: "كركوك", en: "Kirkuk" },
+  { value: "diyala", ar: "ديالى", en: "Diyala" },
+  { value: "anbar", ar: "الأنبار", en: "Anbar" },
+  { value: "babylon", ar: "بابل", en: "Babylon" },
+  { value: "karbala", ar: "كربلاء", en: "Karbala" },
+  { value: "najaf", ar: "النجف", en: "Najaf" },
+  { value: "wasit", ar: "واسط", en: "Wasit" },
+  { value: "maysan", ar: "ميسان", en: "Maysan" },
+  { value: "dhi_qar", ar: "ذي قار", en: "Dhi Qar" },
+  { value: "muthanna", ar: "المثنى", en: "Muthanna" },
+  { value: "qadisiyyah", ar: "القادسية", en: "Qadisiyyah" },
+  { value: "saladin", ar: "صلاح الدين", en: "Saladin" },
+];
+
 const checkoutSchema = z.object({
   customerName: z.string().min(2, "الاسم مطلوب"),
   customerEmail: z.string().email("البريد الإلكتروني غير صحيح"),
-  customerPhone: z.string().min(8, "رقم الهاتف مطلوب"),
+  customerPhone: z.string().min(10, "رقم الهاتف يجب أن يكون على الأقل 10 أرقام"),
   customerAddress: z.string().min(5, "العنوان مطلوب"),
-  customerCity: z.string().min(2, "المدينة مطلوبة"),
-  customerPostal: z.string().min(2, "الرمز البريدي مطلوب"),
+  customerCity: z.string().min(2, "المحافظة مطلوبة"),
+  customerPostal: z.string().min(2, "المنطقة/الحي مطلوب"),
   paymentMethod: z.string().min(1, "طريقة الدفع مطلوبة"),
 });
 
@@ -41,6 +64,15 @@ export default function Checkout() {
   const { data: cartItems = [], isLoading: cartLoading } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
   });
+
+  const { data: settings } = useQuery<StoreSettings>({
+    queryKey: ['/api/store-settings'],
+  });
+
+  // Calculate shipping based on settings
+  const shippingCost = settings ? parseFloat(settings.shippingCost || "5000") : 5000;
+  const freeShippingThreshold = settings ? parseFloat(settings.freeShippingThreshold || "100000") : 100000;
+  const enableFreeShipping = settings ? settings.enableFreeShipping === 1 : true;
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -62,24 +94,36 @@ export default function Checkout() {
           (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
           0
         );
+        
+        // Calculate shipping - free if above threshold
+        const calculatedShipping = enableFreeShipping && subtotal >= freeShippingThreshold 
+          ? 0 
+          : shippingCost;
+        
         const items = cartItems.map(item => JSON.stringify({
           productId: item.product.id,
           quantity: item.quantity,
           price: item.product.price,
         }));
 
+        // Get the governorate display name for storage
+        const selectedGovernorate = iraqiGovernorates.find(g => g.value === data.customerCity);
+        const cityName = selectedGovernorate 
+          ? (language === 'ar' ? selectedGovernorate.ar : selectedGovernorate.en)
+          : data.customerCity;
+
         const orderPayload = {
           customerName: data.customerName,
           customerEmail: data.customerEmail,
           customerPhone: data.customerPhone,
           customerAddress: data.customerAddress,
-          customerCity: data.customerCity,
-          customerPostal: data.customerPostal,
+          customerCity: cityName,
+          customerPostal: data.customerPostal, // This now stores neighborhood/area
           paymentMethod: data.paymentMethod,
           items: items,
           subtotal: subtotal.toString(),
-          shipping: "0",
-          total: subtotal.toString(),
+          shipping: calculatedShipping.toString(),
+          total: (subtotal + calculatedShipping).toString(),
           status: "pending",
         };
 
@@ -217,10 +261,21 @@ export default function Checkout() {
                         name="customerCity"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>{t('checkout.city')}</FormLabel>
-                            <FormControl>
-                              <Input placeholder={language === 'ar' ? 'بغداد' : 'Baghdad'} {...field} data-testid="input-city" />
-                            </FormControl>
+                            <FormLabel>{t('checkout.governorate')}</FormLabel>
+                            <Select onValueChange={field.onChange} defaultValue={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-city">
+                                  <SelectValue placeholder={t('checkout.selectGovernorate')} />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {iraqiGovernorates.map((gov) => (
+                                  <SelectItem key={gov.value} value={gov.value}>
+                                    {language === 'ar' ? gov.ar : gov.en}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}
@@ -246,9 +301,9 @@ export default function Checkout() {
                       name="customerPostal"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('checkout.postalCode')}</FormLabel>
+                          <FormLabel>{t('checkout.neighborhood')}</FormLabel>
                           <FormControl>
-                            <Input placeholder="10001" {...field} data-testid="input-postal" />
+                            <Input placeholder={t('checkout.neighborhoodPlaceholder')} {...field} data-testid="input-neighborhood" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -280,13 +335,23 @@ export default function Checkout() {
                                   </div>
                                 </Label>
                               </div>
-                              <div className="flex items-center space-x-2 space-x-reverse border rounded-lg p-4 opacity-50 cursor-not-allowed">
-                                <RadioGroupItem value="online" id="online" disabled />
-                                <Label htmlFor="online" className="flex items-center gap-3 flex-1">
-                                  <CreditCard className="w-5 h-5" />
+                              <div className="flex items-center space-x-2 space-x-reverse border rounded-lg p-4 hover-elevate cursor-pointer">
+                                <RadioGroupItem value="zaincash" id="zaincash" data-testid="radio-zaincash" />
+                                <Label htmlFor="zaincash" className="flex items-center gap-3 cursor-pointer flex-1">
+                                  <Smartphone className="w-5 h-5 text-green-600" />
                                   <div>
-                                    <div className="font-medium">{t('checkout.onlinePayment')}</div>
-                                    <div className="text-sm text-muted-foreground">{t('checkout.comingSoon')}</div>
+                                    <div className="font-medium">{t('checkout.zainCash')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('checkout.zainCashDesc')}</div>
+                                  </div>
+                                </Label>
+                              </div>
+                              <div className="flex items-center space-x-2 space-x-reverse border rounded-lg p-4 hover-elevate cursor-pointer">
+                                <RadioGroupItem value="fastpay" id="fastpay" data-testid="radio-fastpay" />
+                                <Label htmlFor="fastpay" className="flex items-center gap-3 cursor-pointer flex-1">
+                                  <Truck className="w-5 h-5 text-blue-600" />
+                                  <div>
+                                    <div className="font-medium">{t('checkout.fastPay')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('checkout.fastPayDesc')}</div>
                                   </div>
                                 </Label>
                               </div>
@@ -319,14 +384,35 @@ export default function Checkout() {
                       <span>x{item.quantity}</span>
                     </div>
                     <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>{parseFloat(item.product.price).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 2 })} {t('common.currency')}</span>
+                      <span>{parseFloat(item.product.price).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
                     </div>
                   </div>
                 ))}
                 <Separator />
+                <div className="flex justify-between">
+                  <span>{t('checkout.subtotal')}</span>
+                  <span data-testid="text-subtotal">{subtotal.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{t('checkout.shipping')}</span>
+                  <span data-testid="text-shipping" className={enableFreeShipping && subtotal >= freeShippingThreshold ? "text-green-600 font-medium" : ""}>
+                    {enableFreeShipping && subtotal >= freeShippingThreshold 
+                      ? t('checkout.freeShipping')
+                      : `${shippingCost.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} ${t('common.currency')}`
+                    }
+                  </span>
+                </div>
+                {enableFreeShipping && subtotal < freeShippingThreshold && (
+                  <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
+                    {t('checkout.freeShippingThreshold', { amount: freeShippingThreshold.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 }) })}
+                  </div>
+                )}
+                <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>{t('cart.total')}</span>
-                  <span data-testid="text-order-total">{subtotal.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 2 })} {t('common.currency')}</span>
+                  <span data-testid="text-order-total">
+                    {(subtotal + (enableFreeShipping && subtotal >= freeShippingThreshold ? 0 : shippingCost)).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}
+                  </span>
                 </div>
               </CardContent>
             </Card>

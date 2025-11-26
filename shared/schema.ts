@@ -107,6 +107,7 @@ export const storeSettings = pgTable("store_settings", {
   facebookUrl: text("facebook_url").default(""),
   twitterUrl: text("twitter_url").default(""),
   instagramUrl: text("instagram_url").default(""),
+  whatsappNumber: text("whatsapp_number").default(""),
   
   // Theme & Branding
   logoUrl: text("logo_url").default(""),

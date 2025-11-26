@@ -37,6 +37,7 @@ export default function AdminSettings() {
     facebookUrl: z.string().optional(),
     twitterUrl: z.string().optional(),
     instagramUrl: z.string().optional(),
+    whatsappNumber: z.string().optional(),
     logoUrl: z.string().optional(),
     faviconUrl: z.string().optional(),
     primaryColor: z.string().optional(),
@@ -92,6 +93,7 @@ export default function AdminSettings() {
       facebookUrl: settings.facebookUrl || "",
       twitterUrl: settings.twitterUrl || "",
       instagramUrl: settings.instagramUrl || "",
+      whatsappNumber: settings.whatsappNumber || "",
       logoUrl: settings.logoUrl || "",
       faviconUrl: settings.faviconUrl || "",
       primaryColor: settings.primaryColor || "#3B82F6",
@@ -389,6 +391,16 @@ export default function AdminSettings() {
                       placeholder="https://instagram.com/..."
                       data-testid="input-instagram"
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsappNumber">{t("admin.settings.whatsappNumber")}</Label>
+                    <Input
+                      id="whatsappNumber"
+                      {...form.register("whatsappNumber")}
+                      placeholder="+964 770 123 4567"
+                      data-testid="input-whatsapp"
+                    />
+                    <p className="text-sm text-muted-foreground">{t("admin.settings.whatsappNumberHint")}</p>
                   </div>
                 </CardContent>
               </Card>

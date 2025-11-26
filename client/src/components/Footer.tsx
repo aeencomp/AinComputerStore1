@@ -4,7 +4,8 @@ import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { StoreSettings } from "@shared/schema";
-import { Twitter, Instagram, Facebook } from "lucide-react";
+import { Twitter, Instagram, Facebook, MessageCircle, Phone } from "lucide-react";
+import { SiWhatsapp } from "react-icons/si";
 
 export function Footer() {
   const { language, t } = useLanguage();
@@ -49,13 +50,25 @@ export function Footer() {
             <p className="text-sm text-muted-foreground">
               {aboutText || description}
             </p>
-            <div className="text-sm text-muted-foreground space-y-1">
+            <div className="text-sm text-muted-foreground space-y-2">
               <p data-testid="text-footer-email">
                 {t('footer.email')} {email}
               </p>
               <p data-testid="text-footer-phone">
                 {t('footer.phone')} {phone}
               </p>
+              {settings?.whatsappNumber && (
+                <a 
+                  href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-green-600 hover:text-green-700 font-medium"
+                  data-testid="link-footer-whatsapp"
+                >
+                  <SiWhatsapp className="w-4 h-4" />
+                  {t('footer.whatsapp')}
+                </a>
+              )}
               <p data-testid="text-footer-hours">
                 {t('footer.hours')} {hours}
               </p>
@@ -107,10 +120,23 @@ export function Footer() {
               <Button data-testid="button-newsletter-subscribe">{t('footer.subscribe')}</Button>
               <Input placeholder={t('footer.newsletterPlaceholder')} className="flex-1" data-testid="input-newsletter" />
             </div>
-            {(settings?.twitterUrl || settings?.instagramUrl || settings?.facebookUrl) && (
+            {(settings?.twitterUrl || settings?.instagramUrl || settings?.facebookUrl || settings?.whatsappNumber) && (
               <div className="pt-4">
                 <p className="text-sm font-medium mb-2">{t('footer.followUs')}</p>
                 <div className="flex gap-2">
+                  {settings?.whatsappNumber && (
+                    <Button 
+                      size="icon" 
+                      variant="outline" 
+                      className="text-green-600 hover:text-green-700 border-green-600 hover:border-green-700"
+                      data-testid="button-social-whatsapp"
+                      asChild
+                    >
+                      <a href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer">
+                        <SiWhatsapp className="h-4 w-4" />
+                      </a>
+                    </Button>
+                  )}
                   {settings?.twitterUrl && (
                     <Button 
                       size="icon" 
