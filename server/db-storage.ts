@@ -31,6 +31,10 @@ export class DrizzleStorage implements IStorage {
     return await db.select().from(products).where(eq(products.category, category));
   }
 
+  async getProductsByComponentType(componentType: string): Promise<Product[]> {
+    return await db.select().from(products).where(eq(products.componentType, componentType));
+  }
+
   async createProduct(insertProduct: InsertProduct): Promise<Product> {
     const result = await db.insert(products).values(insertProduct).returning();
     return result[0];

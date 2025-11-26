@@ -1,4 +1,5 @@
-import { ShoppingCart, Search, Menu, Languages } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu } from "lucide-react";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -145,6 +146,12 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           <Button variant="ghost" onClick={() => onCategorySelect?.("accessories")} data-testid="link-accessories">{t('category.accessories')}</Button>
           <Button variant="ghost" onClick={() => onCategorySelect?.("monitors")} data-testid="link-monitors">{t('category.monitors')}</Button>
           <Button variant="ghost" onClick={() => onCategorySelect?.("desktops")} data-testid="link-desktops">{t('category.desktops')}</Button>
+          <Link href="/pc-builder">
+            <Button variant="ghost" className="gap-1" data-testid="link-pc-builder">
+              <Cpu className="h-4 w-4" />
+              {t('header.pcBuilder')}
+            </Button>
+          </Link>
         </nav>
 
         {mobileMenuOpen && (
@@ -154,6 +161,12 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("accessories"); setMobileMenuOpen(false); }} data-testid="link-accessories-mobile">{t('category.accessories')}</Button>
             <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("monitors"); setMobileMenuOpen(false); }} data-testid="link-monitors-mobile">{t('category.monitors')}</Button>
             <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("desktops"); setMobileMenuOpen(false); }} data-testid="link-desktops-mobile">{t('category.desktops')}</Button>
+            <Link href="/pc-builder" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" className="justify-start gap-2 w-full" data-testid="link-pc-builder-mobile">
+                <Cpu className="h-4 w-4" />
+                {t('header.pcBuilder')}
+              </Button>
+            </Link>
           </nav>
         )}
       </div>

@@ -15,6 +15,7 @@ import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
 import TicketDetail from "@/pages/technician/TicketDetail";
 import RepairRequest from "@/pages/RepairRequest";
 import TrackRepair from "@/pages/TrackRepair";
+import PCBuilder from "@/pages/PCBuilder";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -31,6 +32,7 @@ function Router() {
       <Route path="/technician/tickets/:id" component={TicketDetail}/>
       <Route path="/repair-request" component={RepairRequest}/>
       <Route path="/track-repair" component={TrackRepair}/>
+      <Route path="/pc-builder" component={PCBuilder}/>
       <Route component={NotFound} />
     </Switch>
   );

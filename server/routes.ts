@@ -10,7 +10,12 @@ import bcrypt from "bcrypt";
 export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/products", async (req, res) => {
     try {
-      const { category } = req.query;
+      const { category, componentType } = req.query;
+      
+      if (componentType && typeof componentType === 'string') {
+        const products = await storage.getProductsByComponentType(componentType);
+        return res.json(products);
+      }
       
       if (category && typeof category === 'string') {
         const products = await storage.getProductsByCategory(category);
@@ -282,6 +287,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error adding to cart:", error);
       return res.status(500).json({ error: "Failed to add to cart" });
+    }
+  });
+
+  // Batch add to cart for PC Builder
+  app.post("/api/cart/batch", async (req, res) => {
+    try {
+      const batchSchema = z.object({
+        items: z.array(z.object({
+          productId: z.string(),
+          quantity: z.number().int().min(1).default(1),
+        })),
+      });
+      
+      const { items } = batchSchema.parse(req.body);
+      
+      // Validate all products exist
+      const productIds = items.map(item => item.productId);
+      const products = await Promise.all(productIds.map(id => storage.getProduct(id)));
+      
+      const missingProducts = productIds.filter((id, index) => !products[index]);
+      if (missingProducts.length > 0) {
+        return res.status(404).json({ error: "Some products not found", missingProducts });
+      }
+
+      req.session.cartInitialized = true;
+      
+      return new Promise((resolve, reject) => {
+        req.session.save(async (err) => {
+          if (err) {
+            console.error("Session save error:", err);
+            reject(err);
+            return;
+          }
+          
+          try {
+            const sessionId = req.session.id;
+            const results = await Promise.all(
+              items.map(item => storage.addToCart(sessionId, { productId: item.productId, quantity: item.quantity }))
+            );
+            resolve(res.json({ success: true, addedItems: results.length }));
+          } catch (error) {
+            reject(error);
+          }
+        });
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "Invalid request", details: error.errors });
+      }
+      console.error("Error batch adding to cart:", error);
+      return res.status(500).json({ error: "Failed to add items to cart" });
     }
   });
 

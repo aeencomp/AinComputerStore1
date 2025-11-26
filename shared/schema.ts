@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -33,7 +33,70 @@ export const products = pgTable("products", {
   specs: text("specs").array(),
   badge: text("badge"),
   inStock: integer("in_stock").notNull().default(1),
+  componentType: text("component_type"),
+  compatibility: jsonb("compatibility"),
 });
+
+export type ComponentType = 'cpu' | 'motherboard' | 'ram' | 'gpu' | 'storage' | 'psu' | 'case' | 'cooler';
+
+export interface CPUCompatibility {
+  socket: string;
+  tdpW: number;
+}
+
+export interface MotherboardCompatibility {
+  socket: string;
+  chipset: string;
+  formFactor: string;
+  ramType: string;
+  ramSlots: number;
+  maxRamGB: number;
+  m2Slots: number;
+  sataPorts: number;
+}
+
+export interface RAMCompatibility {
+  type: string;
+  speedMHz: number;
+  modules: number;
+  capacityGB: number;
+}
+
+export interface GPUCompatibility {
+  pcie: string;
+  lengthMm: number;
+  slotWidth: number;
+  tdpW: number;
+  powerConnectors8Pin: number;
+}
+
+export interface StorageCompatibility {
+  kind: 'nvme' | 'sata' | 'hdd';
+  interface: string;
+  capacityGB: number;
+}
+
+export interface PSUCompatibility {
+  wattageW: number;
+  efficiency: string;
+  formFactor: string;
+  pcie8pinCount: number;
+}
+
+export interface CaseCompatibility {
+  supportedMB: string[];
+  maxGpuLengthMm: number;
+  maxCpuCoolerHeightMm: number;
+  radiatorSizes: number[];
+  psuFormFactors: string[];
+}
+
+export interface CoolerCompatibility {
+  type: 'air' | 'aio';
+  socketSupport: string[];
+  heightMm?: number;
+  radiatorSize?: number;
+}
 
 export const insertProductSchema = createInsertSchema(products).omit({
   id: true,
