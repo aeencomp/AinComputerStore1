@@ -200,3 +200,40 @@ Order confirmation emails via Gmail SMTP:
 - HeroSection: Dynamic title, subtitle, image from settings
 - Home: Conditional categories section, configurable featured products count
 - Footer: Dynamic about text, copyright, social links from settings
+
+## Iraqi Market Features
+
+**Governorate Selection**
+- Dropdown selector with all 18 Iraqi governorates (Baghdad, Basra, Nineveh, Erbil, Sulaymaniyah, Duhok, Kirkuk, Diyala, Anbar, Babylon, Karbala, Najaf, Wasit, Maysan, Dhi Qar, Muthanna, Qadisiyyah, Saladin)
+- Bilingual names based on current language context
+- Replaces free-text city input for more accurate shipping
+
+**Payment Methods**
+- Cash on Delivery (الدفع عند الاستلام) - default option
+- ZainCash - popular Iraqi mobile wallet
+- FastPay - Iraqi payment service
+- All methods displayed with proper Arabic/English labels
+
+**Address Format**
+- Neighborhood/Area field (الحي/المنطقة) replaces postal code (not commonly used in Iraq)
+- Detailed address field for specific location
+- Governorate-based organization
+
+**WhatsApp Integration**
+- Store settings include WhatsApp number configuration
+- Footer displays clickable WhatsApp contact link (wa.me format)
+- Social media icons include WhatsApp alongside Facebook/Instagram/Twitter
+
+**Currency**
+- Iraqi Dinar (IQD / د.ع) displayed throughout
+- Arabic-Indic numerals in Arabic mode, Western numerals in English
+
+**Shipping**
+- Dynamic shipping costs based on store settings
+- Free shipping threshold configurable (default: 100,000 IQD)
+- Shipping cost displayed at checkout
+
+**Order Number System**
+- Uses PostgreSQL sequence (order_number_seq) for auto-increment
+- Format: ORD-XXXXX (e.g., ORD-01001)
+- Sequence created idempotently on startup
