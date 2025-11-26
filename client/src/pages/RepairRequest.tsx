@@ -118,7 +118,7 @@ export default function RepairRequest() {
                         <FormItem>
                           <FormLabel>{t('repair.request.customerPhone')}</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-customer-phone" />
+                            <Input placeholder="07XX XXX XXXX" {...field} data-testid="input-customer-phone" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
