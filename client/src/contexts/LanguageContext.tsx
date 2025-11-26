@@ -44,6 +44,11 @@ const translations: Record<Language, Record<string, string>> = {
     'home.noProducts': 'لا توجد منتجات متاحة',
     'home.noSearchResults': 'لا توجد منتجات تطابق البحث',
     'home.loadError': 'حدث خطأ أثناء تحميل المنتجات. يرجى المحاولة مرة أخرى.',
+    'home.repair.title': 'خدمة الإصلاح',
+    'home.repair.subtitle': 'هل جهازك يحتاج إصلاح؟',
+    'home.repair.description': 'نقدم خدمات إصلاح احترافية لجميع أنواع الحواسيب والأجهزة الإلكترونية. فريقنا المتخصص جاهز لمساعدتك.',
+    'home.repair.requestBtn': 'طلب إصلاح',
+    'home.repair.trackBtn': 'تتبع طلبك',
     
     // Product
     'product.specifications': 'المواصفات',
@@ -499,6 +504,11 @@ const translations: Record<Language, Record<string, string>> = {
     'home.noProducts': 'No products available',
     'home.noSearchResults': 'No products match your search',
     'home.loadError': 'An error occurred while loading products. Please try again.',
+    'home.repair.title': 'Repair Service',
+    'home.repair.subtitle': 'Does your device need repair?',
+    'home.repair.description': 'We offer professional repair services for all types of computers and electronic devices. Our specialized team is ready to help you.',
+    'home.repair.requestBtn': 'Request Repair',
+    'home.repair.trackBtn': 'Track Your Request',
     
     // Product
     'product.specifications': 'Specifications',
