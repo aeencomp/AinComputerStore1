@@ -9,10 +9,10 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import type { Product, CPUCompatibility, MotherboardCompatibility, RAMCompatibility, GPUCompatibility, StorageCompatibility, PSUCompatibility, CaseCompatibility, CoolerCompatibility } from '@shared/schema';
-import { Cpu, CircuitBoard, MemoryStick, MonitorPlay, HardDrive, Zap, Box, Fan, Check, AlertTriangle, X, ShoppingCart, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import type { Product, CPUCompatibility, MotherboardCompatibility, RAMCompatibility, GPUCompatibility, StorageCompatibility, PSUCompatibility, CaseCompatibility, CoolerCompatibility, MonitorCompatibility, MouseCompatibility, KeyboardCompatibility } from '@shared/schema';
+import { Cpu, CircuitBoard, MemoryStick, MonitorPlay, HardDrive, Zap, Box, Fan, Check, AlertTriangle, X, ShoppingCart, Trash2, ChevronLeft, ChevronRight, Monitor, Mouse, Keyboard } from 'lucide-react';
 
-type ComponentType = 'cpu' | 'motherboard' | 'ram' | 'gpu' | 'storage' | 'psu' | 'case' | 'cooler';
+type ComponentType = 'cpu' | 'motherboard' | 'ram' | 'gpu' | 'storage' | 'psu' | 'case' | 'cooler' | 'monitor' | 'mouse' | 'keyboard';
 
 interface SelectedComponents {
   cpu: Product | null;
@@ -23,9 +23,12 @@ interface SelectedComponents {
   psu: Product | null;
   case: Product | null;
   cooler: Product | null;
+  monitor: Product | null;
+  mouse: Product | null;
+  keyboard: Product | null;
 }
 
-const componentOrder: ComponentType[] = ['cpu', 'motherboard', 'ram', 'gpu', 'storage', 'psu', 'case', 'cooler'];
+const componentOrder: ComponentType[] = ['cpu', 'motherboard', 'ram', 'gpu', 'storage', 'psu', 'case', 'cooler', 'monitor', 'mouse', 'keyboard'];
 
 const componentIcons: Record<ComponentType, typeof Cpu> = {
   cpu: Cpu,
@@ -36,6 +39,9 @@ const componentIcons: Record<ComponentType, typeof Cpu> = {
   psu: Zap,
   case: Box,
   cooler: Fan,
+  monitor: Monitor,
+  mouse: Mouse,
+  keyboard: Keyboard,
 };
 
 export default function PCBuilder() {
@@ -52,6 +58,9 @@ export default function PCBuilder() {
     psu: null,
     case: null,
     cooler: null,
+    monitor: null,
+    mouse: null,
+    keyboard: null,
   });
 
   // Fetch all components

@@ -37,7 +37,7 @@ export const products = pgTable("products", {
   compatibility: jsonb("compatibility"),
 });
 
-export type ComponentType = 'cpu' | 'motherboard' | 'ram' | 'gpu' | 'storage' | 'psu' | 'case' | 'cooler';
+export type ComponentType = 'cpu' | 'motherboard' | 'ram' | 'gpu' | 'storage' | 'psu' | 'case' | 'cooler' | 'monitor' | 'mouse' | 'keyboard';
 
 export interface CPUCompatibility {
   socket: string;
@@ -96,6 +96,22 @@ export interface CoolerCompatibility {
   socketSupport: string[];
   heightMm?: number;
   radiatorSize?: number;
+}
+
+export interface MonitorCompatibility {
+  sizeInches: number;
+  resolution: string;
+  refreshRateHz: number;
+}
+
+export interface MouseCompatibility {
+  dpi: number;
+  wireless: boolean;
+}
+
+export interface KeyboardCompatibility {
+  layout: string;
+  mechanical: boolean;
 }
 
 export const insertProductSchema = createInsertSchema(products).omit({
