@@ -49,7 +49,6 @@ export default function ProductDetail() {
 
   const { data: cartItems = [] } = useAuthQuery<any[]>({
     queryKey: ['/api/cart'],
-    enabled: !!currentUser,
   });
 
   const addToCartMutation = useMutation({
@@ -68,20 +67,11 @@ export default function ProductDetail() {
       setQuantity(1);
     },
     onError: (error: any) => {
-      if (error.message === 'Not authenticated') {
-        toast({
-          title: t('cart.loginRequired'),
-          description: t('cart.loginRequiredDesc'),
-          variant: "destructive",
-        });
-        setLocation('/login');
-      } else {
-        toast({
-          title: t('common.error'),
-          description: t('cart.addError'),
-          variant: "destructive",
-        });
-      }
+      toast({
+        title: t('common.error'),
+        description: t('cart.addError'),
+        variant: "destructive",
+      });
     },
   });
 

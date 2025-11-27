@@ -239,10 +239,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/cart", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-      
       const sessionId = req.session.id;
       const cartItems = await storage.getCartItems(sessionId);
       const itemsWithProducts = await Promise.all(
@@ -262,10 +258,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/cart", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-      
       const validatedData = insertCartItemSchema.parse(req.body);
       const product = await storage.getProduct(validatedData.productId);
       
@@ -301,10 +293,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Batch add to cart for PC Builder
   app.post("/api/cart/batch", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-      
       const batchSchema = z.object({
         items: z.array(z.object({
           productId: z.string(),
@@ -355,10 +343,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/cart/:id", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-      
       const sessionId = req.session.id;
       const { id } = req.params;
       
@@ -387,10 +371,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart/:id", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-      
       const sessionId = req.session.id;
       const { id } = req.params;
       await storage.removeFromCart(id, sessionId);
@@ -403,10 +383,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/cart", async (req, res) => {
     try {
-      if (!req.session.userId) {
-        return res.status(401).json({ error: "Not authenticated" });
-      }
-      
       const sessionId = req.session.id;
       await storage.clearCart(sessionId);
       return res.json({ success: true });

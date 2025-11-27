@@ -41,7 +41,6 @@ export default function Home() {
 
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
-    enabled: !!currentUser,
   });
 
   const { data: storeSettings } = useQuery<StoreSettings>({
@@ -103,16 +102,6 @@ export default function Home() {
   };
 
   const handleAddToCart = async (product: Product) => {
-    if (!currentUser) {
-      toast({
-        title: t('cart.loginRequired'),
-        description: t('cart.loginRequiredDesc'),
-        variant: "destructive",
-      });
-      setLocation('/login');
-      return;
-    }
-
     try {
       await addToCartMutation.mutateAsync(product.id);
       toast({

@@ -141,25 +141,23 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               <Search className="h-5 w-5" />
             </Button>
 
-            {currentUser && (
-              <Button
-                size="icon"
-                variant="ghost"
-                className="relative"
-                onClick={onCartClick}
-                data-testid="button-cart"
-              >
-                <ShoppingCart className="h-5 w-5" />
-                {cartItemsCount > 0 && (
-                  <Badge 
-                    className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs"
-                    data-testid="badge-cart-count"
-                  >
-                    {cartItemsCount}
-                  </Badge>
-                )}
-              </Button>
-            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="relative"
+              onClick={onCartClick}
+              data-testid="button-cart"
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {cartItemsCount > 0 && (
+                <Badge 
+                  className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs"
+                  data-testid="badge-cart-count"
+                >
+                  {cartItemsCount}
+                </Badge>
+              )}
+            </Button>
 
             {currentUser ? (
               <DropdownMenu>
