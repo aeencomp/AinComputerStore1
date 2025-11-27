@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,18 +6,38 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useLocation } from 'wouter';
 import type { RepairTicket } from '@shared/schema';
 import { Search } from 'lucide-react';
 import { format } from 'date-fns';
 
 export default function TrackRepair() {
   const { t } = useLanguage();
+  const [location] = useLocation();
   const [phoneNumber, setPhoneNumber] = useState('');
   const [ticket, setTicket] = useState<RepairTicket | null>(null);
 
+  // Auto-search if ticket parameter is in URL
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const ticketParam = params.get('ticket');
+    if (ticketParam && !phoneNumber && !ticket) {
+      // Search by ticket number
+      searchMutation.mutate(ticketParam);
+    }
+  }, []);
+
   const searchMutation = useMutation({
-    mutationFn: async (phone: string) => {
-      const res = await fetch(`/api/repair-tickets/lookup/phone/${encodeURIComponent(phone)}`);
+    mutationFn: async (query: string) => {
+      // Try ticket number search first (if it starts with TKT-)
+      if (query.startsWith('TKT-') || query.startsWith('REP-')) {
+        const res = await fetch(`/api/repair-tickets/lookup/${encodeURIComponent(query)}`);
+        if (res.ok) {
+          return res.json();
+        }
+      }
+      // Otherwise search by phone
+      const res = await fetch(`/api/repair-tickets/lookup/phone/${encodeURIComponent(query)}`);
       if (!res.ok) {
         throw new Error('Not found');
       }

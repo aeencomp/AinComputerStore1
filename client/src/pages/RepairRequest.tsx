@@ -241,23 +241,29 @@ export default function RepairRequest() {
                 <p className="text-2xl font-bold text-foreground" data-testid="text-ticket-number">
                   {ticketNumber}
                 </p>
-                <svg
-                  ref={(el) => {
-                    if (el && ticketNumber) {
-                      try {
-                        JsBarcode(el, ticketNumber, {
-                          format: 'CODE128',
-                          width: 2,
-                          height: 50,
-                          margin: 10,
-                        });
-                      } catch (e) {
-                        console.error('Barcode error:', e);
+                <a
+                  href={`/track-repair?ticket=${encodeURIComponent(ticketNumber)}`}
+                  className="hover-elevate"
+                >
+                  <svg
+                    ref={(el) => {
+                      if (el && ticketNumber) {
+                        try {
+                          JsBarcode(el, ticketNumber, {
+                            format: 'CODE128',
+                            width: 2,
+                            height: 50,
+                            margin: 10,
+                          });
+                        } catch (e) {
+                          console.error('Barcode error:', e);
+                        }
                       }
-                    }
-                  }}
-                  data-testid="barcode-ticket"
-                />
+                    }}
+                    data-testid="barcode-ticket"
+                    className="cursor-pointer"
+                  />
+                </a>
               </div>
               <div className="flex gap-2 justify-center pt-2">
                 <Button
