@@ -28,8 +28,12 @@ export function WhatsAppButton() {
       rel="noopener noreferrer"
       data-testid="button-whatsapp-chat"
       title={t('footer.whatsapp')}
-      className="fixed bottom-6 right-6 z-50 flex items-center justify-center w-14 h-14 bg-[#25D366] hover:bg-[#20BD5C] rounded-full shadow-xl text-white transition-all duration-300 hover:scale-110 animate-pulse hover:animate-none"
+      className="flex items-center justify-center w-14 h-14 bg-[#25D366] hover:bg-[#20BD5C] rounded-full shadow-xl text-white transition-all duration-300 hover:scale-110 animate-pulse hover:animate-none"
       style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        zIndex: 9999,
         boxShadow: '0 4px 20px rgba(37, 211, 102, 0.4)',
       }}
     >
