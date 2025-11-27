@@ -473,6 +473,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Public order lookup by order number and phone (no auth required)
+  app.post("/api/orders/lookup", async (req, res) => {
+    try {
+      const { orderNumber, phone } = req.body;
+      
+      // Validate order number format (ORD-XXXXX)
+      if (!orderNumber || !/^ORD-\d{5}$/.test(orderNumber)) {
+        return res.status(400).json({ error: "Invalid order number format" });
+      }
+      
+      // Validate phone format (Iraqi: 07XXXXXXXXX - 11 digits starting with 07)
+      const normalizedPhone = phone?.replace(/\D/g, '') || '';
+      if (!normalizedPhone || normalizedPhone.length !== 11 || !normalizedPhone.startsWith('07')) {
+        return res.status(400).json({ error: "Invalid phone number format" });
+      }
+      
+      const order = await storage.lookupOrderByNumberAndPhone(orderNumber, normalizedPhone);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      // Parse items and fetch product details
+      const itemsWithProducts = await Promise.all(
+        order.items.map(async (itemStr: string) => {
+          const item = JSON.parse(itemStr);
+          const product = await storage.getProduct(item.productId);
+          return {
+            ...item,
+            product: product || { nameAr: 'منتج غير متوفر', nameEn: 'Product unavailable' }
+          };
+        })
+      );
+      
+      // Return order without sensitive fields (sessionId)
+      const { sessionId, ...safeOrder } = order;
+      return res.json({ ...safeOrder, itemsWithProducts });
+    } catch (error) {
+      console.error("Error looking up order:", error);
+      return res.status(500).json({ error: "Failed to lookup order" });
+    }
+  });
+
   app.get("/api/orders/by-number/:orderNumber", async (req, res) => {
     try {
       const { orderNumber } = req.params;

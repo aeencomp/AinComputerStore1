@@ -3,8 +3,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Link } from "wouter";
 import type { StoreSettings } from "@shared/schema";
-import { Twitter, Instagram, Facebook, MessageCircle, Phone, MapPin } from "lucide-react";
+import { Twitter, Instagram, Facebook, MessageCircle, Phone, MapPin, Package } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -144,6 +145,12 @@ export function Footer() {
               <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-faq">
                 {t('footer.faq')}
               </Button>
+              <Link href="/track-order">
+                <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground flex items-center gap-2" data-testid="link-footer-track-order">
+                  <Package className="h-4 w-4" />
+                  {t('footer.trackOrder')}
+                </Button>
+              </Link>
             </div>
           </div>
 

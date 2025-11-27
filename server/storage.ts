@@ -18,6 +18,7 @@ export interface IStorage {
   createOrder(order: InsertOrder, sessionId: string): Promise<any>;
   getOrders(): Promise<any[]>;
   getOrderByNumber(orderNumber: string): Promise<any>;
+  lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<any>;
   updateOrderStatus(id: string, status: string): Promise<any>;
   getStoreSettings(): Promise<StoreSettings | undefined>;
   updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
@@ -304,6 +305,17 @@ export class MemStorage implements IStorage {
 
   async getOrderByNumber(orderNumber: string): Promise<any> {
     return Array.from(this.orders.values()).find(o => o.orderNumber === orderNumber);
+  }
+
+  async lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<any> {
+    const normalizedInputPhone = phone.replace(/\D/g, '');
+    if (!normalizedInputPhone) return undefined;
+    
+    const order = Array.from(this.orders.values()).find(o => {
+      const normalizedStoredPhone = (o.customerPhone || '').replace(/\D/g, '');
+      return o.orderNumber === orderNumber && normalizedStoredPhone && normalizedStoredPhone === normalizedInputPhone;
+    });
+    return order || undefined;
   }
 
   async updateOrderStatus(id: string, status: string): Promise<any> {

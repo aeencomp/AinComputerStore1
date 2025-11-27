@@ -141,6 +141,22 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
+  async lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<Order | undefined> {
+    const normalizedInputPhone = phone.replace(/\D/g, '');
+    if (!normalizedInputPhone) return undefined;
+    
+    const result = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber)).limit(1);
+    const order = result[0];
+    if (!order) return undefined;
+    
+    const normalizedStoredPhone = (order.customerPhone || '').replace(/\D/g, '');
+    if (!normalizedStoredPhone || normalizedStoredPhone !== normalizedInputPhone) {
+      return undefined;
+    }
+    
+    return order;
+  }
+
   async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
     const result = await db.update(orders)
       .set({ status })
