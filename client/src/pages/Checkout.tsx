@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -14,7 +15,7 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { CartItem, StoreSettings } from "@shared/schema";
+import { CartItem, StoreSettings, User } from "@shared/schema";
 import { Banknote, Smartphone, Truck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -61,6 +62,11 @@ export default function Checkout() {
   const { toast } = useToast();
   const { language, t } = useLanguage();
 
+  // Check authentication
+  const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
+    queryKey: ['/api/auth/me'],
+  });
+
   const { data: cartItems = [], isLoading: cartLoading } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
   });
@@ -68,6 +74,18 @@ export default function Checkout() {
   const { data: settings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
   });
+
+  // Redirect if not authenticated
+  useEffect(() => {
+    if (!userLoading && !currentUser) {
+      toast({
+        title: t('cart.loginRequired'),
+        description: t('cart.loginRequiredDesc'),
+        variant: "destructive",
+      });
+      setLocation('/login');
+    }
+  }, [currentUser, userLoading, setLocation, toast, t]);
 
   // Calculate shipping based on settings
   const shippingCost = settings ? parseFloat(settings.shippingCost || "5000") : 5000;
@@ -77,9 +95,9 @@ export default function Checkout() {
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
     defaultValues: {
-      customerName: "",
-      customerEmail: "",
-      customerPhone: "",
+      customerName: currentUser?.name || "",
+      customerEmail: currentUser?.email || "",
+      customerPhone: currentUser?.phone || "",
       customerAddress: "",
       customerCity: "",
       customerPostal: "",
@@ -170,7 +188,7 @@ export default function Checkout() {
     0
   );
 
-  if (cartLoading) {
+  if (userLoading || cartLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -179,6 +197,11 @@ export default function Checkout() {
         </div>
       </div>
     );
+  }
+
+  // Don't render if not authenticated
+  if (!currentUser) {
+    return null;
   }
 
   if (cartItems.length === 0) {
