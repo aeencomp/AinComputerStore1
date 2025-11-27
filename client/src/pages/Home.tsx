@@ -12,6 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useCart } from "@/contexts/CartContext";
 import { Link, useLocation } from "wouter";
 import { Wrench, Search } from "lucide-react";
 
@@ -20,7 +21,7 @@ interface CartItemWithId extends CartItem {
 }
 
 export default function Home() {
-  const [cartOpen, setCartOpen] = useState(false);
+  const { cartOpen, setCartOpen } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();

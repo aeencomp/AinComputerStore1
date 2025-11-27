@@ -3,16 +3,18 @@ import { useLocation } from "wouter";
 import { useState } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
+import { CartSidebar } from "@/components/CartSidebar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Card } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatPrice } from "@/lib/formatters";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery as useAuthQuery } from "@tanstack/react-query";
-import type { Product, User } from "@shared/schema";
+import type { Product, User, CartItem } from "@shared/schema";
 import { ShoppingCart, ArrowLeft, Check } from "lucide-react";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
@@ -30,11 +32,15 @@ const imageMap: Record<string, string> = {
   "gaming_headset_product_photo.png": headsetImage,
 };
 
+interface CartItemWithId extends CartItem {
+  id: string;
+}
+
 export default function ProductDetail() {
   const [location, setLocation] = useLocation();
   const { language, t } = useLanguage();
+  const { cartOpen, setCartOpen } = useCart();
   const { toast } = useToast();
-  const [cartOpen, setCartOpen] = useState(false);
   const [quantity, setQuantity] = useState(1);
 
   const productId = location.split("/product/")[1];
@@ -47,8 +53,26 @@ export default function ProductDetail() {
     queryKey: ['/api/auth/me'],
   });
 
-  const { data: cartItems = [] } = useAuthQuery<any[]>({
+  const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useAuthQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
+  });
+
+  const updateQuantityMutation = useMutation({
+    mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
+      return await apiRequest('PATCH', `/api/cart/${id}`, { quantity });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const removeItemMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/cart/${id}`, undefined);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
   });
 
   const addToCartMutation = useMutation({
@@ -107,9 +131,51 @@ export default function ProductDetail() {
   const imageSrc = imageMap[product.image] || laptopImage;
   const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
+  const handleUpdateQuantity = async (id: string, quantity: number) => {
+    if (quantity <= 0) {
+      handleRemoveItem(id);
+      return;
+    }
+    try {
+      await updateQuantityMutation.mutateAsync({ id, quantity });
+    } catch {
+      toast({
+        title: t('common.error'),
+        description: t('cart.updateError'),
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleRemoveItem = async (id: string) => {
+    try {
+      await removeItemMutation.mutateAsync(id);
+      toast({
+        title: t('cart.removed'),
+        description: t('cart.removedDescription'),
+      });
+    } catch {
+      toast({
+        title: t('common.error'),
+        description: t('cart.removeError'),
+        variant: "destructive",
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
       <Header cartItemsCount={cartItemsCount} onCartClick={() => setCartOpen(true)} onSearch={() => {}} />
+
+      <CartSidebar
+        open={cartOpen}
+        onOpenChange={setCartOpen}
+        items={cartItems}
+        onUpdateQuantity={handleUpdateQuantity}
+        onRemoveItem={handleRemoveItem}
+        isLoading={cartLoading}
+        isError={cartError}
+      />
 
       <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8">
