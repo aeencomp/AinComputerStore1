@@ -136,6 +136,11 @@ export class DrizzleStorage implements IStorage {
     return await db.select().from(orders);
   }
 
+  async getOrderByNumber(orderNumber: string): Promise<Order | undefined> {
+    const result = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber)).limit(1);
+    return result[0];
+  }
+
   async updateOrderStatus(id: string, status: string): Promise<Order | undefined> {
     const result = await db.update(orders)
       .set({ status })

@@ -163,14 +163,12 @@ export default function Checkout() {
       toast({
         title: t('checkout.orderSuccess'),
         description: language === 'ar' 
-          ? `رقم طلبك: ${order.orderNumber}\nسيتم التواصل معك قريباً لتأكيد الطلب`
-          : `Your order number: ${order.orderNumber}\nWe will contact you soon to confirm your order`,
-        duration: 6000,
+          ? `رقم طلبك: ${order.orderNumber}`
+          : `Your order number: ${order.orderNumber}`,
+        duration: 4000,
       });
       
-      setTimeout(() => {
-        setLocation("/");
-      }, 2000);
+      setLocation(`/order-confirmation/${order.orderNumber}`);
     },
     onError: (error: any) => {
       console.error("Order creation error:", error);

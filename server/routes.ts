@@ -473,6 +473,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/orders/by-number/:orderNumber", async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      const order = await storage.getOrderByNumber(orderNumber);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      // Parse items and fetch product details
+      const itemsWithProducts = await Promise.all(
+        order.items.map(async (itemStr: string) => {
+          const item = JSON.parse(itemStr);
+          const product = await storage.getProduct(item.productId);
+          return {
+            ...item,
+            product: product || { nameAr: 'منتج غير متوفر', nameEn: 'Product unavailable' }
+          };
+        })
+      );
+      
+      return res.json({ ...order, itemsWithProducts });
+    } catch (error) {
+      console.error("Error fetching order:", error);
+      return res.status(500).json({ error: "Failed to fetch order" });
+    }
+  });
+
   app.patch("/api/orders/:id", async (req, res) => {
     try {
       const { id } = req.params;

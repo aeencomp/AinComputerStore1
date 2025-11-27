@@ -17,6 +17,7 @@ export interface IStorage {
   clearCart(sessionId: string): Promise<void>;
   createOrder(order: InsertOrder, sessionId: string): Promise<any>;
   getOrders(): Promise<any[]>;
+  getOrderByNumber(orderNumber: string): Promise<any>;
   updateOrderStatus(id: string, status: string): Promise<any>;
   getStoreSettings(): Promise<StoreSettings | undefined>;
   updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
@@ -299,6 +300,10 @@ export class MemStorage implements IStorage {
 
   async getOrders(): Promise<any[]> {
     return Array.from(this.orders.values());
+  }
+
+  async getOrderByNumber(orderNumber: string): Promise<any> {
+    return Array.from(this.orders.values()).find(o => o.orderNumber === orderNumber);
   }
 
   async updateOrderStatus(id: string, status: string): Promise<any> {
