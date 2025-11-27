@@ -5,14 +5,14 @@ import { CategorySection } from "@/components/CategorySection";
 import { ProductCard } from "@/components/ProductCard";
 import { CartSidebar } from "@/components/CartSidebar";
 import { Footer } from "@/components/Footer";
-import { Product, CartItem, StoreSettings } from "@shared/schema";
+import { Product, CartItem, StoreSettings, User } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Wrench, Search } from "lucide-react";
 
 interface CartItemWithId extends CartItem {
@@ -25,6 +25,7 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();
   const { language, t } = useLanguage();
+  const [, setLocation] = useLocation();
 
   const queryKey = selectedCategory 
     ? `/api/products?category=${selectedCategory}`
@@ -34,8 +35,13 @@ export default function Home() {
     queryKey: [queryKey],
   });
 
+  const { data: currentUser } = useQuery<User | null>({
+    queryKey: ['/api/auth/me'],
+  });
+
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
+    enabled: !!currentUser,
   });
 
   const { data: storeSettings } = useQuery<StoreSettings>({
@@ -97,6 +103,16 @@ export default function Home() {
   };
 
   const handleAddToCart = async (product: Product) => {
+    if (!currentUser) {
+      toast({
+        title: t('cart.loginRequired'),
+        description: t('cart.loginRequiredDesc'),
+        variant: "destructive",
+      });
+      setLocation('/login');
+      return;
+    }
+
     try {
       await addToCartMutation.mutateAsync(product.id);
       toast({
