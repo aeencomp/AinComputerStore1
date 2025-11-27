@@ -527,6 +527,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/repair-tickets/lookup/phone/:phone", async (req, res) => {
+    try {
+      const { phone } = req.params;
+      const ticket = await storage.getRepairTicketByPhone(phone);
+      
+      if (!ticket) {
+        return res.status(404).json({ error: "Repair ticket not found" });
+      }
+      
+      return res.json(ticket);
+    } catch (error) {
+      console.error("Error looking up repair ticket by phone:", error);
+      return res.status(500).json({ error: "Failed to lookup repair ticket" });
+    }
+  });
+
   app.get("/api/repair-tickets/lookup/:ticketNumber", async (req, res) => {
     try {
       const { ticketNumber } = req.params;

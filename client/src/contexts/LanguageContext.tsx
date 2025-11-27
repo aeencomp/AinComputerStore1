@@ -396,6 +396,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.lookup.description': 'تحقق من حالة طلب الإصلاح',
     'repair.lookup.ticketNumber': 'رقم التذكرة',
     'repair.lookup.ticketNumberPlaceholder': 'REP-٠٠٠٠١',
+    'repair.lookup.phonePlaceholder': '٠٧٩٠٠٠٠٠٠٠٠',
     'repair.lookup.search': 'بحث',
     'repair.lookup.searching': 'جاري البحث...',
     'repair.lookup.notFound': 'لم يتم العثور على التذكرة',
@@ -929,6 +930,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     'repair.lookup.title': 'Track Repair',
     'repair.lookup.description': 'Check your repair request status',
+    'repair.lookup.phonePlaceholder': '07901234567',
     'repair.lookup.ticketNumber': 'Ticket Number',
     'repair.lookup.ticketNumberPlaceholder': 'REP-00001',
     'repair.lookup.search': 'Search',

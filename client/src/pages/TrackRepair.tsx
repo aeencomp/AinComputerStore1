@@ -12,12 +12,12 @@ import { format } from 'date-fns';
 
 export default function TrackRepair() {
   const { t } = useLanguage();
-  const [ticketNumber, setTicketNumber] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [ticket, setTicket] = useState<RepairTicket | null>(null);
 
   const searchMutation = useMutation({
-    mutationFn: async (ticketNum: string) => {
-      const res = await fetch(`/api/repair-tickets/lookup/${ticketNum}`);
+    mutationFn: async (phone: string) => {
+      const res = await fetch(`/api/repair-tickets/lookup/phone/${encodeURIComponent(phone)}`);
       if (!res.ok) {
         throw new Error('Not found');
       }
@@ -33,8 +33,8 @@ export default function TrackRepair() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (ticketNumber.trim()) {
-      searchMutation.mutate(ticketNumber.trim());
+    if (phoneNumber.trim()) {
+      searchMutation.mutate(phoneNumber.trim());
     }
   };
 
@@ -63,12 +63,12 @@ export default function TrackRepair() {
           <CardContent className="space-y-6">
             <form onSubmit={handleSearch} className="flex gap-2">
               <Input
-                value={ticketNumber}
-                onChange={(e) => setTicketNumber(e.target.value)}
-                placeholder={t('repair.lookup.ticketNumberPlaceholder')}
-                data-testid="input-ticket-number"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder={t('repair.lookup.phonePlaceholder')}
+                data-testid="input-phone-number"
               />
-              <Button type="submit" disabled={searchMutation.isPending} data-testid="button-search-ticket">
+              <Button type="submit" disabled={searchMutation.isPending} data-testid="button-search-repair">
                 {searchMutation.isPending ? t('repair.lookup.searching') : t('repair.lookup.search')}
               </Button>
             </form>

@@ -193,6 +193,14 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
+  async getRepairTicketByPhone(phone: string): Promise<RepairTicket | undefined> {
+    const normalizedPhone = phone.replace(/[\s\-+]/g, '');
+    const result = await db.select().from(repairTickets)
+      .where(eq(sql`REPLACE(REPLACE(REPLACE(${repairTickets.customerPhone}, ' ', ''), '-', ''), '+', '')`, normalizedPhone))
+      .limit(1);
+    return result[0];
+  }
+
   async updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined> {
     const result = await db.update(repairTickets)
       .set({ ...updates, updatedAt: new Date() })

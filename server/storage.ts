@@ -24,6 +24,7 @@ export interface IStorage {
   getRepairTickets(): Promise<RepairTicket[]>;
   getRepairTicket(id: string): Promise<RepairTicket | undefined>;
   getRepairTicketByNumber(ticketNumber: string): Promise<RepairTicket | undefined>;
+  getRepairTicketByPhone(phone: string): Promise<RepairTicket | undefined>;
   updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined>;
   deleteRepairTicket(id: string): Promise<void>;
 }
@@ -348,6 +349,10 @@ export class MemStorage implements IStorage {
   }
 
   async getRepairTicketByNumber(ticketNumber: string): Promise<RepairTicket | undefined> {
+    return undefined;
+  }
+
+  async getRepairTicketByPhone(phone: string): Promise<RepairTicket | undefined> {
     return undefined;
   }
 
