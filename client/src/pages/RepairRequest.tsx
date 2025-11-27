@@ -22,7 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import JsBarcode from 'jsbarcode';
+import { QRCodeSVG as QRCode } from 'qrcode.react';
 
 export default function RepairRequest() {
   const [, setLocation] = useLocation();
@@ -244,24 +244,15 @@ export default function RepairRequest() {
                 <a
                   href={`/track-repair?ticket=${encodeURIComponent(ticketNumber)}`}
                   className="hover-elevate"
+                  data-testid="link-qr-code"
                 >
-                  <svg
-                    ref={(el) => {
-                      if (el && ticketNumber) {
-                        try {
-                          JsBarcode(el, ticketNumber, {
-                            format: 'CODE128',
-                            width: 2,
-                            height: 50,
-                            margin: 10,
-                          });
-                        } catch (e) {
-                          console.error('Barcode error:', e);
-                        }
-                      }
-                    }}
-                    data-testid="barcode-ticket"
+                  <QRCode
+                    value={`${window.location.origin}/track-repair?ticket=${encodeURIComponent(ticketNumber)}`}
+                    size={200}
+                    level="H"
+                    includeMargin={true}
                     className="cursor-pointer"
+                    data-testid="qrcode-ticket"
                   />
                 </a>
               </div>
