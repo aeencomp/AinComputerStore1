@@ -1,11 +1,11 @@
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -64,12 +64,12 @@ export function CartSidebar({
   const total = subtotal + shipping;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="left" className="w-full sm:max-w-lg flex flex-col" data-testid="sheet-cart">
-        <SheetHeader>
-          <SheetTitle className="text-2xl" data-testid="text-cart-title">{t('cart.title')}</SheetTitle>
-          <SheetDescription>{t('cart.description')}</SheetDescription>
-        </SheetHeader>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col" data-testid="sheet-cart">
+        <DialogHeader>
+          <DialogTitle className="text-2xl" data-testid="text-cart-title">{t('cart.title')}</DialogTitle>
+          <DialogDescription>{t('cart.description')}</DialogDescription>
+        </DialogHeader>
 
         {isLoading ? (
           <div className="flex-1 overflow-auto py-4">
@@ -177,7 +177,7 @@ export function CartSidebar({
               </div>
             </div>
 
-            <SheetFooter className="flex-col gap-4">
+            <DialogFooter className="flex-col gap-4">
               <Separator />
               <div className="space-y-2">
                 <div className="flex justify-between text-sm">
@@ -217,10 +217,10 @@ export function CartSidebar({
               >
                 {t('cart.continueShopping')}
               </Button>
-            </SheetFooter>
+            </DialogFooter>
           </>
         )}
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
