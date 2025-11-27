@@ -1,5 +1,5 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu } from "lucide-react";
-import { Link } from "wouter";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon } from "lucide-react";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +11,19 @@ import {
   SheetTitle,
   SheetDescription,
 } from "@/components/ui/sheet";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { useQuery } from "@tanstack/react-query";
-import type { StoreSettings } from "@shared/schema";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { StoreSettings, User } from "@shared/schema";
 
 interface HeaderProps {
   cartItemsCount: number;
@@ -28,6 +38,8 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
   const [searchQuery, setSearchQuery] = useState(searchValue);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
     setSearchQuery(searchValue);
@@ -35,6 +47,25 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
 
   const { data: storeSettings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
+  });
+
+  const { data: currentUser } = useQuery<User | null>({
+    queryKey: ['/api/auth/me'],
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/auth/logout', {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      toast({
+        title: t('header.logout'),
+        description: 'تم تسجيل خروجك بنجاح',
+      });
+      navigate('/');
+    },
   });
 
   const storeName = storeSettings 
@@ -110,23 +141,62 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               <Search className="h-5 w-5" />
             </Button>
 
-            <Button
-              size="icon"
-              variant="ghost"
-              className="relative"
-              onClick={onCartClick}
-              data-testid="button-cart"
-            >
-              <ShoppingCart className="h-5 w-5" />
-              {cartItemsCount > 0 && (
-                <Badge 
-                  className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs"
-                  data-testid="badge-cart-count"
+            {currentUser && (
+              <Button
+                size="icon"
+                variant="ghost"
+                className="relative"
+                onClick={onCartClick}
+                data-testid="button-cart"
+              >
+                <ShoppingCart className="h-5 w-5" />
+                {cartItemsCount > 0 && (
+                  <Badge 
+                    className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 px-1.5 text-xs"
+                    data-testid="badge-cart-count"
+                  >
+                    {cartItemsCount}
+                  </Badge>
+                )}
+              </Button>
+            )}
+
+            {currentUser ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button 
+                    size="icon" 
+                    variant="ghost"
+                    data-testid="button-user-menu"
+                  >
+                    <UserIcon className="h-5 w-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel data-testid="text-user-name">
+                    {currentUser.name}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem 
+                    onClick={() => logoutMutation.mutate()}
+                    data-testid="button-logout"
+                  >
+                    <LogOut className="h-4 w-4 mr-2" />
+                    {t('header.logout')}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <Link href="/login">
+                <Button 
+                  size="sm" 
+                  variant="default"
+                  data-testid="button-login"
                 >
-                  {cartItemsCount}
-                </Badge>
-              )}
-            </Button>
+                  {t('header.login')}
+                </Button>
+              </Link>
+            )}
 
             <Button
               size="icon"
