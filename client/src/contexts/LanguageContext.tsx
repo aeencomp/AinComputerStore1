@@ -389,6 +389,8 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.request.successTitle': 'تم إرسال الطلب',
     'repair.request.successMessage': 'رقم التذكرة: {ticketNumber}',
     'repair.request.successNote': 'احفظ رقم التذكرة لمتابعة حالة الإصلاح',
+    'repair.request.copyTicket': 'نسخ رقم التذكرة',
+    'repair.request.copied': 'تم النسخ',
     'repair.request.errorTitle': 'فشل إرسال الطلب',
     'repair.request.errorMessage': 'حدث خطأ، يرجى المحاولة مرة أخرى',
     
@@ -925,6 +927,8 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.request.successTitle': 'Request Submitted',
     'repair.request.successMessage': 'Ticket Number: {ticketNumber}',
     'repair.request.successNote': 'Save this ticket number to track your repair status',
+    'repair.request.copyTicket': 'Copy Ticket Number',
+    'repair.request.copied': 'Copied',
     'repair.request.errorTitle': 'Request Failed',
     'repair.request.errorMessage': 'An error occurred, please try again',
     

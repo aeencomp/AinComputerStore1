@@ -13,7 +13,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
-import { Wrench } from 'lucide-react';
+import { Wrench, Copy, Check } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -22,6 +22,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import JsBarcode from 'jsbarcode';
 
 export default function RepairRequest() {
   const [, setLocation] = useLocation();
@@ -29,6 +30,7 @@ export default function RepairRequest() {
   const { toast } = useToast();
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [ticketNumber, setTicketNumber] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const formSchema = useMemo(() => z.object({
     customerName: z.string().min(1, t('validation.required') || 'Required'),
@@ -231,14 +233,58 @@ export default function RepairRequest() {
       </div>
 
       <AlertDialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
-        <AlertDialogContent>
+        <AlertDialogContent className="max-w-md">
           <AlertDialogHeader>
             <AlertDialogTitle>{t('repair.request.successTitle')}</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p className="text-lg font-semibold" data-testid="text-ticket-number">
-                {t('repair.request.successMessage').replace('{ticketNumber}', ticketNumber)}
-              </p>
-              <p>{t('repair.request.successNote')}</p>
+            <AlertDialogDescription className="space-y-4 pt-4">
+              <div className="flex flex-col items-center gap-3">
+                <p className="text-2xl font-bold text-foreground" data-testid="text-ticket-number">
+                  {ticketNumber}
+                </p>
+                <svg
+                  ref={(el) => {
+                    if (el && ticketNumber) {
+                      try {
+                        JsBarcode(el, ticketNumber, {
+                          format: 'CODE128',
+                          width: 2,
+                          height: 50,
+                          margin: 10,
+                        });
+                      } catch (e) {
+                        console.error('Barcode error:', e);
+                      }
+                    }
+                  }}
+                  data-testid="barcode-ticket"
+                />
+              </div>
+              <div className="flex gap-2 justify-center pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(ticketNumber);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  data-testid="button-copy-ticket"
+                >
+                  {copied ? (
+                    <>
+                      <Check className="h-4 w-4 me-1" />
+                      {t('repair.request.copied')}
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 me-1" />
+                      {t('repair.request.copyTicket')}
+                    </>
+                  )}
+                </Button>
+              </div>
+              <p className="text-sm">{t('repair.request.successNote')}</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
