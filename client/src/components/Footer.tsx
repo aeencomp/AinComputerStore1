@@ -4,8 +4,19 @@ import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { StoreSettings } from "@shared/schema";
-import { Twitter, Instagram, Facebook, MessageCircle, Phone } from "lucide-react";
+import { Twitter, Instagram, Facebook, MessageCircle, Phone, MapPin } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import L from 'leaflet';
+import 'leaflet/dist/leaflet.css';
+
+// Fix leaflet marker icon
+delete (L.Icon.Default.prototype as any)._getIconUrl;
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+});
 
 export function Footer() {
   const { language, t } = useLanguage();
@@ -42,6 +53,31 @@ export function Footer() {
   return (
     <footer className="bg-muted mt-12 md:mt-16" data-testid="footer">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-12">
+        {/* Map Section */}
+        <div className="mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <MapPin className="h-5 w-5" />
+            <h3 className="font-bold text-lg">{t('footer.location')}</h3>
+          </div>
+          <div className="rounded-lg overflow-hidden h-64 border border-border">
+            <MapContainer center={[33.3128, 44.3615] as [number, number]} zoom={13} style={{ height: '100%', width: '100%' }} data-testid="map-store-location">
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              <Marker position={[33.3128, 44.3615] as [number, number]}>
+                <Popup>
+                  <div className="text-center">
+                    <p className="font-bold">{storeName}</p>
+                    <p className="text-sm">{settings ? (language === 'ar' ? settings.addressAr : settings.addressEn) : t('footer.location')}</p>
+                  </div>
+                </Popup>
+              </Marker>
+            </MapContainer>
+          </div>
+        </div>
+
+        <Separator className="mb-8" />
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           <div className="space-y-4">
             <h3 className="font-bold text-lg" data-testid="text-footer-about">
