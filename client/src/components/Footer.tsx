@@ -60,11 +60,11 @@ export function Footer() {
             <h3 className="font-bold text-lg">{t('footer.location')}</h3>
           </div>
           <div className="rounded-lg overflow-hidden h-64 border border-border">
-            <MapContainer center={[33.3128, 44.3615] as [number, number]} zoom={13} style={{ height: '100%', width: '100%' }} data-testid="map-store-location">
+            <MapContainer center={[32.5155, 44.0155] as [number, number]} zoom={13} style={{ height: '100%', width: '100%' }} data-testid="map-store-location">
               <TileLayer
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-              <Marker position={[33.3128, 44.3615] as [number, number]}>
+              <Marker position={[32.5155, 44.0155] as [number, number]}>
                 <Popup>
                   <div className="text-center">
                     <p className="font-bold">{storeName}</p>
