@@ -1,0 +1,274 @@
+import { useQuery } from "@tanstack/react-query";
+import { useLocation } from "wouter";
+import { useState } from "react";
+import { Header } from "@/components/Header";
+import { Footer } from "@/components/Footer";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Card } from "@/components/ui/card";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
+import { formatPrice } from "@/lib/formatters";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useMutation, useQuery as useAuthQuery } from "@tanstack/react-query";
+import type { Product, User } from "@shared/schema";
+import { ShoppingCart, ArrowLeft, Check } from "lucide-react";
+import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
+import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
+import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
+import keyboardImage from "@assets/generated_images/gaming_keyboard_product_photo.png";
+import mouseImage from "@assets/generated_images/gaming_mouse_product_photo.png";
+import headsetImage from "@assets/generated_images/gaming_headset_product_photo.png";
+
+const imageMap: Record<string, string> = {
+  "gaming_laptop_product_photo.png": laptopImage,
+  "desktop_pc_tower_photo.png": desktopImage,
+  "gaming_monitor_product_photo.png": monitorImage,
+  "gaming_keyboard_product_photo.png": keyboardImage,
+  "gaming_mouse_product_photo.png": mouseImage,
+  "gaming_headset_product_photo.png": headsetImage,
+};
+
+export default function ProductDetail() {
+  const [location, setLocation] = useLocation();
+  const { language, t } = useLanguage();
+  const { toast } = useToast();
+  const [cartOpen, setCartOpen] = useState(false);
+  const [quantity, setQuantity] = useState(1);
+
+  const productId = location.split("/product/")[1];
+
+  const { data: product, isLoading: productLoading } = useQuery<Product>({
+    queryKey: [`/api/products/${productId}`],
+  });
+
+  const { data: currentUser } = useAuthQuery<User | null>({
+    queryKey: ['/api/auth/me'],
+  });
+
+  const { data: cartItems = [] } = useAuthQuery<any[]>({
+    queryKey: ['/api/cart'],
+    enabled: !!currentUser,
+  });
+
+  const addToCartMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/cart', {
+        productId,
+        quantity,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      toast({
+        title: t('cart.addedToCart'),
+        description: `${quantity} ${t('product.addToCart')}`,
+      });
+      setQuantity(1);
+    },
+    onError: (error: any) => {
+      if (error.message === 'Not authenticated') {
+        toast({
+          title: t('cart.loginRequired'),
+          description: t('cart.loginRequiredDesc'),
+          variant: "destructive",
+        });
+        setLocation('/login');
+      } else {
+        toast({
+          title: t('common.error'),
+          description: t('cart.addError'),
+          variant: "destructive",
+        });
+      }
+    },
+  });
+
+  if (productLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header cartItemsCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)} onCartClick={() => setCartOpen(true)} onSearch={() => {}} />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-muted-foreground">{t('product.loading')}</div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (!product) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header cartItemsCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)} onCartClick={() => setCartOpen(true)} onSearch={() => {}} />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-lg text-muted-foreground mb-4">{t('product.notFound')}</p>
+            <Button onClick={() => setLocation("/")}>{t('login.backToHome')}</Button>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  const productName = language === 'ar' ? product.nameAr : product.nameEn;
+  const productDescription = language === 'ar' ? product.descriptionAr : product.descriptionEn;
+  const imageSrc = imageMap[product.image] || laptopImage;
+  const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      <Header cartItemsCount={cartItemsCount} onCartClick={() => setCartOpen(true)} onSearch={() => {}} />
+
+      <main className="flex-1">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8">
+          {/* Back Button */}
+          <Button variant="ghost" className="mb-6 gap-2" onClick={() => setLocation("/")} data-testid="button-back">
+            <ArrowLeft className="h-4 w-4" />
+            {language === 'ar' ? 'العودة للمتجر' : 'Back to Store'}
+          </Button>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {/* Product Image */}
+            <div data-testid={`product-detail-image-${product.id}`}>
+              <Card className="overflow-hidden">
+                <div className="aspect-square overflow-hidden bg-muted flex items-center justify-center">
+                  <img
+                    src={imageSrc}
+                    alt={productName}
+                    className="w-full h-full object-cover"
+                    data-testid={`img-product-detail-${product.id}`}
+                  />
+                </div>
+              </Card>
+              {product.badge && (
+                <div className="mt-4">
+                  <Badge 
+                    variant={product.badge.includes('خصم') || product.badge.includes('discount') ? 'destructive' : 'default'}
+                    className="text-sm py-1"
+                    data-testid={`badge-product-detail-${product.id}`}
+                  >
+                    {product.badge}
+                  </Badge>
+                </div>
+              )}
+            </div>
+
+            {/* Product Details */}
+            <div className="space-y-6">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-bold mb-2" data-testid={`text-product-name-${product.id}`}>
+                  {productName}
+                </h1>
+                <p className="text-lg text-muted-foreground" data-testid={`text-product-description-${product.id}`}>
+                  {productDescription}
+                </p>
+              </div>
+
+              {/* Price Section */}
+              <div className="space-y-2">
+                <div className="flex items-baseline gap-3">
+                  <span className="text-4xl font-bold text-primary" data-testid={`text-price-detail-${product.id}`}>
+                    {formatPrice(product.price, language)} {t('common.currency')}
+                  </span>
+                  {product.oldPrice && (
+                    <span className="text-lg text-muted-foreground line-through" data-testid={`text-old-price-detail-${product.id}`}>
+                      {formatPrice(product.oldPrice, language)} {t('common.currency')}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Stock Status */}
+              <div className="flex items-center gap-3">
+                {product.inStock ? (
+                  <>
+                    <Check className="h-5 w-5 text-green-600" />
+                    <span className="text-green-600 font-medium" data-testid={`text-in-stock-${product.id}`}>
+                      {t('product.inStock')}
+                    </span>
+                  </>
+                ) : (
+                  <span className="text-destructive font-medium" data-testid={`text-out-of-stock-${product.id}`}>
+                    {t('product.outOfStock')}
+                  </span>
+                )}
+              </div>
+
+              {/* Specifications */}
+              {product.specs && product.specs.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <h2 className="text-lg font-bold mb-4" data-testid="text-specifications-title">
+                      {t('product.specifications')}
+                    </h2>
+                    <ul className="space-y-3">
+                      {product.specs.map((spec, index) => (
+                        <li 
+                          key={index} 
+                          className="flex items-start gap-3"
+                          data-testid={`spec-item-${index}`}
+                        >
+                          <span className="text-primary mt-1">•</span>
+                          <span className="text-sm md:text-base">{spec}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
+              )}
+
+              <Separator />
+
+              {/* Add to Cart Section */}
+              <div className="space-y-4">
+                {product.inStock && (
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center border rounded-md">
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        data-testid="button-decrease-quantity"
+                      >
+                        −
+                      </Button>
+                      <span className="w-12 text-center font-medium" data-testid="text-quantity">
+                        {quantity}
+                      </span>
+                      <Button 
+                        variant="ghost" 
+                        size="sm"
+                        onClick={() => setQuantity(quantity + 1)}
+                        data-testid="button-increase-quantity"
+                      >
+                        +
+                      </Button>
+                    </div>
+                  </div>
+                )}
+
+                <Button 
+                  className="w-full gap-2 py-6 text-lg"
+                  size="lg"
+                  disabled={!product.inStock || addToCartMutation.isPending}
+                  onClick={() => addToCartMutation.mutate()}
+                  data-testid={`button-add-to-cart-detail-${product.id}`}
+                >
+                  <ShoppingCart className="h-5 w-5" />
+                  {addToCartMutation.isPending ? t('product.loading') : t('product.addToCart')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <Footer />
+    </div>
+  );
+}

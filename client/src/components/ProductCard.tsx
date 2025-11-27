@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Product } from "@shared/schema";
 import { ShoppingCart } from "lucide-react";
+import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatPrice } from "@/lib/formatters";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
@@ -34,42 +35,44 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   
   return (
     <Card className="overflow-hidden group hover-elevate" data-testid={`card-product-${product.id}`}>
-      <CardContent className="p-0 relative">
-        {product.badge && (
-          <Badge 
-            className="absolute top-2 right-2 z-10"
-            variant={product.badge.includes('خصم') ? 'destructive' : 'default'}
-            data-testid={`badge-${product.id}`}
-          >
-            {product.badge}
-          </Badge>
-        )}
-        <div className="aspect-square overflow-hidden bg-muted">
-          <img
-            src={imageSrc}
-            alt={productName}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            data-testid={`img-product-${product.id}`}
-          />
-        </div>
-      </CardContent>
-      <CardContent className="p-4 space-y-2">
-        <h3 className="font-bold text-lg line-clamp-1" data-testid={`text-name-${product.id}`}>
-          {productName}
-        </h3>
-        <p className="text-sm text-muted-foreground line-clamp-2" data-testid={`text-description-${product.id}`}>
-          {productDescription}
-        </p>
-        {product.specs && product.specs.length > 0 && (
-          <div className="space-y-1">
-            {product.specs.slice(0, 2).map((spec, index) => (
-              <p key={index} className="text-xs text-muted-foreground" data-testid={`text-spec-${product.id}-${index}`}>
-                • {spec}
-              </p>
-            ))}
+      <Link href={`/product/${product.id}`}>
+        <CardContent className="p-0 relative cursor-pointer">
+          {product.badge && (
+            <Badge 
+              className="absolute top-2 right-2 z-10"
+              variant={product.badge.includes('خصم') ? 'destructive' : 'default'}
+              data-testid={`badge-${product.id}`}
+            >
+              {product.badge}
+            </Badge>
+          )}
+          <div className="aspect-square overflow-hidden bg-muted">
+            <img
+              src={imageSrc}
+              alt={productName}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+              data-testid={`img-product-${product.id}`}
+            />
           </div>
-        )}
-      </CardContent>
+        </CardContent>
+        <CardContent className="p-4 space-y-2 cursor-pointer">
+          <h3 className="font-bold text-lg line-clamp-1" data-testid={`text-name-${product.id}`}>
+            {productName}
+          </h3>
+          <p className="text-sm text-muted-foreground line-clamp-2" data-testid={`text-description-${product.id}`}>
+            {productDescription}
+          </p>
+          {product.specs && product.specs.length > 0 && (
+            <div className="space-y-1">
+              {product.specs.slice(0, 2).map((spec, index) => (
+                <p key={index} className="text-xs text-muted-foreground" data-testid={`text-spec-${product.id}-${index}`}>
+                  • {spec}
+                </p>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Link>
       <CardFooter className="p-4 pt-0 flex flex-col gap-3">
         <div className="w-full flex items-baseline gap-2">
           {product.oldPrice && (
