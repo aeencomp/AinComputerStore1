@@ -101,6 +101,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Default footer links
+  const defaultFooterLinks = [
+    {
+      id: "quick-links",
+      titleAr: "روابط سريعة",
+      titleEn: "Quick Links",
+      links: [
+        { id: "about", labelAr: "من نحن", labelEn: "About Us", url: "/about", isExternal: false },
+        { id: "contact", labelAr: "اتصل بنا", labelEn: "Contact Us", url: "/contact", isExternal: false },
+        { id: "branches", labelAr: "فروعنا", labelEn: "Our Branches", url: "/branches", isExternal: false },
+        { id: "careers", labelAr: "وظائف", labelEn: "Careers", url: "/careers", isExternal: false },
+      ]
+    },
+    {
+      id: "customer-service",
+      titleAr: "خدمة العملاء",
+      titleEn: "Customer Service",
+      links: [
+        { id: "shipping", labelAr: "الشحن والتوصيل", labelEn: "Shipping & Delivery", url: "/shipping", isExternal: false },
+        { id: "returns", labelAr: "الإرجاع والاستبدال", labelEn: "Returns & Exchange", url: "/returns", isExternal: false },
+        { id: "warranty", labelAr: "الضمان", labelEn: "Warranty", url: "/warranty", isExternal: false },
+        { id: "faq", labelAr: "الأسئلة الشائعة", labelEn: "FAQ", url: "/faq", isExternal: false },
+        { id: "track-order", labelAr: "تتبع طلبك", labelEn: "Track Order", url: "/track-order", isExternal: false },
+      ]
+    }
+  ];
+
   app.get("/api/store-settings", async (req, res) => {
     try {
       const settings = await storage.getStoreSettings();
@@ -109,7 +136,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Store settings not found" });
       }
       
-      return res.json(settings);
+      // Return settings with default footer links if none are set
+      const settingsWithDefaults = {
+        ...settings,
+        footerLinks: settings.footerLinks || defaultFooterLinks
+      };
+      
+      return res.json(settingsWithDefaults);
     } catch (error) {
       console.error("Error fetching store settings:", error);
       return res.status(500).json({ error: "Failed to fetch store settings" });
