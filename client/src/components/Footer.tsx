@@ -4,8 +4,8 @@ import { Input } from "@/components/ui/input";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Link } from "wouter";
-import type { StoreSettings } from "@shared/schema";
-import { Twitter, Instagram, Facebook, MessageCircle, Phone, MapPin, Package } from "lucide-react";
+import type { StoreSettings, FooterLinkGroup } from "@shared/schema";
+import { Twitter, Instagram, Facebook, MessageCircle, Phone, MapPin, Package, ExternalLink } from "lucide-react";
 import { SiWhatsapp } from "react-icons/si";
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
@@ -112,47 +112,57 @@ export function Footer() {
             </div>
           </div>
 
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg" data-testid="text-footer-links">{t('footer.quickLinks')}</h3>
-            <div className="flex flex-col gap-2">
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-about-us">
-                {t('footer.aboutUs')}
-              </Button>
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-contact">
-                {t('footer.contact')}
-              </Button>
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-branches">
-                {t('footer.branches')}
-              </Button>
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-careers">
-                {t('footer.careers')}
-              </Button>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="font-bold text-lg" data-testid="text-footer-support">{t('footer.customerService')}</h3>
-            <div className="flex flex-col gap-2">
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-shipping">
-                {t('footer.shipping')}
-              </Button>
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-returns">
-                {t('footer.returns')}
-              </Button>
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-warranty">
-                {t('footer.warranty')}
-              </Button>
-              <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground" data-testid="link-footer-faq">
-                {t('footer.faq')}
-              </Button>
-              <Link href="/track-order">
-                <Button variant="ghost" className="justify-start p-0 h-auto text-muted-foreground flex items-center gap-2" data-testid="link-footer-track-order">
-                  <Package className="h-4 w-4" />
-                  {t('footer.trackOrder')}
-                </Button>
-              </Link>
-            </div>
-          </div>
+          {/* Dynamic Footer Link Groups from Settings */}
+          {(() => {
+            const footerLinks = settings?.footerLinks;
+            if (!footerLinks || !Array.isArray(footerLinks)) return null;
+            
+            return (footerLinks as FooterLinkGroup[]).map((group, groupIndex) => {
+              if (!group || !group.id || !Array.isArray(group.links)) return null;
+              
+              return (
+                <div key={group.id} className="space-y-4">
+                  <h3 className="font-bold text-lg" data-testid={`text-footer-links-${groupIndex}`}>
+                    {language === 'ar' ? group.titleAr : group.titleEn}
+                  </h3>
+                  <div className="flex flex-col gap-2">
+                    {group.links.map((link, linkIndex) => {
+                      if (!link || !link.id) return null;
+                      const label = language === 'ar' ? link.labelAr : link.labelEn;
+                      
+                      if (link.isExternal) {
+                        return (
+                          <a
+                            key={link.id}
+                            href={link.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-muted-foreground hover:text-foreground transition-colors text-sm"
+                            data-testid={`link-footer-${groupIndex}-${linkIndex}`}
+                          >
+                            {label}
+                            <ExternalLink className="h-3 w-3" />
+                          </a>
+                        );
+                      }
+                      
+                      return (
+                        <Link key={link.id} href={link.url}>
+                          <Button 
+                            variant="ghost" 
+                            className="justify-start p-0 h-auto text-muted-foreground" 
+                            data-testid={`link-footer-${groupIndex}-${linkIndex}`}
+                          >
+                            {label}
+                          </Button>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            });
+          })()}
 
           <div className="space-y-4">
             <h3 className="font-bold text-lg" data-testid="text-footer-newsletter">{t('footer.newsletter')}</h3>
