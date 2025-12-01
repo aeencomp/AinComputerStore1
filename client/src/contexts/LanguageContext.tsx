@@ -50,6 +50,10 @@ const translations: Record<Language, Record<string, string>> = {
     'home.repair.description': 'نقدم خدمات إصلاح احترافية لجميع أنواع الحواسيب والأجهزة الإلكترونية. فريقنا المتخصص جاهز لمساعدتك.',
     'home.repair.requestBtn': 'طلب إصلاح',
     'home.repair.trackBtn': 'تتبع طلبك',
+    'home.orderTracking.title': 'تتبع طلبك',
+    'home.orderTracking.subtitle': 'هل لديك طلب قيد التوصيل؟',
+    'home.orderTracking.description': 'تابع حالة طلبك بسهولة. أدخل رقم الطلب ورقم هاتفك للاطلاع على تفاصيل الشحن والتوصيل.',
+    'home.orderTracking.trackBtn': 'تتبع الطلب',
     
     // Product
     'product.specifications': 'المواصفات',
@@ -641,6 +645,10 @@ const translations: Record<Language, Record<string, string>> = {
     'home.repair.description': 'We offer professional repair services for all types of computers and electronic devices. Our specialized team is ready to help you.',
     'home.repair.requestBtn': 'Request Repair',
     'home.repair.trackBtn': 'Track Your Request',
+    'home.orderTracking.title': 'Track Your Order',
+    'home.orderTracking.subtitle': 'Have an order on the way?',
+    'home.orderTracking.description': 'Easily track your order status. Enter your order number and phone number to view shipping and delivery details.',
+    'home.orderTracking.trackBtn': 'Track Order',
     
     // Product
     'product.specifications': 'Specifications',
