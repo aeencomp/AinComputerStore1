@@ -54,7 +54,7 @@ export default function CustomerDashboard() {
   const { cartOpen, setCartOpen } = useCart();
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
-  const { data: currentUser } = useQuery<User | null>({
+  const { data: currentUser, isLoading: isAuthLoading, isFetched: isAuthFetched } = useQuery<User | null>({
     queryKey: ['/api/auth/me'],
   });
 
@@ -62,9 +62,11 @@ export default function CustomerDashboard() {
     queryKey: ['/api/cart'],
   });
 
-  const { data: orders = [], isLoading, isError } = useQuery<Order[]>({
+  const isAuthenticated = isAuthFetched && !!currentUser;
+
+  const { data: orders = [], isLoading: isOrdersLoading, isError } = useQuery<Order[]>({
     queryKey: ['/api/orders/my-orders'],
-    enabled: !!currentUser,
+    enabled: isAuthenticated,
   });
 
   const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -110,7 +112,37 @@ export default function CustomerDashboard() {
     return `${numPrice.toLocaleString('en-IQ')} IQD`;
   };
 
-  if (!currentUser) {
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Header
+          cartItemsCount={cartItemsCount}
+          onCartClick={() => setCartOpen(true)}
+          onSearch={() => {}}
+          onCategorySelect={() => {}}
+          searchValue=""
+        />
+        <main className="flex-1 flex items-center justify-center">
+          <div className="space-y-4 text-center">
+            <Skeleton className="h-12 w-12 rounded-full mx-auto" />
+            <Skeleton className="h-6 w-48 mx-auto" />
+          </div>
+        </main>
+        <Footer />
+        <CartSidebar
+          open={cartOpen}
+          onOpenChange={setCartOpen}
+          items={cartItems}
+          onUpdateQuantity={() => {}}
+          onRemoveItem={() => {}}
+          isLoading={false}
+          isError={false}
+        />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col">
         <Header
@@ -171,7 +203,7 @@ export default function CustomerDashboard() {
             </p>
           </div>
 
-          {isLoading ? (
+          {isOrdersLoading ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
                 <Card key={i}>

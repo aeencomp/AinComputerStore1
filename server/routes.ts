@@ -395,12 +395,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/orders", async (req, res) => {
     try {
       const sessionId = req.session.id;
+      const userId = (req.session as any)?.userId;
 
       console.log("Received order data:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
       console.log("Validated order data:", JSON.stringify(validatedData, null, 2));
       
-      const order = await storage.createOrder(validatedData, sessionId);
+      const order = await storage.createOrder(validatedData, sessionId, userId);
       console.log("Created order:", order.id);
       
       try {

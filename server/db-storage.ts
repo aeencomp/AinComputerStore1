@@ -118,7 +118,7 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
-  async createOrder(insertOrder: InsertOrder, sessionId: string): Promise<Order> {
+  async createOrder(insertOrder: InsertOrder, sessionId: string, userId?: string): Promise<Order> {
     await this.ensureOrderSequence();
     const sequenceResult = await db.execute(sql`SELECT nextval('order_number_seq') as next_num`);
     const nextNumber = (sequenceResult.rows[0] as any).next_num;
@@ -127,6 +127,7 @@ export class DrizzleStorage implements IStorage {
     const result = await db.insert(orders).values({
       ...insertOrder,
       sessionId,
+      userId: userId || null,
       orderNumber,
     }).returning();
     return result[0];

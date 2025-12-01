@@ -15,7 +15,7 @@ export interface IStorage {
   updateCartItemQuantity(id: string, sessionId: string, quantity: number): Promise<CartItemRecord | undefined>;
   removeFromCart(id: string, sessionId: string): Promise<void>;
   clearCart(sessionId: string): Promise<void>;
-  createOrder(order: InsertOrder, sessionId: string): Promise<any>;
+  createOrder(order: InsertOrder, sessionId: string, userId?: string): Promise<any>;
   getOrders(): Promise<any[]>;
   getOrderByNumber(orderNumber: string): Promise<any>;
   getOrdersByUserId(userId: string): Promise<any[]>;
@@ -284,7 +284,7 @@ export class MemStorage implements IStorage {
     return this.users.get(id);
   }
 
-  async createOrder(insertOrder: InsertOrder, sessionId: string): Promise<any> {
+  async createOrder(insertOrder: InsertOrder, sessionId: string, userId?: string): Promise<any> {
     const id = randomUUID();
     const orderNumber = `ORD-${String(this.orderCounter).padStart(5, '0')}`;
     this.orderCounter++;
@@ -293,6 +293,7 @@ export class MemStorage implements IStorage {
       ...insertOrder,
       id,
       sessionId,
+      userId: userId || null,
       orderNumber,
       createdAt: new Date(),
     };

@@ -144,6 +144,7 @@ export interface CartItem {
 export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   sessionId: varchar("session_id"),
+  userId: varchar("user_id"),
   orderNumber: text("order_number").notNull().unique(),
   customerName: text("customer_name").notNull(),
   customerEmail: text("customer_email").notNull(),
@@ -165,6 +166,7 @@ export const insertOrderSchema = createInsertSchema(orders).omit({
   orderNumber: true,
   createdAt: true,
   sessionId: true,
+  userId: true,
 });
 
 export type InsertOrder = z.infer<typeof insertOrderSchema>;
