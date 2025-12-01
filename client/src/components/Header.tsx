@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -99,7 +99,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             )}
           </div>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-2xl hidden md:flex">
+          <form onSubmit={handleSearch} className="flex-1 max-w-md hidden md:flex">
             <div className="relative w-full">
               <Input
                 type="search"
@@ -226,6 +226,12 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               {t('header.pcBuilder')}
             </Button>
           </Link>
+          <Link href="/track-order">
+            <Button variant="ghost" size="sm" className="gap-1 text-primary" data-testid="link-track-order">
+              <MapPin className="h-4 w-4" />
+              {t('header.trackOrder')}
+            </Button>
+          </Link>
         </nav>
 
         {mobileMenuOpen && (
@@ -239,6 +245,12 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               <Button variant="ghost" className="justify-start gap-2 w-full" data-testid="link-pc-builder-mobile">
                 <Cpu className="h-4 w-4" />
                 {t('header.pcBuilder')}
+              </Button>
+            </Link>
+            <Link href="/track-order" onClick={() => setMobileMenuOpen(false)}>
+              <Button variant="ghost" className="justify-start gap-2 w-full text-primary" data-testid="link-track-order-mobile">
+                <MapPin className="h-4 w-4" />
+                {t('header.trackOrder')}
               </Button>
             </Link>
           </nav>

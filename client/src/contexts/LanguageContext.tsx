@@ -25,6 +25,7 @@ const translations: Record<Language, Record<string, string>> = {
     'header.searchTitle': 'البحث',
     'header.searchDescription': 'ابحث عن منتجات الحواسيب والملحقات',
     'header.pcBuilder': 'بناء جهازك',
+    'header.trackOrder': 'تتبع طلبك',
     
     // Categories
     'category.all': 'جميع المنتجات',
@@ -662,6 +663,7 @@ const translations: Record<Language, Record<string, string>> = {
     'header.searchTitle': 'Search',
     'header.searchDescription': 'Search for computers and accessories',
     'header.pcBuilder': 'Build Your PC',
+    'header.trackOrder': 'Track Order',
     
     // Categories
     'category.all': 'All Products',

@@ -123,7 +123,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         { id: "returns", labelAr: "الإرجاع والاستبدال", labelEn: "Returns & Exchange", url: "/returns", isExternal: false },
         { id: "warranty", labelAr: "الضمان", labelEn: "Warranty", url: "/warranty", isExternal: false },
         { id: "faq", labelAr: "الأسئلة الشائعة", labelEn: "FAQ", url: "/faq", isExternal: false },
-        { id: "track-order", labelAr: "تتبع طلبك", labelEn: "Track Order", url: "/track-order", isExternal: false },
       ]
     }
   ];
