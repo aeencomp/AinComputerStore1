@@ -22,6 +22,7 @@ import RepairRequest from "@/pages/RepairRequest";
 import TrackRepair from "@/pages/TrackRepair";
 import TrackOrder from "@/pages/TrackOrder";
 import PCBuilder from "@/pages/PCBuilder";
+import CustomerDashboard from "@/pages/CustomerDashboard";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -44,6 +45,7 @@ function Router() {
       <Route path="/track-repair" component={TrackRepair}/>
       <Route path="/track-order" component={TrackOrder}/>
       <Route path="/pc-builder" component={PCBuilder}/>
+      <Route path="/my-orders" component={CustomerDashboard}/>
       <Route component={NotFound} />
     </Switch>
   );

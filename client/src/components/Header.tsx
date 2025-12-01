@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -175,6 +175,12 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                     {currentUser.name}
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
+                  <Link href="/my-orders">
+                    <DropdownMenuItem data-testid="link-my-orders">
+                      <Package className="h-4 w-4 mr-2" />
+                      {t('dashboard.myOrders')}
+                    </DropdownMenuItem>
+                  </Link>
                   <DropdownMenuItem 
                     onClick={() => logoutMutation.mutate()}
                     data-testid="button-logout"
