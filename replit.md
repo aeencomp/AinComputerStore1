@@ -193,14 +193,23 @@ Order confirmation emails via Gmail SMTP:
 2. Theme: Primary/accent colors (future expansion)
 3. SEO: Meta title, description, keywords - bilingual
 4. Homepage: Hero banner, categories toggle, featured products count
-5. Footer: About text, copyright text - bilingual
+5. Footer: About text, copyright text, footer link groups - bilingual
 6. Shipping: Free shipping threshold, shipping cost
+
+**Footer Links Management**
+- Dynamic footer link groups stored as JSONB in store_settings
+- Each group has: id, titleAr, titleEn, links array
+- Each link has: id, labelAr, labelEn, url, isExternal flag
+- Default groups: Quick Links (About Us, Contact, Branches, Careers) and Customer Service (Shipping, Returns, Warranty, FAQ, Track Order)
+- Admin can add/remove groups and links via accordion UI
+- External links open in new tab with external link icon
+- Footer component renders all groups dynamically with proper type safety checks
 
 **Dynamic Frontend Integration**
 - Header: Dynamic store name, logo from settings
 - HeroSection: Dynamic title, subtitle, image from settings
 - Home: Conditional categories section, configurable featured products count
-- Footer: Dynamic about text, copyright, social links from settings
+- Footer: Dynamic about text, copyright, social links, and configurable link groups from settings
 
 ## Iraqi Market Features
 
