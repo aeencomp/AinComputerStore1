@@ -1,6 +1,6 @@
 import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, products, cartItems, orders, users, storeSettings, repairTickets } from "@shared/schema";
 import { db } from "./db.js";
-import { eq, sql, and } from "drizzle-orm";
+import { eq, sql, and, desc } from "drizzle-orm";
 import type { IStorage } from "./storage";
 import bcrypt from "bcrypt";
 
@@ -139,6 +139,12 @@ export class DrizzleStorage implements IStorage {
   async getOrderByNumber(orderNumber: string): Promise<Order | undefined> {
     const result = await db.select().from(orders).where(eq(orders.orderNumber, orderNumber)).limit(1);
     return result[0];
+  }
+
+  async getOrdersByUserId(userId: string): Promise<Order[]> {
+    return await db.select().from(orders)
+      .where(eq(orders.userId, userId))
+      .orderBy(desc(orders.createdAt));
   }
 
   async lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<Order | undefined> {

@@ -18,6 +18,7 @@ export interface IStorage {
   createOrder(order: InsertOrder, sessionId: string): Promise<any>;
   getOrders(): Promise<any[]>;
   getOrderByNumber(orderNumber: string): Promise<any>;
+  getOrdersByUserId(userId: string): Promise<any[]>;
   lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<any>;
   updateOrderStatus(id: string, status: string): Promise<any>;
   getStoreSettings(): Promise<StoreSettings | undefined>;
@@ -305,6 +306,12 @@ export class MemStorage implements IStorage {
 
   async getOrderByNumber(orderNumber: string): Promise<any> {
     return Array.from(this.orders.values()).find(o => o.orderNumber === orderNumber);
+  }
+
+  async getOrdersByUserId(userId: string): Promise<any[]> {
+    return Array.from(this.orders.values())
+      .filter(o => o.userId === userId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   async lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<any> {
