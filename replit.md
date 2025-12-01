@@ -50,6 +50,7 @@ Preferred communication style: Simple, everyday language.
 - `PATCH /api/cart/:id` - Update cart item quantity (requires authentication)
 - `DELETE /api/cart/:id` - Remove item from cart (requires authentication)
 - `DELETE /api/cart` - Clear entire cart (requires authentication)
+- `GET /api/orders/my-orders` - Retrieve authenticated user's order history (401 if not logged in)
 
 **Data Layer**
 - PostgreSQL database with Neon serverless driver for full persistence
