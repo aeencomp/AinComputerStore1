@@ -12,15 +12,18 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ArrowRight, Save, Store, Palette, Search, Home, CreditCard, FileText } from "lucide-react";
+import { ArrowRight, Save, Store, Palette, Search, Home, CreditCard, FileText, Plus, Trash2, GripVertical, ExternalLink, Link as LinkIcon } from "lucide-react";
 import { Link } from "wouter";
-import type { StoreSettings } from "@shared/schema";
-import { useMemo, useState } from "react";
+import type { StoreSettings, FooterLinkGroup, FooterLink } from "@shared/schema";
+import { useMemo, useState, useEffect } from "react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function AdminSettings() {
   const { language, t } = useLanguage();
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("store");
+  const [footerLinks, setFooterLinks] = useState<FooterLinkGroup[]>([]);
 
   const storeSettingsFormSchema = useMemo(() => z.object({
     storeNameAr: z.string().min(1, t("admin.settings.validation.storeNameArRequired")),
@@ -127,9 +130,18 @@ export default function AdminSettings() {
     } : undefined,
   });
 
+  // Sync footer links from settings
+  useEffect(() => {
+    if (settings?.footerLinks) {
+      setFooterLinks(settings.footerLinks as FooterLinkGroup[]);
+    }
+  }, [settings]);
+
   const updateMutation = useMutation({
     mutationFn: async (data: StoreSettingsForm) => {
-      return apiRequest("PUT", "/api/admin/store-settings", data);
+      // Include footer links in the update
+      const dataWithFooterLinks = { ...data, footerLinks };
+      return apiRequest("PUT", "/api/admin/store-settings", dataWithFooterLinks);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/store-settings"] });
@@ -149,6 +161,54 @@ export default function AdminSettings() {
 
   const onSubmit = (data: StoreSettingsForm) => {
     updateMutation.mutate(data);
+  };
+
+  // Footer links management functions
+  const addLinkGroup = () => {
+    const newGroup: FooterLinkGroup = {
+      id: `group-${Date.now()}`,
+      titleAr: "",
+      titleEn: "",
+      links: []
+    };
+    setFooterLinks([...footerLinks, newGroup]);
+  };
+
+  const removeLinkGroup = (groupId: string) => {
+    setFooterLinks(footerLinks.filter(g => g.id !== groupId));
+  };
+
+  const updateLinkGroup = (groupId: string, field: keyof FooterLinkGroup, value: string) => {
+    setFooterLinks(footerLinks.map(g => 
+      g.id === groupId ? { ...g, [field]: value } : g
+    ));
+  };
+
+  const addLink = (groupId: string) => {
+    const newLink: FooterLink = {
+      id: `link-${Date.now()}`,
+      labelAr: "",
+      labelEn: "",
+      url: "",
+      isExternal: false
+    };
+    setFooterLinks(footerLinks.map(g => 
+      g.id === groupId ? { ...g, links: [...g.links, newLink] } : g
+    ));
+  };
+
+  const removeLink = (groupId: string, linkId: string) => {
+    setFooterLinks(footerLinks.map(g => 
+      g.id === groupId ? { ...g, links: g.links.filter(l => l.id !== linkId) } : g
+    ));
+  };
+
+  const updateLink = (groupId: string, linkId: string, field: keyof FooterLink, value: string | boolean) => {
+    setFooterLinks(footerLinks.map(g => 
+      g.id === groupId 
+        ? { ...g, links: g.links.map(l => l.id === linkId ? { ...l, [field]: value } : l) }
+        : g
+    ));
   };
 
   if (isLoading) {
@@ -759,6 +819,166 @@ export default function AdminSettings() {
                       />
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <LinkIcon className="h-5 w-5" />
+                    {t("admin.settings.footer.linksTitle")}
+                  </CardTitle>
+                  <CardDescription>{t("admin.settings.footer.linksDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {footerLinks.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <LinkIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                      <p>{t("admin.settings.footer.noGroups")}</p>
+                    </div>
+                  ) : (
+                    <Accordion type="multiple" className="space-y-4">
+                      {footerLinks.map((group, groupIndex) => (
+                        <AccordionItem key={group.id} value={group.id} className="border rounded-lg px-4">
+                          <AccordionTrigger className="hover:no-underline">
+                            <div className="flex items-center gap-3 flex-1">
+                              <GripVertical className="h-4 w-4 text-muted-foreground" />
+                              <span className="font-medium">
+                                {language === 'ar' ? (group.titleAr || t("admin.settings.footer.untitledGroup")) : (group.titleEn || t("admin.settings.footer.untitledGroup"))}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                ({group.links.length} {t("admin.settings.footer.links")})
+                              </span>
+                            </div>
+                          </AccordionTrigger>
+                          <AccordionContent className="pt-4 space-y-4">
+                            <div className="grid md:grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label>{t("admin.settings.footer.groupTitleAr")}</Label>
+                                <Input
+                                  value={group.titleAr}
+                                  onChange={(e) => updateLinkGroup(group.id, 'titleAr', e.target.value)}
+                                  placeholder={t("admin.settings.footer.groupTitlePlaceholder")}
+                                  data-testid={`input-group-title-ar-${groupIndex}`}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>{t("admin.settings.footer.groupTitleEn")}</Label>
+                                <Input
+                                  value={group.titleEn}
+                                  onChange={(e) => updateLinkGroup(group.id, 'titleEn', e.target.value)}
+                                  placeholder={t("admin.settings.footer.groupTitlePlaceholder")}
+                                  data-testid={`input-group-title-en-${groupIndex}`}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="space-y-3">
+                              <Label className="text-sm font-medium">{t("admin.settings.footer.linksInGroup")}</Label>
+                              {group.links.length === 0 ? (
+                                <p className="text-sm text-muted-foreground py-2">{t("admin.settings.footer.noLinks")}</p>
+                              ) : (
+                                <div className="space-y-3">
+                                  {group.links.map((link, linkIndex) => (
+                                    <div key={link.id} className="flex items-start gap-3 p-3 border rounded-lg bg-muted/30">
+                                      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">{t("admin.settings.footer.labelAr")}</Label>
+                                          <Input
+                                            value={link.labelAr}
+                                            onChange={(e) => updateLink(group.id, link.id, 'labelAr', e.target.value)}
+                                            placeholder={t("admin.settings.footer.labelPlaceholder")}
+                                            data-testid={`input-link-label-ar-${groupIndex}-${linkIndex}`}
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">{t("admin.settings.footer.labelEn")}</Label>
+                                          <Input
+                                            value={link.labelEn}
+                                            onChange={(e) => updateLink(group.id, link.id, 'labelEn', e.target.value)}
+                                            placeholder={t("admin.settings.footer.labelPlaceholder")}
+                                            data-testid={`input-link-label-en-${groupIndex}-${linkIndex}`}
+                                          />
+                                        </div>
+                                        <div className="space-y-1">
+                                          <Label className="text-xs">{t("admin.settings.footer.url")}</Label>
+                                          <Input
+                                            value={link.url}
+                                            onChange={(e) => updateLink(group.id, link.id, 'url', e.target.value)}
+                                            placeholder="/page or https://..."
+                                            data-testid={`input-link-url-${groupIndex}-${linkIndex}`}
+                                          />
+                                        </div>
+                                        <div className="space-y-1 flex items-end gap-2">
+                                          <div className="flex items-center gap-2 flex-1">
+                                            <Checkbox
+                                              id={`external-${link.id}`}
+                                              checked={link.isExternal || false}
+                                              onCheckedChange={(checked) => updateLink(group.id, link.id, 'isExternal', !!checked)}
+                                              data-testid={`checkbox-external-${groupIndex}-${linkIndex}`}
+                                            />
+                                            <Label htmlFor={`external-${link.id}`} className="text-xs flex items-center gap-1">
+                                              <ExternalLink className="h-3 w-3" />
+                                              {t("admin.settings.footer.external")}
+                                            </Label>
+                                          </div>
+                                        </div>
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => removeLink(group.id, link.id)}
+                                        className="text-destructive hover:text-destructive"
+                                        data-testid={`button-remove-link-${groupIndex}-${linkIndex}`}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => addLink(group.id)}
+                                className="mt-2"
+                                data-testid={`button-add-link-${groupIndex}`}
+                              >
+                                <Plus className="h-4 w-4 ml-1" />
+                                {t("admin.settings.footer.addLink")}
+                              </Button>
+                            </div>
+
+                            <div className="flex justify-end pt-2 border-t">
+                              <Button
+                                type="button"
+                                variant="destructive"
+                                size="sm"
+                                onClick={() => removeLinkGroup(group.id)}
+                                data-testid={`button-remove-group-${groupIndex}`}
+                              >
+                                <Trash2 className="h-4 w-4 ml-1" />
+                                {t("admin.settings.footer.removeGroup")}
+                              </Button>
+                            </div>
+                          </AccordionContent>
+                        </AccordionItem>
+                      ))}
+                    </Accordion>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={addLinkGroup}
+                    className="w-full"
+                    data-testid="button-add-group"
+                  >
+                    <Plus className="h-4 w-4 ml-1" />
+                    {t("admin.settings.footer.addGroup")}
+                  </Button>
                 </CardContent>
               </Card>
             </TabsContent>
