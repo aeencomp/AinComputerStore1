@@ -220,6 +220,7 @@ export const storeSettings = pgTable("store_settings", {
   copyrightTextEn: text("copyright_text_en").default("All Rights Reserved"),
   aboutTextAr: text("about_text_ar").default("متجر العين لتجارة الحاسبات يقدم أفضل الأجهزة والملحقات بأسعار منافسة"),
   aboutTextEn: text("about_text_en").default("Al-Ain Computer Trading offers the best devices and accessories at competitive prices"),
+  footerLinks: jsonb("footer_links"),
   
   // Shipping Settings
   shippingCost: decimal("shipping_cost", { precision: 10, scale: 2 }).default("5000"),
@@ -244,6 +245,22 @@ export const insertStoreSettingsSchema = createInsertSchema(storeSettings).omit(
 
 export type InsertStoreSettings = z.infer<typeof insertStoreSettingsSchema>;
 export type StoreSettings = typeof storeSettings.$inferSelect;
+
+// Footer Links Types
+export interface FooterLink {
+  id: string;
+  labelAr: string;
+  labelEn: string;
+  url: string;
+  isExternal?: boolean;
+}
+
+export interface FooterLinkGroup {
+  id: string;
+  titleAr: string;
+  titleEn: string;
+  links: FooterLink[];
+}
 
 export const repairTickets = pgTable("repair_tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
