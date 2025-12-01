@@ -516,6 +516,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Get orders for the authenticated user
+  app.get("/api/orders/my-orders", async (req, res) => {
+    try {
+      const userId = (req.session as any)?.userId;
+      
+      if (!userId) {
+        return res.status(401).json({ error: "Authentication required" });
+      }
+      
+      const userOrders = await storage.getOrdersByUserId(userId);
+      
+      // Enrich orders with product details
+      const ordersWithProducts = await Promise.all(
+        userOrders.map(async (order) => {
+          const itemsWithProducts = await Promise.all(
+            order.items.map(async (itemStr: string) => {
+              const item = JSON.parse(itemStr);
+              const product = await storage.getProduct(item.productId);
+              return {
+                ...item,
+                product: product || { nameAr: 'منتج غير متوفر', nameEn: 'Product unavailable' }
+              };
+            })
+          );
+          const { sessionId, ...safeOrder } = order;
+          return { ...safeOrder, itemsWithProducts };
+        })
+      );
+      
+      return res.json(ordersWithProducts);
+    } catch (error) {
+      console.error("Error fetching user orders:", error);
+      return res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
   app.get("/api/orders/by-number/:orderNumber", async (req, res) => {
     try {
       const { orderNumber } = req.params;
