@@ -9,11 +9,20 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocation } from 'wouter';
 import type { RepairTicket } from '@shared/schema';
 import { Search } from 'lucide-react';
-import { format } from 'date-fns';
 
 export default function TrackRepair() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [location] = useLocation();
+  
+  const formatDate = (dateValue: string | Date) => {
+    const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
+    return date.toLocaleDateString(language === 'ar' ? 'ar-IQ' : 'en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
   const [phoneNumber, setPhoneNumber] = useState('');
   const [ticket, setTicket] = useState<RepairTicket | null>(null);
 
@@ -130,12 +139,12 @@ export default function TrackRepair() {
                   </div>
                   <div>
                     <Label className="text-muted-foreground">{t('repair.ticket.createdAt')}</Label>
-                    <p className="font-medium">{format(new Date(ticket.createdAt), 'MMM dd, yyyy')}</p>
+                    <p className="font-medium">{formatDate(ticket.createdAt)}</p>
                   </div>
                   {ticket.estimatedCompletion && (
                     <div>
                       <Label className="text-muted-foreground">{t('repair.ticket.estimatedCompletion')}</Label>
-                      <p className="font-medium">{format(new Date(ticket.estimatedCompletion), 'MMM dd, yyyy')}</p>
+                      <p className="font-medium">{formatDate(ticket.estimatedCompletion)}</p>
                     </div>
                   )}
                   {ticket.costEstimate && (
