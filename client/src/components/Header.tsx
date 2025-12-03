@@ -211,7 +211,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           </div>
         </div>
 
-        <nav className="hidden md:flex items-center justify-center gap-1 py-2 border-t bg-muted/30">
+        <nav className="hidden md:flex items-center justify-center gap-1 py-3 mt-2 border-t bg-muted/30">
           <Button 
             variant="ghost" 
             onClick={() => { onSearch(""); }} 
