@@ -25,6 +25,8 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import type { StoreSettings, User } from "@shared/schema";
 
+import aeenn from "@assets/aeenn.jpg";
+
 interface HeaderProps {
   cartItemsCount: number;
   onCartClick: () => void;
@@ -87,7 +89,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           <Link href="/" className="flex items-center gap-2 cursor-pointer" data-testid="link-logo-home">
             {logoUrl ? (
               <img 
-                src={logoUrl} 
+                src={aeenn} 
                 alt={storeName} 
                 className="h-12 max-w-[180px] object-contain"
                 data-testid="logo-image"
@@ -367,7 +369,6 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           </nav>
         )}
       </div>
-
       <Sheet open={mobileSearchOpen} onOpenChange={setMobileSearchOpen}>
         <SheetContent side="top" className="h-auto" data-testid="sheet-mobile-search">
           <SheetHeader>
