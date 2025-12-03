@@ -242,12 +242,12 @@ export default function RepairRequest() {
                   {ticketNumber}
                 </p>
                 <a
-                  href={`/track-repair?ticket=${encodeURIComponent(ticketNumber)}`}
+                  href={`/track-repair?ticket=${encodeURIComponent(ticketNumber)}&lang=ar`}
                   className="hover-elevate"
                   data-testid="link-qr-code"
                 >
                   <QRCode
-                    value={`${window.location.origin}/track-repair?ticket=${encodeURIComponent(ticketNumber)}`}
+                    value={`${window.location.origin}/track-repair?ticket=${encodeURIComponent(ticketNumber)}&lang=ar`}
                     size={200}
                     level="H"
                     includeMargin={true}

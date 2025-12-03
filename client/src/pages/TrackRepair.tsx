@@ -11,7 +11,7 @@ import type { RepairTicket } from '@shared/schema';
 import { Search } from 'lucide-react';
 
 export default function TrackRepair() {
-  const { t, language } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const [location] = useLocation();
   
   const formatDate = (dateValue: string | Date) => {
@@ -26,9 +26,16 @@ export default function TrackRepair() {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [ticket, setTicket] = useState<RepairTicket | null>(null);
 
-  // Auto-search if ticket parameter is in URL
+  // Auto-search if ticket parameter is in URL and set language from URL param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+    
+    // Set language to Arabic if lang=ar is in URL (from QR code scan)
+    const langParam = params.get('lang');
+    if (langParam === 'ar' || langParam === 'en') {
+      setLanguage(langParam);
+    }
+    
     const ticketParam = params.get('ticket');
     if (ticketParam && !phoneNumber && !ticket) {
       // Search by ticket number
