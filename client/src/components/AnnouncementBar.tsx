@@ -26,16 +26,19 @@ export function AnnouncementBar() {
 
   return (
     <div 
-      className="relative py-2 px-4 text-center text-sm font-medium text-white"
+      className="relative py-2 text-sm font-medium text-white overflow-hidden"
       style={{ backgroundColor: bgColor }}
       data-testid="announcement-bar"
     >
-      <div className="max-w-7xl mx-auto flex items-center justify-center gap-2">
-        <span data-testid="text-announcement">{text}</span>
+      <div className="flex animate-marquee whitespace-nowrap">
+        <span className="mx-8" data-testid="text-announcement">{text}</span>
+        <span className="mx-8">{text}</span>
+        <span className="mx-8">{text}</span>
+        <span className="mx-8">{text}</span>
       </div>
       <button
         onClick={() => setDismissed(true)}
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded transition-colors"
+        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded transition-colors z-10 bg-black/20"
         aria-label="Dismiss announcement"
         data-testid="button-dismiss-announcement"
       >
