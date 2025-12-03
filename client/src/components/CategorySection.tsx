@@ -55,21 +55,21 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
   return (
     <section className="py-16 md:py-20 bg-gradient-to-b from-background via-muted/20 to-background" data-testid="section-categories">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <div className="text-center mb-14">
-          <h2 className="text-4xl md:text-6xl font-black mb-4 tracking-tight" data-testid="text-categories-title">
+        <div className="text-center pt-8 mb-20">
+          <h2 className="text-5xl md:text-7xl font-black mb-6 tracking-tight" data-testid="text-categories-title">
             <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
               {t('home.categories.title')}
             </span>
           </h2>
-          <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto mb-6">
+          <p className="text-muted-foreground text-xl md:text-2xl max-w-2xl mx-auto mb-8">
             {language === 'ar' 
               ? 'اختر من بين مجموعة واسعة من المنتجات عالية الجودة'
               : 'Choose from a wide range of high-quality products'}
           </p>
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-12 h-1 bg-gradient-to-r from-transparent to-primary rounded-full" />
-            <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
-            <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
+          <div className="flex items-center justify-center gap-3">
+            <div className="w-16 h-1.5 bg-gradient-to-r from-transparent to-primary rounded-full" />
+            <div className="w-4 h-4 rounded-full bg-primary animate-pulse" />
+            <div className="w-16 h-1.5 bg-gradient-to-l from-transparent to-primary rounded-full" />
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-8">
