@@ -165,7 +165,6 @@ export default function Home() {
       />
 
       <main className="flex-1">
-        {!searchQuery && !selectedCategory && showHeroBanner && <HeroSection settings={storeSettings} />}
         {!searchQuery && !selectedCategory && showCategories && <CategorySection onCategoryClick={handleCategorySelect} />}
 
         {!searchQuery && !selectedCategory && (
