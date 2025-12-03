@@ -283,4 +283,23 @@ export class DrizzleStorage implements IStorage {
   async deleteTechnician(id: string): Promise<void> {
     await db.delete(technicians).where(eq(technicians.id, id));
   }
+
+  async initializeDefaultTechnician(): Promise<void> {
+    try {
+      const existing = await this.getTechnicianByUsername('admin');
+      if (!existing) {
+        await this.createTechnician({
+          username: 'admin',
+          password: 'admin123',
+          displayName: 'مدير النظام',
+          isAdmin: 1,
+          isActive: 1,
+          permissions: ['view_tickets', 'update_status', 'manage_tickets', 'manage_technicians'],
+        });
+        console.log('Default admin technician created (username: admin, password: admin123)');
+      }
+    } catch (error) {
+      console.error('Failed to initialize default technician:', error);
+    }
+  }
 }

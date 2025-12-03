@@ -13,7 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { ArrowLeft, ArrowRight, Plus, Pencil, Trash2, Wrench, Shield, User, Users } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Pencil, Trash2, Wrench, Shield, User, Users, LogOut } from 'lucide-react';
 
 interface Technician {
   id: string;
@@ -117,6 +117,27 @@ export default function TechnicianManagement() {
       });
     },
   });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('POST', '/api/technician/auth/logout');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/technician/auth/me'] });
+      navigate('/technician/login');
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('common.errorOccurred'),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const handleLogout = () => {
+    logoutMutation.mutate();
+  };
 
   const resetForm = () => {
     setFormData({
@@ -295,20 +316,26 @@ export default function TechnicianManagement() {
             </div>
           </div>
           
-          <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={handleAdd} data-testid="button-add-technician">
-                <Plus className="h-4 w-4 me-2" />
-                {t('technician.management.addNew')}
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>{t('technician.management.addNew')}</DialogTitle>
-              </DialogHeader>
-              <TechnicianForm />
-            </DialogContent>
-          </Dialog>
+          <div className="flex items-center gap-2">
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={handleAdd} data-testid="button-add-technician">
+                  <Plus className="h-4 w-4 me-2" />
+                  {t('technician.management.addNew')}
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>{t('technician.management.addNew')}</DialogTitle>
+                </DialogHeader>
+                <TechnicianForm />
+              </DialogContent>
+            </Dialog>
+            <Button variant="outline" onClick={handleLogout} disabled={logoutMutation.isPending} data-testid="button-technician-logout">
+              <LogOut className="h-4 w-4 me-2" />
+              {t('technician.dashboard.logout')}
+            </Button>
+          </div>
         </div>
       </div>
 

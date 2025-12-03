@@ -8,6 +8,9 @@ import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Initialize default admin technician
+  await storage.initializeDefaultTechnician();
+
   app.get("/api/products", async (req, res) => {
     try {
       const { category, componentType } = req.query;

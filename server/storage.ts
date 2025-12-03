@@ -38,6 +38,7 @@ export interface IStorage {
   getTechnicianByUsername(username: string): Promise<Technician | undefined>;
   updateTechnician(id: string, updates: Partial<InsertTechnician>): Promise<Technician | undefined>;
   deleteTechnician(id: string): Promise<void>;
+  initializeDefaultTechnician(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -418,6 +419,10 @@ export class MemStorage implements IStorage {
   }
 
   async deleteTechnician(id: string): Promise<void> {
+    // MemStorage does not support technicians
+  }
+
+  async initializeDefaultTechnician(): Promise<void> {
     // MemStorage does not support technicians
   }
 }
