@@ -99,26 +99,23 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             )}
           </div>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex mt-3">
-            <div className="relative w-full">
-              <Input
-                type="search"
-                placeholder={t('header.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 h-11 rounded-full border-2 border-muted-foreground/20 bg-muted/50 focus:border-primary focus:bg-background transition-all shadow-sm placeholder:text-muted-foreground/60"
-                data-testid="input-search"
-              />
-              <Button
-                type="submit"
-                size="icon"
-                variant="ghost"
-                className="absolute left-1 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
-                data-testid="button-search"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl hidden md:flex mt-4 gap-2">
+            <Input
+              type="search"
+              placeholder={t('header.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 h-12 px-5 rounded-xl border-2 border-muted-foreground/20 bg-muted/40 focus:border-primary focus:bg-background transition-all shadow-md placeholder:text-muted-foreground/60 text-base"
+              data-testid="input-search"
+            />
+            <Button
+              type="submit"
+              className="h-12 px-6 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg shadow-primary/25 font-bold gap-2"
+              data-testid="button-search"
+            >
+              <Search className="h-5 w-5" />
+              {t('header.search')}
+            </Button>
           </form>
 
           <div className="flex items-center gap-2">
@@ -359,27 +356,23 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             <SheetTitle>{t('header.searchTitle')}</SheetTitle>
             <SheetDescription>{t('header.searchDescription')}</SheetDescription>
           </SheetHeader>
-          <form onSubmit={handleSearch} className="mt-4">
-            <div className="relative">
-              <Input
-                type="search"
-                placeholder={t('header.searchPlaceholder')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-4 h-11 rounded-full border-2 border-muted-foreground/20 bg-muted/50 focus:border-primary focus:bg-background transition-all shadow-sm placeholder:text-muted-foreground/60"
-                data-testid="input-search-mobile"
-                autoFocus
-              />
-              <Button
-                type="submit"
-                size="icon"
-                variant="ghost"
-                className="absolute left-1 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
-                data-testid="button-search-mobile"
-              >
-                <Search className="h-4 w-4" />
-              </Button>
-            </div>
+          <form onSubmit={handleSearch} className="mt-4 flex gap-2">
+            <Input
+              type="search"
+              placeholder={t('header.searchPlaceholder')}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="flex-1 h-12 px-5 rounded-xl border-2 border-muted-foreground/20 bg-muted/40 focus:border-primary focus:bg-background transition-all shadow-md placeholder:text-muted-foreground/60 text-base"
+              data-testid="input-search-mobile"
+              autoFocus
+            />
+            <Button
+              type="submit"
+              className="h-12 px-6 rounded-xl bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground shadow-lg shadow-primary/25 font-bold gap-2"
+              data-testid="button-search-mobile"
+            >
+              <Search className="h-5 w-5" />
+            </Button>
           </form>
         </SheetContent>
       </Sheet>
