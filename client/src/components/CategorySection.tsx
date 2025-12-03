@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Laptop, Monitor, Keyboard, Cpu } from "lucide-react";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -12,28 +11,24 @@ const categories = [
     nameAr: 'أجهزة لابتوب',
     nameEn: 'Laptops',
     image: laptopImage,
-    icon: Laptop,
   },
   {
     id: 'desktops',
     nameAr: 'أجهزة مكتبية',
     nameEn: 'Desktops',
     image: desktopImage,
-    icon: Cpu,
   },
   {
     id: 'monitors',
     nameAr: 'شاشات',
     nameEn: 'Monitors',
     image: monitorImage,
-    icon: Monitor,
   },
   {
     id: 'accessories',
     nameAr: 'ملحقات الألعاب',
     nameEn: 'Gaming Accessories',
     image: accessoriesImage,
-    icon: Keyboard,
   },
 ];
 
@@ -65,35 +60,29 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-8">
-          {categories.map((category) => {
-            const IconComponent = category.icon;
-            return (
+          {categories.map((category) => (
               <Card
                 key={category.id}
                 className="overflow-hidden group cursor-pointer border-0 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
                 onClick={() => onCategoryClick?.(category.id)}
                 data-testid={`card-category-${category.id}`}
               >
-                <CardContent className="p-0 relative">
-                  <div className="aspect-[4/5] overflow-hidden bg-muted">
+                <CardContent className="p-0">
+                  <div className="aspect-square overflow-hidden bg-muted">
                     <img
                       src={category.image}
                       alt={language === 'ar' ? category.nameAr : category.nameEn}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent flex flex-col items-center justify-end pb-6">
-                    <div className="bg-primary w-14 h-14 rounded-full flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform duration-300">
-                      <IconComponent className="w-7 h-7 text-white" />
-                    </div>
-                    <h3 className="text-white font-bold text-lg md:text-xl text-center drop-shadow-lg" data-testid={`text-category-${category.id}`}>
+                  <div className="p-4 text-center bg-card">
+                    <h3 className="font-bold text-lg md:text-xl" data-testid={`text-category-${category.id}`}>
                       {language === 'ar' ? category.nameAr : category.nameEn}
                     </h3>
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
+            ))}
         </div>
       </div>
     </section>
