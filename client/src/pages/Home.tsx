@@ -187,16 +187,16 @@ export default function Home() {
                     {t('home.repair.description')}
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <Button asChild size="lg" className="gap-2" data-testid="link-request-repair">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25 font-semibold px-6" data-testid="link-request-repair">
                     <Link href="/repair-request">
-                      <Wrench className="w-4 h-4" />
+                      <Wrench className="w-5 h-5" />
                       {t('home.repair.requestBtn')}
                     </Link>
                   </Button>
-                  <Button asChild variant="outline" size="lg" className="gap-2" data-testid="link-track-repair">
+                  <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-lg shadow-emerald-500/25 font-semibold px-6" data-testid="link-track-repair">
                     <Link href="/track-repair">
-                      <Search className="w-4 h-4" />
+                      <Search className="w-5 h-5" />
                       {t('home.repair.trackBtn')}
                     </Link>
                   </Button>
