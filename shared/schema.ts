@@ -301,3 +301,37 @@ export const insertRepairTicketSchema = createInsertSchema(repairTickets).omit({
 
 export type InsertRepairTicket = z.infer<typeof insertRepairTicketSchema>;
 export type RepairTicket = typeof repairTickets.$inferSelect;
+
+// Technician Users for repair management
+export const technicians = pgTable("technicians", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  displayName: text("display_name").notNull(),
+  isAdmin: integer("is_admin").notNull().default(0),
+  isActive: integer("is_active").notNull().default(1),
+  permissions: jsonb("permissions").notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertTechnicianSchema = createInsertSchema(technicians).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertTechnician = z.infer<typeof insertTechnicianSchema>;
+export type Technician = typeof technicians.$inferSelect;
+
+// Technician permissions enum
+export const TECHNICIAN_PERMISSIONS = {
+  VIEW_TICKETS: 'view_tickets',
+  UPDATE_STATUS: 'update_status',
+  ADD_NOTES: 'add_notes',
+  SET_COSTS: 'set_costs',
+  DELETE_TICKETS: 'delete_tickets',
+  MANAGE_TECHNICIANS: 'manage_technicians',
+} as const;
+
+export type TechnicianPermission = typeof TECHNICIAN_PERMISSIONS[keyof typeof TECHNICIAN_PERMISSIONS];
