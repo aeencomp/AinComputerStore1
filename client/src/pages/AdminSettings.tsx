@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { ArrowRight, Save, Store, Palette, Search, Home, CreditCard, FileText, Plus, Trash2, GripVertical, ExternalLink, Link as LinkIcon } from "lucide-react";
+import { ArrowRight, Save, Store, Palette, Search, Home, CreditCard, FileText, Plus, Trash2, GripVertical, ExternalLink, Link as LinkIcon, RotateCcw, XCircle } from "lucide-react";
 import { Link } from "wouter";
 import type { StoreSettings, FooterLinkGroup, FooterLink } from "@shared/schema";
 import { useMemo, useState, useEffect } from "react";
@@ -170,6 +170,26 @@ export default function AdminSettings() {
   const onSubmit = (data: StoreSettingsForm) => {
     updateMutation.mutate(data);
   };
+
+  const resetDismissCountMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/reset-announcement-dismiss-count");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/store-settings"] });
+      toast({
+        title: t("admin.settings.homepage.dismissCountReset"),
+        description: t("admin.settings.homepage.dismissCountResetDesc"),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t("common.error"),
+        description: t("admin.settings.errorMessage"),
+        variant: "destructive",
+      });
+    },
+  });
 
   // Footer links management functions
   const addLinkGroup = () => {
@@ -720,6 +740,31 @@ export default function AdminSettings() {
                         className="flex-1"
                         data-testid="input-announcement-color-text"
                       />
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-muted rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <XCircle className="h-5 w-5 text-muted-foreground" />
+                        <div>
+                          <p className="font-medium">{t("admin.settings.homepage.dismissCount")}</p>
+                          <p className="text-2xl font-bold" data-testid="text-dismiss-count">
+                            {settings?.announcementDismissCount || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => resetDismissCountMutation.mutate()}
+                        disabled={resetDismissCountMutation.isPending}
+                        data-testid="button-reset-dismiss-count"
+                      >
+                        <RotateCcw className="h-4 w-4 me-2" />
+                        {t("admin.settings.homepage.resetCount")}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>

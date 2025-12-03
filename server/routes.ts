@@ -162,6 +162,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/announcement-dismiss", async (req, res) => {
+    try {
+      const settings = await storage.getStoreSettings();
+      if (settings) {
+        const currentCount = settings.announcementDismissCount || 0;
+        await storage.updateStoreSettings({ announcementDismissCount: currentCount + 1 });
+      }
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error incrementing dismiss count:", error);
+      return res.status(500).json({ error: "Failed to increment dismiss count" });
+    }
+  });
+
+  app.post("/api/admin/reset-announcement-dismiss-count", async (req, res) => {
+    try {
+      await storage.updateStoreSettings({ announcementDismissCount: 0 });
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error resetting dismiss count:", error);
+      return res.status(500).json({ error: "Failed to reset dismiss count" });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const registerSchema = insertUserSchema.extend({

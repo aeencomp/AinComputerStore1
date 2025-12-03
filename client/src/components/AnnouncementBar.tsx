@@ -12,6 +12,15 @@ export function AnnouncementBar() {
     queryKey: ["/api/store-settings"],
   });
 
+  const handleDismiss = async () => {
+    setDismissed(true);
+    try {
+      await fetch("/api/announcement-dismiss", { method: "POST" });
+    } catch (error) {
+      console.error("Failed to track dismiss:", error);
+    }
+  };
+
   if (!settings?.announcementEnabled || dismissed) {
     return null;
   }
@@ -37,7 +46,7 @@ export function AnnouncementBar() {
         <span className="mx-8">{text}</span>
       </div>
       <button
-        onClick={() => setDismissed(true)}
+        onClick={handleDismiss}
         className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded transition-colors z-10 bg-black/20"
         aria-label="Dismiss announcement"
         data-testid="button-dismiss-announcement"
