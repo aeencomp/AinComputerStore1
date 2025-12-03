@@ -41,10 +41,18 @@ export function AnnouncementBar() {
       data-testid="announcement-bar"
     >
       <div className={`flex whitespace-nowrap ${scrollDirection === 'rtl' ? 'animate-marquee-rtl' : 'animate-marquee-ltr'}`}>
-        <span className="mx-8" data-testid="text-announcement">{text}</span>
-        <span className="mx-8">{text}</span>
-        <span className="mx-8">{text}</span>
-        <span className="mx-8">{text}</span>
+        <div className="flex shrink-0">
+          <span className="mx-8" data-testid="text-announcement">{text}</span>
+          <span className="mx-8">{text}</span>
+          <span className="mx-8">{text}</span>
+          <span className="mx-8">{text}</span>
+        </div>
+        <div className="flex shrink-0">
+          <span className="mx-8">{text}</span>
+          <span className="mx-8">{text}</span>
+          <span className="mx-8">{text}</span>
+          <span className="mx-8">{text}</span>
+        </div>
       </div>
       <button
         onClick={handleDismiss}
