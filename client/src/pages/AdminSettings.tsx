@@ -51,6 +51,10 @@ export default function AdminSettings() {
     metaDescriptionEn: z.string().optional(),
     metaKeywordsAr: z.string().optional(),
     metaKeywordsEn: z.string().optional(),
+    announcementTextAr: z.string().optional(),
+    announcementTextEn: z.string().optional(),
+    announcementEnabled: z.number().optional(),
+    announcementBgColor: z.string().optional(),
     heroTitleAr: z.string().optional(),
     heroTitleEn: z.string().optional(),
     heroSubtitleAr: z.string().optional(),
@@ -107,6 +111,10 @@ export default function AdminSettings() {
       metaDescriptionEn: settings.metaDescriptionEn || "",
       metaKeywordsAr: settings.metaKeywordsAr || "",
       metaKeywordsEn: settings.metaKeywordsEn || "",
+      announcementTextAr: settings.announcementTextAr || "",
+      announcementTextEn: settings.announcementTextEn || "",
+      announcementEnabled: settings.announcementEnabled ?? 0,
+      announcementBgColor: settings.announcementBgColor || "#3B82F6",
       heroTitleAr: settings.heroTitleAr || "",
       heroTitleEn: settings.heroTitleEn || "",
       heroSubtitleAr: settings.heroSubtitleAr || "",
@@ -659,6 +667,64 @@ export default function AdminSettings() {
             </TabsContent>
 
             <TabsContent value="homepage" className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t("admin.settings.homepage.announcement")}</CardTitle>
+                  <CardDescription>{t("admin.settings.homepage.announcementDesc")}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="announcementEnabled">{t("admin.settings.homepage.enableAnnouncement")}</Label>
+                    <Switch
+                      id="announcementEnabled"
+                      checked={form.watch("announcementEnabled") === 1}
+                      onCheckedChange={(checked) => form.setValue("announcementEnabled", checked ? 1 : 0)}
+                      data-testid="switch-announcement-enabled"
+                    />
+                  </div>
+
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="announcementTextAr">{t("admin.settings.homepage.announcementTextAr")}</Label>
+                      <Input
+                        id="announcementTextAr"
+                        {...form.register("announcementTextAr")}
+                        placeholder={t("admin.settings.homepage.announcementPlaceholder")}
+                        data-testid="input-announcement-text-ar"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="announcementTextEn">{t("admin.settings.homepage.announcementTextEn")}</Label>
+                      <Input
+                        id="announcementTextEn"
+                        {...form.register("announcementTextEn")}
+                        placeholder={t("admin.settings.homepage.announcementPlaceholder")}
+                        data-testid="input-announcement-text-en"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="announcementBgColor">{t("admin.settings.homepage.announcementBgColor")}</Label>
+                    <div className="flex gap-2 items-center">
+                      <Input
+                        id="announcementBgColor"
+                        type="color"
+                        {...form.register("announcementBgColor")}
+                        className="w-16 h-10 p-1 cursor-pointer"
+                        data-testid="input-announcement-color"
+                      />
+                      <Input
+                        {...form.register("announcementBgColor")}
+                        placeholder="#3B82F6"
+                        className="flex-1"
+                        data-testid="input-announcement-color-text"
+                      />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               <Card>
                 <CardHeader>
                   <CardTitle>{t("admin.settings.homepage.hero")}</CardTitle>

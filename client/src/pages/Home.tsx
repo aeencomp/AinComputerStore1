@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Header } from "@/components/Header";
+import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { HeroSection } from "@/components/HeroSection";
 import { CategorySection } from "@/components/CategorySection";
 import { ProductCard } from "@/components/ProductCard";
@@ -154,6 +155,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
+      <AnnouncementBar />
       <Header
         cartItemsCount={cartItemsCount}
         onCartClick={() => setCartOpen(true)}

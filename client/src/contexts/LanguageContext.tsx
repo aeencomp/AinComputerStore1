@@ -373,6 +373,13 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.settings.seo.keywordsPlaceholder': 'كلمة1، كلمة2، كلمة3',
     
     // Homepage Settings
+    'admin.settings.homepage.announcement': 'شريط الإعلانات',
+    'admin.settings.homepage.announcementDesc': 'إعدادات شريط العروض والإعلانات في أعلى الصفحة',
+    'admin.settings.homepage.enableAnnouncement': 'تفعيل شريط الإعلانات',
+    'admin.settings.homepage.announcementTextAr': 'نص الإعلان بالعربية',
+    'admin.settings.homepage.announcementTextEn': 'نص الإعلان بالإنجليزية',
+    'admin.settings.homepage.announcementPlaceholder': 'مثال: خصم 20% على جميع المنتجات!',
+    'admin.settings.homepage.announcementBgColor': 'لون خلفية الشريط',
     'admin.settings.homepage.hero': 'البانر الرئيسي',
     'admin.settings.homepage.heroDesc': 'إعدادات البانر في الصفحة الرئيسية',
     'admin.settings.homepage.showHeroBanner': 'إظهار البانر الرئيسي',
@@ -1009,6 +1016,13 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.settings.seo.keywordsPlaceholder': 'keyword1, keyword2, keyword3',
     
     // Homepage Settings
+    'admin.settings.homepage.announcement': 'Announcement Bar',
+    'admin.settings.homepage.announcementDesc': 'Settings for the offers and announcements bar at the top of the page',
+    'admin.settings.homepage.enableAnnouncement': 'Enable Announcement Bar',
+    'admin.settings.homepage.announcementTextAr': 'Announcement Text (Arabic)',
+    'admin.settings.homepage.announcementTextEn': 'Announcement Text (English)',
+    'admin.settings.homepage.announcementPlaceholder': 'Example: 20% off all products!',
+    'admin.settings.homepage.announcementBgColor': 'Background Color',
     'admin.settings.homepage.hero': 'Hero Banner',
     'admin.settings.homepage.heroDesc': 'Homepage hero banner settings',
     'admin.settings.homepage.showHeroBanner': 'Show Hero Banner',

@@ -204,6 +204,12 @@ export const storeSettings = pgTable("store_settings", {
   metaKeywordsAr: text("meta_keywords_ar").default("كمبيوتر، لابتوب، بغداد، العراق، ألعاب، قطع كمبيوتر"),
   metaKeywordsEn: text("meta_keywords_en").default("computer, laptop, Baghdad, Iraq, gaming, computer parts"),
   
+  // Announcement Bar Settings
+  announcementTextAr: text("announcement_text_ar").default(""),
+  announcementTextEn: text("announcement_text_en").default(""),
+  announcementEnabled: integer("announcement_enabled").notNull().default(0),
+  announcementBgColor: text("announcement_bg_color").default("#3B82F6"),
+  
   // Homepage Settings
   heroTitleAr: text("hero_title_ar").default("مرحباً بك في متجرنا"),
   heroTitleEn: text("hero_title_en").default("Welcome to Our Store"),
