@@ -99,7 +99,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             )}
           </div>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex mt-1">
+          <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex mt-3">
             <div className="relative w-full">
               <Input
                 type="search"
