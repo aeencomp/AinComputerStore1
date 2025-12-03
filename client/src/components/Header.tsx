@@ -99,21 +99,21 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             )}
           </div>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-md hidden md:flex">
+          <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex mt-1">
             <div className="relative w-full">
               <Input
                 type="search"
                 placeholder={t('header.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pr-10"
+                className="w-full pl-12 pr-4 h-11 rounded-full border-2 border-muted-foreground/20 bg-muted/50 focus:border-primary focus:bg-background transition-all shadow-sm placeholder:text-muted-foreground/60"
                 data-testid="input-search"
               />
               <Button
                 type="submit"
                 size="icon"
                 variant="ghost"
-                className="absolute left-0 top-0 h-full"
+                className="absolute left-1 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
                 data-testid="button-search"
               >
                 <Search className="h-4 w-4" />
@@ -366,7 +366,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 placeholder={t('header.searchPlaceholder')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pr-10"
+                className="w-full pl-12 pr-4 h-11 rounded-full border-2 border-muted-foreground/20 bg-muted/50 focus:border-primary focus:bg-background transition-all shadow-sm placeholder:text-muted-foreground/60"
                 data-testid="input-search-mobile"
                 autoFocus
               />
@@ -374,7 +374,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 type="submit"
                 size="icon"
                 variant="ghost"
-                className="absolute left-0 top-0 h-full"
+                className="absolute left-1 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-primary text-primary-foreground hover:bg-primary/90"
                 data-testid="button-search-mobile"
               >
                 <Search className="h-4 w-4" />
