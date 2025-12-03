@@ -743,17 +743,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
       
-      // Convert empty strings to null for numeric fields
-      const cleanedBody = { ...req.body };
-      if (cleanedBody.costEstimate === '' || cleanedBody.costEstimate === undefined) {
-        cleanedBody.costEstimate = null;
+      // Build update object with only the fields that are being updated
+      const updateData: Record<string, any> = {};
+      
+      if (req.body.status !== undefined) {
+        updateData.status = req.body.status;
       }
-      if (cleanedBody.finalCost === '' || cleanedBody.finalCost === undefined) {
-        cleanedBody.finalCost = null;
+      if (req.body.priority !== undefined) {
+        updateData.priority = req.body.priority;
+      }
+      if (req.body.technicianNotes !== undefined) {
+        updateData.technicianNotes = req.body.technicianNotes || '';
+      }
+      if (req.body.estimatedCompletion !== undefined) {
+        updateData.estimatedCompletion = req.body.estimatedCompletion ? new Date(req.body.estimatedCompletion) : null;
+      }
+      if (req.body.costEstimate !== undefined) {
+        updateData.costEstimate = req.body.costEstimate && req.body.costEstimate !== '' ? req.body.costEstimate : null;
+      }
+      if (req.body.finalCost !== undefined) {
+        updateData.finalCost = req.body.finalCost && req.body.finalCost !== '' ? req.body.finalCost : null;
       }
       
-      const validatedData = insertRepairTicketSchema.partial().parse(cleanedBody);
-      const ticket = await storage.updateRepairTicket(id, validatedData);
+      const ticket = await storage.updateRepairTicket(id, updateData);
       
       if (!ticket) {
         return res.status(404).json({ error: "Repair ticket not found" });
