@@ -1,38 +1,87 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useLocation, Link } from 'wouter';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { useToast } from '@/hooks/use-toast';
+import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench, Search } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings } from 'lucide-react';
 import { format } from 'date-fns';
 
+interface Technician {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: number;
+  isActive: number;
+  permissions: string[];
+}
+
 export default function TechnicianDashboard() {
-  const [, setLocation] = useLocation();
+  const [, navigate] = useLocation();
   const { t, language } = useLanguage();
+  const { toast } = useToast();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
-  useEffect(() => {
-    const isAuth = localStorage.getItem('technicianAuth');
-    if (!isAuth) {
-      setLocation('/technician/login');
-    }
-  }, [setLocation]);
+  const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
+    queryKey: ['/api/technician/auth/me'],
+    retry: false,
+  });
 
-  const { data: tickets, isLoading } = useQuery<RepairTicket[]>({
+  const { data: tickets, isLoading: isTicketsLoading } = useQuery<RepairTicket[]>({
     queryKey: ['/api/repair-tickets'],
+    enabled: !!currentTechnician,
+  });
+
+  const logoutMutation = useMutation({
+    mutationFn: async () => {
+      await apiRequest('POST', '/api/technician/auth/logout');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/technician/auth/me'] });
+      toast({
+        title: t('technician.dashboard.logout'),
+        description: t('technician.login.success.description'),
+      });
+      navigate('/technician/login');
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('common.errorOccurred'),
+        variant: 'destructive',
+      });
+    },
   });
 
   const handleLogout = () => {
-    localStorage.removeItem('technicianAuth');
-    setLocation('/technician/login');
+    logoutMutation.mutate();
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <Wrench className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+          <p>{t('common.loading')}</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (authError || !currentTechnician) {
+    navigate('/technician/login');
+    return null;
+  }
+
+  const isAdmin = currentTechnician.isAdmin === 1;
 
   const filteredTickets = tickets?.filter((ticket) => {
     if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
@@ -72,18 +121,36 @@ export default function TechnicianDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <Wrench className="h-6 w-6" />
-            <h1 className="text-2xl font-bold" data-testid="text-technician-dashboard-title">
-              {t('repair.technician.dashboard.title')}
-            </h1>
+      <div className="border-b bg-card">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+              <Wrench className="h-5 w-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold" data-testid="text-technician-dashboard-title">
+                {t('repair.technician.dashboard.title')}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {t('technician.dashboard.welcome', { name: currentTechnician.displayName })}
+              </p>
+            </div>
           </div>
-          <Button variant="outline" onClick={handleLogout} data-testid="button-technician-logout">
-            <LogOut className="h-4 w-4" />
-            {t('header.logout')}
-          </Button>
+          
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Link href="/technician/manage">
+                <Button variant="outline" data-testid="button-manage-technicians">
+                  <Users className="h-4 w-4 me-2" />
+                  {t('technician.management.title')}
+                </Button>
+              </Link>
+            )}
+            <Button variant="outline" onClick={handleLogout} disabled={logoutMutation.isPending} data-testid="button-technician-logout">
+              <LogOut className="h-4 w-4 me-2" />
+              {t('technician.dashboard.logout')}
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -129,7 +196,7 @@ export default function TechnicianDashboard() {
           </Select>
         </div>
 
-        {isLoading ? (
+        {isTicketsLoading ? (
           <div className="text-center py-12" data-testid="text-loading">
             {t('common.loading')}
           </div>

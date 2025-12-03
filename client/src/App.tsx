@@ -18,6 +18,7 @@ import AdminPrograms from "@/pages/AdminPrograms";
 import AdminSettings from "@/pages/AdminSettings";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
 import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
+import TechnicianManagement from "@/pages/technician/TechnicianManagement";
 import TicketDetail from "@/pages/technician/TicketDetail";
 import RepairRequest from "@/pages/RepairRequest";
 import TrackRepair from "@/pages/TrackRepair";
@@ -42,6 +43,8 @@ function Router() {
       <Route path="/admin/settings" component={AdminSettings}/>
       <Route path="/technician/login" component={TechnicianLogin}/>
       <Route path="/technician/dashboard" component={TechnicianDashboard}/>
+      <Route path="/technician" component={TechnicianDashboard}/>
+      <Route path="/technician/manage" component={TechnicianManagement}/>
       <Route path="/technician/tickets/:id" component={TicketDetail}/>
       <Route path="/repair-request" component={RepairRequest}/>
       <Route path="/track-repair" component={TrackRepair}/>
