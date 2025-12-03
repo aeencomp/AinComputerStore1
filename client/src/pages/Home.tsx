@@ -177,13 +177,13 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="flex-1 text-center md:text-start">
-                  <h2 className="text-2xl md:text-3xl font-bold mb-2" data-testid="text-repair-title">
+                  <h2 className="text-3xl md:text-4xl font-extrabold mb-2" data-testid="text-repair-title">
                     {t('home.repair.title')}
                   </h2>
-                  <p className="text-lg text-primary font-medium mb-2" data-testid="text-repair-subtitle">
+                  <p className="text-xl text-primary font-bold mb-2" data-testid="text-repair-subtitle">
                     {t('home.repair.subtitle')}
                   </p>
-                  <p className="text-muted-foreground" data-testid="text-repair-description">
+                  <p className="text-muted-foreground font-medium" data-testid="text-repair-description">
                     {t('home.repair.description')}
                   </p>
                 </div>
