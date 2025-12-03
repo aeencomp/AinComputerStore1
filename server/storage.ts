@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -30,6 +30,14 @@ export interface IStorage {
   getRepairTicketByPhone(phone: string): Promise<RepairTicket | undefined>;
   updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined>;
   deleteRepairTicket(id: string): Promise<void>;
+  
+  // Technician methods
+  createTechnician(technician: InsertTechnician): Promise<Technician>;
+  getTechnicians(): Promise<Technician[]>;
+  getTechnician(id: string): Promise<Technician | undefined>;
+  getTechnicianByUsername(username: string): Promise<Technician | undefined>;
+  updateTechnician(id: string, updates: Partial<InsertTechnician>): Promise<Technician | undefined>;
+  deleteTechnician(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -387,6 +395,30 @@ export class MemStorage implements IStorage {
 
   async deleteRepairTicket(id: string): Promise<void> {
     // MemStorage does not support repair tickets
+  }
+
+  async createTechnician(technician: InsertTechnician): Promise<Technician> {
+    throw new Error("MemStorage does not support technicians");
+  }
+
+  async getTechnicians(): Promise<Technician[]> {
+    return [];
+  }
+
+  async getTechnician(id: string): Promise<Technician | undefined> {
+    return undefined;
+  }
+
+  async getTechnicianByUsername(username: string): Promise<Technician | undefined> {
+    return undefined;
+  }
+
+  async updateTechnician(id: string, updates: Partial<InsertTechnician>): Promise<Technician | undefined> {
+    return undefined;
+  }
+
+  async deleteTechnician(id: string): Promise<void> {
+    // MemStorage does not support technicians
   }
 }
 

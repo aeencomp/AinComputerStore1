@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, products, cartItems, orders, users, storeSettings, repairTickets } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, products, cartItems, orders, users, storeSettings, repairTickets, technicians } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -239,5 +239,48 @@ export class DrizzleStorage implements IStorage {
 
   async deleteRepairTicket(id: string): Promise<void> {
     await db.delete(repairTickets).where(eq(repairTickets.id, id));
+  }
+
+  // Technician methods
+  async createTechnician(insertTechnician: InsertTechnician): Promise<Technician> {
+    const hashedPassword = await bcrypt.hash(insertTechnician.password, 10);
+    const result = await db.insert(technicians).values({
+      ...insertTechnician,
+      password: hashedPassword,
+    }).returning();
+    return result[0];
+  }
+
+  async getTechnicians(): Promise<Technician[]> {
+    return await db.select().from(technicians);
+  }
+
+  async getTechnician(id: string): Promise<Technician | undefined> {
+    const result = await db.select().from(technicians).where(eq(technicians.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getTechnicianByUsername(username: string): Promise<Technician | undefined> {
+    const result = await db.select().from(technicians).where(eq(technicians.username, username)).limit(1);
+    return result[0];
+  }
+
+  async updateTechnician(id: string, updates: Partial<InsertTechnician>): Promise<Technician | undefined> {
+    const updateData: any = { ...updates, updatedAt: new Date() };
+    
+    // Hash password if it's being updated
+    if (updates.password) {
+      updateData.password = await bcrypt.hash(updates.password, 10);
+    }
+    
+    const result = await db.update(technicians)
+      .set(updateData)
+      .where(eq(technicians.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteTechnician(id: string): Promise<void> {
+    await db.delete(technicians).where(eq(technicians.id, id));
   }
 }
