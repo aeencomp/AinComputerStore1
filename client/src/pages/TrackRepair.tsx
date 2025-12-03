@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,11 +8,96 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocation } from 'wouter';
 import type { RepairTicket } from '@shared/schema';
-import { Search } from 'lucide-react';
+import { Search, Clock, Wrench, Package, CheckCircle, Truck, Circle } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
+
+const repairSteps = [
+  { id: 'pending', icon: Clock },
+  { id: 'in-progress', icon: Wrench },
+  { id: 'waiting-parts', icon: Package },
+  { id: 'completed', icon: CheckCircle },
+  { id: 'delivered', icon: Truck },
+];
+
+function RepairTimeline({ currentStatus, t, language }: { currentStatus: string; t: (key: string) => string; language: string }) {
+  const currentIndex = repairSteps.findIndex(step => step.id === currentStatus);
+  
+  return (
+    <div className="py-6" data-testid="repair-timeline">
+      <h4 className="font-semibold mb-4 text-center">{language === 'ar' ? 'مراحل الصيانة' : 'Repair Progress'}</h4>
+      <div className="relative">
+        <div className="flex justify-between items-start">
+          {repairSteps.map((step, index) => {
+            const Icon = step.icon;
+            const isCompleted = index <= currentIndex;
+            const isCurrent = index === currentIndex;
+            
+            return (
+              <div key={step.id} className="flex flex-col items-center flex-1 relative z-10">
+                <div 
+                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                    isCompleted 
+                      ? isCurrent 
+                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/30 animate-pulse' 
+                        : 'bg-primary text-primary-foreground'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                  data-testid={`timeline-step-${step.id}`}
+                >
+                  <Icon className="w-5 h-5" />
+                </div>
+                <span className={`text-xs mt-2 text-center max-w-[70px] leading-tight ${
+                  isCompleted ? 'font-medium text-foreground' : 'text-muted-foreground'
+                }`}>
+                  {t(`repair.status.${step.id}`)}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+        <div className="absolute top-5 left-0 right-0 h-0.5 bg-muted -z-0 mx-8">
+          <div 
+            className="h-full bg-primary transition-all duration-500"
+            style={{ width: `${(currentIndex / (repairSteps.length - 1)) * 100}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TicketBarcode({ ticketNumber }: { ticketNumber: string }) {
+  const barcodeRef = useRef<SVGSVGElement>(null);
+  
+  useEffect(() => {
+    if (barcodeRef.current && ticketNumber) {
+      try {
+        JsBarcode(barcodeRef.current, ticketNumber, {
+          format: 'CODE128',
+          width: 2,
+          height: 50,
+          displayValue: true,
+          fontSize: 14,
+          margin: 10,
+          background: 'transparent',
+        });
+      } catch (error) {
+        console.error('Barcode generation error:', error);
+      }
+    }
+  }, [ticketNumber]);
+  
+  return (
+    <div className="flex justify-center py-4 bg-white rounded-lg" data-testid="ticket-barcode">
+      <svg ref={barcodeRef} />
+    </div>
+  );
+}
 
 export default function TrackRepair() {
   const { t, language, setLanguage } = useLanguage();
   const [location] = useLocation();
+  const barcodeRef = useRef<SVGSVGElement>(null);
   
   const formatDate = (dateValue: string | Date) => {
     const date = typeof dateValue === 'string' ? new Date(dateValue) : dateValue;
@@ -116,7 +201,7 @@ export default function TrackRepair() {
             )}
 
             {ticket && (
-              <div className="space-y-4 border-t pt-6">
+              <div className="space-y-6 border-t pt-6">
                 <div className="flex justify-between items-start">
                   <div>
                     <h3 className="font-semibold text-lg" data-testid="text-ticket-number-result">{ticket.ticketNumber}</h3>
@@ -126,6 +211,10 @@ export default function TrackRepair() {
                     {t(`repair.status.${ticket.status}`)}
                   </Badge>
                 </div>
+
+                <TicketBarcode ticketNumber={ticket.ticketNumber} />
+
+                <RepairTimeline currentStatus={ticket.status} t={t} language={language} />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
