@@ -14,6 +14,7 @@ import OrderConfirmation from "@/pages/OrderConfirmation";
 import AdminLogin from "@/pages/AdminLogin";
 import AdminDashboard from "@/pages/AdminDashboard";
 import AdminProducts from "@/pages/AdminProducts";
+import AdminPrograms from "@/pages/AdminPrograms";
 import AdminSettings from "@/pages/AdminSettings";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
 import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
@@ -37,6 +38,7 @@ function Router() {
       <Route path="/admin/login" component={AdminLogin}/>
       <Route path="/admin/dashboard" component={AdminDashboard}/>
       <Route path="/admin/products" component={AdminProducts}/>
+      <Route path="/admin/programs" component={AdminPrograms}/>
       <Route path="/admin/settings" component={AdminSettings}/>
       <Route path="/technician/login" component={TechnicianLogin}/>
       <Route path="/technician/dashboard" component={TechnicianDashboard}/>
