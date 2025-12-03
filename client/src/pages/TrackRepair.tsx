@@ -157,8 +157,8 @@ export default function TrackRepair() {
 
   const searchMutation = useMutation({
     mutationFn: async (query: string) => {
-      // Try ticket number search first (if it starts with TKT-)
-      if (query.startsWith('TKT-') || query.startsWith('REP-')) {
+      // Try ticket number search first (if it starts with AEEN-)
+      if (query.startsWith('AEEN-') || query.startsWith('TKT-') || query.startsWith('REP-')) {
         const res = await fetch(`/api/repair-tickets/lookup/${encodeURIComponent(query)}`);
         if (res.ok) {
           return res.json();

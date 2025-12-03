@@ -198,7 +198,7 @@ export class DrizzleStorage implements IStorage {
     await this.ensureOrderSequence();
     const sequenceResult = await db.execute(sql`SELECT nextval('repair_ticket_seq') as next_num`);
     const nextNumber = (sequenceResult.rows[0] as any).next_num;
-    const ticketNumber = `TKT-${String(nextNumber).padStart(6, '0')}`;
+    const ticketNumber = `AEEN-${String(nextNumber).padStart(5, '0')}`;
     
     const result = await db.insert(repairTickets).values({
       ...insertTicket,
