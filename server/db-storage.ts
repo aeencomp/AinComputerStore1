@@ -189,6 +189,10 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
+  async deleteOrder(id: string): Promise<void> {
+    await db.delete(orders).where(eq(orders.id, id));
+  }
+
   async getStoreSettings(): Promise<StoreSettings | undefined> {
     const result = await db.select().from(storeSettings).limit(1);
     return result[0];

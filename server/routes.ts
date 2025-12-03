@@ -660,6 +660,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/orders/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteOrder(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      return res.status(500).json({ error: "Failed to delete order" });
+    }
+  });
+
   app.post("/api/repair-tickets", async (req, res) => {
     try {
       const validatedData = insertRepairTicketSchema.parse(req.body);

@@ -5,9 +5,19 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow, Users } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users, Trash2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Order {
@@ -28,6 +38,7 @@ export default function AdminDashboard() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const [selectedOrders, setSelectedOrders] = useState<{ [key: string]: string }>({});
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     const isAdmin = localStorage.getItem("adminAuth");
@@ -59,6 +70,37 @@ export default function AdminDashboard() {
       });
     },
   });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      return await apiRequest('DELETE', `/api/orders/${orderId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      setDeleteOrderId(null);
+      toast({
+        title: t('admin.dashboard.deleteSuccess'),
+        description: t('admin.dashboard.deleteSuccessDesc'),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('admin.dashboard.deleteError'),
+        description: t('admin.dashboard.deleteErrorDesc'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleDeleteOrder = (orderId: string) => {
+    setDeleteOrderId(orderId);
+  };
+
+  const confirmDelete = () => {
+    if (deleteOrderId) {
+      deleteMutation.mutate(deleteOrderId);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("adminAuth");
@@ -189,28 +231,39 @@ export default function AdminDashboard() {
 
                   <Separator />
 
-                  <div className="flex gap-2 items-center">
-                    <Select
-                      value={selectedOrders[order.id] || order.status}
-                      onValueChange={(value) => handleStatusChange(order.id, value)}
-                    >
-                      <SelectTrigger className="w-48" data-testid={`select-order-status-${order.id}`}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">{t('admin.dashboard.pending')}</SelectItem>
-                        <SelectItem value="processing">{t('admin.dashboard.processing')}</SelectItem>
-                        <SelectItem value="shipped">{t('admin.dashboard.shipped')}</SelectItem>
-                        <SelectItem value="delivered">{t('admin.dashboard.delivered')}</SelectItem>
-                        <SelectItem value="cancelled">{t('admin.dashboard.cancelled')}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="flex flex-wrap gap-2 items-center justify-between">
+                    <div className="flex gap-2 items-center">
+                      <Select
+                        value={selectedOrders[order.id] || order.status}
+                        onValueChange={(value) => handleStatusChange(order.id, value)}
+                      >
+                        <SelectTrigger className="w-48" data-testid={`select-order-status-${order.id}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">{t('admin.dashboard.pending')}</SelectItem>
+                          <SelectItem value="processing">{t('admin.dashboard.processing')}</SelectItem>
+                          <SelectItem value="shipped">{t('admin.dashboard.shipped')}</SelectItem>
+                          <SelectItem value="delivered">{t('admin.dashboard.delivered')}</SelectItem>
+                          <SelectItem value="cancelled">{t('admin.dashboard.cancelled')}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        onClick={() => handleUpdateOrder(order.id)}
+                        disabled={!selectedOrders[order.id] || updateMutation.isPending}
+                        data-testid={`button-update-order-${order.id}`}
+                      >
+                        {updateMutation.isPending ? t('admin.dashboard.updating') : t('admin.dashboard.update')}
+                      </Button>
+                    </div>
                     <Button
-                      onClick={() => handleUpdateOrder(order.id)}
-                      disabled={!selectedOrders[order.id] || updateMutation.isPending}
-                      data-testid={`button-update-order-${order.id}`}
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => handleDeleteOrder(order.id)}
+                      data-testid={`button-delete-order-${order.id}`}
                     >
-                      {updateMutation.isPending ? t('admin.dashboard.updating') : t('admin.dashboard.update')}
+                      <Trash2 className="h-4 w-4 me-1" />
+                      {t('admin.dashboard.delete')}
                     </Button>
                   </div>
                 </CardContent>
@@ -219,6 +272,29 @@ export default function AdminDashboard() {
           </div>
         )}
       </main>
+
+      <AlertDialog open={!!deleteOrderId} onOpenChange={(open) => !open && setDeleteOrderId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('admin.dashboard.deleteOrderTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('admin.dashboard.deleteOrderConfirm')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-order">
+              {t('common.cancel')}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete-order"
+            >
+              {deleteMutation.isPending ? t('admin.dashboard.deleting') : t('admin.dashboard.delete')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

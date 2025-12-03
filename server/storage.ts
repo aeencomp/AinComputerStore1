@@ -21,6 +21,7 @@ export interface IStorage {
   getOrdersByUserId(userId: string): Promise<any[]>;
   lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<any>;
   updateOrderStatus(id: string, status: string): Promise<any>;
+  deleteOrder(id: string): Promise<void>;
   getStoreSettings(): Promise<StoreSettings | undefined>;
   updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
   createRepairTicket(ticket: InsertRepairTicket): Promise<RepairTicket>;
@@ -368,6 +369,10 @@ export class MemStorage implements IStorage {
     order.status = status;
     this.orders.set(id, order);
     return order;
+  }
+
+  async deleteOrder(id: string): Promise<void> {
+    this.orders.delete(id);
   }
 
   async getStoreSettings(): Promise<StoreSettings | undefined> {
