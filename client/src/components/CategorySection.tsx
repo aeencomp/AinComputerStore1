@@ -13,8 +13,6 @@ const categories = [
     nameEn: 'Laptops',
     image: laptopImage,
     icon: Laptop,
-    gradient: 'from-purple-600/90 via-purple-500/70 to-transparent',
-    accentColor: 'bg-purple-500',
   },
   {
     id: 'desktops',
@@ -22,8 +20,6 @@ const categories = [
     nameEn: 'Desktops',
     image: desktopImage,
     icon: Cpu,
-    gradient: 'from-blue-600/90 via-blue-500/70 to-transparent',
-    accentColor: 'bg-blue-500',
   },
   {
     id: 'monitors',
@@ -31,8 +27,6 @@ const categories = [
     nameEn: 'Monitors',
     image: monitorImage,
     icon: Monitor,
-    gradient: 'from-teal-600/90 via-teal-500/70 to-transparent',
-    accentColor: 'bg-teal-500',
   },
   {
     id: 'accessories',
@@ -40,8 +34,6 @@ const categories = [
     nameEn: 'Gaming Accessories',
     image: accessoriesImage,
     icon: Keyboard,
-    gradient: 'from-rose-600/90 via-rose-500/70 to-transparent',
-    accentColor: 'bg-rose-500',
   },
 ];
 
@@ -57,7 +49,7 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="text-center mb-14">
           <h2 className="text-4xl md:text-6xl font-black mb-4 tracking-tight" data-testid="text-categories-title">
-            <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent text-[48px]">
               {t('home.categories.title')}
             </span>
           </h2>
@@ -90,8 +82,8 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
                   </div>
-                  <div className={`absolute inset-0 bg-gradient-to-t ${category.gradient} flex flex-col items-center justify-end pb-6`}>
-                    <div className={`${category.accentColor} w-14 h-14 rounded-full flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent flex flex-col items-center justify-end pb-6">
+                    <div className="bg-primary w-14 h-14 rounded-full flex items-center justify-center mb-3 shadow-lg group-hover:scale-110 transition-transform duration-300">
                       <IconComponent className="w-7 h-7 text-white" />
                     </div>
                     <h3 className="text-white font-bold text-lg md:text-xl text-center drop-shadow-lg" data-testid={`text-category-${category.id}`}>
