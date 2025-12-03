@@ -803,6 +803,232 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===============================
+  // Technician Auth Routes
+  // ===============================
+
+  app.post("/api/technician/auth/login", async (req, res) => {
+    try {
+      const loginSchema = z.object({
+        username: z.string().min(1, "اسم المستخدم مطلوب"),
+        password: z.string().min(1, "كلمة المرور مطلوبة"),
+      });
+
+      const validatedData = loginSchema.parse(req.body);
+      
+      const technician = await storage.getTechnicianByUsername(validatedData.username);
+      if (!technician) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+
+      if (!technician.isActive) {
+        return res.status(401).json({ error: "هذا الحساب معطل" });
+      }
+
+      const isPasswordValid = await bcrypt.compare(validatedData.password, technician.password);
+      if (!isPasswordValid) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+
+      // Store technician session
+      (req.session as any).technicianId = technician.id;
+      (req.session as any).technicianUsername = technician.username;
+      (req.session as any).technicianIsAdmin = technician.isAdmin;
+      (req.session as any).technicianPermissions = technician.permissions;
+      
+      return new Promise((resolve) => {
+        req.session.save((err) => {
+          if (err) {
+            console.error("Session save error:", err);
+          }
+          const { password: _, ...technicianWithoutPassword } = technician;
+          resolve(res.json(technicianWithoutPassword));
+        });
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error logging in technician:", error);
+      return res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/technician/auth/logout", async (req, res) => {
+    // Only clear technician-related session data
+    delete (req.session as any).technicianId;
+    delete (req.session as any).technicianUsername;
+    delete (req.session as any).technicianIsAdmin;
+    delete (req.session as any).technicianPermissions;
+    
+    return new Promise((resolve) => {
+      req.session.save((err) => {
+        if (err) {
+          console.error("Session save error:", err);
+        }
+        resolve(res.json({ success: true }));
+      });
+    });
+  });
+
+  app.get("/api/technician/auth/me", async (req, res) => {
+    try {
+      const technicianId = (req.session as any)?.technicianId;
+      
+      if (!technicianId) {
+        return res.status(401).json({ error: "غير مسجل الدخول" });
+      }
+
+      const technician = await storage.getTechnician(technicianId);
+      if (!technician) {
+        return res.status(401).json({ error: "الفني غير موجود" });
+      }
+
+      if (!technician.isActive) {
+        return res.status(401).json({ error: "هذا الحساب معطل" });
+      }
+
+      const { password: _, ...technicianWithoutPassword } = technician;
+      return res.json(technicianWithoutPassword);
+    } catch (error) {
+      console.error("Error fetching current technician:", error);
+      return res.status(500).json({ error: "خطأ في جلب بيانات الفني" });
+    }
+  });
+
+  // ===============================
+  // Technician Management Routes (Admin only)
+  // ===============================
+
+  // Middleware to check if user is technician admin
+  const requireTechnicianAdmin = (req: any, res: any, next: any) => {
+    const technicianId = req.session?.technicianId;
+    const isAdmin = req.session?.technicianIsAdmin;
+    
+    if (!technicianId || !isAdmin) {
+      return res.status(403).json({ error: "غير مصرح لك بالوصول" });
+    }
+    next();
+  };
+
+  app.get("/api/admin/technicians", requireTechnicianAdmin, async (req, res) => {
+    try {
+      const technicians = await storage.getTechnicians();
+      // Remove passwords from response
+      const techsWithoutPasswords = technicians.map(t => {
+        const { password: _, ...tech } = t;
+        return tech;
+      });
+      return res.json(techsWithoutPasswords);
+    } catch (error) {
+      console.error("Error fetching technicians:", error);
+      return res.status(500).json({ error: "Failed to fetch technicians" });
+    }
+  });
+
+  app.post("/api/admin/technicians", requireTechnicianAdmin, async (req, res) => {
+    try {
+      const createSchema = z.object({
+        username: z.string().min(3, "اسم المستخدم يجب أن يكون 3 أحرف على الأقل"),
+        password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+        displayName: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
+        isAdmin: z.boolean().optional().default(false),
+        permissions: z.array(z.string()).optional().default([]),
+      });
+
+      const validatedData = createSchema.parse(req.body);
+      
+      // Check if username already exists
+      const existing = await storage.getTechnicianByUsername(validatedData.username);
+      if (existing) {
+        return res.status(400).json({ error: "اسم المستخدم مستخدم بالفعل" });
+      }
+
+      // Convert boolean to number for database
+      const dbData = {
+        ...validatedData,
+        isAdmin: validatedData.isAdmin ? 1 : 0,
+      };
+
+      const technician = await storage.createTechnician(dbData);
+      const { password: _, ...techWithoutPassword } = technician;
+      return res.json(techWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating technician:", error);
+      return res.status(500).json({ error: "Failed to create technician" });
+    }
+  });
+
+  app.patch("/api/admin/technicians/:id", requireTechnicianAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const updateSchema = z.object({
+        username: z.string().min(3).optional(),
+        password: z.string().min(6).optional(),
+        displayName: z.string().min(2).optional(),
+        isAdmin: z.boolean().optional(),
+        isActive: z.boolean().optional(),
+        permissions: z.array(z.string()).optional(),
+      });
+
+      const validatedData = updateSchema.parse(req.body);
+      
+      // If updating username, check it doesn't conflict with another user
+      if (validatedData.username) {
+        const existing = await storage.getTechnicianByUsername(validatedData.username);
+        if (existing && existing.id !== id) {
+          return res.status(400).json({ error: "اسم المستخدم مستخدم بالفعل" });
+        }
+      }
+
+      // Convert booleans to numbers for database
+      const dbData: any = { ...validatedData };
+      if (validatedData.isAdmin !== undefined) {
+        dbData.isAdmin = validatedData.isAdmin ? 1 : 0;
+      }
+      if (validatedData.isActive !== undefined) {
+        dbData.isActive = validatedData.isActive ? 1 : 0;
+      }
+
+      const technician = await storage.updateTechnician(id, dbData);
+      
+      if (!technician) {
+        return res.status(404).json({ error: "الفني غير موجود" });
+      }
+
+      const { password: _, ...techWithoutPassword } = technician;
+      return res.json(techWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating technician:", error);
+      return res.status(500).json({ error: "Failed to update technician" });
+    }
+  });
+
+  app.delete("/api/admin/technicians/:id", requireTechnicianAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const currentTechnicianId = (req.session as any)?.technicianId;
+      
+      // Prevent deleting yourself
+      if (id === currentTechnicianId) {
+        return res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص" });
+      }
+      
+      await storage.deleteTechnician(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting technician:", error);
+      return res.status(500).json({ error: "Failed to delete technician" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
