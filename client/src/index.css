@@ -318,3 +318,30 @@
 .animate-marquee-ltr:hover {
   animation-play-state: paused;
 }
+
+/* Wrench animation for repair section */
+@keyframes wrench {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+  10% {
+    transform: rotate(-12deg);
+  }
+  20% {
+    transform: rotate(12deg);
+  }
+  30% {
+    transform: rotate(-10deg);
+  }
+  40% {
+    transform: rotate(10deg);
+  }
+  50% {
+    transform: rotate(0deg);
+  }
+}
+
+.animate-wrench {
+  animation: wrench 2s ease-in-out infinite;
+  transform-origin: center center;
+}
