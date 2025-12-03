@@ -11,7 +11,7 @@ import type { RepairTicket } from '@shared/schema';
 import { Search, Clock, Wrench, Package, CheckCircle, Truck, Circle } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 
-const repairSteps = [
+const allRepairSteps = [
   { id: 'pending', icon: Clock },
   { id: 'in-progress', icon: Wrench },
   { id: 'waiting-parts', icon: Package },
@@ -20,13 +20,35 @@ const repairSteps = [
 ];
 
 function RepairTimeline({ currentStatus, t, language }: { currentStatus: string; t: (key: string) => string; language: string }) {
+  const showWaitingParts = currentStatus === 'waiting-parts';
+  
+  const repairSteps = showWaitingParts 
+    ? allRepairSteps 
+    : allRepairSteps.filter(step => step.id !== 'waiting-parts');
+  
   const currentIndex = repairSteps.findIndex(step => step.id === currentStatus);
+  const progressPercent = currentIndex >= 0 ? (currentIndex / (repairSteps.length - 1)) * 100 : 0;
   
   return (
-    <div className="py-6" data-testid="repair-timeline">
-      <h4 className="font-semibold mb-4 text-center">{language === 'ar' ? 'مراحل الصيانة' : 'Repair Progress'}</h4>
-      <div className="relative">
-        <div className="flex justify-between items-start">
+    <div className="py-8 px-4" data-testid="repair-timeline">
+      <div className="text-center mb-8">
+        <h4 className="text-lg font-bold text-foreground mb-1">
+          {language === 'ar' ? 'مراحل الصيانة' : 'Repair Progress'}
+        </h4>
+        <p className="text-sm text-muted-foreground">
+          {language === 'ar' ? 'تتبع حالة جهازك' : 'Track your device status'}
+        </p>
+      </div>
+      
+      <div className="relative max-w-2xl mx-auto">
+        <div className="absolute top-6 left-0 right-0 h-1 bg-muted rounded-full mx-12">
+          <div 
+            className="h-full bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-700 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        
+        <div className="flex justify-between items-start relative">
           {repairSteps.map((step, index) => {
             const Icon = step.icon;
             const isCompleted = index <= currentIndex;
@@ -35,31 +57,36 @@ function RepairTimeline({ currentStatus, t, language }: { currentStatus: string;
             return (
               <div key={step.id} className="flex flex-col items-center flex-1 relative z-10">
                 <div 
-                  className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
+                  className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-500 shadow-sm ${
                     isCompleted 
                       ? isCurrent 
-                        ? 'bg-primary text-primary-foreground ring-4 ring-primary/30 animate-pulse' 
+                        ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/30 scale-110' 
                         : 'bg-primary text-primary-foreground'
-                      : 'bg-muted text-muted-foreground'
+                      : 'bg-background border-2 border-muted text-muted-foreground'
                   }`}
                   data-testid={`timeline-step-${step.id}`}
                 >
-                  <Icon className="w-5 h-5" />
+                  {isCompleted && !isCurrent ? (
+                    <CheckCircle className="w-5 h-5" />
+                  ) : (
+                    <Icon className={`w-5 h-5 ${isCurrent ? 'animate-pulse' : ''}`} />
+                  )}
                 </div>
-                <span className={`text-xs mt-2 text-center max-w-[70px] leading-tight ${
-                  isCompleted ? 'font-medium text-foreground' : 'text-muted-foreground'
-                }`}>
-                  {t(`repair.status.${step.id}`)}
-                </span>
+                <div className="mt-3 text-center">
+                  <span className={`text-xs font-medium block leading-tight ${
+                    isCompleted ? 'text-foreground' : 'text-muted-foreground'
+                  }`}>
+                    {t(`repair.status.${step.id}`)}
+                  </span>
+                  {isCurrent && (
+                    <span className="text-[10px] text-primary font-medium mt-1 block">
+                      {language === 'ar' ? 'الحالة الحالية' : 'Current'}
+                    </span>
+                  )}
+                </div>
               </div>
             );
           })}
-        </div>
-        <div className="absolute top-5 left-0 right-0 h-0.5 bg-muted -z-0 mx-8">
-          <div 
-            className="h-full bg-primary transition-all duration-500"
-            style={{ width: `${(currentIndex / (repairSteps.length - 1)) * 100}%` }}
-          />
         </div>
       </div>
     </div>
