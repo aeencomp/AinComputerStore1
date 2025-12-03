@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Order {
@@ -104,6 +104,12 @@ export default function AdminDashboard() {
               <Button variant="outline" size="sm" className="border-cyan-300 text-cyan-700 hover:bg-cyan-50 dark:border-cyan-700 dark:text-cyan-400 dark:hover:bg-cyan-900/20" data-testid="link-admin-programs">
                 <AppWindow className="w-4 h-4 ms-2" />
                 {t('admin.programs.managePrograms')}
+              </Button>
+            </Link>
+            <Link href="/admin/customers">
+              <Button variant="outline" size="sm" className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20" data-testid="link-admin-customers">
+                <Users className="w-4 h-4 ms-2" />
+                {t('admin.customers.manageCustomers')}
               </Button>
             </Link>
             <Link href="/admin/settings">

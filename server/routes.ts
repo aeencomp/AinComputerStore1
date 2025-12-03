@@ -1032,6 +1032,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ===============================
+  // Customer Management Routes (Admin panel)
+  // ===============================
+  
+  app.get("/api/admin/customers", async (req, res) => {
+    try {
+      const users = await storage.getUsers();
+      // Remove passwords from response
+      const usersWithoutPasswords = users.map(u => {
+        const { password: _, ...user } = u;
+        return user;
+      });
+      return res.json(usersWithoutPasswords);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      return res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
+  app.get("/api/admin/customers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const user = await storage.getUserById(id);
+      
+      if (!user) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+      
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      console.error("Error fetching customer:", error);
+      return res.status(500).json({ error: "Failed to fetch customer" });
+    }
+  });
+
+  app.patch("/api/admin/customers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      
+      const updateSchema = z.object({
+        name: z.string().min(2).optional(),
+        email: z.string().email().optional(),
+        phone: z.string().min(10).optional(),
+        password: z.string().min(6).optional(),
+      });
+
+      const validatedData = updateSchema.parse(req.body);
+      
+      // If updating email, check it doesn't conflict with another user
+      if (validatedData.email) {
+        const existing = await storage.getUserByEmail(validatedData.email);
+        if (existing && existing.id !== id) {
+          return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
+        }
+      }
+
+      const user = await storage.updateUser(id, validatedData);
+      
+      if (!user) {
+        return res.status(404).json({ error: "Customer not found" });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating customer:", error);
+      return res.status(500).json({ error: "Failed to update customer" });
+    }
+  });
+
+  app.delete("/api/admin/customers/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteUser(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting customer:", error);
+      return res.status(500).json({ error: "Failed to delete customer" });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;

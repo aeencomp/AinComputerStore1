@@ -31,6 +31,14 @@ export interface IStorage {
   updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined>;
   deleteRepairTicket(id: string): Promise<void>;
   
+  // User methods (for customer management)
+  createUser(user: InsertUser): Promise<User>;
+  getUsers(): Promise<User[]>;
+  getUserById(id: string): Promise<User | undefined>;
+  getUserByEmail(email: string): Promise<User | undefined>;
+  updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<void>;
+  
   // Technician methods
   createTechnician(technician: InsertTechnician): Promise<Technician>;
   getTechnicians(): Promise<Technician[]>;
@@ -291,6 +299,24 @@ export class MemStorage implements IStorage {
 
   async getUserById(id: string): Promise<User | undefined> {
     return this.users.get(id);
+  }
+
+  async getUsers(): Promise<User[]> {
+    return Array.from(this.users.values()).sort((a, b) => 
+      b.createdAt.getTime() - a.createdAt.getTime()
+    );
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const existing = this.users.get(id);
+    if (!existing) return undefined;
+    const updated = { ...existing, ...updates };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    this.users.delete(id);
   }
 
   async createOrder(insertOrder: InsertOrder, sessionId: string, userId?: string): Promise<any> {

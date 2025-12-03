@@ -118,6 +118,23 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
+  async getUsers(): Promise<User[]> {
+    return await db.select().from(users).orderBy(desc(users.createdAt));
+  }
+
+  async updateUser(id: string, updates: Partial<InsertUser>): Promise<User | undefined> {
+    const updateData: any = { ...updates };
+    if (updates.password) {
+      updateData.password = await bcrypt.hash(updates.password, 10);
+    }
+    const result = await db.update(users).set(updateData).where(eq(users.id, id)).returning();
+    return result[0];
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+
   async createOrder(insertOrder: InsertOrder, sessionId: string, userId?: string): Promise<Order> {
     await this.ensureOrderSequence();
     const sequenceResult = await db.execute(sql`SELECT nextval('order_number_seq') as next_num`);
