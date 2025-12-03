@@ -152,10 +152,14 @@ export default function AdminSettings() {
     mutationFn: async (data: StoreSettingsForm) => {
       // Include footer links in the update
       const dataWithFooterLinks = { ...data, footerLinks };
-      return apiRequest("PUT", "/api/admin/store-settings", dataWithFooterLinks);
+      const response = await apiRequest("PUT", "/api/admin/store-settings", dataWithFooterLinks);
+      return response.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/store-settings"] });
+    onSuccess: (updatedSettings) => {
+      // Force update the cache with the new data
+      queryClient.setQueryData(["/api/store-settings"], updatedSettings);
+      // Also invalidate to ensure any other components get fresh data
+      queryClient.invalidateQueries({ queryKey: ["/api/store-settings"], refetchType: 'all' });
       toast({
         title: t("admin.settings.successTitle"),
         description: t("admin.settings.successMessage"),
