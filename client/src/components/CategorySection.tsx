@@ -1,7 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Laptop, Monitor, Keyboard, Cpu, Sparkles } from "lucide-react";
+import { Laptop, Monitor, Keyboard, Cpu } from "lucide-react";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -57,10 +56,6 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
     <section className="py-16 md:py-20 bg-gradient-to-b from-background via-muted/20 to-background" data-testid="section-categories">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="text-center mb-14">
-          <Badge variant="secondary" className="mb-4 px-4 py-1.5 text-sm font-medium bg-primary/10 text-primary border-primary/20 gap-1.5">
-            <Sparkles className="w-3.5 h-3.5" />
-            {language === 'ar' ? 'اكتشف منتجاتنا' : 'Explore Our Products'}
-          </Badge>
           <h2 className="text-4xl md:text-6xl font-black mb-4 tracking-tight" data-testid="text-categories-title">
             <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
               {t('home.categories.title')}
