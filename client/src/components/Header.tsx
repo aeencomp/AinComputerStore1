@@ -86,10 +86,10 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
     <header className="sticky top-0 z-50 bg-background border-b">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
-          <Link href="/" className="flex items-center gap-2 cursor-pointer" data-testid="link-logo-home">
+          <Link href="/" className="flex items-center gap-3 cursor-pointer" data-testid="link-logo-home">
             {logoUrl ? (
               <img 
-                src={aeenn} 
+                src={logoUrl} 
                 alt={storeName} 
                 className="h-12 max-w-[180px] object-contain"
                 data-testid="logo-image"
@@ -99,6 +99,9 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 <span className="text-sm font-bold text-muted-foreground text-center">{storeName}</span>
               </div>
             )}
+            <span className="hidden sm:block text-lg font-bold text-foreground whitespace-nowrap" data-testid="text-store-name">
+              {storeName}
+            </span>
           </Link>
 
           <form onSubmit={handleSearch} className="flex-1 max-w-xl hidden md:flex mt-4 gap-2">
