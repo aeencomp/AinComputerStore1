@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -214,20 +214,68 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           </div>
         </div>
 
-        <nav className="hidden md:flex items-center justify-center gap-6 py-3 border-t">
-          <Button variant="ghost" onClick={() => { onSearch(""); }} data-testid="link-home">{t('header.home')}</Button>
-          <Button variant="ghost" onClick={() => onCategorySelect?.("laptops")} data-testid="link-computers">{t('category.laptops')}</Button>
-          <Button variant="ghost" onClick={() => onCategorySelect?.("accessories")} data-testid="link-accessories">{t('category.accessories')}</Button>
-          <Button variant="ghost" onClick={() => onCategorySelect?.("monitors")} data-testid="link-monitors">{t('category.monitors')}</Button>
-          <Button variant="ghost" onClick={() => onCategorySelect?.("desktops")} data-testid="link-desktops">{t('category.desktops')}</Button>
+        <nav className="hidden md:flex items-center justify-center gap-1 py-2 border-t bg-muted/30">
+          <Button 
+            variant="ghost" 
+            onClick={() => { onSearch(""); }} 
+            className="gap-2 px-4 py-2 rounded-full hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 transition-colors font-medium"
+            data-testid="link-home"
+          >
+            <Home className="h-4 w-4" />
+            {t('header.home')}
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => onCategorySelect?.("laptops")} 
+            className="gap-2 px-4 py-2 rounded-full hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 transition-colors font-medium"
+            data-testid="link-computers"
+          >
+            <Laptop className="h-4 w-4" />
+            {t('category.laptops')}
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => onCategorySelect?.("accessories")} 
+            className="gap-2 px-4 py-2 rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 transition-colors font-medium"
+            data-testid="link-accessories"
+          >
+            <Keyboard className="h-4 w-4" />
+            {t('category.accessories')}
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => onCategorySelect?.("monitors")} 
+            className="gap-2 px-4 py-2 rounded-full hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 transition-colors font-medium"
+            data-testid="link-monitors"
+          >
+            <Monitor className="h-4 w-4" />
+            {t('category.monitors')}
+          </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => onCategorySelect?.("desktops")} 
+            className="gap-2 px-4 py-2 rounded-full hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-colors font-medium"
+            data-testid="link-desktops"
+          >
+            <Computer className="h-4 w-4" />
+            {t('category.desktops')}
+          </Button>
           <Link href="/pc-builder">
-            <Button variant="ghost" className="gap-1" data-testid="link-pc-builder">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-400 transition-colors font-medium"
+              data-testid="link-pc-builder"
+            >
               <Cpu className="h-4 w-4" />
               {t('header.pcBuilder')}
             </Button>
           </Link>
           <Link href="/track-order">
-            <Button variant="ghost" size="sm" className="gap-1 text-primary" data-testid="link-track-order">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 transition-colors font-medium border border-emerald-200 dark:border-emerald-800"
+              data-testid="link-track-order"
+            >
               <MapPin className="h-4 w-4" />
               {t('header.trackOrder')}
             </Button>
@@ -235,20 +283,68 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
         </nav>
 
         {mobileMenuOpen && (
-          <nav className="md:hidden flex flex-col gap-2 py-3 border-t">
-            <Button variant="ghost" className="justify-start" onClick={() => { onSearch(""); setMobileMenuOpen(false); }} data-testid="link-home-mobile">{t('header.home')}</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("laptops"); setMobileMenuOpen(false); }} data-testid="link-computers-mobile">{t('category.laptops')}</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("accessories"); setMobileMenuOpen(false); }} data-testid="link-accessories-mobile">{t('category.accessories')}</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("monitors"); setMobileMenuOpen(false); }} data-testid="link-monitors-mobile">{t('category.monitors')}</Button>
-            <Button variant="ghost" className="justify-start" onClick={() => { onCategorySelect?.("desktops"); setMobileMenuOpen(false); }} data-testid="link-desktops-mobile">{t('category.desktops')}</Button>
+          <nav className="md:hidden flex flex-col gap-1 py-3 border-t bg-muted/30 px-2">
+            <Button 
+              variant="ghost" 
+              className="justify-start gap-3 rounded-lg hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 font-medium" 
+              onClick={() => { onSearch(""); setMobileMenuOpen(false); }} 
+              data-testid="link-home-mobile"
+            >
+              <Home className="h-4 w-4" />
+              {t('header.home')}
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="justify-start gap-3 rounded-lg hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 font-medium" 
+              onClick={() => { onCategorySelect?.("laptops"); setMobileMenuOpen(false); }} 
+              data-testid="link-computers-mobile"
+            >
+              <Laptop className="h-4 w-4" />
+              {t('category.laptops')}
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="justify-start gap-3 rounded-lg hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 font-medium" 
+              onClick={() => { onCategorySelect?.("accessories"); setMobileMenuOpen(false); }} 
+              data-testid="link-accessories-mobile"
+            >
+              <Keyboard className="h-4 w-4" />
+              {t('category.accessories')}
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="justify-start gap-3 rounded-lg hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 font-medium" 
+              onClick={() => { onCategorySelect?.("monitors"); setMobileMenuOpen(false); }} 
+              data-testid="link-monitors-mobile"
+            >
+              <Monitor className="h-4 w-4" />
+              {t('category.monitors')}
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="justify-start gap-3 rounded-lg hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 font-medium" 
+              onClick={() => { onCategorySelect?.("desktops"); setMobileMenuOpen(false); }} 
+              data-testid="link-desktops-mobile"
+            >
+              <Computer className="h-4 w-4" />
+              {t('category.desktops')}
+            </Button>
             <Link href="/pc-builder" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="ghost" className="justify-start gap-2 w-full" data-testid="link-pc-builder-mobile">
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg hover:bg-indigo-100 hover:text-indigo-700 dark:hover:bg-indigo-900/30 dark:hover:text-indigo-400 font-medium" 
+                data-testid="link-pc-builder-mobile"
+              >
                 <Cpu className="h-4 w-4" />
                 {t('header.pcBuilder')}
               </Button>
             </Link>
             <Link href="/track-order" onClick={() => setMobileMenuOpen(false)}>
-              <Button variant="ghost" className="justify-start gap-2 w-full text-primary" data-testid="link-track-order-mobile">
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40 font-medium border border-emerald-200 dark:border-emerald-800" 
+                data-testid="link-track-order-mobile"
+              >
                 <MapPin className="h-4 w-4" />
                 {t('header.trackOrder')}
               </Button>
