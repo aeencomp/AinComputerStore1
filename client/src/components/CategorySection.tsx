@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Laptop, Monitor, Keyboard, Cpu } from "lucide-react";
+import { Laptop, Monitor, Keyboard, Cpu, Sparkles } from "lucide-react";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -55,11 +56,26 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
   return (
     <section className="py-16 md:py-20 bg-gradient-to-b from-background via-muted/20 to-background" data-testid="section-categories">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-5xl font-extrabold mb-4 bg-gradient-to-r from-primary via-primary/80 to-primary bg-clip-text text-transparent" data-testid="text-categories-title">
-            {t('home.categories.title')}
+        <div className="text-center mb-14">
+          <Badge variant="secondary" className="mb-4 px-4 py-1.5 text-sm font-medium bg-primary/10 text-primary border-primary/20 gap-1.5">
+            <Sparkles className="w-3.5 h-3.5" />
+            {language === 'ar' ? 'اكتشف منتجاتنا' : 'Explore Our Products'}
+          </Badge>
+          <h2 className="text-4xl md:text-6xl font-black mb-4 tracking-tight" data-testid="text-categories-title">
+            <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent">
+              {t('home.categories.title')}
+            </span>
           </h2>
-          <div className="w-24 h-1 bg-gradient-to-r from-primary to-primary/50 mx-auto rounded-full" />
+          <p className="text-muted-foreground text-lg md:text-xl max-w-2xl mx-auto mb-6">
+            {language === 'ar' 
+              ? 'اختر من بين مجموعة واسعة من المنتجات عالية الجودة'
+              : 'Choose from a wide range of high-quality products'}
+          </p>
+          <div className="flex items-center justify-center gap-2">
+            <div className="w-12 h-1 bg-gradient-to-r from-transparent to-primary rounded-full" />
+            <div className="w-3 h-3 rounded-full bg-primary animate-pulse" />
+            <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
+          </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-8">
           {categories.map((category) => {
