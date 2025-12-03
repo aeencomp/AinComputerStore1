@@ -46,7 +46,7 @@ app.use(session({
   }),
   secret: process.env.SESSION_SECRET || 'default-secret-please-change-in-production',
   resave: false,
-  saveUninitialized: false,
+  saveUninitialized: true,
   cookie: {
     maxAge: 30 * 24 * 60 * 60 * 1000,
     httpOnly: true,
