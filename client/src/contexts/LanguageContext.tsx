@@ -34,6 +34,7 @@ const translations: Record<Language, Record<string, string>> = {
     'category.desktops': 'أجهزة مكتبية',
     'category.monitors': 'شاشات',
     'category.accessories': 'ملحقات',
+    'category.programs': 'برامج',
     
     // Home page
     'home.hero.title': 'أفضل أجهزة الحاسوب والملحقات',
@@ -688,6 +689,7 @@ const translations: Record<Language, Record<string, string>> = {
     'category.desktops': 'Desktops',
     'category.monitors': 'Monitors',
     'category.accessories': 'Accessories',
+    'category.programs': 'Programs',
     
     // Home page
     'home.hero.title': 'Best Computers & Accessories',

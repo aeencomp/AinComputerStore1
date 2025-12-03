@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -257,6 +257,15 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             <Computer className="h-4 w-4" />
             {t('category.desktops')}
           </Button>
+          <Button 
+            variant="ghost" 
+            onClick={() => onCategorySelect?.("programs")} 
+            className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
+            data-testid="link-programs"
+          >
+            <AppWindow className="h-4 w-4" />
+            {t('category.programs')}
+          </Button>
           <Link href="/pc-builder">
             <Button 
               variant="ghost" 
@@ -325,6 +334,15 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             >
               <Computer className="h-4 w-4" />
               {t('category.desktops')}
+            </Button>
+            <Button 
+              variant="ghost" 
+              className="justify-start gap-3 rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold" 
+              onClick={() => { onCategorySelect?.("programs"); setMobileMenuOpen(false); }} 
+              data-testid="link-programs-mobile"
+            >
+              <AppWindow className="h-4 w-4" />
+              {t('category.programs')}
             </Button>
             <Link href="/pc-builder" onClick={() => setMobileMenuOpen(false)}>
               <Button 
