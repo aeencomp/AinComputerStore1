@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
@@ -55,6 +56,7 @@ export default function AdminSettings() {
     announcementTextEn: z.string().optional(),
     announcementEnabled: z.number().optional(),
     announcementBgColor: z.string().optional(),
+    announcementScrollDirection: z.string().optional(),
     heroTitleAr: z.string().optional(),
     heroTitleEn: z.string().optional(),
     heroSubtitleAr: z.string().optional(),
@@ -115,6 +117,7 @@ export default function AdminSettings() {
       announcementTextEn: settings.announcementTextEn || "",
       announcementEnabled: settings.announcementEnabled ?? 0,
       announcementBgColor: settings.announcementBgColor || "#3B82F6",
+      announcementScrollDirection: settings.announcementScrollDirection || "rtl",
       heroTitleAr: settings.heroTitleAr || "",
       heroTitleEn: settings.heroTitleEn || "",
       heroSubtitleAr: settings.heroSubtitleAr || "",
@@ -724,22 +727,43 @@ export default function AdminSettings() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="announcementBgColor">{t("admin.settings.homepage.announcementBgColor")}</Label>
-                    <div className="flex gap-2 items-center">
-                      <Input
-                        id="announcementBgColor"
-                        type="color"
-                        {...form.register("announcementBgColor")}
-                        className="w-16 h-10 p-1 cursor-pointer"
-                        data-testid="input-announcement-color"
-                      />
-                      <Input
-                        {...form.register("announcementBgColor")}
-                        placeholder="#3B82F6"
-                        className="flex-1"
-                        data-testid="input-announcement-color-text"
-                      />
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="announcementBgColor">{t("admin.settings.homepage.announcementBgColor")}</Label>
+                      <div className="flex gap-2 items-center">
+                        <Input
+                          id="announcementBgColor"
+                          type="color"
+                          {...form.register("announcementBgColor")}
+                          className="w-16 h-10 p-1 cursor-pointer"
+                          data-testid="input-announcement-color"
+                        />
+                        <Input
+                          {...form.register("announcementBgColor")}
+                          placeholder="#3B82F6"
+                          className="flex-1"
+                          data-testid="input-announcement-color-text"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="announcementScrollDirection">{t("admin.settings.homepage.scrollDirection")}</Label>
+                      <Select
+                        value={form.watch("announcementScrollDirection") || "rtl"}
+                        onValueChange={(value) => form.setValue("announcementScrollDirection", value)}
+                      >
+                        <SelectTrigger data-testid="select-scroll-direction">
+                          <SelectValue placeholder={t("admin.settings.homepage.scrollDirection")} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="rtl" data-testid="select-scroll-rtl">
+                            {t("admin.settings.homepage.scrollRtl")}
+                          </SelectItem>
+                          <SelectItem value="ltr" data-testid="select-scroll-ltr">
+                            {t("admin.settings.homepage.scrollLtr")}
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
                     </div>
                   </div>
 

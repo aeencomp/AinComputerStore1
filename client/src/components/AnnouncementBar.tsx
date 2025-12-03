@@ -32,6 +32,7 @@ export function AnnouncementBar() {
   }
 
   const bgColor = settings.announcementBgColor || '#3B82F6';
+  const scrollDirection = settings.announcementScrollDirection || 'rtl';
 
   return (
     <div 
@@ -39,7 +40,7 @@ export function AnnouncementBar() {
       style={{ backgroundColor: bgColor }}
       data-testid="announcement-bar"
     >
-      <div className="flex animate-marquee whitespace-nowrap">
+      <div className={`flex whitespace-nowrap ${scrollDirection === 'rtl' ? 'animate-marquee-rtl' : 'animate-marquee-ltr'}`}>
         <span className="mx-8" data-testid="text-announcement">{text}</span>
         <span className="mx-8">{text}</span>
         <span className="mx-8">{text}</span>

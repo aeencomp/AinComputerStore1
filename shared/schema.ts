@@ -210,6 +210,7 @@ export const storeSettings = pgTable("store_settings", {
   announcementEnabled: integer("announcement_enabled").notNull().default(0),
   announcementBgColor: text("announcement_bg_color").default("#3B82F6"),
   announcementDismissCount: integer("announcement_dismiss_count").notNull().default(0),
+  announcementScrollDirection: text("announcement_scroll_direction").default("rtl"),
   
   // Homepage Settings
   heroTitleAr: text("hero_title_ar").default("مرحباً بك في متجرنا"),
