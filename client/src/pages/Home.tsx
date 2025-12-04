@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { HeroSection } from "@/components/HeroSection";
@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
-import { Link, useLocation } from "wouter";
+import { Link, useLocation, useSearch } from "wouter";
 import { Wrench, Search, Package } from "lucide-react";
 
 interface CartItemWithId extends CartItem {
@@ -24,10 +24,23 @@ interface CartItemWithId extends CartItem {
 export default function Home() {
   const { cartOpen, setCartOpen } = useCart();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
   const { toast } = useToast();
   const { language, t } = useLanguage();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
+  const searchString = useSearch();
+  
+  const urlParams = new URLSearchParams(searchString);
+  const categoryFromUrl = urlParams.get('category') || "";
+  const searchFromUrl = urlParams.get('search') || "";
+  
+  const [selectedCategory, setSelectedCategory] = useState(categoryFromUrl);
+  
+  useEffect(() => {
+    setSelectedCategory(categoryFromUrl);
+    if (searchFromUrl) {
+      setSearchQuery(searchFromUrl);
+    }
+  }, [categoryFromUrl, searchFromUrl]);
 
   const queryKey = selectedCategory 
     ? `/api/products?category=${selectedCategory}`
@@ -94,13 +107,21 @@ export default function Home() {
     : products;
 
   const handleCategorySelect = (category: string) => {
-    setSelectedCategory(category);
+    if (category) {
+      setLocation(`/?category=${category}`);
+    } else {
+      setLocation('/');
+    }
     setSearchQuery("");
   };
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
-    setSelectedCategory("");
+    if (query) {
+      setLocation(`/?search=${encodeURIComponent(query)}`);
+    } else {
+      setLocation('/');
+    }
   };
 
   const handleAddToCart = async (product: Product) => {

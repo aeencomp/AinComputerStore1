@@ -220,7 +220,6 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           <Link href="/">
             <Button 
               variant="ghost" 
-              onClick={() => { onSearch(""); }} 
               className="gap-2 px-4 py-2 rounded-full hover:bg-blue-100 hover:text-blue-700 dark:hover:bg-blue-900/30 dark:hover:text-blue-400 transition-colors font-bold"
               data-testid="link-home"
             >
@@ -228,51 +227,56 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               {t('header.home')}
             </Button>
           </Link>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate('/'); onCategorySelect?.("laptops"); }} 
-            className="gap-2 px-4 py-2 rounded-full hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 transition-colors font-bold"
-            data-testid="link-computers"
-          >
-            <Laptop className="h-4 w-4" />
-            {t('category.laptops')}
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate('/'); onCategorySelect?.("accessories"); }} 
-            className="gap-2 px-4 py-2 rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 transition-colors font-bold"
-            data-testid="link-accessories"
-          >
-            <Keyboard className="h-4 w-4" />
-            {t('category.accessories')}
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate('/'); onCategorySelect?.("monitors"); }} 
-            className="gap-2 px-4 py-2 rounded-full hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 transition-colors font-bold"
-            data-testid="link-monitors"
-          >
-            <Monitor className="h-4 w-4" />
-            {t('category.monitors')}
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate('/'); onCategorySelect?.("desktops"); }} 
-            className="gap-2 px-4 py-2 rounded-full hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-colors font-bold"
-            data-testid="link-desktops"
-          >
-            <Computer className="h-4 w-4" />
-            {t('category.desktops')}
-          </Button>
-          <Button 
-            variant="ghost" 
-            onClick={() => { navigate('/'); onCategorySelect?.("programs"); }} 
-            className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
-            data-testid="link-programs"
-          >
-            <AppWindow className="h-4 w-4" />
-            {t('category.programs')}
-          </Button>
+          <Link href="/?category=laptops">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 transition-colors font-bold"
+              data-testid="link-computers"
+            >
+              <Laptop className="h-4 w-4" />
+              {t('category.laptops')}
+            </Button>
+          </Link>
+          <Link href="/?category=accessories">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 transition-colors font-bold"
+              data-testid="link-accessories"
+            >
+              <Keyboard className="h-4 w-4" />
+              {t('category.accessories')}
+            </Button>
+          </Link>
+          <Link href="/?category=monitors">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 transition-colors font-bold"
+              data-testid="link-monitors"
+            >
+              <Monitor className="h-4 w-4" />
+              {t('category.monitors')}
+            </Button>
+          </Link>
+          <Link href="/?category=desktops">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-colors font-bold"
+              data-testid="link-desktops"
+            >
+              <Computer className="h-4 w-4" />
+              {t('category.desktops')}
+            </Button>
+          </Link>
+          <Link href="/?category=programs">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
+              data-testid="link-programs"
+            >
+              <AppWindow className="h-4 w-4" />
+              {t('category.programs')}
+            </Button>
+          </Link>
           <Link href="/pc-builder">
             <Button 
               variant="ghost" 
@@ -307,51 +311,56 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 {t('header.home')}
               </Button>
             </Link>
-            <Button 
-              variant="ghost" 
-              className="justify-start gap-3 rounded-lg hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 font-bold" 
-              onClick={() => { navigate('/'); onCategorySelect?.("laptops"); setMobileMenuOpen(false); }} 
-              data-testid="link-computers-mobile"
-            >
-              <Laptop className="h-4 w-4" />
-              {t('category.laptops')}
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="justify-start gap-3 rounded-lg hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 font-bold" 
-              onClick={() => { navigate('/'); onCategorySelect?.("accessories"); setMobileMenuOpen(false); }} 
-              data-testid="link-accessories-mobile"
-            >
-              <Keyboard className="h-4 w-4" />
-              {t('category.accessories')}
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="justify-start gap-3 rounded-lg hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 font-bold" 
-              onClick={() => { navigate('/'); onCategorySelect?.("monitors"); setMobileMenuOpen(false); }} 
-              data-testid="link-monitors-mobile"
-            >
-              <Monitor className="h-4 w-4" />
-              {t('category.monitors')}
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="justify-start gap-3 rounded-lg hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 font-bold" 
-              onClick={() => { navigate('/'); onCategorySelect?.("desktops"); setMobileMenuOpen(false); }} 
-              data-testid="link-desktops-mobile"
-            >
-              <Computer className="h-4 w-4" />
-              {t('category.desktops')}
-            </Button>
-            <Button 
-              variant="ghost" 
-              className="justify-start gap-3 rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold" 
-              onClick={() => { navigate('/'); onCategorySelect?.("programs"); setMobileMenuOpen(false); }} 
-              data-testid="link-programs-mobile"
-            >
-              <AppWindow className="h-4 w-4" />
-              {t('category.programs')}
-            </Button>
+            <Link href="/?category=laptops" onClick={() => setMobileMenuOpen(false)}>
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 font-bold" 
+                data-testid="link-computers-mobile"
+              >
+                <Laptop className="h-4 w-4" />
+                {t('category.laptops')}
+              </Button>
+            </Link>
+            <Link href="/?category=accessories" onClick={() => setMobileMenuOpen(false)}>
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 font-bold" 
+                data-testid="link-accessories-mobile"
+              >
+                <Keyboard className="h-4 w-4" />
+                {t('category.accessories')}
+              </Button>
+            </Link>
+            <Link href="/?category=monitors" onClick={() => setMobileMenuOpen(false)}>
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 font-bold" 
+                data-testid="link-monitors-mobile"
+              >
+                <Monitor className="h-4 w-4" />
+                {t('category.monitors')}
+              </Button>
+            </Link>
+            <Link href="/?category=desktops" onClick={() => setMobileMenuOpen(false)}>
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 font-bold" 
+                data-testid="link-desktops-mobile"
+              >
+                <Computer className="h-4 w-4" />
+                {t('category.desktops')}
+              </Button>
+            </Link>
+            <Link href="/?category=programs" onClick={() => setMobileMenuOpen(false)}>
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold" 
+                data-testid="link-programs-mobile"
+              >
+                <AppWindow className="h-4 w-4" />
+                {t('category.programs')}
+              </Button>
+            </Link>
             <Link href="/pc-builder" onClick={() => setMobileMenuOpen(false)}>
               <Button 
                 variant="ghost" 
