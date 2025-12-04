@@ -75,6 +75,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
     : t('header.title');
 
   const logoUrl = storeSettings?.logoUrl;
+  const [logoError, setLogoError] = useState(false);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,17 +88,21 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-4">
           <Link href="/" className="flex items-center gap-3 cursor-pointer" data-testid="link-logo-home">
-            {logoUrl ? (
+            {(logoUrl && !logoError) ? (
               <img 
                 src={logoUrl} 
                 alt={storeName} 
                 className="h-12 max-w-[180px] object-contain"
                 data-testid="logo-image"
+                onError={() => setLogoError(true)}
               />
             ) : (
-              <div className="flex items-center justify-center border-2 border-border rounded-md h-14 px-4 min-w-[120px]" data-testid="logo-placeholder">
-                <span className="text-sm font-bold text-muted-foreground text-center">{storeName}</span>
-              </div>
+              <img 
+                src={aeenn} 
+                alt={storeName} 
+                className="h-12 max-w-[180px] object-contain"
+                data-testid="logo-fallback"
+              />
             )}
             <span className="hidden sm:block text-lg font-bold text-foreground whitespace-nowrap" data-testid="text-store-name">
               {storeName}
