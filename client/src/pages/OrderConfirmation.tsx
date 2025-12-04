@@ -69,7 +69,7 @@ export default function OrderConfirmation() {
     const methods: Record<string, string> = {
       cash_on_delivery: t('orderConfirmation.cashOnDelivery'),
       zaincash: t('orderConfirmation.zainCash'),
-      fastpay: t('orderConfirmation.fastPay'),
+      qicard: t('orderConfirmation.qiCard'),
     };
     return methods[method] || method;
   };

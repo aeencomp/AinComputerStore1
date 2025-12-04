@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CartItem, StoreSettings, User } from "@shared/schema";
-import { Banknote, Smartphone, Truck, Loader2 } from "lucide-react";
+import { Banknote, Smartphone, CreditCard, Loader2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CartItemWithId extends CartItem {
@@ -408,12 +408,12 @@ export default function Checkout() {
                                 </Label>
                               </div>
                               <div className="flex items-center space-x-2 space-x-reverse border rounded-lg p-4 hover-elevate cursor-pointer">
-                                <RadioGroupItem value="fastpay" id="fastpay" data-testid="radio-fastpay" />
-                                <Label htmlFor="fastpay" className="flex items-center gap-3 cursor-pointer flex-1">
-                                  <Truck className="w-5 h-5 text-blue-600" />
+                                <RadioGroupItem value="qicard" id="qicard" data-testid="radio-qicard" />
+                                <Label htmlFor="qicard" className="flex items-center gap-3 cursor-pointer flex-1">
+                                  <CreditCard className="w-5 h-5 text-blue-600" />
                                   <div>
-                                    <div className="font-medium">{t('checkout.fastPay')}</div>
-                                    <div className="text-sm text-muted-foreground">{t('checkout.fastPayDesc')}</div>
+                                    <div className="font-medium">{t('checkout.qiCard')}</div>
+                                    <div className="text-sm text-muted-foreground">{t('checkout.qiCardDesc')}</div>
                                   </div>
                                 </Label>
                               </div>

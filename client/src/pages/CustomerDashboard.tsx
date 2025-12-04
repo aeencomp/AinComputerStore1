@@ -99,7 +99,7 @@ export default function CustomerDashboard() {
     switch (method) {
       case 'cash_on_delivery': return t('orderConfirmation.cashOnDelivery');
       case 'zain_cash': return t('orderConfirmation.zainCash');
-      case 'fast_pay': return t('orderConfirmation.fastPay');
+      case 'qicard': return t('orderConfirmation.qiCard');
       default: return method;
     }
   };
