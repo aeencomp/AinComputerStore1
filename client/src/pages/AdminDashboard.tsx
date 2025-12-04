@@ -28,8 +28,16 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2 } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAdminNotifications } from "@/hooks/useAdminNotifications";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Badge } from "@/components/ui/badge";
 
 interface Order {
   id: string;
@@ -68,6 +76,10 @@ export default function AdminDashboard() {
   const [newAdminForm, setNewAdminForm] = useState({ username: '', password: '', name: '', role: 'admin' });
   const [editAdminForm, setEditAdminForm] = useState({ username: '', name: '', role: '' });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+
+  // Real-time order notifications
+  const { notifications, unreadCount, markAsRead, markAllAsRead, isConnected } = useAdminNotifications();
 
   // Check admin session
   const { data: currentAdmin, isLoading: authLoading, isError: authError } = useQuery<AdminUser>({
@@ -353,6 +365,96 @@ export default function AdminDashboard() {
                 {t('admin.settings.manageSettings')}
               </Button>
             </Link>
+            
+            {/* Notification Bell */}
+            <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="relative"
+                  data-testid="button-notifications"
+                >
+                  <Bell className="w-5 h-5" />
+                  {unreadCount > 0 && (
+                    <Badge 
+                      className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-destructive text-destructive-foreground"
+                      data-testid="badge-notification-count"
+                    >
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </Badge>
+                  )}
+                  {!isConnected && (
+                    <span className="absolute bottom-0 right-0 w-2 h-2 bg-yellow-500 rounded-full" title="Reconnecting..." />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0" data-testid="popover-notifications">
+                <div className="flex items-center justify-between p-3 border-b">
+                  <h4 className="font-semibold text-sm">{t('admin.notifications.title')}</h4>
+                  {notifications.length > 0 && (
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      onClick={markAllAsRead}
+                      className="h-7 text-xs"
+                      data-testid="button-mark-all-read"
+                    >
+                      <CheckCheck className="w-3 h-3 me-1" />
+                      {t('admin.notifications.markAllRead')}
+                    </Button>
+                  )}
+                </div>
+                <ScrollArea className="h-72">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-center p-4 text-muted-foreground">
+                      <Bell className="w-8 h-8 mb-2 opacity-50" />
+                      <p className="text-sm">{t('admin.notifications.empty')}</p>
+                    </div>
+                  ) : (
+                    <div className="divide-y">
+                      {notifications.map((notification) => (
+                        <div 
+                          key={notification.timestamp}
+                          className={`p-3 cursor-pointer hover-elevate transition-colors ${!notification.read ? 'bg-accent/50' : ''}`}
+                          onClick={() => {
+                            markAsRead(notification.timestamp);
+                            queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+                            setNotificationsOpen(false);
+                          }}
+                          data-testid={`notification-${notification.data.orderNumber}`}
+                        >
+                          <div className="flex items-start gap-2">
+                            <div className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${!notification.read ? 'bg-primary' : 'bg-muted'}`} />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm">
+                                {t('admin.notifications.newOrder')}
+                              </p>
+                              <p className="text-sm text-muted-foreground truncate">
+                                {notification.data.orderNumber} - {notification.data.customerName}
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Intl.NumberFormat('ar-IQ').format(Number(notification.data.total))} د.ع
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(notification.timestamp).toLocaleTimeString('ar-IQ', { 
+                                  hour: '2-digit', 
+                                  minute: '2-digit' 
+                                })}
+                              </p>
+                            </div>
+                            {!notification.read && (
+                              <Check className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+
             <Button
               variant="ghost"
               size="sm"

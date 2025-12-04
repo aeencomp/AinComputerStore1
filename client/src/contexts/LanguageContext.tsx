@@ -276,6 +276,12 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.dashboard.logoutSuccess': 'تسجيل الخروج',
     'admin.dashboard.logoutSuccessDesc': 'تم تسجيل خروجك بنجاح',
     
+    // Admin Notifications
+    'admin.notifications.title': 'الإشعارات',
+    'admin.notifications.empty': 'لا توجد إشعارات جديدة',
+    'admin.notifications.newOrder': 'طلب جديد',
+    'admin.notifications.markAllRead': 'تحديد الكل كمقروء',
+    
     // Admin Products
     'admin.products.title': 'إدارة المنتجات',
     'admin.products.addNew': 'إضافة منتج جديد',
@@ -1059,6 +1065,12 @@ const translations: Record<Language, Record<string, string>> = {
     'admin.dashboard.updateErrorDesc': 'Failed to update order',
     'admin.dashboard.logoutSuccess': 'Logged Out',
     'admin.dashboard.logoutSuccessDesc': 'You have been logged out successfully',
+    
+    // Admin Notifications
+    'admin.notifications.title': 'Notifications',
+    'admin.notifications.empty': 'No new notifications',
+    'admin.notifications.newOrder': 'New Order',
+    'admin.notifications.markAllRead': 'Mark all read',
     
     // Admin Products
     'admin.products.title': 'Manage Products',
