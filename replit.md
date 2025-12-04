@@ -48,6 +48,39 @@ A comprehensive admin settings system allows customization across six categories
 
 Specific features for the Iraqi market include a dropdown selector for 18 Iraqi governorates, local payment methods (Cash on Delivery, ZainCash, FastPay), an address format replacing postal codes with Neighborhood/Area fields, WhatsApp integration, and the use of Iraqi Dinar (IQD) currency with Arabic-Indic numerals. Dynamic shipping costs and free shipping thresholds are also configurable.
 
+## Zain Cash Payment Integration
+
+Full integration with ZainCash payment gateway for Iraqi Dinar (IQD) transactions:
+
+**Backend Implementation (`server/zaincash.ts`):**
+- JWT-based transaction initialization with ZainCash API
+- Supports both test and production environments
+- Transaction verification via callback tokens
+- Status checking for pending transactions
+
+**API Routes:**
+- `GET /api/zaincash/config` - Check if ZainCash is configured
+- `POST /api/zaincash/init` - Initialize payment for an order
+- `GET /api/zaincash/callback` - Handle ZainCash redirect after payment
+- `GET /api/zaincash/status/:orderNumber` - Check payment status
+
+**Frontend Flow:**
+1. Customer selects ZainCash at checkout
+2. Order is created with status "awaiting_payment"
+3. Customer is redirected to ZainCash payment page
+4. After payment, callback redirects to `/payment/zaincash/callback`
+5. Order status updated based on payment result
+
+**Required Environment Variables:**
+- `ZAINCASH_MERCHANT_ID` - Merchant ID from ZainCash
+- `ZAINCASH_MSISDN` - Wallet phone number (format: 9647XXXXXXXXX)
+- `ZAINCASH_SECRET` - Secret key for JWT encoding
+- `ZAINCASH_TEST_MODE` - Set to "true" for test environment
+
+**Database Fields:**
+- `orders.paymentStatus` - Payment status (pending, success, failed)
+- `orders.zaincashTransactionId` - ZainCash transaction ID
+
 ## PC Builder Feature
 
 A step-by-step PC builder allows users to select components (CPU, Motherboard, RAM, GPU, Storage, PSU, Case, Cooler) with real-time compatibility checking. A sidebar displays a live-updating build summary, including total power consumption, recommended PSU wattage, and total price.

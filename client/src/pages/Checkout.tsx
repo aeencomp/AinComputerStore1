@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useLocation } from "wouter";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CartItem, StoreSettings, User } from "@shared/schema";
-import { Banknote, Smartphone, Truck } from "lucide-react";
+import { Banknote, Smartphone, Truck, Loader2 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface CartItemWithId extends CartItem {
@@ -105,6 +105,8 @@ export default function Checkout() {
     },
   });
 
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+
   const createOrderMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues) => {
       try {
@@ -142,23 +144,62 @@ export default function Checkout() {
           subtotal: subtotal.toString(),
           shipping: calculatedShipping.toString(),
           total: (subtotal + calculatedShipping).toString(),
-          status: "pending",
+          status: data.paymentMethod === 'zaincash' ? 'awaiting_payment' : 'pending',
         };
 
         console.log("Submitting order:", orderPayload);
         const response = await apiRequest('POST', '/api/orders', orderPayload);
         const result = await response.json();
         console.log("Order created successfully:", result);
-        return result;
+        return { order: result, paymentMethod: data.paymentMethod };
       } catch (error) {
         console.error("Error in mutationFn:", error);
         throw error;
       }
     },
-    onSuccess: (order: any) => {
-      console.log("Order success handler:", order);
+    onSuccess: async ({ order, paymentMethod }: { order: any; paymentMethod: string }) => {
+      console.log("Order success handler:", order, "Payment method:", paymentMethod);
       
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      
+      // If Zain Cash payment, redirect to payment page
+      if (paymentMethod === 'zaincash') {
+        setIsProcessingPayment(true);
+        try {
+          const paymentResponse = await apiRequest('POST', '/api/zaincash/init', {
+            orderId: order.id,
+          });
+          const paymentResult = await paymentResponse.json();
+          
+          if (paymentResult.success && paymentResult.paymentUrl) {
+            toast({
+              title: language === 'ar' ? 'جاري التحويل للدفع...' : 'Redirecting to payment...',
+              description: language === 'ar' 
+                ? 'سيتم تحويلك إلى زين كاش للدفع'
+                : 'You will be redirected to Zain Cash to complete payment',
+              duration: 3000,
+            });
+            // Redirect to Zain Cash payment page
+            window.location.href = paymentResult.paymentUrl;
+          } else {
+            throw new Error(paymentResult.error || 'Payment initialization failed');
+          }
+        } catch (paymentError: any) {
+          console.error("Payment initialization error:", paymentError);
+          setIsProcessingPayment(false);
+          toast({
+            title: language === 'ar' ? 'خطأ في الدفع' : 'Payment Error',
+            description: language === 'ar'
+              ? 'فشل في تهيئة الدفع. يرجى المحاولة مرة أخرى أو اختيار طريقة دفع أخرى.'
+              : 'Failed to initialize payment. Please try again or choose another payment method.',
+            variant: "destructive",
+            duration: 6000,
+          });
+          // Still redirect to order confirmation so user can see their order
+          setLocation(`/order-confirmation/${order.orderNumber}?payment=pending`);
+        }
+        return;
+      }
       
       toast({
         title: t('checkout.orderSuccess'),
@@ -383,8 +424,13 @@ export default function Checkout() {
                       )}
                     />
 
-                    <Button type="submit" className="w-full" disabled={createOrderMutation.isPending} data-testid="button-place-order">
-                      {createOrderMutation.isPending ? t('checkout.processing') : t('checkout.confirmOrder')}
+                    <Button type="submit" className="w-full" disabled={createOrderMutation.isPending || isProcessingPayment} data-testid="button-place-order">
+                      {(createOrderMutation.isPending || isProcessingPayment) ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin ltr:mr-2 rtl:ml-2" />
+                          {isProcessingPayment ? (language === 'ar' ? 'جاري تهيئة الدفع...' : 'Initializing payment...') : t('checkout.processing')}
+                        </>
+                      ) : t('checkout.confirmOrder')}
                     </Button>
                   </form>
                 </Form>

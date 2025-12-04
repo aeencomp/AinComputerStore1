@@ -26,6 +26,7 @@ import TrackRepair from "@/pages/TrackRepair";
 import TrackOrder from "@/pages/TrackOrder";
 import PCBuilder from "@/pages/PCBuilder";
 import CustomerDashboard from "@/pages/CustomerDashboard";
+import ZainCashCallback from "@/pages/ZainCashCallback";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -53,6 +54,7 @@ function Router() {
       <Route path="/track-order" component={TrackOrder}/>
       <Route path="/pc-builder" component={PCBuilder}/>
       <Route path="/my-orders" component={CustomerDashboard}/>
+      <Route path="/payment/zaincash/callback" component={ZainCashCallback}/>
       <Route component={NotFound} />
     </Switch>
   );

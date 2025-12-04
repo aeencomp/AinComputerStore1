@@ -7,6 +7,7 @@ import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
 import { adminNotifications } from "./admin-notifications";
+import { zaincash } from "./zaincash";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -915,6 +916,192 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to delete order" });
     }
   });
+
+  // ==================== Zain Cash Payment Routes ====================
+  
+  // Check if Zain Cash is configured
+  app.get("/api/zaincash/config", async (req, res) => {
+    try {
+      const config = zaincash.getConfig();
+      return res.json(config);
+    } catch (error) {
+      console.error("Error checking Zain Cash config:", error);
+      return res.status(500).json({ error: "Failed to check Zain Cash configuration" });
+    }
+  });
+
+  // Initialize Zain Cash payment for an order
+  app.post("/api/zaincash/init", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
+      
+      // Get the order
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      // Check if order payment method is zaincash
+      if (order.paymentMethod !== 'zaincash') {
+        return res.status(400).json({ error: "Order payment method is not Zain Cash" });
+      }
+      
+      // Build redirect URL
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['host'];
+      const redirectUrl = `${protocol}://${host}/payment/zaincash/callback`;
+      
+      // Initialize transaction
+      const result = await zaincash.initTransaction({
+        amount: Math.round(parseFloat(order.total)),
+        orderId: order.orderNumber,
+        serviceType: 'العين لتجارة الحاسبات - طلب رقم ' + order.orderNumber,
+        redirectUrl: redirectUrl,
+      });
+      
+      if (!result.success) {
+        console.error("Zain Cash init failed:", result.error);
+        return res.status(500).json({ error: result.error || "Failed to initialize payment" });
+      }
+      
+      // Update order with transaction ID
+      await storage.updateOrderPaymentInfo(order.id, {
+        zaincashTransactionId: result.transactionId,
+        paymentStatus: 'pending',
+      });
+      
+      return res.json({
+        success: true,
+        paymentUrl: result.paymentUrl,
+        transactionId: result.transactionId,
+      });
+    } catch (error) {
+      console.error("Error initializing Zain Cash payment:", error);
+      return res.status(500).json({ error: "Failed to initialize payment" });
+    }
+  });
+
+  // Zain Cash callback handler (called by Zain Cash after payment)
+  app.get("/api/zaincash/callback", async (req, res) => {
+    try {
+      const token = req.query.token as string;
+      
+      if (!token) {
+        console.error("Zain Cash callback: No token received");
+        return res.redirect('/payment/zaincash/callback?status=error&msg=no_token');
+      }
+      
+      // Verify the callback token
+      const callbackData = zaincash.verifyCallback(token);
+      
+      if (!callbackData) {
+        console.error("Zain Cash callback: Invalid token");
+        return res.redirect('/payment/zaincash/callback?status=error&msg=invalid_token');
+      }
+      
+      console.log("Zain Cash callback data:", callbackData);
+      
+      // Get the order by order number
+      const order = await storage.getOrderByNumber(callbackData.orderId);
+      
+      if (!order) {
+        console.error("Zain Cash callback: Order not found:", callbackData.orderId);
+        return res.redirect('/payment/zaincash/callback?status=error&msg=order_not_found');
+      }
+      
+      // Update order based on payment status
+      const paymentStatus = callbackData.status;
+      let orderStatus = order.status;
+      
+      if (paymentStatus === 'success' || paymentStatus === 'completed') {
+        orderStatus = 'processing';
+        
+        // Broadcast notification to admins
+        adminNotifications.broadcastNewOrder({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          total: order.total,
+          createdAt: order.createdAt,
+        });
+        
+        // Send confirmation email
+        try {
+          const allOrderItems = order.items.map(itemStr => JSON.parse(itemStr));
+          const itemsWithProducts = await Promise.all(
+            allOrderItems.map(async (item: any) => {
+              const product = await storage.getProduct(item.productId);
+              return {
+                name: product?.nameAr || 'منتج',
+                quantity: item.quantity,
+                price: Number(item.price),
+              };
+            })
+          );
+          
+          await sendOrderConfirmationEmail({
+            orderNumber: order.orderNumber,
+            customerName: order.customerName,
+            customerEmail: order.customerEmail,
+            customerPhone: order.customerPhone,
+            customerAddress: order.customerAddress,
+            customerCity: order.customerCity,
+            customerPostalCode: order.customerPostal,
+            items: itemsWithProducts,
+            total: Number(order.total),
+          });
+        } catch (emailError) {
+          console.error("Failed to send confirmation email:", emailError);
+        }
+      } else if (paymentStatus === 'failed') {
+        orderStatus = 'payment_failed';
+      }
+      
+      // Update order with payment status
+      await storage.updateOrderPaymentInfo(order.id, {
+        paymentStatus: paymentStatus,
+        zaincashTransactionId: callbackData.transactionId,
+      });
+      
+      if (orderStatus !== order.status) {
+        await storage.updateOrderStatus(order.id, orderStatus);
+      }
+      
+      // Redirect to frontend callback page
+      return res.redirect(`/payment/zaincash/callback?status=${paymentStatus}&order=${order.orderNumber}`);
+    } catch (error) {
+      console.error("Error handling Zain Cash callback:", error);
+      return res.redirect('/payment/zaincash/callback?status=error&msg=internal_error');
+    }
+  });
+
+  // Check payment status for an order
+  app.get("/api/zaincash/status/:orderNumber", async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      const order = await storage.getOrderByNumber(orderNumber);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      return res.json({
+        orderNumber: order.orderNumber,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: (order as any).paymentStatus || 'pending',
+        orderStatus: order.status,
+      });
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+      return res.status(500).json({ error: "Failed to check payment status" });
+    }
+  });
+
+  // ==================== End Zain Cash Routes ====================
 
   app.post("/api/repair-tickets", async (req, res) => {
     try {

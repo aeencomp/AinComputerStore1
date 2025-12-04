@@ -22,6 +22,8 @@ export interface IStorage {
   getOrdersByUserId(userId: string): Promise<any[]>;
   lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<any>;
   updateOrderStatus(id: string, status: string): Promise<any>;
+  updateOrderPaymentInfo(id: string, info: { paymentStatus?: string; zaincashTransactionId?: string }): Promise<any>;
+  getOrder(id: string): Promise<any>;
   deleteOrder(id: string): Promise<void>;
   getStoreSettings(): Promise<StoreSettings | undefined>;
   updateStoreSettings(settings: Partial<InsertStoreSettings>): Promise<StoreSettings>;
@@ -379,6 +381,20 @@ export class MemStorage implements IStorage {
     order.status = status;
     this.orders.set(id, order);
     return order;
+  }
+
+  async updateOrderPaymentInfo(id: string, info: { paymentStatus?: string; zaincashTransactionId?: string }): Promise<any> {
+    const order = this.orders.get(id);
+    if (!order) return undefined;
+    
+    if (info.paymentStatus) order.paymentStatus = info.paymentStatus;
+    if (info.zaincashTransactionId) order.zaincashTransactionId = info.zaincashTransactionId;
+    this.orders.set(id, order);
+    return order;
+  }
+
+  async getOrder(id: string): Promise<any> {
+    return this.orders.get(id);
   }
 
   async deleteOrder(id: string): Promise<void> {
