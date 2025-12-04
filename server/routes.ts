@@ -1,15 +1,240 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Initialize default admin technician
+  // Initialize default admin technician and admin user
   await storage.initializeDefaultTechnician();
+  await storage.initializeDefaultAdmin();
+
+  // Admin Authentication Routes
+  app.post("/api/admin/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "اسم المستخدم وكلمة المرور مطلوبان" });
+      }
+      
+      const admin = await storage.getAdminUserByUsername(username);
+      if (!admin) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+      
+      const validPassword = await bcrypt.compare(password, admin.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+      
+      // Set admin session
+      (req.session as any).adminId = admin.id;
+      (req.session as any).adminUsername = admin.username;
+      
+      return res.json({ 
+        success: true, 
+        admin: { 
+          id: admin.id, 
+          username: admin.username, 
+          name: admin.name, 
+          role: admin.role 
+        } 
+      });
+    } catch (error) {
+      console.error("Admin login error:", error);
+      return res.status(500).json({ error: "فشل تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/admin/auth/logout", async (req, res) => {
+    try {
+      delete (req.session as any).adminId;
+      delete (req.session as any).adminUsername;
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Admin logout error:", error);
+      return res.status(500).json({ error: "فشل تسجيل الخروج" });
+    }
+  });
+
+  app.get("/api/admin/auth/me", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مسجل الدخول" });
+      }
+      
+      const admin = await storage.getAdminUser(adminId);
+      if (!admin) {
+        return res.status(401).json({ error: "المستخدم غير موجود" });
+      }
+      
+      return res.json({ 
+        id: admin.id, 
+        username: admin.username, 
+        name: admin.name, 
+        role: admin.role 
+      });
+    } catch (error) {
+      console.error("Admin auth check error:", error);
+      return res.status(500).json({ error: "فشل التحقق من المستخدم" });
+    }
+  });
+
+  // Admin User Management Routes
+  app.get("/api/admin/users", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const admins = await storage.getAdminUsers();
+      // Don't send passwords
+      const sanitizedAdmins = admins.map(a => ({
+        id: a.id,
+        username: a.username,
+        name: a.name,
+        role: a.role,
+        createdAt: a.createdAt,
+      }));
+      
+      return res.json(sanitizedAdmins);
+    } catch (error) {
+      console.error("Error fetching admin users:", error);
+      return res.status(500).json({ error: "فشل جلب المستخدمين" });
+    }
+  });
+
+  app.post("/api/admin/users", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const validatedData = insertAdminUserSchema.parse(req.body);
+      
+      // Check if username already exists
+      const existing = await storage.getAdminUserByUsername(validatedData.username);
+      if (existing) {
+        return res.status(400).json({ error: "اسم المستخدم موجود بالفعل" });
+      }
+      
+      const admin = await storage.createAdminUser(validatedData);
+      
+      return res.json({ 
+        id: admin.id, 
+        username: admin.username, 
+        name: admin.name, 
+        role: admin.role,
+        createdAt: admin.createdAt,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating admin user:", error);
+      return res.status(500).json({ error: "فشل إنشاء المستخدم" });
+    }
+  });
+
+  app.put("/api/admin/users/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      const updates = req.body;
+      
+      // If changing username, check if it already exists
+      if (updates.username) {
+        const existing = await storage.getAdminUserByUsername(updates.username);
+        if (existing && existing.id !== id) {
+          return res.status(400).json({ error: "اسم المستخدم موجود بالفعل" });
+        }
+      }
+      
+      const admin = await storage.updateAdminUser(id, updates);
+      if (!admin) {
+        return res.status(404).json({ error: "المستخدم غير موجود" });
+      }
+      
+      return res.json({ 
+        id: admin.id, 
+        username: admin.username, 
+        name: admin.name, 
+        role: admin.role,
+        createdAt: admin.createdAt,
+      });
+    } catch (error) {
+      console.error("Error updating admin user:", error);
+      return res.status(500).json({ error: "فشل تحديث المستخدم" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      
+      // Prevent deleting yourself
+      if (id === adminId) {
+        return res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص" });
+      }
+      
+      await storage.deleteAdminUser(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting admin user:", error);
+      return res.status(500).json({ error: "فشل حذف المستخدم" });
+    }
+  });
+
+  app.put("/api/admin/auth/change-password", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { currentPassword, newPassword } = req.body;
+      
+      if (!currentPassword || !newPassword) {
+        return res.status(400).json({ error: "كلمة المرور الحالية والجديدة مطلوبتان" });
+      }
+      
+      if (newPassword.length < 4) {
+        return res.status(400).json({ error: "كلمة المرور يجب أن تكون 4 أحرف على الأقل" });
+      }
+      
+      const admin = await storage.getAdminUser(adminId);
+      if (!admin) {
+        return res.status(404).json({ error: "المستخدم غير موجود" });
+      }
+      
+      const validPassword = await bcrypt.compare(currentPassword, admin.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
+      }
+      
+      await storage.updateAdminUser(adminId, { password: newPassword });
+      return res.json({ success: true, message: "تم تغيير كلمة المرور بنجاح" });
+    } catch (error) {
+      console.error("Error changing password:", error);
+      return res.status(500).json({ error: "فشل تغيير كلمة المرور" });
+    }
+  });
 
   app.get("/api/products", async (req, res) => {
     try {

@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, products, cartItems, orders, users, storeSettings, repairTickets, technicians } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -321,6 +321,66 @@ export class DrizzleStorage implements IStorage {
       }
     } catch (error) {
       console.error('Failed to initialize default technician:', error);
+    }
+  }
+
+  // Admin user methods
+  async createAdminUser(insertAdminUser: InsertAdminUser): Promise<AdminUser> {
+    const hashedPassword = await bcrypt.hash(insertAdminUser.password, 10);
+    const result = await db.insert(adminUsers).values({
+      ...insertAdminUser,
+      password: hashedPassword,
+    }).returning();
+    return result[0];
+  }
+
+  async getAdminUsers(): Promise<AdminUser[]> {
+    return await db.select().from(adminUsers);
+  }
+
+  async getAdminUser(id: string): Promise<AdminUser | undefined> {
+    const result = await db.select().from(adminUsers).where(eq(adminUsers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getAdminUserByUsername(username: string): Promise<AdminUser | undefined> {
+    const result = await db.select().from(adminUsers).where(eq(adminUsers.username, username)).limit(1);
+    return result[0];
+  }
+
+  async updateAdminUser(id: string, updates: Partial<InsertAdminUser>): Promise<AdminUser | undefined> {
+    const updateData: any = { ...updates };
+    
+    // Hash password if it's being updated
+    if (updates.password) {
+      updateData.password = await bcrypt.hash(updates.password, 10);
+    }
+    
+    const result = await db.update(adminUsers)
+      .set(updateData)
+      .where(eq(adminUsers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteAdminUser(id: string): Promise<void> {
+    await db.delete(adminUsers).where(eq(adminUsers.id, id));
+  }
+
+  async initializeDefaultAdmin(): Promise<void> {
+    try {
+      const existing = await this.getAdminUserByUsername('admin');
+      if (!existing) {
+        await this.createAdminUser({
+          username: 'admin',
+          password: 'admin123',
+          name: 'مدير النظام',
+          role: 'admin',
+        });
+        console.log('Default admin user created (username: admin, password: admin123)');
+      }
+    } catch (error) {
+      console.error('Failed to initialize default admin:', error);
     }
   }
 }

@@ -1,4 +1,5 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser } from "@shared/schema";
+import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
@@ -48,6 +49,15 @@ export interface IStorage {
   updateTechnician(id: string, updates: Partial<InsertTechnician>): Promise<Technician | undefined>;
   deleteTechnician(id: string): Promise<void>;
   initializeDefaultTechnician(): Promise<void>;
+  
+  // Admin user methods
+  createAdminUser(user: InsertAdminUser): Promise<AdminUser>;
+  getAdminUsers(): Promise<AdminUser[]>;
+  getAdminUser(id: string): Promise<AdminUser | undefined>;
+  getAdminUserByUsername(username: string): Promise<AdminUser | undefined>;
+  updateAdminUser(id: string, updates: Partial<InsertAdminUser>): Promise<AdminUser | undefined>;
+  deleteAdminUser(id: string): Promise<void>;
+  initializeDefaultAdmin(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -455,6 +465,35 @@ export class MemStorage implements IStorage {
 
   async initializeDefaultTechnician(): Promise<void> {
     // MemStorage does not support technicians
+  }
+
+  // Admin user methods (stubs for MemStorage)
+  async createAdminUser(user: InsertAdminUser): Promise<AdminUser> {
+    throw new Error("MemStorage does not support admin users");
+  }
+
+  async getAdminUsers(): Promise<AdminUser[]> {
+    return [];
+  }
+
+  async getAdminUser(id: string): Promise<AdminUser | undefined> {
+    return undefined;
+  }
+
+  async getAdminUserByUsername(username: string): Promise<AdminUser | undefined> {
+    return undefined;
+  }
+
+  async updateAdminUser(id: string, updates: Partial<InsertAdminUser>): Promise<AdminUser | undefined> {
+    return undefined;
+  }
+
+  async deleteAdminUser(id: string): Promise<void> {
+    // MemStorage does not support admin users
+  }
+
+  async initializeDefaultAdmin(): Promise<void> {
+    // MemStorage does not support admin users
   }
 }
 
