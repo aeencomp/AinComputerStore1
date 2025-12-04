@@ -20,9 +20,9 @@ The app will NOT work offline - it requires internet connection to access your s
 
 ### Step 1: Update Your Website URL
 
-Edit `capacitor.config.ts` and replace the URL:
+The URL is already configured in `capacitor.config.ts`:
 ```typescript
-const LIVE_WEBSITE_URL = 'https://YOUR-PUBLISHED-URL.replit.app';
+const LIVE_WEBSITE_URL = 'https://aeen-iq.com';
 ```
 
 ### Step 2: Build the Web App

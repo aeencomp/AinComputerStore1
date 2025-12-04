@@ -1,8 +1,7 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
-// IMPORTANT: Set your published website URL here before building the APK
-// Example: 'https://your-app-name.replit.app'
-const LIVE_WEBSITE_URL = process.env.LIVE_WEBSITE_URL || 'https://alain-computers.replit.app';
+// Your live store website URL
+const LIVE_WEBSITE_URL = 'https://aeen-iq.com';
 
 const config: CapacitorConfig = {
   appId: 'com.alain.computers',
