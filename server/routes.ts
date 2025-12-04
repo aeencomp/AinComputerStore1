@@ -6,8 +6,15 @@ import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
+import { adminNotifications } from "./admin-notifications";
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Create HTTP server
+  const httpServer = createServer(app);
+  
+  // Initialize WebSocket server for admin notifications
+  adminNotifications.initialize(httpServer);
+  
   // Initialize default admin technician and admin user
   await storage.initializeDefaultTechnician();
   await storage.initializeDefaultAdmin();
@@ -737,6 +744,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Warning: Failed to send order confirmation email:", emailError);
       }
       
+      // Broadcast new order notification to admin dashboard
+      try {
+        adminNotifications.broadcastNewOrder({
+          id: order.id,
+          orderNumber: order.orderNumber,
+          customerName: order.customerName,
+          total: order.total,
+          createdAt: order.createdAt,
+        });
+      } catch (notifyError) {
+        console.error("Warning: Failed to broadcast order notification:", notifyError);
+      }
+      
       return res.json(order);
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -1352,8 +1372,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to delete customer" });
     }
   });
-
-  const httpServer = createServer(app);
 
   return httpServer;
 }
