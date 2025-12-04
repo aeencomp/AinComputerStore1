@@ -1,46 +1,63 @@
-# Android APK Build Instructions
+# Android APK Build Instructions - العين لتجارة الحاسبات
+
+## Important: This APK Connects to Your Online Store
+
+This Android app is configured to load your **live published website**. 
+The app will NOT work offline - it requires internet connection to access your store.
+
+**Before building, you MUST:**
+1. Publish your website on Replit first
+2. Update `capacitor.config.ts` with your published URL
 
 ## Prerequisites
 
 1. **Android Studio** (Download from https://developer.android.com/studio)
 2. **Java JDK 17+**
 3. **Node.js 18+**
+4. **Your published website URL** (e.g., https://your-app.replit.app)
 
-## Building the APK
+## Step-by-Step Build Guide
 
-### Step 1: Build the Web App
+### Step 1: Update Your Website URL
+
+Edit `capacitor.config.ts` and replace the URL:
+```typescript
+const LIVE_WEBSITE_URL = 'https://YOUR-PUBLISHED-URL.replit.app';
+```
+
+### Step 2: Build the Web App
 ```bash
 npm run build
 ```
 
-### Step 2: Initialize Capacitor Android
+### Step 3: Initialize Capacitor Android
 ```bash
 npx cap add android
 ```
 
-### Step 3: Copy Web Assets to Android
+### Step 4: Copy Web Assets to Android
 ```bash
 npx cap copy android
 ```
 
-### Step 4: Sync Capacitor Plugins
+### Step 5: Sync Capacitor Plugins
 ```bash
 npx cap sync android
 ```
 
-### Step 5: Open in Android Studio
+### Step 6: Open in Android Studio
 ```bash
 npx cap open android
 ```
 
-### Step 6: Build APK in Android Studio
+### Step 7: Build APK in Android Studio
 
 1. Wait for Gradle sync to complete
 2. Go to **Build > Build Bundle(s) / APK(s) > Build APK(s)**
 3. The APK will be generated at:
    `android/app/build/outputs/apk/debug/app-debug.apk`
 
-### For Release APK (Google Play):
+## For Release APK (Google Play):
 
 1. Generate a signing key:
 ```bash

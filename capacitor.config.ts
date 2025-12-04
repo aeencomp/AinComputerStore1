@@ -1,13 +1,18 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
+// IMPORTANT: Set your published website URL here before building the APK
+// Example: 'https://your-app-name.replit.app'
+const LIVE_WEBSITE_URL = process.env.LIVE_WEBSITE_URL || 'https://alain-computers.replit.app';
+
 const config: CapacitorConfig = {
   appId: 'com.alain.computers',
   appName: 'العين لتجارة الحاسبات',
   webDir: 'dist/public',
   server: {
+    // The APK will load your live website (online store)
+    url: LIVE_WEBSITE_URL,
     androidScheme: 'https',
-    url: process.env.CAPACITOR_SERVER_URL || undefined,
-    cleartext: true
+    cleartext: false // Use HTTPS only for security
   },
   plugins: {
     SplashScreen: {
@@ -26,7 +31,7 @@ const config: CapacitorConfig = {
     }
   },
   android: {
-    allowMixedContent: true,
+    allowMixedContent: false,
     captureInput: true,
     webContentsDebuggingEnabled: false
   }
