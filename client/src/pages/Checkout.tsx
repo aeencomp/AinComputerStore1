@@ -144,7 +144,7 @@ export default function Checkout() {
           subtotal: subtotal.toString(),
           shipping: calculatedShipping.toString(),
           total: (subtotal + calculatedShipping).toString(),
-          status: data.paymentMethod === 'zaincash' ? 'awaiting_payment' : 'pending',
+          status: (data.paymentMethod === 'zaincash' || data.paymentMethod === 'qicard') ? 'awaiting_payment' : 'pending',
         };
 
         console.log("Submitting order:", orderPayload);
@@ -186,6 +186,45 @@ export default function Checkout() {
           }
         } catch (paymentError: any) {
           console.error("Payment initialization error:", paymentError);
+          setIsProcessingPayment(false);
+          toast({
+            title: language === 'ar' ? 'خطأ في الدفع' : 'Payment Error',
+            description: language === 'ar'
+              ? 'فشل في تهيئة الدفع. يرجى المحاولة مرة أخرى أو اختيار طريقة دفع أخرى.'
+              : 'Failed to initialize payment. Please try again or choose another payment method.',
+            variant: "destructive",
+            duration: 6000,
+          });
+          // Still redirect to order confirmation so user can see their order
+          setLocation(`/order-confirmation/${order.orderNumber}?payment=pending`);
+        }
+        return;
+      }
+
+      // If QiCard payment, redirect to payment page
+      if (paymentMethod === 'qicard') {
+        setIsProcessingPayment(true);
+        try {
+          const paymentResponse = await apiRequest('POST', '/api/qicard/init', {
+            orderId: order.id,
+          });
+          const paymentResult = await paymentResponse.json();
+          
+          if (paymentResult.success && paymentResult.paymentUrl) {
+            toast({
+              title: language === 'ar' ? 'جاري التحويل للدفع...' : 'Redirecting to payment...',
+              description: language === 'ar' 
+                ? 'سيتم تحويلك إلى كي كارد للدفع'
+                : 'You will be redirected to QiCard to complete payment',
+              duration: 3000,
+            });
+            // Redirect to QiCard payment page
+            window.location.href = paymentResult.paymentUrl;
+          } else {
+            throw new Error(paymentResult.error || 'Payment initialization failed');
+          }
+        } catch (paymentError: any) {
+          console.error("QiCard payment initialization error:", paymentError);
           setIsProcessingPayment(false);
           toast({
             title: language === 'ar' ? 'خطأ في الدفع' : 'Payment Error',

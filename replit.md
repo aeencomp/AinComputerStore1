@@ -46,7 +46,7 @@ A comprehensive admin settings system allows customization across six categories
 
 ## Iraqi Market Features
 
-Specific features for the Iraqi market include a dropdown selector for 18 Iraqi governorates, local payment methods (Cash on Delivery, ZainCash, FastPay), an address format replacing postal codes with Neighborhood/Area fields, WhatsApp integration, and the use of Iraqi Dinar (IQD) currency with Arabic-Indic numerals. Dynamic shipping costs and free shipping thresholds are also configurable.
+Specific features for the Iraqi market include a dropdown selector for 18 Iraqi governorates, local payment methods (Cash on Delivery, ZainCash, QiCard), an address format replacing postal codes with Neighborhood/Area fields, WhatsApp integration, and the use of Iraqi Dinar (IQD) currency with Arabic-Indic numerals. Dynamic shipping costs and free shipping thresholds are also configurable.
 
 ## Zain Cash Payment Integration
 
@@ -80,6 +80,40 @@ Full integration with ZainCash payment gateway for Iraqi Dinar (IQD) transaction
 **Database Fields:**
 - `orders.paymentStatus` - Payment status (pending, success, failed)
 - `orders.zaincashTransactionId` - ZainCash transaction ID
+
+## QiCard Payment Integration
+
+Full integration with QiCard payment gateway for card payments in Iraqi Dinar (IQD):
+
+**Backend Implementation (`server/qicard.ts`):**
+- REST API-based payment initialization
+- Supports both test and production environments
+- Payment verification via transaction ID
+- Webhook support for real-time payment notifications
+
+**API Routes:**
+- `GET /api/qicard/config` - Check if QiCard is configured
+- `POST /api/qicard/init` - Initialize payment for an order
+- `GET /api/qicard/callback` - Handle QiCard redirect after payment
+- `POST /api/qicard/webhook` - Receive server-to-server payment notifications
+- `GET /api/qicard/status/:orderNumber` - Check payment status
+
+**Frontend Flow:**
+1. Customer selects QiCard at checkout
+2. Order is created with status "awaiting_payment"
+3. Customer is redirected to QiCard payment page
+4. After payment, callback redirects to `/payment/qicard/callback`
+5. Order status updated based on payment result
+
+**Required Environment Variables:**
+- `QICARD_MERCHANT_ID` - Merchant ID from QiCard
+- `QICARD_API_KEY` - API key for authentication
+- `QICARD_SECRET_KEY` - Secret key for API requests
+- `QICARD_TEST_MODE` - Set to "false" for production (default is test mode)
+
+**Database Fields:**
+- `orders.paymentStatus` - Payment status (pending, success, failed)
+- `orders.qicardTransactionId` - QiCard transaction ID
 
 ## PC Builder Feature
 

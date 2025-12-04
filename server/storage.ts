@@ -22,7 +22,7 @@ export interface IStorage {
   getOrdersByUserId(userId: string): Promise<any[]>;
   lookupOrderByNumberAndPhone(orderNumber: string, phone: string): Promise<any>;
   updateOrderStatus(id: string, status: string): Promise<any>;
-  updateOrderPaymentInfo(id: string, info: { paymentStatus?: string; zaincashTransactionId?: string }): Promise<any>;
+  updateOrderPaymentInfo(id: string, info: { paymentStatus?: string; zaincashTransactionId?: string; qicardTransactionId?: string }): Promise<any>;
   getOrder(id: string): Promise<any>;
   deleteOrder(id: string): Promise<void>;
   getStoreSettings(): Promise<StoreSettings | undefined>;

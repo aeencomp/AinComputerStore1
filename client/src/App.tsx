@@ -27,6 +27,7 @@ import TrackOrder from "@/pages/TrackOrder";
 import PCBuilder from "@/pages/PCBuilder";
 import CustomerDashboard from "@/pages/CustomerDashboard";
 import ZainCashCallback from "@/pages/ZainCashCallback";
+import QiCardCallback from "@/pages/QiCardCallback";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -55,6 +56,7 @@ function Router() {
       <Route path="/pc-builder" component={PCBuilder}/>
       <Route path="/my-orders" component={CustomerDashboard}/>
       <Route path="/payment/zaincash/callback" component={ZainCashCallback}/>
+      <Route path="/payment/qicard/callback" component={QiCardCallback}/>
       <Route component={NotFound} />
     </Switch>
   );

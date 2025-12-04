@@ -8,6 +8,7 @@ import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
 import { adminNotifications } from "./admin-notifications";
 import { zaincash } from "./zaincash";
+import { qicard } from "./qicard";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -1102,6 +1103,216 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ==================== End Zain Cash Routes ====================
+
+  // ==================== QiCard Payment Routes ====================
+  
+  // Check if QiCard is configured
+  app.get("/api/qicard/config", async (req, res) => {
+    try {
+      const config = qicard.getConfig();
+      return res.json(config);
+    } catch (error) {
+      console.error("Error checking QiCard config:", error);
+      return res.status(500).json({ error: "Failed to check QiCard configuration" });
+    }
+  });
+
+  // Initialize QiCard payment for an order
+  app.post("/api/qicard/init", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ error: "Order ID is required" });
+      }
+      
+      const order = await storage.getOrder(orderId);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      // Check if order payment method is qicard
+      if (order.paymentMethod !== 'qicard') {
+        return res.status(400).json({ error: "Order payment method is not QiCard" });
+      }
+      
+      // Build redirect URL
+      const protocol = req.headers['x-forwarded-proto'] || req.protocol;
+      const host = req.headers['host'];
+      const redirectUrl = `${protocol}://${host}/payment/qicard/callback`;
+      const callbackUrl = `${protocol}://${host}/api/qicard/webhook`;
+      
+      // Initialize payment
+      const result = await qicard.initPayment({
+        amount: Math.round(parseFloat(order.total)),
+        orderId: order.orderNumber,
+        customerName: order.customerName,
+        customerEmail: order.customerEmail,
+        customerPhone: order.customerPhone,
+        description: `Order ${order.orderNumber}`,
+        redirectUrl,
+        callbackUrl,
+      });
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.error });
+      }
+      
+      // Update order with transaction ID
+      await storage.updateOrderPaymentInfo(order.id, {
+        qicardTransactionId: result.transactionId,
+        paymentStatus: 'pending',
+      });
+      
+      return res.json({
+        success: true,
+        paymentUrl: result.paymentUrl,
+        transactionId: result.transactionId,
+      });
+    } catch (error) {
+      console.error("Error initializing QiCard payment:", error);
+      return res.status(500).json({ error: "Failed to initialize payment" });
+    }
+  });
+
+  // QiCard callback handler (redirect from QiCard after payment)
+  app.get("/api/qicard/callback", async (req, res) => {
+    try {
+      const { transactionId, orderId, status } = req.query;
+      
+      if (!transactionId || !orderId) {
+        console.error("QiCard callback: Missing parameters");
+        return res.redirect('/payment/qicard/callback?status=error&msg=missing_params');
+      }
+      
+      // Verify the payment
+      const verification = await qicard.verifyPayment(transactionId as string);
+      
+      if (!verification.success) {
+        console.error("QiCard callback: Verification failed");
+        return res.redirect('/payment/qicard/callback?status=error&msg=verification_failed');
+      }
+      
+      // Find order by order number
+      const order = await storage.getOrderByNumber(orderId as string);
+      
+      if (!order) {
+        console.error("QiCard callback: Order not found:", orderId);
+        return res.redirect('/payment/qicard/callback?status=error&msg=order_not_found');
+      }
+      
+      // Map QiCard status to our payment status
+      const paymentStatus = qicard.mapStatusToPaymentStatus(verification.status || 'pending');
+      let orderStatus = order.status;
+      
+      // Update order status based on payment result
+      if (paymentStatus === 'success') {
+        orderStatus = 'confirmed';
+        
+        // Send confirmation email
+        try {
+          await sendOrderConfirmationEmail({
+            to: order.customerEmail,
+            orderNumber: order.orderNumber,
+            customerName: order.customerName,
+            items: order.itemsWithProducts || [],
+            subtotal: Number(order.subtotal),
+            shipping: Number(order.shipping),
+            total: Number(order.total),
+          });
+        } catch (emailError) {
+          console.error("Failed to send confirmation email:", emailError);
+        }
+      } else if (paymentStatus === 'failed') {
+        orderStatus = 'payment_failed';
+      }
+      
+      // Update order with payment status
+      await storage.updateOrderPaymentInfo(order.id, {
+        paymentStatus: paymentStatus,
+        qicardTransactionId: transactionId as string,
+      });
+      
+      if (orderStatus !== order.status) {
+        await storage.updateOrderStatus(order.id, orderStatus);
+      }
+      
+      // Redirect to frontend callback page
+      return res.redirect(`/payment/qicard/callback?status=${paymentStatus}&order=${order.orderNumber}`);
+    } catch (error) {
+      console.error("Error handling QiCard callback:", error);
+      return res.redirect('/payment/qicard/callback?status=error&msg=internal_error');
+    }
+  });
+
+  // QiCard webhook handler (server-to-server notification)
+  app.post("/api/qicard/webhook", async (req, res) => {
+    try {
+      const callbackData = qicard.parseCallback(req.body);
+      
+      if (!callbackData) {
+        console.error("QiCard webhook: Invalid callback data");
+        return res.status(400).json({ error: "Invalid callback data" });
+      }
+      
+      // Find order by order number
+      const order = await storage.getOrderByNumber(callbackData.orderId);
+      
+      if (!order) {
+        console.error("QiCard webhook: Order not found:", callbackData.orderId);
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      // Map status
+      const paymentStatus = qicard.mapStatusToPaymentStatus(callbackData.status);
+      let orderStatus = order.status;
+      
+      if (paymentStatus === 'success') {
+        orderStatus = 'confirmed';
+      } else if (paymentStatus === 'failed') {
+        orderStatus = 'payment_failed';
+      }
+      
+      // Update order
+      await storage.updateOrderPaymentInfo(order.id, {
+        paymentStatus: paymentStatus,
+        qicardTransactionId: callbackData.transactionId,
+      });
+      
+      if (orderStatus !== order.status) {
+        await storage.updateOrderStatus(order.id, orderStatus);
+      }
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error handling QiCard webhook:", error);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+  });
+
+  // Check QiCard payment status for an order
+  app.get("/api/qicard/status/:orderNumber", async (req, res) => {
+    try {
+      const { orderNumber } = req.params;
+      const order = await storage.getOrderByNumber(orderNumber);
+      
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+      
+      return res.json({
+        orderNumber: order.orderNumber,
+        paymentMethod: order.paymentMethod,
+        paymentStatus: (order as any).paymentStatus || 'pending',
+        orderStatus: order.status,
+      });
+    } catch (error) {
+      console.error("Error checking payment status:", error);
+      return res.status(500).json({ error: "Failed to check payment status" });
+    }
+  });
+
+  // ==================== End QiCard Routes ====================
 
   app.post("/api/repair-tickets", async (req, res) => {
     try {

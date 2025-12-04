@@ -189,10 +189,11 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
-  async updateOrderPaymentInfo(id: string, info: { paymentStatus?: string; zaincashTransactionId?: string }): Promise<Order | undefined> {
+  async updateOrderPaymentInfo(id: string, info: { paymentStatus?: string; zaincashTransactionId?: string; qicardTransactionId?: string }): Promise<Order | undefined> {
     const updateData: any = {};
     if (info.paymentStatus) updateData.paymentStatus = info.paymentStatus;
     if (info.zaincashTransactionId) updateData.zaincashTransactionId = info.zaincashTransactionId;
+    if (info.qicardTransactionId) updateData.qicardTransactionId = info.qicardTransactionId;
     
     const result = await db.update(orders)
       .set(updateData)
