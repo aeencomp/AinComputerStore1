@@ -313,22 +313,26 @@ export function Footer() {
               </div>
             </div>
 
-            {/* Mini Map */}
-            <div className="rounded-xl overflow-hidden border border-border/50">
-              <div className="flex items-center gap-2 p-3 bg-card border-b border-border/50">
+            {/* Store Location Map */}
+            <div className="rounded-xl border border-border/50 bg-card">
+              <div className="flex items-center gap-2 p-3 border-b border-border/50">
                 <MapPin className="h-4 w-4 text-primary" />
                 <span className="font-medium text-sm">{t('footer.location')}</span>
               </div>
-              <div className="h-36">
+              <div style={{ height: '160px', width: '100%' }}>
                 <MapContainer 
                   center={[32.60524733098948, 44.02350055860585] as [number, number]} 
                   zoom={15} 
-                  style={{ height: '100%', width: '100%' }} 
+                  style={{ height: '160px', width: '100%' }} 
                   data-testid="map-store-location"
                   zoomControl={false}
                   attributionControl={false}
+                  scrollWheelZoom={false}
                 >
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  <TileLayer 
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                  />
                   <Marker position={[32.60524733098948, 44.02350055860585] as [number, number]}>
                     <Popup>
                       <div className="text-center p-1">
@@ -339,7 +343,7 @@ export function Footer() {
                   </Marker>
                 </MapContainer>
               </div>
-              <div className="p-2 bg-card">
+              <div className="p-3 border-t border-border/50">
                 <p className="text-xs text-muted-foreground text-center">{address}</p>
               </div>
             </div>
