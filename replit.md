@@ -119,6 +119,55 @@ Full integration with QiCard payment gateway for card payments in Iraqi Dinar (I
 
 A step-by-step PC builder allows users to select components (CPU, Motherboard, RAM, GPU, Storage, PSU, Case, Cooler) with real-time compatibility checking. A sidebar displays a live-updating build summary, including total power consumption, recommended PSU wattage, and total price.
 
+## Progressive Web App (PWA)
+
+The application is a fully-featured PWA that can be installed on mobile devices:
+
+**Features:**
+- Installable on Android/iOS home screens
+- Offline support via service worker
+- Push notification support
+- App-like experience with standalone display mode
+- Custom app icons (72x72 to 512x512)
+- Splash screen with theme color
+
+**Files:**
+- `client/public/manifest.json` - Web app manifest
+- `client/public/sw.js` - Service worker for caching
+- `client/public/icons/` - App icons in various sizes
+- `client/src/components/PWAInstallPrompt.tsx` - Install prompt component
+
+**Service Worker Caching Strategy:**
+- Static assets: Cache first
+- API calls: Network first with fallback
+- Images: Cache first with network fallback
+
+## Android App (Capacitor)
+
+The app can be packaged as a native Android APK using Capacitor:
+
+**Configuration:**
+- `capacitor.config.ts` - Capacitor configuration
+- Package ID: `com.alain.computers`
+- Target SDK: 34 (Android 14)
+- Min SDK: 22 (Android 5.1)
+
+**Build Instructions:**
+See `android/README.md` for detailed build instructions.
+
+**Quick Build Steps:**
+1. `npm run build` - Build web app
+2. `npx cap add android` - Initialize Android project
+3. `npx cap copy android` - Copy web assets
+4. `npx cap sync android` - Sync plugins
+5. `npx cap open android` - Open in Android Studio
+6. Build APK in Android Studio
+
+**Plugins:**
+- `@capacitor/splash-screen` - Custom splash screen
+- `@capacitor/status-bar` - Status bar styling
+- `@capacitor/app` - App lifecycle management
+
 # External Dependencies
 
 ## Database & ORM
