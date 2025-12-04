@@ -130,10 +130,16 @@ Preferred communication style: Simple, everyday language.
 - Auto-fill customer information in checkout from authenticated user account
 - Orders linked to user accounts via userId foreign key
 
-**Admin Authentication**
-- Password-protected admin panel (password: "admin123")
-- Client-side authentication using localStorage
+**Admin Authentication (Session-Based)**
+- Full admin user management with username/password authentication
+- Session-based authentication using express-session (same store as customer auth)
+- Default admin credentials: username "admin", password "admin123"
 - Admin routes: /admin/login and /admin/dashboard
+- API routes: POST /api/admin/auth/login, /api/admin/auth/logout, GET /api/admin/auth/me, PUT /api/admin/auth/change-password
+- Admin user CRUD: GET/POST /api/admin/users, PUT/DELETE /api/admin/users/:id
+- Admin dashboard has "المديرين" tab for managing admin users (create, edit, delete)
+- Password hashing with bcrypt, passwords never exposed in API responses
+- Self-deletion protection: admins cannot delete their own account
 - Separate from customer authentication system
 
 ## Email Notifications
