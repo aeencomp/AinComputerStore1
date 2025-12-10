@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface Technician {
@@ -39,6 +39,12 @@ export default function TechnicianDashboard() {
     queryKey: ['/api/repair-tickets'],
     enabled: !!currentTechnician,
   });
+
+  useEffect(() => {
+    if (authError || (!isAuthLoading && !currentTechnician)) {
+      navigate('/technician/login');
+    }
+  }, [authError, isAuthLoading, currentTechnician, navigate]);
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -76,8 +82,7 @@ export default function TechnicianDashboard() {
     );
   }
 
-  if (authError || !currentTechnician) {
-    navigate('/technician/login');
+  if (!currentTechnician) {
     return null;
   }
 
@@ -137,7 +142,13 @@ export default function TechnicianDashboard() {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Link href="/technician/new-request">
+              <Button data-testid="button-new-repair-request">
+                <Plus className="h-4 w-4 me-2" />
+                {language === 'ar' ? 'طلب صيانة جديد' : 'New Request'}
+              </Button>
+            </Link>
             {isAdmin && (
               <Link href="/technician/manage">
                 <Button variant="outline" data-testid="button-manage-technicians">

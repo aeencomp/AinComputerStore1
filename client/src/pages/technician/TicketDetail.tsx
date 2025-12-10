@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useRoute } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -11,7 +11,8 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket } from '@shared/schema';
-import { ArrowLeft, Trash2 } from 'lucide-react';
+import { ArrowLeft, Trash2, Printer } from 'lucide-react';
+import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useForm } from 'react-hook-form';
@@ -30,18 +31,35 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
+interface Technician {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: number;
+  isActive: number;
+  permissions: string[];
+}
+
 export default function TicketDetail() {
   const [, params] = useRoute('/technician/tickets/:id');
   const [, setLocation] = useLocation();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const { toast } = useToast();
+  const isRTL = language === 'ar';
+  const printRef = useRef<HTMLDivElement>(null);
+  const barcodeRef = useRef<SVGSVGElement>(null);
+  const [barcodeReady, setBarcodeReady] = useState(false);
+
+  const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
+    queryKey: ['/api/technician/auth/me'],
+    retry: false,
+  });
 
   useEffect(() => {
-    const isAuth = localStorage.getItem('technicianAuth');
-    if (!isAuth) {
+    if (authError || (!isAuthLoading && !currentTechnician)) {
       setLocation('/technician/login');
     }
-  }, [setLocation]);
+  }, [authError, isAuthLoading, currentTechnician, setLocation]);
 
   const { data: ticket, isLoading } = useQuery<RepairTicket>({
     queryKey: ['/api/repair-tickets', params?.id],
@@ -133,12 +151,127 @@ export default function TicketDetail() {
     updateMutation.mutate(data);
   };
 
-  if (isLoading) {
+  useEffect(() => {
+    if (ticket && barcodeRef.current) {
+      requestAnimationFrame(() => {
+        if (barcodeRef.current) {
+          try {
+            JsBarcode(barcodeRef.current, ticket.ticketNumber, {
+              format: 'CODE128',
+              width: 1.5,
+              height: 40,
+              displayValue: true,
+              fontSize: 12,
+              margin: 5,
+              background: '#ffffff',
+            });
+            setBarcodeReady(true);
+          } catch (error) {
+            console.error('Barcode generation error:', error);
+          }
+        }
+      });
+    }
+  }, [ticket]);
+
+  const handlePrint = () => {
+    if (printRef.current && ticket) {
+      const printContents = printRef.current.innerHTML;
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(`
+          <!DOCTYPE html>
+          <html dir="${isRTL ? 'rtl' : 'ltr'}">
+          <head>
+            <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
+            <style>
+              @page { 
+                size: 80mm 60mm; 
+                margin: 2mm; 
+              }
+              body { 
+                font-family: Arial, sans-serif; 
+                font-size: 10px; 
+                margin: 0; 
+                padding: 4px;
+                direction: ${isRTL ? 'rtl' : 'ltr'};
+              }
+              .label-container {
+                border: 1px solid #000;
+                padding: 4px;
+                max-width: 76mm;
+              }
+              .ticket-number {
+                font-size: 14px;
+                font-weight: bold;
+                text-align: center;
+                margin-bottom: 4px;
+              }
+              .barcode-container {
+                text-align: center;
+                margin: 4px 0;
+              }
+              .barcode-container svg {
+                max-width: 100%;
+                height: 35px;
+              }
+              .info-row {
+                display: flex;
+                justify-content: space-between;
+                margin: 2px 0;
+                font-size: 9px;
+              }
+              .info-label {
+                font-weight: bold;
+              }
+              .problem-section {
+                margin-top: 4px;
+                padding-top: 4px;
+                border-top: 1px dashed #000;
+              }
+              .problem-title {
+                font-weight: bold;
+                font-size: 9px;
+              }
+              .problem-text {
+                font-size: 8px;
+                margin-top: 2px;
+                max-height: 30px;
+                overflow: hidden;
+              }
+              .store-name {
+                text-align: center;
+                font-size: 11px;
+                font-weight: bold;
+                margin-bottom: 2px;
+              }
+            </style>
+          </head>
+          <body>
+            ${printContents}
+          </body>
+          </html>
+        `);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+          printWindow.close();
+        }, 250);
+      }
+    }
+  };
+
+  if (isAuthLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <p>{t('common.loading')}</p>
       </div>
     );
+  }
+
+  if (!currentTechnician) {
+    return null;
   }
 
   if (!ticket) {
@@ -198,6 +331,60 @@ export default function TicketDetail() {
             <div>
               <Label className="text-muted-foreground">{t('repair.ticket.issueDescription')}</Label>
               <p className="mt-2">{ticket.issueDescriptionAr || ticket.issueDescriptionEn}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Printable Label Card */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>{isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</CardTitle>
+              <CardDescription>{isRTL ? 'اطبع البطاقة لتعليقها على الجهاز' : 'Print label to attach to device'}</CardDescription>
+            </div>
+            <Button onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-print-label">
+              <Printer className="h-4 w-4" />
+              {barcodeReady ? (isRTL ? 'طباعة' : 'Print') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
+              <div ref={printRef} data-testid="print-label">
+                <div style={{ border: '1px solid #000', padding: '8px', maxWidth: '300px', margin: '0 auto' }}>
+                  <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
+                    {isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
+                  </div>
+                  <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+                    {ticket.ticketNumber}
+                  </div>
+                  <div style={{ textAlign: 'center', marginBottom: '8px' }}>
+                    <svg ref={barcodeRef} />
+                  </div>
+                  <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الاسم:' : 'Name:'}</span>
+                      <span>{ticket.customerName}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الهاتف:' : 'Phone:'}</span>
+                      <span dir="ltr">{ticket.customerPhone}</span>
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الجهاز:' : 'Device:'}</span>
+                      <span>{ticket.deviceBrand} {ticket.deviceModel}</span>
+                    </div>
+                    <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #000' }}>
+                      <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{isRTL ? 'المشكلة:' : 'Problem:'}</div>
+                      <div style={{ fontSize: '10px' }}>
+                        {ticket.issueDescriptionAr || ticket.issueDescriptionEn}
+                      </div>
+                    </div>
+                    <div style={{ marginTop: '6px', fontSize: '9px', textAlign: 'center', color: '#666' }}>
+                      {new Date(ticket.createdAt).toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>

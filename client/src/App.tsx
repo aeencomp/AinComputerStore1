@@ -22,6 +22,7 @@ import TechnicianLogin from "@/pages/technician/TechnicianLogin";
 import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
 import TechnicianManagement from "@/pages/technician/TechnicianManagement";
 import TicketDetail from "@/pages/technician/TicketDetail";
+import NewRepairRequest from "@/pages/technician/NewRepairRequest";
 import RepairRequest from "@/pages/RepairRequest";
 import TrackRepair from "@/pages/TrackRepair";
 import TrackOrder from "@/pages/TrackOrder";
@@ -51,6 +52,7 @@ function Router() {
       <Route path="/technician" component={TechnicianDashboard}/>
       <Route path="/technician/manage" component={TechnicianManagement}/>
       <Route path="/technician/tickets/:id" component={TicketDetail}/>
+      <Route path="/technician/new-request" component={NewRepairRequest}/>
       <Route path="/repair-request" component={RepairRequest}/>
       <Route path="/track-repair" component={TrackRepair}/>
       <Route path="/track-order" component={TrackOrder}/>
