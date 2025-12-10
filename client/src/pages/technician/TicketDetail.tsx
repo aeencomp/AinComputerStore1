@@ -12,7 +12,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket } from '@shared/schema';
 import { ArrowLeft, Trash2, Printer } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useForm } from 'react-hook-form';
@@ -47,6 +47,8 @@ export default function TicketDetail() {
   const { toast } = useToast();
   const isRTL = language === 'ar';
   const printRef = useRef<HTMLDivElement>(null);
+  const barcodeRef = useRef<SVGSVGElement>(null);
+  const [barcodeReady, setBarcodeReady] = useState(false);
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -149,6 +151,28 @@ export default function TicketDetail() {
     updateMutation.mutate(data);
   };
 
+  useEffect(() => {
+    if (ticket && barcodeRef.current) {
+      requestAnimationFrame(() => {
+        if (barcodeRef.current) {
+          try {
+            JsBarcode(barcodeRef.current, ticket.ticketNumber, {
+              format: 'CODE128',
+              width: 1,
+              height: 20,
+              displayValue: true,
+              fontSize: 8,
+              margin: 2,
+              background: '#ffffff',
+            });
+            setBarcodeReady(true);
+          } catch (error) {
+            console.error('Barcode generation error:', error);
+          }
+        }
+      });
+    }
+  }, [ticket]);
 
   const handlePrint = () => {
     if (printRef.current && ticket) {
@@ -285,9 +309,9 @@ export default function TicketDetail() {
               <CardTitle>{isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</CardTitle>
               <CardDescription>{isRTL ? 'اطبع البطاقة لتعليقها على الجهاز' : 'Print label to attach to device'}</CardDescription>
             </div>
-            <Button onClick={handlePrint} className="gap-2" data-testid="button-print-label">
+            <Button onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-print-label">
               <Printer className="h-4 w-4" />
-              {isRTL ? 'طباعة' : 'Print'}
+              {barcodeReady ? (isRTL ? 'طباعة' : 'Print') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
             </Button>
           </CardHeader>
           <CardContent>
@@ -310,7 +334,7 @@ export default function TicketDetail() {
                     {ticket.ticketNumber}
                   </div>
                   <div style={{ marginBottom: '2px' }}>
-                    <QRCodeSVG value={ticket.ticketNumber} size={60} level="M" />
+                    <svg ref={barcodeRef} style={{ maxWidth: '88px', height: 'auto' }} />
                   </div>
                   <div style={{ textAlign: isRTL ? 'right' : 'left', fontSize: '6px' }}>
                     <div style={{ marginBottom: '1px' }}>

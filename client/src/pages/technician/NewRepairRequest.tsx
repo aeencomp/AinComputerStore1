@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { ArrowLeft, ArrowRight, Plus, Printer } from 'lucide-react';
-import { QRCodeSVG } from 'qrcode.react';
+import JsBarcode from 'jsbarcode';
 import type { RepairTicket } from '@shared/schema';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +35,7 @@ export default function NewRepairRequest() {
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const [createdTicket, setCreatedTicket] = useState<RepairTicket | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const barcodeRef = useRef<SVGSVGElement>(null);
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -47,6 +48,7 @@ export default function NewRepairRequest() {
     }
   }, [authError, isAuthLoading, currentTechnician, navigate]);
 
+  const [barcodeReady, setBarcodeReady] = useState(false);
 
   const formSchema = z.object({
     customerName: z.string().min(2, isRTL ? 'اسم العميل مطلوب' : 'Customer name is required'),
@@ -75,6 +77,28 @@ export default function NewRepairRequest() {
     },
   });
 
+  useEffect(() => {
+    if (createdTicket && barcodeRef.current) {
+      requestAnimationFrame(() => {
+        if (barcodeRef.current) {
+          try {
+            JsBarcode(barcodeRef.current, createdTicket.ticketNumber, {
+              format: 'CODE128',
+              width: 1,
+              height: 20,
+              displayValue: true,
+              fontSize: 8,
+              margin: 2,
+              background: '#ffffff',
+            });
+            setBarcodeReady(true);
+          } catch (error) {
+            console.error('Barcode generation error:', error);
+          }
+        }
+      });
+    }
+  }, [createdTicket]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -164,6 +188,7 @@ export default function NewRepairRequest() {
 
   const handleNewRequest = () => {
     setCreatedTicket(null);
+    setBarcodeReady(false);
     form.reset();
   };
 
@@ -221,7 +246,7 @@ export default function NewRepairRequest() {
                       {createdTicket.ticketNumber}
                     </div>
                     <div style={{ marginBottom: '2px' }}>
-                      <QRCodeSVG value={createdTicket.ticketNumber} size={60} level="M" />
+                      <svg ref={barcodeRef} style={{ maxWidth: '88px', height: 'auto' }} />
                     </div>
                     <div style={{ textAlign: isRTL ? 'right' : 'left', fontSize: '6px' }}>
                       <div style={{ marginBottom: '1px' }}>
@@ -251,9 +276,9 @@ export default function NewRepairRequest() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button onClick={handlePrint} className="gap-2" data-testid="button-print-label">
+                <Button onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-print-label">
                   <Printer className="h-4 w-4" />
-                  {isRTL ? 'طباعة البطاقة' : 'Print Label'}
+                  {barcodeReady ? (isRTL ? 'طباعة البطاقة' : 'Print Label') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
                 </Button>
                 <Button variant="outline" onClick={handleNewRequest} className="gap-2" data-testid="button-new-request">
                   <Plus className="h-4 w-4" />
