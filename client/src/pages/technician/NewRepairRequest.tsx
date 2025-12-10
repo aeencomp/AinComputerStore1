@@ -84,11 +84,11 @@ export default function NewRepairRequest() {
           try {
             JsBarcode(barcodeRef.current, createdTicket.ticketNumber, {
               format: 'CODE128',
-              width: 1.5,
-              height: 40,
+              width: 1,
+              height: 20,
               displayValue: true,
-              fontSize: 12,
-              margin: 5,
+              fontSize: 8,
+              margin: 2,
               background: '#ffffff',
             });
             setBarcodeReady(true);
@@ -143,64 +143,70 @@ export default function NewRepairRequest() {
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
               @page { 
-                size: 80mm 60mm; 
-                margin: 2mm; 
+                size: 25mm 50mm; 
+                margin: 1mm; 
               }
               body { 
                 font-family: Arial, sans-serif; 
-                font-size: 10px; 
+                font-size: 6px; 
                 margin: 0; 
-                padding: 4px;
+                padding: 1px;
                 direction: ${isRTL ? 'rtl' : 'ltr'};
+                width: 23mm;
+                height: 48mm;
               }
               .label-container {
-                border: 1px solid #000;
-                padding: 4px;
-                max-width: 76mm;
+                padding: 1px;
+                max-width: 23mm;
+                height: 46mm;
+                overflow: hidden;
               }
               .ticket-number {
-                font-size: 14px;
+                font-size: 7px;
                 font-weight: bold;
                 text-align: center;
-                margin-bottom: 4px;
+                margin-bottom: 1px;
               }
               .barcode-container {
                 text-align: center;
-                margin: 4px 0;
+                margin: 1px 0;
               }
               .barcode-container svg {
-                max-width: 100%;
-                height: 35px;
+                max-width: 21mm;
+                height: 18px;
               }
               .info-row {
-                display: flex;
-                justify-content: space-between;
-                margin: 2px 0;
-                font-size: 9px;
+                margin: 1px 0;
+                font-size: 5px;
+                line-height: 1.1;
               }
               .info-label {
                 font-weight: bold;
               }
+              .info-value {
+                display: block;
+              }
               .problem-section {
-                margin-top: 4px;
-                padding-top: 4px;
+                margin-top: 1px;
+                padding-top: 1px;
                 border-top: 1px dashed #000;
               }
               .problem-title {
                 font-weight: bold;
-                font-size: 9px;
+                font-size: 5px;
               }
               .problem-text {
-                font-size: 8px;
-                margin-top: 2px;
-                max-height: 30px;
+                font-size: 5px;
+                margin-top: 1px;
+                max-height: 12mm;
                 overflow: hidden;
+                line-height: 1.1;
               }
               .store-name {
                 text-align: center;
-                font-size: 11px;
+                font-size: 6px;
                 font-weight: bold;
-                margin-bottom: 2px;
+                margin-bottom: 1px;
               }
             </style>
           </head>
