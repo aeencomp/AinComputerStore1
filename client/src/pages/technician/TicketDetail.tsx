@@ -187,69 +187,30 @@ export default function TicketDetail() {
             <style>
               @page { 
                 size: 25mm 50mm; 
-                margin: 1mm; 
+                margin: 0; 
               }
               body { 
                 font-family: Arial, sans-serif; 
-                font-size: 6px; 
                 margin: 0; 
-                padding: 1px;
+                padding: 0;
                 direction: ${isRTL ? 'rtl' : 'ltr'};
-                width: 23mm;
-                height: 48mm;
               }
               .label-container {
-                padding: 1px;
-                max-width: 23mm;
-                height: 46mm;
-                overflow: hidden;
-              }
-              .ticket-number {
-                font-size: 7px;
-                font-weight: bold;
-                text-align: center;
-                margin-bottom: 1px;
-              }
-              .barcode-container {
-                text-align: center;
-                margin: 1px 0;
-              }
-              .barcode-container svg {
-                max-width: 21mm;
-                height: 18px;
-              }
-              .info-row {
-                margin: 1px 0;
-                font-size: 5px;
-                line-height: 1.1;
-              }
-              .info-label {
-                font-weight: bold;
-              }
-              .info-value {
-                display: block;
-              }
-              .problem-section {
-                margin-top: 1px;
-                padding-top: 1px;
-                border-top: 1px dashed #000;
-              }
-              .problem-title {
-                font-weight: bold;
-                font-size: 5px;
-              }
-              .problem-text {
-                font-size: 5px;
-                margin-top: 1px;
-                max-height: 12mm;
-                overflow: hidden;
-                line-height: 1.1;
-              }
-              .store-name {
-                text-align: center;
+                width: 25mm;
+                height: 50mm;
+                padding: 1mm;
+                box-sizing: border-box;
                 font-size: 6px;
-                font-weight: bold;
-                margin-bottom: 1px;
+                line-height: 1.2;
+                text-align: center;
+                overflow: hidden;
+              }
+              .label-container > div {
+                margin-bottom: 0.5mm;
+              }
+              .label-container svg {
+                max-width: 22mm;
+                height: auto;
               }
             </style>
           </head>
@@ -354,38 +315,47 @@ export default function TicketDetail() {
             </Button>
           </CardHeader>
           <CardContent>
-            <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
+            {/* Vertical 25mm x 50mm Label Preview */}
+            <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white flex justify-center">
               <div ref={printRef} data-testid="print-label">
-                <div style={{ border: '1px solid #000', padding: '8px', maxWidth: '300px', margin: '0 auto' }}>
-                  <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
-                    {isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
+                <div className="label-container" style={{ 
+                  border: '1px solid #000', 
+                  padding: '3px', 
+                  width: '94px', 
+                  minHeight: '189px',
+                  fontSize: '7px',
+                  lineHeight: '1.2',
+                  textAlign: 'center'
+                }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '6px', marginBottom: '2px' }}>
+                    {isRTL ? 'العين للحاسبات' : 'Al-Ain Computers'}
                   </div>
-                  <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
+                  <div style={{ fontWeight: 'bold', fontSize: '8px', marginBottom: '2px' }}>
                     {ticket.ticketNumber}
                   </div>
-                  <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                    <svg ref={barcodeRef} style={{ maxWidth: '100%', height: 'auto', minHeight: '30px' }} />
+                  <div style={{ marginBottom: '2px' }}>
+                    <svg ref={barcodeRef} style={{ maxWidth: '88px', height: 'auto' }} />
                   </div>
-                  <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الاسم:' : 'Name:'}</span>
-                      <span>{ticket.customerName}</span>
+                  <div style={{ textAlign: isRTL ? 'right' : 'left', fontSize: '6px' }}>
+                    <div style={{ marginBottom: '1px' }}>
+                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الاسم: ' : 'Name: '}</span>
+                      {ticket.customerName}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الهاتف:' : 'Phone:'}</span>
-                      <span dir="ltr">{ticket.customerPhone}</span>
+                    <div style={{ marginBottom: '1px' }} dir="ltr">
+                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'هاتف: ' : 'Tel: '}</span>
+                      {ticket.customerPhone}
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الجهاز:' : 'Device:'}</span>
-                      <span>{ticket.deviceBrand} {ticket.deviceModel}</span>
+                    <div style={{ marginBottom: '1px' }}>
+                      <span style={{ fontWeight: 'bold' }}>{isRTL ? 'جهاز: ' : 'Dev: '}</span>
+                      {ticket.deviceBrand} {ticket.deviceModel}
                     </div>
-                    <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #000' }}>
-                      <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{isRTL ? 'المشكلة:' : 'Problem:'}</div>
-                      <div style={{ fontSize: '10px' }}>
+                    <div style={{ borderTop: '1px dashed #000', paddingTop: '2px', marginTop: '2px' }}>
+                      <div style={{ fontWeight: 'bold' }}>{isRTL ? 'المشكلة:' : 'Issue:'}</div>
+                      <div style={{ fontSize: '5px', maxHeight: '30px', overflow: 'hidden' }}>
                         {ticket.issueDescriptionAr || ticket.issueDescriptionEn}
                       </div>
                     </div>
-                    <div style={{ marginTop: '6px', fontSize: '9px', textAlign: 'center', color: '#666' }}>
+                    <div style={{ fontSize: '5px', textAlign: 'center', marginTop: '2px', color: '#666' }}>
                       {new Date(ticket.createdAt).toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')}
                     </div>
                   </div>
