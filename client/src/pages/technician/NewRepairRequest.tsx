@@ -277,7 +277,7 @@ export default function NewRepairRequest() {
                       {createdTicket.ticketNumber}
                     </div>
                     <div className="barcode-container" style={{ textAlign: 'center', marginBottom: '8px' }}>
-                      <svg ref={barcodeRef} />
+                      <svg ref={barcodeRef} style={{ maxWidth: '100%', height: 'auto', minHeight: '30px' }} />
                     </div>
                     <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
