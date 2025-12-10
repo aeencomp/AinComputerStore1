@@ -84,11 +84,11 @@ export default function NewRepairRequest() {
           try {
             JsBarcode(barcodeRef.current, createdTicket.ticketNumber, {
               format: 'CODE128',
-              width: 1,
-              height: 20,
+              width: 1.5,
+              height: 40,
               displayValue: true,
-              fontSize: 8,
-              margin: 2,
+              fontSize: 12,
+              margin: 5,
               background: '#ffffff',
             });
             setBarcodeReady(true);
@@ -143,31 +143,64 @@ export default function NewRepairRequest() {
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
               @page { 
-                size: 25mm 50mm; 
-                margin: 0; 
+                size: 80mm 60mm; 
+                margin: 2mm; 
               }
               body { 
                 font-family: Arial, sans-serif; 
+                font-size: 10px; 
                 margin: 0; 
-                padding: 0;
+                padding: 4px;
                 direction: ${isRTL ? 'rtl' : 'ltr'};
               }
               .label-container {
-                width: 25mm;
-                height: 50mm;
-                padding: 1mm;
-                box-sizing: border-box;
-                font-size: 6px;
-                line-height: 1.2;
+                border: 1px solid #000;
+                padding: 4px;
+                max-width: 76mm;
+              }
+              .ticket-number {
+                font-size: 14px;
+                font-weight: bold;
                 text-align: center;
+                margin-bottom: 4px;
+              }
+              .barcode-container {
+                text-align: center;
+                margin: 4px 0;
+              }
+              .barcode-container svg {
+                max-width: 100%;
+                height: 35px;
+              }
+              .info-row {
+                display: flex;
+                justify-content: space-between;
+                margin: 2px 0;
+                font-size: 9px;
+              }
+              .info-label {
+                font-weight: bold;
+              }
+              .problem-section {
+                margin-top: 4px;
+                padding-top: 4px;
+                border-top: 1px dashed #000;
+              }
+              .problem-title {
+                font-weight: bold;
+                font-size: 9px;
+              }
+              .problem-text {
+                font-size: 8px;
+                margin-top: 2px;
+                max-height: 30px;
                 overflow: hidden;
               }
-              .label-container > div {
-                margin-bottom: 0.5mm;
-              }
-              .label-container svg {
-                max-width: 22mm;
-                height: auto;
+              .store-name {
+                text-align: center;
+                font-size: 11px;
+                font-weight: bold;
+                margin-bottom: 2px;
               }
             </style>
           </head>
@@ -227,47 +260,39 @@ export default function NewRepairRequest() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              {/* Printable Label Preview - Vertical 25mm x 50mm */}
-              <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white flex justify-center">
+              {/* Printable Label Preview */}
+              <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
                 <div ref={printRef} data-testid="print-label">
-                  <div className="label-container" style={{ 
-                    border: '1px solid #000', 
-                    padding: '3px', 
-                    width: '94px', 
-                    minHeight: '189px',
-                    fontSize: '7px',
-                    lineHeight: '1.2',
-                    textAlign: 'center'
-                  }}>
-                    <div style={{ fontWeight: 'bold', fontSize: '6px', marginBottom: '2px' }}>
-                      {isRTL ? 'العين للحاسبات' : 'Al-Ain Computers'}
+                  <div className="label-container" style={{ border: '1px solid #000', padding: '8px', maxWidth: '300px', margin: '0 auto' }}>
+                    <div className="store-name" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
+                      {isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
                     </div>
-                    <div style={{ fontWeight: 'bold', fontSize: '8px', marginBottom: '2px' }}>
+                    <div className="ticket-number" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
                       {createdTicket.ticketNumber}
                     </div>
-                    <div style={{ marginBottom: '2px' }}>
-                      <svg ref={barcodeRef} style={{ maxWidth: '88px', height: 'auto' }} />
+                    <div className="barcode-container" style={{ textAlign: 'center', marginBottom: '8px' }}>
+                      <svg ref={barcodeRef} />
                     </div>
-                    <div style={{ textAlign: isRTL ? 'right' : 'left', fontSize: '6px' }}>
-                      <div style={{ marginBottom: '1px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الاسم: ' : 'Name: '}</span>
-                        {createdTicket.customerName}
+                    <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الاسم:' : 'Name:'}</span>
+                        <span>{createdTicket.customerName}</span>
                       </div>
-                      <div style={{ marginBottom: '1px' }} dir="ltr">
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'هاتف: ' : 'Tel: '}</span>
-                        {createdTicket.customerPhone}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الهاتف:' : 'Phone:'}</span>
+                        <span dir="ltr">{createdTicket.customerPhone}</span>
                       </div>
-                      <div style={{ marginBottom: '1px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'جهاز: ' : 'Dev: '}</span>
-                        {createdTicket.deviceBrand} {createdTicket.deviceModel}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
+                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الجهاز:' : 'Device:'}</span>
+                        <span>{createdTicket.deviceBrand} {createdTicket.deviceModel}</span>
                       </div>
-                      <div style={{ borderTop: '1px dashed #000', paddingTop: '2px', marginTop: '2px' }}>
-                        <div style={{ fontWeight: 'bold' }}>{isRTL ? 'المشكلة:' : 'Issue:'}</div>
-                        <div style={{ fontSize: '5px', maxHeight: '30px', overflow: 'hidden' }}>
+                      <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #000' }}>
+                        <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{isRTL ? 'المشكلة:' : 'Problem:'}</div>
+                        <div style={{ fontSize: '10px' }}>
                           {createdTicket.issueDescriptionAr || createdTicket.issueDescriptionEn}
                         </div>
                       </div>
-                      <div style={{ fontSize: '5px', textAlign: 'center', marginTop: '2px', color: '#666' }}>
+                      <div style={{ marginTop: '6px', fontSize: '9px', textAlign: 'center', color: '#666' }}>
                         {new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')}
                       </div>
                     </div>
