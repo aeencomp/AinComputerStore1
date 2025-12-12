@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
@@ -1888,6 +1888,198 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting market price:", error);
       return res.status(500).json({ error: "Failed to delete market price" });
+    }
+  });
+
+  // External Price Sources Routes
+  // Public: Get market prices with their external price comparisons
+  app.get("/api/market-prices/with-comparisons", async (req, res) => {
+    try {
+      const { type } = req.query;
+      
+      let prices;
+      if (type && typeof type === 'string') {
+        prices = await storage.getMarketPricesByType(type);
+      } else {
+        prices = await storage.getMarketPrices();
+      }
+      
+      // Get exchange rate for USD to IQD
+      const exchangeRate = await storage.getExchangeRate("USD", "IQD");
+      const usdToIqdRate = exchangeRate ? parseFloat(exchangeRate.rate) : 1310; // Default rate
+      
+      // Enrich each price with external sources
+      const pricesWithComparisons = await Promise.all(
+        prices.map(async (price) => {
+          const externalSources = await storage.getExternalPriceSourcesByMarketPrice(price.id);
+          return {
+            ...price,
+            externalSources: externalSources.filter(s => s.isActive === 1),
+            exchangeRate: usdToIqdRate
+          };
+        })
+      );
+      
+      return res.json({
+        prices: pricesWithComparisons,
+        exchangeRate: usdToIqdRate,
+        lastRateUpdate: exchangeRate?.lastUpdated || null
+      });
+    } catch (error) {
+      console.error("Error fetching market prices with comparisons:", error);
+      return res.status(500).json({ error: "Failed to fetch market prices" });
+    }
+  });
+
+  // Admin: Get all external price sources
+  app.get("/api/admin/external-prices", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const sources = await storage.getExternalPriceSources();
+      return res.json(sources);
+    } catch (error) {
+      console.error("Error fetching external price sources:", error);
+      return res.status(500).json({ error: "Failed to fetch external prices" });
+    }
+  });
+
+  // Admin: Create external price source
+  app.post("/api/admin/external-prices", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const validatedData = insertExternalPriceSourceSchema.parse(req.body);
+      
+      // Auto-calculate IQD price if USD is provided
+      if (validatedData.priceUSD && !validatedData.priceIQD) {
+        const exchangeRate = await storage.getExchangeRate("USD", "IQD");
+        const rate = exchangeRate ? parseFloat(exchangeRate.rate) : 1310;
+        (validatedData as any).priceIQD = (parseFloat(validatedData.priceUSD) * rate).toFixed(2);
+      }
+      
+      const source = await storage.createExternalPriceSource(validatedData);
+      return res.json(source);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating external price source:", error);
+      return res.status(500).json({ error: "Failed to create external price" });
+    }
+  });
+
+  // Admin: Update external price source
+  app.put("/api/admin/external-prices/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      const validatedData = insertExternalPriceSourceSchema.partial().parse(req.body);
+      
+      // Auto-calculate IQD price if USD is provided
+      if (validatedData.priceUSD) {
+        const exchangeRate = await storage.getExchangeRate("USD", "IQD");
+        const rate = exchangeRate ? parseFloat(exchangeRate.rate) : 1310;
+        (validatedData as any).priceIQD = (parseFloat(validatedData.priceUSD) * rate).toFixed(2);
+      }
+      
+      const source = await storage.updateExternalPriceSource(id, validatedData);
+      if (!source) {
+        return res.status(404).json({ error: "المصدر غير موجود" });
+      }
+      
+      return res.json(source);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating external price source:", error);
+      return res.status(500).json({ error: "Failed to update external price" });
+    }
+  });
+
+  // Admin: Delete external price source
+  app.delete("/api/admin/external-prices/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      await storage.deleteExternalPriceSource(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting external price source:", error);
+      return res.status(500).json({ error: "Failed to delete external price" });
+    }
+  });
+
+  // Admin: Get/Update exchange rate
+  app.get("/api/admin/exchange-rate", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const rate = await storage.getExchangeRate("USD", "IQD");
+      if (!rate) {
+        return res.json({ rate: "1310", fromCurrency: "USD", toCurrency: "IQD", lastUpdated: null });
+      }
+      return res.json(rate);
+    } catch (error) {
+      console.error("Error fetching exchange rate:", error);
+      return res.status(500).json({ error: "Failed to fetch exchange rate" });
+    }
+  });
+
+  app.put("/api/admin/exchange-rate", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { rate } = req.body;
+      if (!rate || isNaN(parseFloat(rate))) {
+        return res.status(400).json({ error: "سعر الصرف غير صالح" });
+      }
+      
+      const updatedRate = await storage.upsertExchangeRate({
+        fromCurrency: "USD",
+        toCurrency: "IQD",
+        rate: rate.toString()
+      });
+      
+      return res.json(updatedRate);
+    } catch (error) {
+      console.error("Error updating exchange rate:", error);
+      return res.status(500).json({ error: "Failed to update exchange rate" });
+    }
+  });
+
+  // Public: Get current exchange rate
+  app.get("/api/exchange-rate", async (req, res) => {
+    try {
+      const rate = await storage.getExchangeRate("USD", "IQD");
+      if (!rate) {
+        return res.json({ rate: "1310", fromCurrency: "USD", toCurrency: "IQD" });
+      }
+      return res.json(rate);
+    } catch (error) {
+      console.error("Error fetching exchange rate:", error);
+      return res.status(500).json({ error: "Failed to fetch exchange rate" });
     }
   });
 
