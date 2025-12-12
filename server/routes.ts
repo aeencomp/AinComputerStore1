@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
@@ -1768,6 +1768,126 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting customer:", error);
       return res.status(500).json({ error: "Failed to delete customer" });
+    }
+  });
+
+  // ===============================
+  // Market Price Analysis Routes
+  // ===============================
+  
+  // Public route to get all market prices
+  app.get("/api/market-prices", async (req, res) => {
+    try {
+      const { type } = req.query;
+      
+      if (type && typeof type === 'string') {
+        const prices = await storage.getMarketPricesByType(type);
+        return res.json(prices);
+      }
+      
+      const prices = await storage.getMarketPrices();
+      return res.json(prices);
+    } catch (error) {
+      console.error("Error fetching market prices:", error);
+      return res.status(500).json({ error: "Failed to fetch market prices" });
+    }
+  });
+
+  // Admin routes for managing market prices
+  app.get("/api/admin/market-prices", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const prices = await storage.getMarketPrices();
+      return res.json(prices);
+    } catch (error) {
+      console.error("Error fetching market prices:", error);
+      return res.status(500).json({ error: "Failed to fetch market prices" });
+    }
+  });
+
+  app.get("/api/admin/market-prices/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      const price = await storage.getMarketPrice(id);
+      
+      if (!price) {
+        return res.status(404).json({ error: "السعر غير موجود" });
+      }
+      
+      return res.json(price);
+    } catch (error) {
+      console.error("Error fetching market price:", error);
+      return res.status(500).json({ error: "Failed to fetch market price" });
+    }
+  });
+
+  app.post("/api/admin/market-prices", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const validatedData = insertMarketPriceSchema.parse(req.body);
+      const price = await storage.createMarketPrice(validatedData);
+      
+      return res.json(price);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating market price:", error);
+      return res.status(500).json({ error: "Failed to create market price" });
+    }
+  });
+
+  app.put("/api/admin/market-prices/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      const validatedData = insertMarketPriceSchema.partial().parse(req.body);
+      const price = await storage.updateMarketPrice(id, validatedData);
+      
+      if (!price) {
+        return res.status(404).json({ error: "السعر غير موجود" });
+      }
+      
+      return res.json(price);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating market price:", error);
+      return res.status(500).json({ error: "Failed to update market price" });
+    }
+  });
+
+  app.delete("/api/admin/market-prices/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      await storage.deleteMarketPrice(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting market price:", error);
+      return res.status(500).json({ error: "Failed to delete market price" });
     }
   });
 

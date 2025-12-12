@@ -119,6 +119,40 @@ Full integration with QiCard payment gateway for card payments in Iraqi Dinar (I
 
 A step-by-step PC builder allows users to select components (CPU, Motherboard, RAM, GPU, Storage, PSU, Case, Cooler) with real-time compatibility checking. A sidebar displays a live-updating build summary, including total power consumption, recommended PSU wattage, and total price.
 
+## Market Analysis Feature
+
+A market price tracking system for RAM, SSD, and M.2 storage components with daily price updates and trend analysis:
+
+**Public View (`/market-analysis`):**
+- Tab-based navigation for RAM, SSD, and M.2 component types
+- Price cards showing brand, model, capacity, and current price
+- Price change indicators (green up arrow, red down arrow, neutral dash)
+- Last updated timestamps for each price entry
+- Full bilingual support (Arabic/English) with RTL layout
+
+**Admin Management (`/admin/market-prices`):**
+- Form to add new price entries with component type, brand, model, capacity, current/previous prices
+- Table view of all prices with edit and delete actions
+- Automatic previous price tracking when updating current prices
+- Protected by admin session authentication
+
+**API Routes:**
+- `GET /api/market-prices` - Get all prices (optional `type` filter for ram/ssd/m2)
+- `POST /api/market-prices` - Add new price (admin only)
+- `PUT /api/market-prices/:id` - Update price (admin only)
+- `DELETE /api/market-prices/:id` - Delete price (admin only)
+
+**Database Schema (`market_prices` table):**
+- `id` - Serial primary key
+- `componentType` - Enum: "ram", "ssd", "m2"
+- `brand` - Brand name (e.g., "Kingston", "Samsung")
+- `model` - Model name (e.g., "Fury Beast DDR4")
+- `capacity` - Storage capacity (e.g., "16GB", "1TB")
+- `currentPrice` - Current price in IQD
+- `previousPrice` - Previous price for trend calculation
+- `priceDate` - Date of latest price update
+- `nameAr` / `nameEn` - Bilingual display names
+
 ## Progressive Web App (PWA)
 
 The application is a fully-featured PWA that can be installed on mobile devices:

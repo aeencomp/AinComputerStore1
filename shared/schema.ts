@@ -355,3 +355,28 @@ export const TECHNICIAN_PERMISSIONS = {
 } as const;
 
 export type TechnicianPermission = typeof TECHNICIAN_PERMISSIONS[keyof typeof TECHNICIAN_PERMISSIONS];
+
+// Market Analysis for RAM, SSD, M.2 prices
+export const marketPrices = pgTable("market_prices", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  componentType: text("component_type").notNull(), // ram, ssd, m2
+  nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en").notNull(),
+  brand: text("brand").notNull(),
+  capacity: text("capacity").notNull(), // e.g., "8GB", "256GB", "1TB"
+  specs: text("specs"), // e.g., "DDR4 3200MHz", "NVMe Gen4"
+  currentPrice: decimal("current_price", { precision: 10, scale: 2 }).notNull(),
+  previousPrice: decimal("previous_price", { precision: 10, scale: 2 }),
+  priceDate: timestamp("price_date").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertMarketPriceSchema = createInsertSchema(marketPrices).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertMarketPrice = z.infer<typeof insertMarketPriceSchema>;
+export type MarketPrice = typeof marketPrices.$inferSelect;

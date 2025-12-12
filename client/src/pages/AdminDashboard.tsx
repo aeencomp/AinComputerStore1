@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 import {
@@ -357,6 +357,12 @@ export default function AdminDashboard() {
               <Button variant="outline" size="sm" className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20" data-testid="link-admin-customers">
                 <Users className="w-4 h-4 ms-2" />
                 {t('admin.customers.manageCustomers')}
+              </Button>
+            </Link>
+            <Link href="/admin/market-prices">
+              <Button variant="outline" size="sm" className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20" data-testid="link-admin-market-prices">
+                <TrendingUp className="w-4 h-4 ms-2" />
+                {t('admin.marketPrices.title', 'تحليل الأسعار')}
               </Button>
             </Link>
             <Link href="/admin/settings">

@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, marketPrices } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -400,5 +400,48 @@ export class DrizzleStorage implements IStorage {
     } catch (error) {
       console.error('Failed to initialize default admin:', error);
     }
+  }
+
+  // Market price methods
+  async getMarketPrices(): Promise<MarketPrice[]> {
+    return await db.select().from(marketPrices).orderBy(desc(marketPrices.updatedAt));
+  }
+
+  async getMarketPricesByType(componentType: string): Promise<MarketPrice[]> {
+    return await db.select().from(marketPrices)
+      .where(eq(marketPrices.componentType, componentType))
+      .orderBy(desc(marketPrices.updatedAt));
+  }
+
+  async getMarketPrice(id: string): Promise<MarketPrice | undefined> {
+    const result = await db.select().from(marketPrices).where(eq(marketPrices.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createMarketPrice(insertPrice: InsertMarketPrice): Promise<MarketPrice> {
+    const result = await db.insert(marketPrices).values(insertPrice).returning();
+    return result[0];
+  }
+
+  async updateMarketPrice(id: string, updates: Partial<InsertMarketPrice>): Promise<MarketPrice | undefined> {
+    const existing = await this.getMarketPrice(id);
+    if (!existing) return undefined;
+    
+    // If current price is changing, store old current price as previous
+    const updateData: any = { ...updates, updatedAt: new Date() };
+    if (updates.currentPrice && updates.currentPrice !== existing.currentPrice) {
+      updateData.previousPrice = existing.currentPrice;
+      updateData.priceDate = new Date();
+    }
+    
+    const result = await db.update(marketPrices)
+      .set(updateData)
+      .where(eq(marketPrices.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteMarketPrice(id: string): Promise<void> {
+    await db.delete(marketPrices).where(eq(marketPrices.id, id));
   }
 }

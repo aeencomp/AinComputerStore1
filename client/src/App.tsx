@@ -18,6 +18,7 @@ import AdminProducts from "@/pages/AdminProducts";
 import AdminPrograms from "@/pages/AdminPrograms";
 import AdminCustomers from "@/pages/AdminCustomers";
 import AdminSettings from "@/pages/AdminSettings";
+import AdminMarketPrices from "@/pages/AdminMarketPrices";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
 import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
 import TechnicianManagement from "@/pages/technician/TechnicianManagement";
@@ -27,6 +28,7 @@ import RepairRequest from "@/pages/RepairRequest";
 import TrackRepair from "@/pages/TrackRepair";
 import TrackOrder from "@/pages/TrackOrder";
 import PCBuilder from "@/pages/PCBuilder";
+import MarketAnalysis from "@/pages/MarketAnalysis";
 import CustomerDashboard from "@/pages/CustomerDashboard";
 import ZainCashCallback from "@/pages/ZainCashCallback";
 import QiCardCallback from "@/pages/QiCardCallback";
@@ -47,6 +49,7 @@ function Router() {
       <Route path="/admin/programs" component={AdminPrograms}/>
       <Route path="/admin/customers" component={AdminCustomers}/>
       <Route path="/admin/settings" component={AdminSettings}/>
+      <Route path="/admin/market-prices" component={AdminMarketPrices}/>
       <Route path="/technician/login" component={TechnicianLogin}/>
       <Route path="/technician/dashboard" component={TechnicianDashboard}/>
       <Route path="/technician" component={TechnicianDashboard}/>
@@ -57,6 +60,7 @@ function Router() {
       <Route path="/track-repair" component={TrackRepair}/>
       <Route path="/track-order" component={TrackOrder}/>
       <Route path="/pc-builder" component={PCBuilder}/>
+      <Route path="/market-analysis" component={MarketAnalysis}/>
       <Route path="/my-orders" component={CustomerDashboard}/>
       <Route path="/payment/zaincash/callback" component={ZainCashCallback}/>
       <Route path="/payment/qicard/callback" component={QiCardCallback}/>

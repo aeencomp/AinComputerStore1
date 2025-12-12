@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -60,6 +60,14 @@ export interface IStorage {
   updateAdminUser(id: string, updates: Partial<InsertAdminUser>): Promise<AdminUser | undefined>;
   deleteAdminUser(id: string): Promise<void>;
   initializeDefaultAdmin(): Promise<void>;
+  
+  // Market price methods
+  getMarketPrices(): Promise<MarketPrice[]>;
+  getMarketPricesByType(componentType: string): Promise<MarketPrice[]>;
+  getMarketPrice(id: string): Promise<MarketPrice | undefined>;
+  createMarketPrice(price: InsertMarketPrice): Promise<MarketPrice>;
+  updateMarketPrice(id: string, updates: Partial<InsertMarketPrice>): Promise<MarketPrice | undefined>;
+  deleteMarketPrice(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -510,6 +518,31 @@ export class MemStorage implements IStorage {
 
   async initializeDefaultAdmin(): Promise<void> {
     // MemStorage does not support admin users
+  }
+  
+  // Market price methods (stubs for MemStorage)
+  async getMarketPrices(): Promise<MarketPrice[]> {
+    return [];
+  }
+  
+  async getMarketPricesByType(componentType: string): Promise<MarketPrice[]> {
+    return [];
+  }
+  
+  async getMarketPrice(id: string): Promise<MarketPrice | undefined> {
+    return undefined;
+  }
+  
+  async createMarketPrice(price: InsertMarketPrice): Promise<MarketPrice> {
+    throw new Error("MemStorage does not support market prices");
+  }
+  
+  async updateMarketPrice(id: string, updates: Partial<InsertMarketPrice>): Promise<MarketPrice | undefined> {
+    return undefined;
+  }
+  
+  async deleteMarketPrice(id: string): Promise<void> {
+    // MemStorage does not support market prices
   }
 }
 
