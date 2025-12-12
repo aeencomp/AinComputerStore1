@@ -380,3 +380,41 @@ export const insertMarketPriceSchema = createInsertSchema(marketPrices).omit({
 
 export type InsertMarketPrice = z.infer<typeof insertMarketPriceSchema>;
 export type MarketPrice = typeof marketPrices.$inferSelect;
+
+// External price sources for international price comparison
+export const externalPriceSources = pgTable("external_price_sources", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  marketPriceId: varchar("market_price_id").references(() => marketPrices.id, { onDelete: "cascade" }),
+  source: text("source").notNull(), // "newegg", "amazon"
+  sourceProductUrl: text("source_product_url"),
+  sourceProductName: text("source_product_name"),
+  priceUSD: decimal("price_usd", { precision: 10, scale: 2 }),
+  priceIQD: decimal("price_iqd", { precision: 12, scale: 2 }), // Converted to IQD for comparison
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+  isActive: integer("is_active").notNull().default(1),
+});
+
+export const insertExternalPriceSourceSchema = createInsertSchema(externalPriceSources).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export type InsertExternalPriceSource = z.infer<typeof insertExternalPriceSourceSchema>;
+export type ExternalPriceSource = typeof externalPriceSources.$inferSelect;
+
+// Exchange rate for USD to IQD conversion
+export const exchangeRates = pgTable("exchange_rates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  fromCurrency: text("from_currency").notNull().default("USD"),
+  toCurrency: text("to_currency").notNull().default("IQD"),
+  rate: decimal("rate", { precision: 12, scale: 4 }).notNull(), // e.g., 1310.5 for 1 USD = 1310.5 IQD
+  lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+});
+
+export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
+  id: true,
+  lastUpdated: true,
+});
+
+export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
+export type ExchangeRate = typeof exchangeRates.$inferSelect;

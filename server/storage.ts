@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -68,6 +68,18 @@ export interface IStorage {
   createMarketPrice(price: InsertMarketPrice): Promise<MarketPrice>;
   updateMarketPrice(id: string, updates: Partial<InsertMarketPrice>): Promise<MarketPrice | undefined>;
   deleteMarketPrice(id: string): Promise<void>;
+  
+  // External price source methods
+  getExternalPriceSources(): Promise<ExternalPriceSource[]>;
+  getExternalPriceSourcesByMarketPrice(marketPriceId: string): Promise<ExternalPriceSource[]>;
+  getExternalPriceSource(id: string): Promise<ExternalPriceSource | undefined>;
+  createExternalPriceSource(source: InsertExternalPriceSource): Promise<ExternalPriceSource>;
+  updateExternalPriceSource(id: string, updates: Partial<InsertExternalPriceSource>): Promise<ExternalPriceSource | undefined>;
+  deleteExternalPriceSource(id: string): Promise<void>;
+  
+  // Exchange rate methods
+  getExchangeRate(fromCurrency: string, toCurrency: string): Promise<ExchangeRate | undefined>;
+  upsertExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate>;
 }
 
 export class MemStorage implements IStorage {
@@ -543,6 +555,40 @@ export class MemStorage implements IStorage {
   
   async deleteMarketPrice(id: string): Promise<void> {
     // MemStorage does not support market prices
+  }
+  
+  // External price source methods (stubs for MemStorage)
+  async getExternalPriceSources(): Promise<ExternalPriceSource[]> {
+    return [];
+  }
+  
+  async getExternalPriceSourcesByMarketPrice(marketPriceId: string): Promise<ExternalPriceSource[]> {
+    return [];
+  }
+  
+  async getExternalPriceSource(id: string): Promise<ExternalPriceSource | undefined> {
+    return undefined;
+  }
+  
+  async createExternalPriceSource(source: InsertExternalPriceSource): Promise<ExternalPriceSource> {
+    throw new Error("MemStorage does not support external price sources");
+  }
+  
+  async updateExternalPriceSource(id: string, updates: Partial<InsertExternalPriceSource>): Promise<ExternalPriceSource | undefined> {
+    return undefined;
+  }
+  
+  async deleteExternalPriceSource(id: string): Promise<void> {
+    // MemStorage does not support external price sources
+  }
+  
+  // Exchange rate methods (stubs for MemStorage)
+  async getExchangeRate(fromCurrency: string, toCurrency: string): Promise<ExchangeRate | undefined> {
+    return undefined;
+  }
+  
+  async upsertExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate> {
+    throw new Error("MemStorage does not support exchange rates");
   }
 }
 

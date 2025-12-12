@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, marketPrices } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, marketPrices, externalPriceSources, exchangeRates } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -443,5 +443,63 @@ export class DrizzleStorage implements IStorage {
 
   async deleteMarketPrice(id: string): Promise<void> {
     await db.delete(marketPrices).where(eq(marketPrices.id, id));
+  }
+
+  // External price source methods
+  async getExternalPriceSources(): Promise<ExternalPriceSource[]> {
+    return await db.select().from(externalPriceSources).orderBy(desc(externalPriceSources.lastUpdated));
+  }
+
+  async getExternalPriceSourcesByMarketPrice(marketPriceId: string): Promise<ExternalPriceSource[]> {
+    return await db.select().from(externalPriceSources)
+      .where(eq(externalPriceSources.marketPriceId, marketPriceId))
+      .orderBy(desc(externalPriceSources.lastUpdated));
+  }
+
+  async getExternalPriceSource(id: string): Promise<ExternalPriceSource | undefined> {
+    const result = await db.select().from(externalPriceSources).where(eq(externalPriceSources.id, id)).limit(1);
+    return result[0];
+  }
+
+  async createExternalPriceSource(insertSource: InsertExternalPriceSource): Promise<ExternalPriceSource> {
+    const result = await db.insert(externalPriceSources).values(insertSource).returning();
+    return result[0];
+  }
+
+  async updateExternalPriceSource(id: string, updates: Partial<InsertExternalPriceSource>): Promise<ExternalPriceSource | undefined> {
+    const updateData: any = { ...updates, lastUpdated: new Date() };
+    const result = await db.update(externalPriceSources)
+      .set(updateData)
+      .where(eq(externalPriceSources.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteExternalPriceSource(id: string): Promise<void> {
+    await db.delete(externalPriceSources).where(eq(externalPriceSources.id, id));
+  }
+
+  // Exchange rate methods
+  async getExchangeRate(fromCurrency: string, toCurrency: string): Promise<ExchangeRate | undefined> {
+    const result = await db.select().from(exchangeRates)
+      .where(and(
+        eq(exchangeRates.fromCurrency, fromCurrency),
+        eq(exchangeRates.toCurrency, toCurrency)
+      ))
+      .limit(1);
+    return result[0];
+  }
+
+  async upsertExchangeRate(insertRate: InsertExchangeRate): Promise<ExchangeRate> {
+    const existing = await this.getExchangeRate(insertRate.fromCurrency || "USD", insertRate.toCurrency || "IQD");
+    if (existing) {
+      const result = await db.update(exchangeRates)
+        .set({ rate: insertRate.rate, lastUpdated: new Date() })
+        .where(eq(exchangeRates.id, existing.id))
+        .returning();
+      return result[0];
+    }
+    const result = await db.insert(exchangeRates).values(insertRate).returning();
+    return result[0];
   }
 }
