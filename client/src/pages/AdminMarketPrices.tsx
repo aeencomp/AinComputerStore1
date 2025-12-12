@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, TrendingUp, TrendingDown, Minus, Plus, Edit, Trash2, ArrowRight, MemoryStick, HardDrive, CircuitBoard, Loader2 } from "lucide-react";
+import { LogOut, TrendingUp, TrendingDown, Minus, Plus, Edit, Trash2, ArrowRight, MemoryStick, HardDrive, CircuitBoard, Loader2, Globe } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Badge } from "@/components/ui/badge";
 import type { MarketPrice } from "@shared/schema";
@@ -285,10 +285,18 @@ export default function AdminMarketPrices() {
               {language === 'ar' ? 'تحديث يومي لأسعار الذاكرة والتخزين في السوق العراقي' : 'Daily price updates for memory and storage in the Iraqi market'}
             </p>
           </div>
-          <Button onClick={handleAddClick} data-testid="button-add-price">
-            <Plus className="w-4 h-4 me-2" />
-            {language === 'ar' ? 'إضافة سعر' : 'Add Price'}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Link href="/admin/external-prices">
+              <Button variant="outline" data-testid="link-external-prices">
+                <Globe className="w-4 h-4 me-2" />
+                {language === 'ar' ? 'الأسعار العالمية' : 'International Prices'}
+              </Button>
+            </Link>
+            <Button onClick={handleAddClick} data-testid="button-add-price">
+              <Plus className="w-4 h-4 me-2" />
+              {language === 'ar' ? 'إضافة سعر' : 'Add Price'}
+            </Button>
+          </div>
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>

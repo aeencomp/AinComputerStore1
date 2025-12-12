@@ -5,13 +5,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { TrendingUp, TrendingDown, Minus, MemoryStick, HardDrive, CircuitBoard, ArrowRight, Calendar, Globe, ExternalLink, DollarSign, RefreshCw } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, MemoryStick, HardDrive, CircuitBoard, ArrowRight, Calendar, Globe, ExternalLink, DollarSign } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { Link } from "wouter";
+import { Link, useLocation } from "wouter";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
-import type { MarketPrice, ExternalPriceSource } from "@shared/schema";
+import { CartSidebar } from "@/components/CartSidebar";
+import type { MarketPrice, ExternalPriceSource, CartItem } from "@shared/schema";
+
 import { useState } from "react";
+
+interface CartItemWithId extends CartItem {
+  id: string;
+}
 
 interface MarketPriceWithComparisons extends MarketPrice {
   externalSources: ExternalPriceSource[];
@@ -39,10 +45,18 @@ const sourceLogos: Record<string, { name: string; color: string }> = {
 export default function MarketAnalysis() {
   const { language, t } = useLanguage();
   const [activeTab, setActiveTab] = useState("ram");
+  const [cartOpen, setCartOpen] = useState(false);
+  const [, navigate] = useLocation();
 
   const { data, isLoading } = useQuery<PriceComparisonResponse>({
     queryKey: ['/api/market-prices/with-comparisons'],
   });
+
+  const { data: cartItems = [] } = useQuery<CartItemWithId[]>({
+    queryKey: ['/api/cart'],
+  });
+
+  const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const marketPrices = data?.prices || [];
   const exchangeRate = data?.exchangeRate || 1310;
@@ -101,7 +115,20 @@ export default function MarketAnalysis() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <Header />
+      <Header 
+        cartItemsCount={cartItemsCount} 
+        onCartClick={() => setCartOpen(true)} 
+        onSearch={() => {}} 
+      />
+      
+      <CartSidebar
+        open={cartOpen}
+        onOpenChange={setCartOpen}
+        items={cartItems}
+        onUpdateQuantity={() => {}}
+        onRemoveItem={() => {}}
+        isLoading={false}
+      />
       
       <main className="flex-1 max-w-7xl mx-auto px-4 py-8 w-full">
         <div className="mb-8">

@@ -19,6 +19,7 @@ import AdminPrograms from "@/pages/AdminPrograms";
 import AdminCustomers from "@/pages/AdminCustomers";
 import AdminSettings from "@/pages/AdminSettings";
 import AdminMarketPrices from "@/pages/AdminMarketPrices";
+import AdminExternalPrices from "@/pages/AdminExternalPrices";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
 import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
 import TechnicianManagement from "@/pages/technician/TechnicianManagement";
@@ -50,6 +51,7 @@ function Router() {
       <Route path="/admin/customers" component={AdminCustomers}/>
       <Route path="/admin/settings" component={AdminSettings}/>
       <Route path="/admin/market-prices" component={AdminMarketPrices}/>
+      <Route path="/admin/external-prices" component={AdminExternalPrices}/>
       <Route path="/technician/login" component={TechnicianLogin}/>
       <Route path="/technician/dashboard" component={TechnicianDashboard}/>
       <Route path="/technician" component={TechnicianDashboard}/>
