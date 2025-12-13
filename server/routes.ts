@@ -2083,5 +2083,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ========== INVENTORY MANAGEMENT ROUTES ==========
+  
+  // Get all products with inventory info
+  app.get("/api/admin/inventory", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const products = await storage.getProductsWithInventory();
+      return res.json(products);
+    } catch (error) {
+      console.error("Error fetching inventory:", error);
+      return res.status(500).json({ error: "Failed to fetch inventory" });
+    }
+  });
+  
+  // Get low stock products
+  app.get("/api/admin/inventory/low-stock", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const products = await storage.getLowStockProducts();
+      return res.json(products);
+    } catch (error) {
+      console.error("Error fetching low stock products:", error);
+      return res.status(500).json({ error: "Failed to fetch low stock products" });
+    }
+  });
+  
+  // Update product stock
+  app.put("/api/admin/inventory/:productId", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const { productId } = req.params;
+      const { quantity, reason } = req.body;
+      
+      if (quantity === undefined || quantity < 0) {
+        return res.status(400).json({ error: "الكمية غير صالحة" });
+      }
+      
+      const product = await storage.updateProductStock(productId, quantity, adminId, reason);
+      if (!product) {
+        return res.status(404).json({ error: "المنتج غير موجود" });
+      }
+      return res.json(product);
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      return res.status(500).json({ error: "Failed to update stock" });
+    }
+  });
+  
+  // Adjust product stock (add/remove)
+  app.post("/api/admin/inventory/:productId/adjust", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const { productId } = req.params;
+      const { adjustment, reason, referenceId } = req.body;
+      
+      if (adjustment === undefined || adjustment === 0) {
+        return res.status(400).json({ error: "التعديل غير صالح" });
+      }
+      
+      const product = await storage.adjustProductStock(productId, adjustment, adminId, reason, referenceId);
+      if (!product) {
+        return res.status(404).json({ error: "المنتج غير موجود" });
+      }
+      return res.json(product);
+    } catch (error) {
+      console.error("Error adjusting stock:", error);
+      return res.status(500).json({ error: "Failed to adjust stock" });
+    }
+  });
+  
+  // Get inventory movements
+  app.get("/api/admin/inventory/movements", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const { productId } = req.query;
+      const movements = await storage.getInventoryMovements(productId as string | undefined);
+      return res.json(movements);
+    } catch (error) {
+      console.error("Error fetching movements:", error);
+      return res.status(500).json({ error: "Failed to fetch inventory movements" });
+    }
+  });
+  
+  // Bulk update stock
+  app.post("/api/admin/inventory/bulk-update", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const { updates } = req.body;
+      
+      if (!Array.isArray(updates)) {
+        return res.status(400).json({ error: "البيانات غير صالحة" });
+      }
+      
+      await storage.bulkUpdateStock(updates);
+      return res.json({ success: true, updated: updates.length });
+    } catch (error) {
+      console.error("Error bulk updating stock:", error);
+      return res.status(500).json({ error: "Failed to bulk update stock" });
+    }
+  });
+
   return httpServer;
 }
