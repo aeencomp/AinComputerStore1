@@ -33,7 +33,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, ArrowRight, Pencil, Trash2, Users } from "lucide-react";
+import { Pencil, Trash2, Users, Loader2 } from "lucide-react";
+import { AdminNav } from "@/components/AdminNav";
+
+interface AdminUser {
+  id: string;
+  username: string;
+  name: string;
+  role: string;
+}
 
 interface Customer {
   id: string;
@@ -56,14 +64,17 @@ export default function AdminCustomers() {
     password: "",
   });
 
-  const BackIcon = language === 'ar' ? ArrowRight : ArrowLeft;
+  const { data: currentAdmin, isLoading: authLoading, isError: authError } = useQuery<AdminUser>({
+    queryKey: ['/api/admin/auth/me'],
+    retry: false,
+  });
 
   useEffect(() => {
-    const isAdmin = localStorage.getItem("adminAuth");
-    if (!isAdmin) {
+    if (!authLoading && (authError || !currentAdmin)) {
+      localStorage.removeItem("adminAuth");
       setLocation("/admin/login");
     }
-  }, [setLocation]);
+  }, [authLoading, authError, currentAdmin, setLocation]);
 
   const { data: customers = [], isLoading } = useQuery<Customer[]>({
     queryKey: ["/api/admin/customers"],
@@ -163,41 +174,21 @@ export default function AdminCustomers() {
     );
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p>{t('common.loading')}</p>
+        <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
   }
 
+  if (!currentAdmin) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 z-50 bg-background">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <Link href="/admin/dashboard">
-              <Button variant="ghost" size="icon" data-testid="button-back-to-dashboard">
-                <BackIcon className="h-5 w-5" />
-              </Button>
-            </Link>
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <Users className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold" data-testid="text-customers-title">
-                {t('admin.customers.title')}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {t('admin.customers.subtitle')}
-              </p>
-            </div>
-          </div>
-          <div className="text-sm text-muted-foreground">
-            {t('admin.customers.customersCount')}: {customers.length}
-          </div>
-        </div>
-      </header>
+    <div className="min-h-screen bg-background" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <AdminNav currentAdmin={currentAdmin} />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {customers.length === 0 ? (

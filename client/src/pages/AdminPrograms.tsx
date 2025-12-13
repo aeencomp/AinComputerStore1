@@ -34,8 +34,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Plus, Pencil, Trash2, ArrowRight, AppWindow } from "lucide-react";
-import { Link } from "wouter";
+import { Plus, Pencil, Trash2, AppWindow, Loader2 } from "lucide-react";
+import { AdminNav } from "@/components/AdminNav";
 import type { Product, InsertProduct } from "@shared/schema";
 
 interface ProgramFormData {

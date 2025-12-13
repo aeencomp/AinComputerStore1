@@ -27,8 +27,9 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, TrendingUp, TrendingDown, Minus, Plus, Edit, Trash2, ArrowRight, MemoryStick, HardDrive, CircuitBoard, Loader2, Globe } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, Plus, Edit, Trash2, MemoryStick, HardDrive, CircuitBoard, Loader2, Globe } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AdminNav } from "@/components/AdminNav";
 import { Badge } from "@/components/ui/badge";
 import type { MarketPrice } from "@shared/schema";
 
@@ -91,17 +92,6 @@ export default function AdminMarketPrices() {
   const { data: marketPrices = [], isLoading } = useQuery<MarketPrice[]>({
     queryKey: ['/api/admin/market-prices'],
     enabled: !!currentAdmin,
-  });
-
-  const logoutMutation = useMutation({
-    mutationFn: async () => {
-      return await apiRequest('POST', '/api/admin/auth/logout');
-    },
-    onSuccess: () => {
-      localStorage.removeItem("adminAuth");
-      queryClient.clear();
-      setLocation("/admin/login");
-    },
   });
 
   const createMutation = useMutation({
@@ -240,40 +230,7 @@ export default function AdminMarketPrices() {
 
   return (
     <div className="min-h-screen bg-background" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <header className="border-b bg-card">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/admin">
-              <Button variant="ghost" size="sm" data-testid="link-back-dashboard">
-                <ArrowRight className="w-4 h-4 ms-2" />
-                {language === 'ar' ? 'لوحة التحكم' : 'Dashboard'}
-              </Button>
-            </Link>
-            <h1 className="text-xl font-bold">
-              {language === 'ar' ? 'تحليل أسعار السوق' : 'Market Price Analysis'}
-            </h1>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {language === 'ar' ? 'مرحباً،' : 'Welcome,'} {currentAdmin.name}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => logoutMutation.mutate()}
-              disabled={logoutMutation.isPending}
-              data-testid="button-logout"
-            >
-              {logoutMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin ms-2" />
-              ) : (
-                <LogOut className="w-4 h-4 ms-2" />
-              )}
-              {language === 'ar' ? 'خروج' : 'Logout'}
-            </Button>
-          </div>
-        </div>
-      </header>
+      <AdminNav currentAdmin={currentAdmin} />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <div className="flex items-center justify-between mb-6">

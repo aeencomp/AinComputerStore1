@@ -40,8 +40,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { AdminNav } from "@/components/AdminNav";
 import type { Product, InsertProduct } from "@shared/schema";
+
+interface AdminUser {
+  id: string;
+  username: string;
+  name: string;
+  role: string;
+}
 
 export default function AdminProducts() {
   const { t, language } = useLanguage();
