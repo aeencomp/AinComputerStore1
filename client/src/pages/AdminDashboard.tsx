@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 import {
@@ -63,7 +63,7 @@ interface AdminUser {
 export default function AdminDashboard() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [selectedOrders, setSelectedOrders] = useState<{ [key: string]: string }>({});
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("orders");
@@ -363,6 +363,12 @@ export default function AdminDashboard() {
               <Button variant="outline" size="sm" className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20" data-testid="link-admin-market-prices">
                 <TrendingUp className="w-4 h-4 ms-2" />
                 {t('admin.marketPrices.title', 'تحليل الأسعار')}
+              </Button>
+            </Link>
+            <Link href="/admin/inventory">
+              <Button variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20" data-testid="link-admin-inventory">
+                <Warehouse className="w-4 h-4 ms-2" />
+                {language === 'ar' ? 'المخزون' : 'Inventory'}
               </Button>
             </Link>
             <Link href="/admin/settings">
