@@ -9,6 +9,7 @@ import bcrypt from "bcrypt";
 import { adminNotifications } from "./admin-notifications";
 import { zaincash } from "./zaincash";
 import { qicard } from "./qicard";
+import Papa from "papaparse";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -2199,6 +2200,174 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error bulk updating stock:", error);
       return res.status(500).json({ error: "Failed to bulk update stock" });
+    }
+  });
+
+  // CSV Import for inventory
+  app.post("/api/admin/inventory/import", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { csvData } = req.body;
+      if (!csvData || typeof csvData !== 'string') {
+        return res.status(400).json({ error: "بيانات CSV مطلوبة" });
+      }
+      
+      const parseResult = Papa.parse(csvData, {
+        header: true,
+        skipEmptyLines: true,
+        transformHeader: (header: string) => header.trim().toLowerCase(),
+      });
+      
+      if (parseResult.errors.length > 0) {
+        return res.status(400).json({ 
+          error: "خطأ في تحليل CSV", 
+          details: parseResult.errors.slice(0, 5)
+        });
+      }
+      
+      const rows = parseResult.data as Array<Record<string, string>>;
+      const results = {
+        success: 0,
+        failed: 0,
+        errors: [] as Array<{ row: number; error: string; data?: any }>,
+        created: 0,
+        updated: 0,
+      };
+      
+      // Fetch all products once for SKU matching
+      const allProducts = await storage.getProducts();
+      const productsBySku = new Map(allProducts.filter(p => p.sku).map(p => [p.sku, p]));
+      
+      for (let i = 0; i < rows.length; i++) {
+        const row = rows[i];
+        const rowNumber = i + 2; // Account for header row
+        
+        try {
+          const sku = row.sku?.trim();
+          const nameAr = row.namear?.trim() || row.name_ar?.trim() || row['الاسم بالعربي']?.trim();
+          const nameEn = row.nameen?.trim() || row.name_en?.trim() || row['الاسم بالانجليزي']?.trim();
+          const priceStr = row.price?.trim() || row['السعر']?.trim();
+          const stockQuantityStr = row.stockquantity?.trim() || row.stock_quantity?.trim() || row.stock?.trim() || row.quantity?.trim() || row['الكمية']?.trim();
+          const category = row.category?.trim() || row['الفئة']?.trim();
+          const lowStockThresholdStr = row.lowstockthreshold?.trim() || row.low_stock_threshold?.trim() || row.threshold?.trim();
+          
+          if (!nameAr && !nameEn) {
+            results.errors.push({ row: rowNumber, error: "الاسم مطلوب", data: row });
+            results.failed++;
+            continue;
+          }
+          
+          // Helper to parse numeric values (handles 1,000 and 1.000 formats)
+          const parseNumber = (str: string | undefined): number | undefined => {
+            if (!str || str.trim() === '') return undefined;
+            // Remove thousand separators (comma and period used as thousands sep)
+            const cleaned = str.replace(/[,\s]/g, '').replace(/\.(?=\d{3}$)/, '');
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? undefined : Math.floor(parsed);
+          };
+          
+          // Validate numeric fields
+          let stockQuantity: number | undefined;
+          let lowStockThreshold: number | undefined;
+          
+          if (stockQuantityStr) {
+            stockQuantity = parseNumber(stockQuantityStr);
+            if (stockQuantity === undefined || stockQuantity < 0) {
+              results.errors.push({ row: rowNumber, error: "الكمية غير صالحة", data: row });
+              results.failed++;
+              continue;
+            }
+          }
+          
+          if (lowStockThresholdStr) {
+            lowStockThreshold = parseNumber(lowStockThresholdStr);
+            if (lowStockThreshold === undefined || lowStockThreshold < 0) {
+              results.errors.push({ row: rowNumber, error: "حد التنبيه غير صالح", data: row });
+              results.failed++;
+              continue;
+            }
+          }
+          
+          // Check if product exists by SKU
+          const existingProduct = sku ? productsBySku.get(sku) : null;
+          
+          if (existingProduct) {
+            // Update existing product info (not inventory fields directly)
+            await storage.updateProduct(existingProduct.id, {
+              ...(nameAr && { nameAr }),
+              ...(nameEn && { nameEn }),
+              ...(priceStr && { price: priceStr }),
+              ...(category && { category }),
+              ...(stockQuantity !== undefined && { stockQuantity }),
+              ...(lowStockThreshold !== undefined && { lowStockThreshold }),
+            });
+            results.updated++;
+            results.success++;
+          } else {
+            // Create new product (without inventory fields in insert)
+            const productData = {
+              nameAr: nameAr || nameEn || 'منتج جديد',
+              nameEn: nameEn || nameAr || 'New Product',
+              price: priceStr || '0',
+              category: category || 'other',
+              ...(sku && { sku }),
+            };
+            
+            const newProduct = await storage.createProduct(productData);
+            
+            // Update inventory separately after creation
+            if (stockQuantity !== undefined || lowStockThreshold !== undefined) {
+              await storage.updateProduct(newProduct.id, {
+                ...(stockQuantity !== undefined && { stockQuantity }),
+                ...(lowStockThreshold !== undefined && { lowStockThreshold }),
+              });
+            }
+            
+            results.created++;
+            results.success++;
+          }
+        } catch (error: any) {
+          results.errors.push({ row: rowNumber, error: error.message || 'خطأ غير متوقع', data: row });
+          results.failed++;
+        }
+      }
+      
+      return res.json({
+        success: true,
+        totalRows: rows.length,
+        results,
+      });
+    } catch (error) {
+      console.error("Error importing CSV:", error);
+      return res.status(500).json({ error: "فشل استيراد البيانات" });
+    }
+  });
+
+  // Download sample CSV template
+  app.get("/api/admin/inventory/import/template", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const sampleData = [
+        { sku: 'SKU001', nameAr: 'لابتوب ديل', nameEn: 'Dell Laptop', price: '500000', stockQuantity: '10', category: 'laptops', lowStockThreshold: '5' },
+        { sku: 'SKU002', nameAr: 'ماوس لاسلكي', nameEn: 'Wireless Mouse', price: '25000', stockQuantity: '50', category: 'accessories', lowStockThreshold: '10' },
+      ];
+      
+      const csv = Papa.unparse(sampleData);
+      
+      res.setHeader('Content-Type', 'text/csv');
+      res.setHeader('Content-Disposition', 'attachment; filename=inventory_template.csv');
+      return res.send(csv);
+    } catch (error) {
+      console.error("Error generating template:", error);
+      return res.status(500).json({ error: "Failed to generate template" });
     }
   });
 

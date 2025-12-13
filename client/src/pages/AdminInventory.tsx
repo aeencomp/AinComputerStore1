@@ -46,7 +46,12 @@ import {
   Filter,
   Edit,
   Save,
-  X
+  X,
+  Upload,
+  Download,
+  FileSpreadsheet,
+  CheckCircle2,
+  XCircle
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { Product, InventoryMovement } from "@shared/schema";
@@ -80,6 +85,19 @@ export default function AdminInventory() {
     quantity: "",
     reason: "",
   });
+  
+  const [showImportDialog, setShowImportDialog] = useState(false);
+  const [csvFile, setCsvFile] = useState<File | null>(null);
+  const [importResults, setImportResults] = useState<{
+    totalRows: number;
+    results: {
+      success: number;
+      failed: number;
+      created: number;
+      updated: number;
+      errors: Array<{ row: number; error: string }>;
+    };
+  } | null>(null);
 
   const { data: currentAdmin, isLoading: authLoading, isError: authError } = useQuery<AdminUser>({
     queryKey: ['/api/admin/auth/me'],
@@ -172,6 +190,51 @@ export default function AdminInventory() {
       });
     },
   });
+
+  const importMutation = useMutation({
+    mutationFn: async (csvData: string) => {
+      const response = await apiRequest('POST', '/api/admin/inventory/import', { csvData });
+      return response.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/inventory'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/inventory/low-stock'] });
+      setImportResults(data);
+      setCsvFile(null);
+      toast({
+        title: language === 'ar' ? "تم الاستيراد" : "Import Complete",
+        description: language === 'ar' 
+          ? `تم استيراد ${data.results.success} منتج بنجاح`
+          : `Successfully imported ${data.results.success} products`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: language === 'ar' ? "خطأ في الاستيراد" : "Import Error",
+        description: error.message || (language === 'ar' ? "فشل استيراد البيانات" : "Failed to import data"),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setCsvFile(file);
+      setImportResults(null);
+    }
+  };
+
+  const handleImportSubmit = async () => {
+    if (!csvFile) return;
+    
+    const text = await csvFile.text();
+    importMutation.mutate(text);
+  };
+
+  const handleDownloadTemplate = () => {
+    window.open('/api/admin/inventory/import/template', '_blank');
+  };
 
   const handleStartEdit = (product: ProductWithInventory) => {
     setEditingProduct(product.id);
@@ -351,6 +414,18 @@ export default function AdminInventory() {
                     data-testid="input-search"
                   />
                 </div>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setShowImportDialog(true);
+                    setImportResults(null);
+                    setCsvFile(null);
+                  }}
+                  data-testid="button-import"
+                >
+                  <Upload className="w-4 h-4 me-2" />
+                  {language === 'ar' ? 'استيراد CSV' : 'Import CSV'}
+                </Button>
               </div>
             </div>
           </CardHeader>
@@ -697,6 +772,112 @@ export default function AdminInventory() {
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowHistoryDialog(null)}>
               {language === 'ar' ? 'إغلاق' : 'Close'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showImportDialog} onOpenChange={(open) => {
+        if (!open) {
+          setShowImportDialog(false);
+          setCsvFile(null);
+          setImportResults(null);
+        }
+      }}>
+        <DialogContent className="max-w-lg" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileSpreadsheet className="w-5 h-5" />
+              {language === 'ar' ? 'استيراد المنتجات من CSV' : 'Import Products from CSV'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'ar' 
+                ? 'قم برفع ملف CSV لإضافة أو تحديث المنتجات بشكل مجمع'
+                : 'Upload a CSV file to add or update products in bulk'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={handleDownloadTemplate} data-testid="button-download-template">
+                <Download className="w-4 h-4 me-2" />
+                {language === 'ar' ? 'تحميل قالب CSV' : 'Download CSV Template'}
+              </Button>
+            </div>
+
+            <div className="border-2 border-dashed rounded-lg p-6 text-center">
+              <input
+                type="file"
+                accept=".csv,.txt"
+                onChange={handleFileChange}
+                className="hidden"
+                id="csv-file-input"
+                data-testid="input-csv-file"
+              />
+              <label htmlFor="csv-file-input" className="cursor-pointer">
+                <Upload className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  {csvFile 
+                    ? csvFile.name 
+                    : (language === 'ar' ? 'اضغط لاختيار ملف CSV' : 'Click to select CSV file')}
+                </p>
+              </label>
+            </div>
+
+            {importResults && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="flex items-center gap-2 p-2 bg-green-50 dark:bg-green-950 rounded">
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    <span className="text-sm">
+                      {language === 'ar' ? 'نجح:' : 'Success:'} {importResults.results.success}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-red-50 dark:bg-red-950 rounded">
+                    <XCircle className="w-4 h-4 text-red-600" />
+                    <span className="text-sm">
+                      {language === 'ar' ? 'فشل:' : 'Failed:'} {importResults.results.failed}
+                    </span>
+                  </div>
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  <p>{language === 'ar' ? 'جديد:' : 'Created:'} {importResults.results.created}</p>
+                  <p>{language === 'ar' ? 'محدث:' : 'Updated:'} {importResults.results.updated}</p>
+                </div>
+                {importResults.results.errors.length > 0 && (
+                  <div className="max-h-32 overflow-y-auto text-sm">
+                    <p className="font-medium text-red-600 mb-1">
+                      {language === 'ar' ? 'الأخطاء:' : 'Errors:'}
+                    </p>
+                    {importResults.results.errors.slice(0, 5).map((err, i) => (
+                      <p key={i} className="text-red-500">
+                        {language === 'ar' ? `صف ${err.row}: ${err.error}` : `Row ${err.row}: ${err.error}`}
+                      </p>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowImportDialog(false);
+                setCsvFile(null);
+                setImportResults(null);
+              }}
+            >
+              {language === 'ar' ? 'إغلاق' : 'Close'}
+            </Button>
+            <Button
+              onClick={handleImportSubmit}
+              disabled={!csvFile || importMutation.isPending}
+              data-testid="button-submit-import"
+            >
+              {importMutation.isPending && <Loader2 className="w-4 h-4 animate-spin me-2" />}
+              {language === 'ar' ? 'استيراد' : 'Import'}
             </Button>
           </DialogFooter>
         </DialogContent>
