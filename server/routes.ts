@@ -2124,20 +2124,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       const { productId } = req.params;
-      const { quantity, reason } = req.body;
+      const { stockQuantity, lowStockThreshold, sku } = req.body;
       
-      if (quantity === undefined || quantity < 0) {
-        return res.status(400).json({ error: "الكمية غير صالحة" });
+      // Build update object with provided fields
+      const updates: Record<string, any> = {};
+      if (stockQuantity !== undefined) updates.stockQuantity = stockQuantity;
+      if (lowStockThreshold !== undefined) updates.lowStockThreshold = lowStockThreshold;
+      if (sku !== undefined) updates.sku = sku || null;
+      
+      if (Object.keys(updates).length === 0) {
+        return res.status(400).json({ error: "لا توجد بيانات للتحديث" });
       }
       
-      const product = await storage.updateProductStock(productId, quantity, adminId, reason);
+      const product = await storage.updateProduct(productId, updates);
       if (!product) {
         return res.status(404).json({ error: "المنتج غير موجود" });
       }
       return res.json(product);
     } catch (error) {
-      console.error("Error updating stock:", error);
-      return res.status(500).json({ error: "Failed to update stock" });
+      console.error("Error updating inventory:", error);
+      return res.status(500).json({ error: "Failed to update inventory" });
     }
   });
   
