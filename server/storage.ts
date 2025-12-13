@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -80,6 +80,15 @@ export interface IStorage {
   // Exchange rate methods
   getExchangeRate(fromCurrency: string, toCurrency: string): Promise<ExchangeRate | undefined>;
   upsertExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate>;
+  
+  // Inventory management methods
+  getProductsWithInventory(): Promise<Product[]>;
+  getLowStockProducts(): Promise<Product[]>;
+  updateProductStock(productId: string, quantity: number, adminId?: string, reason?: string): Promise<Product | undefined>;
+  adjustProductStock(productId: string, adjustment: number, adminId?: string, reason?: string, referenceId?: string): Promise<Product | undefined>;
+  getInventoryMovements(productId?: string): Promise<InventoryMovement[]>;
+  createInventoryMovement(movement: InsertInventoryMovement): Promise<InventoryMovement>;
+  bulkUpdateStock(updates: Array<{ productId: string; quantity: number }>): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -589,6 +598,52 @@ export class MemStorage implements IStorage {
   
   async upsertExchangeRate(rate: InsertExchangeRate): Promise<ExchangeRate> {
     throw new Error("MemStorage does not support exchange rates");
+  }
+  
+  // Inventory management methods (stubs for MemStorage)
+  async getProductsWithInventory(): Promise<Product[]> {
+    return Array.from(this.products.values());
+  }
+  
+  async getLowStockProducts(): Promise<Product[]> {
+    return Array.from(this.products.values()).filter(p => 
+      (p.stockQuantity || 0) <= (p.lowStockThreshold || 5)
+    );
+  }
+  
+  async updateProductStock(productId: string, quantity: number, adminId?: string, reason?: string): Promise<Product | undefined> {
+    const product = this.products.get(productId);
+    if (product) {
+      const updated = { ...product, stockQuantity: quantity };
+      this.products.set(productId, updated);
+      return updated;
+    }
+    return undefined;
+  }
+  
+  async adjustProductStock(productId: string, adjustment: number, adminId?: string, reason?: string, referenceId?: string): Promise<Product | undefined> {
+    const product = this.products.get(productId);
+    if (product) {
+      const newQuantity = (product.stockQuantity || 0) + adjustment;
+      const updated = { ...product, stockQuantity: newQuantity };
+      this.products.set(productId, updated);
+      return updated;
+    }
+    return undefined;
+  }
+  
+  async getInventoryMovements(productId?: string): Promise<InventoryMovement[]> {
+    return [];
+  }
+  
+  async createInventoryMovement(movement: InsertInventoryMovement): Promise<InventoryMovement> {
+    throw new Error("MemStorage does not support inventory movements");
+  }
+  
+  async bulkUpdateStock(updates: Array<{ productId: string; quantity: number }>): Promise<void> {
+    for (const update of updates) {
+      await this.updateProductStock(update.productId, update.quantity);
+    }
   }
 }
 

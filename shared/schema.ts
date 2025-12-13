@@ -52,6 +52,10 @@ export const products = pgTable("products", {
   inStock: integer("in_stock").notNull().default(1),
   componentType: text("component_type"),
   compatibility: jsonb("compatibility"),
+  // Inventory management fields
+  sku: text("sku"), // Product SKU/barcode for POS integration
+  stockQuantity: integer("stock_quantity").notNull().default(0), // Actual inventory count
+  lowStockThreshold: integer("low_stock_threshold").notNull().default(5), // Alert when stock falls below this
 });
 
 export type ComponentType = 'cpu' | 'motherboard' | 'ram' | 'gpu' | 'storage' | 'psu' | 'case' | 'cooler' | 'monitor' | 'mouse' | 'keyboard';
@@ -418,3 +422,25 @@ export const insertExchangeRateSchema = createInsertSchema(exchangeRates).omit({
 
 export type InsertExchangeRate = z.infer<typeof insertExchangeRateSchema>;
 export type ExchangeRate = typeof exchangeRates.$inferSelect;
+
+// Inventory movements for tracking stock changes
+export const inventoryMovements = pgTable("inventory_movements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productId: varchar("product_id").references(() => products.id, { onDelete: "cascade" }).notNull(),
+  movementType: text("movement_type").notNull(), // "adjustment", "sale", "purchase", "return", "import"
+  quantityChange: integer("quantity_change").notNull(), // Positive for adding, negative for removing
+  previousQuantity: integer("previous_quantity").notNull(),
+  newQuantity: integer("new_quantity").notNull(),
+  reason: text("reason"), // Optional reason for the movement
+  referenceId: text("reference_id"), // Order ID, import batch ID, etc.
+  createdBy: varchar("created_by"), // Admin user ID who made the change
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertInventoryMovementSchema = createInsertSchema(inventoryMovements).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertInventoryMovement = z.infer<typeof insertInventoryMovementSchema>;
+export type InventoryMovement = typeof inventoryMovements.$inferSelect;

@@ -1,6 +1,6 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, marketPrices, externalPriceSources, exchangeRates } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements } from "@shared/schema";
 import { db } from "./db.js";
-import { eq, sql, and, desc } from "drizzle-orm";
+import { eq, sql, and, desc, lte } from "drizzle-orm";
 import type { IStorage } from "./storage";
 import bcrypt from "bcrypt";
 
@@ -501,5 +501,91 @@ export class DrizzleStorage implements IStorage {
     }
     const result = await db.insert(exchangeRates).values(insertRate).returning();
     return result[0];
+  }
+  
+  // Inventory management methods
+  async getProductsWithInventory(): Promise<Product[]> {
+    return await db.select().from(products);
+  }
+  
+  async getLowStockProducts(): Promise<Product[]> {
+    return await db.select().from(products).where(
+      sql`${products.stockQuantity} <= ${products.lowStockThreshold}`
+    );
+  }
+  
+  async updateProductStock(productId: string, quantity: number, adminId?: string, reason?: string): Promise<Product | undefined> {
+    const product = await this.getProduct(productId);
+    if (!product) return undefined;
+    
+    const previousQuantity = product.stockQuantity || 0;
+    
+    // Update product stock
+    const result = await db.update(products)
+      .set({ stockQuantity: quantity })
+      .where(eq(products.id, productId))
+      .returning();
+    
+    // Record the movement
+    await db.insert(inventoryMovements).values({
+      productId,
+      movementType: "adjustment",
+      quantityChange: quantity - previousQuantity,
+      previousQuantity,
+      newQuantity: quantity,
+      reason: reason || "Manual stock update",
+      createdBy: adminId,
+    });
+    
+    return result[0];
+  }
+  
+  async adjustProductStock(productId: string, adjustment: number, adminId?: string, reason?: string, referenceId?: string): Promise<Product | undefined> {
+    const product = await this.getProduct(productId);
+    if (!product) return undefined;
+    
+    const previousQuantity = product.stockQuantity || 0;
+    const newQuantity = previousQuantity + adjustment;
+    
+    // Update product stock
+    const result = await db.update(products)
+      .set({ stockQuantity: newQuantity })
+      .where(eq(products.id, productId))
+      .returning();
+    
+    // Record the movement
+    await db.insert(inventoryMovements).values({
+      productId,
+      movementType: adjustment > 0 ? "purchase" : "sale",
+      quantityChange: adjustment,
+      previousQuantity,
+      newQuantity,
+      reason,
+      referenceId,
+      createdBy: adminId,
+    });
+    
+    return result[0];
+  }
+  
+  async getInventoryMovements(productId?: string): Promise<InventoryMovement[]> {
+    if (productId) {
+      return await db.select().from(inventoryMovements)
+        .where(eq(inventoryMovements.productId, productId))
+        .orderBy(desc(inventoryMovements.createdAt));
+    }
+    return await db.select().from(inventoryMovements)
+      .orderBy(desc(inventoryMovements.createdAt));
+  }
+  
+  async createInventoryMovement(movement: InsertInventoryMovement): Promise<InventoryMovement> {
+    const result = await db.insert(inventoryMovements).values(movement).returning();
+    return result[0];
+  }
+  
+  async bulkUpdateStock(updates: Array<{ productId: string; quantity: number }>): Promise<void> {
+    for (const update of updates) {
+      await this.updateProductStock(update.productId, update.quantity);
+    }
   }
 }
