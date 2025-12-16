@@ -182,6 +182,11 @@ export const orders = pgTable("orders", {
   shipping: decimal("shipping", { precision: 10, scale: 2 }).notNull().default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
   status: text("status").notNull().default("pending"),
+  orderType: text("order_type").notNull().default("online"), // "online" or "walk-in"
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
+  discountReason: text("discount_reason"),
+  salespersonId: varchar("salesperson_id"), // Admin who created walk-in order
+  notes: text("notes"), // Internal notes for the order
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
