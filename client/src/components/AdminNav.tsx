@@ -9,7 +9,9 @@ import {
   Warehouse,
   GraduationCap,
   LogOut,
-  Loader2
+  Loader2,
+  ShoppingCart,
+  BarChart3
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMutation } from "@tanstack/react-query";
@@ -36,6 +38,8 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
 
   const navItems = [
     { href: "/admin/dashboard", icon: LayoutDashboard, labelAr: "لوحة التحكم", labelEn: "Dashboard" },
+    { href: "/admin/pos", icon: ShoppingCart, labelAr: "نقطة البيع", labelEn: "POS" },
+    { href: "/admin/sales", icon: BarChart3, labelAr: "المبيعات", labelEn: "Sales" },
     { href: "/admin/products", icon: Package, labelAr: "المنتجات", labelEn: "Products" },
     { href: "/admin/inventory", icon: Warehouse, labelAr: "المخزون", labelEn: "Inventory" },
     { href: "/admin/customers", icon: Users, labelAr: "العملاء", labelEn: "Customers" },

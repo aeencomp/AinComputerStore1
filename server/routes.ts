@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
@@ -844,6 +846,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json(allOrders);
     } catch (error) {
       console.error("Error fetching orders:", error);
+      return res.status(500).json({ error: "Failed to fetch orders" });
+    }
+  });
+
+  // Admin authenticated orders endpoint with full details
+  app.get("/api/admin/orders", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      // Get all orders with full details from database
+      const allOrders = await db.select().from(orders).orderBy(orders.createdAt);
+      return res.json(allOrders.reverse()); // Most recent first
+    } catch (error) {
+      console.error("Error fetching admin orders:", error);
       return res.status(500).json({ error: "Failed to fetch orders" });
     }
   });
@@ -2441,6 +2460,93 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error generating template:", error);
       return res.status(500).json({ error: "Failed to generate template" });
+    }
+  });
+
+  // POS - Create walk-in order
+  app.post("/api/admin/pos/order", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const {
+        customerName,
+        customerEmail,
+        customerPhone,
+        customerAddress,
+        customerCity,
+        customerPostal,
+        items,
+        subtotal,
+        discount,
+        discountReason,
+        total,
+        shipping,
+        paymentMethod,
+        paymentStatus,
+        orderType,
+        notes,
+        salespersonId,
+      } = req.body;
+
+      // Validate required fields
+      if (!items || items.length === 0) {
+        return res.status(400).json({ error: "يجب إضافة منتجات للطلب" });
+      }
+
+      // Create the order
+      const orderData = {
+        customerName: customerName || 'زبون متجر',
+        customerEmail: customerEmail || 'walkin@store.local',
+        customerPhone: customerPhone || '0000000000',
+        customerAddress: customerAddress || 'متجر',
+        customerCity: customerCity || 'بغداد',
+        customerPostal: customerPostal || '-',
+        items: items.map((item: any) => `${item.name} x${item.quantity} - ${item.price}`),
+        subtotal,
+        shipping: shipping || "0",
+        total,
+        paymentMethod: paymentMethod || 'cash',
+        paymentStatus: paymentStatus || 'success',
+        status: 'completed', // Walk-in orders are completed immediately
+      };
+
+      const order = await storage.createOrder(orderData, `pos-${Date.now()}`, undefined);
+
+      // Update order with additional POS fields
+      await db.update(orders).set({
+        orderType: orderType || 'walk-in',
+        discount: discount || "0",
+        discountReason: discountReason || null,
+        salespersonId: salespersonId || adminId,
+        notes: notes || null,
+      }).where(eq(orders.id, order.id));
+
+      // Update inventory for each item sold
+      for (const item of items) {
+        try {
+          await storage.adjustProductStock(
+            item.productId,
+            -item.quantity, // Negative for sale
+            adminId,
+            `POS Sale - Order #${order.orderNumber}`,
+            order.orderNumber
+          );
+        } catch (error) {
+          console.error(`Failed to update stock for product ${item.productId}:`, error);
+        }
+      }
+
+      return res.json({
+        success: true,
+        orderNumber: order.orderNumber,
+        orderId: order.id,
+      });
+    } catch (error) {
+      console.error("Error creating POS order:", error);
+      return res.status(500).json({ error: "فشل في إنشاء الطلب" });
     }
   });
 

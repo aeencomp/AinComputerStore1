@@ -21,6 +21,8 @@ import AdminSettings from "@/pages/AdminSettings";
 import AdminMarketPrices from "@/pages/AdminMarketPrices";
 import AdminExternalPrices from "@/pages/AdminExternalPrices";
 import AdminInventory from "@/pages/AdminInventory";
+import AdminPOS from "@/pages/AdminPOS";
+import AdminSales from "@/pages/AdminSales";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
 import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
 import TechnicianManagement from "@/pages/technician/TechnicianManagement";
@@ -54,6 +56,8 @@ function Router() {
       <Route path="/admin/market-prices" component={AdminMarketPrices}/>
       <Route path="/admin/external-prices" component={AdminExternalPrices}/>
       <Route path="/admin/inventory" component={AdminInventory}/>
+      <Route path="/admin/pos" component={AdminPOS}/>
+      <Route path="/admin/sales" component={AdminSales}/>
       <Route path="/technician/login" component={TechnicianLogin}/>
       <Route path="/technician/dashboard" component={TechnicianDashboard}/>
       <Route path="/technician" component={TechnicianDashboard}/>
