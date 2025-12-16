@@ -56,18 +56,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Serve uploaded images
   app.use("/uploads", (await import("express")).default.static(uploadDir));
 
-  // Image upload route
-  app.post("/api/upload/image", imageUpload.single("image"), (req, res) => {
-    try {
-      if (!req.file) {
-        return res.status(400).json({ error: "No file uploaded" });
-      }
-      const url = `/uploads/${req.file.filename}`;
-      return res.json({ url, filename: req.file.filename });
-    } catch (error) {
-      console.error("Image upload error:", error);
-      return res.status(500).json({ error: "Failed to upload image" });
+  // Image upload route (admin only)
+  app.post("/api/upload/image", (req, res, next) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
     }
+    next();
+  }, (req, res, next) => {
+    imageUpload.single("image")(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: "File too large. Maximum size is 5MB" });
+        }
+        if (err.message === 'Invalid file type') {
+          return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, or WebP" });
+        }
+        return res.status(400).json({ error: err.message || "Upload failed" });
+      }
+      next();
+    });
+  }, (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    const url = `/uploads/${req.file.filename}`;
+    return res.json({ url, filename: req.file.filename });
   });
 
   // Admin Authentication Routes

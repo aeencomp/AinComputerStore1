@@ -49,15 +49,25 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-
       const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Upload failed');
+      }
+      
       onChange(data.url);
       setActiveTab("url");
-    } catch (error) {
-      setUploadError(language === 'ar' ? 'فشل رفع الصورة. حاول مرة أخرى' : 'Failed to upload image. Please try again');
+    } catch (error: any) {
+      const errorMessage = error?.message || '';
+      if (errorMessage.includes('Unauthorized')) {
+        setUploadError(language === 'ar' ? 'غير مصرح. يرجى تسجيل الدخول مجدداً' : 'Unauthorized. Please log in again');
+      } else if (errorMessage.includes('File too large')) {
+        setUploadError(language === 'ar' ? 'حجم الملف كبير جداً. الحد الأقصى 5 ميغابايت' : 'File too large. Maximum size is 5MB');
+      } else if (errorMessage.includes('Invalid file type')) {
+        setUploadError(language === 'ar' ? 'نوع الملف غير مدعوم. يرجى استخدام JPG, PNG, GIF, أو WebP' : 'Invalid file type. Use JPG, PNG, GIF, or WebP');
+      } else {
+        setUploadError(language === 'ar' ? 'فشل رفع الصورة. حاول مرة أخرى' : 'Failed to upload image. Please try again');
+      }
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {
