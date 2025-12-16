@@ -16,6 +16,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery as useAuthQuery } from "@tanstack/react-query";
 import type { Product, User, CartItem } from "@shared/schema";
 import { ShoppingCart, ArrowLeft, Check } from "lucide-react";
+import { Link } from "wouter";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -48,6 +49,15 @@ export default function ProductDetail() {
   const { data: product, isLoading: productLoading } = useQuery<Product>({
     queryKey: [`/api/products/${productId}`],
   });
+
+  const { data: allProducts = [] } = useQuery<Product[]>({
+    queryKey: ['/api/products'],
+  });
+
+  // Get related products from the same category (excluding current product)
+  const relatedProducts = allProducts
+    .filter(p => p.category === product?.category && p.id !== product?.id)
+    .slice(0, 4);
 
   const { data: currentUser } = useAuthQuery<User | null>({
     queryKey: ['/api/auth/me'],
@@ -331,6 +341,50 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
+
+        {/* Related Products Section */}
+        {relatedProducts.length > 0 && (
+          <section className="mt-12 border-t pt-8">
+            <h2 className="text-2xl font-bold mb-6" data-testid="text-related-products-title">
+              {language === 'ar' ? 'منتجات ذات صلة' : 'Related Products'}
+            </h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {relatedProducts.map((relatedProduct) => {
+                const getRelatedImageSrc = () => {
+                  if (!relatedProduct.image) return laptopImage;
+                  if (relatedProduct.image.startsWith('/uploads/') || relatedProduct.image.startsWith('http')) {
+                    return relatedProduct.image;
+                  }
+                  return imageMap[relatedProduct.image] || laptopImage;
+                };
+                const relatedProductName = language === 'ar' ? relatedProduct.nameAr : relatedProduct.nameEn;
+                
+                return (
+                  <Link href={`/product/${relatedProduct.id}`} key={relatedProduct.id}>
+                    <Card className="overflow-hidden hover-elevate cursor-pointer" data-testid={`card-related-${relatedProduct.id}`}>
+                      <div className="aspect-square overflow-hidden bg-muted">
+                        <img
+                          src={getRelatedImageSrc()}
+                          alt={relatedProductName}
+                          className="w-full h-full object-cover"
+                          data-testid={`img-related-${relatedProduct.id}`}
+                        />
+                      </div>
+                      <div className="p-3">
+                        <h3 className="font-medium text-sm line-clamp-2 mb-2" data-testid={`text-related-name-${relatedProduct.id}`}>
+                          {relatedProductName}
+                        </h3>
+                        <p className="text-primary font-bold" data-testid={`text-related-price-${relatedProduct.id}`}>
+                          {formatPrice(relatedProduct.price, language)} {t('common.currency')}
+                        </p>
+                      </div>
+                    </Card>
+                  </Link>
+                );
+              })}
+            </div>
+          </section>
+        )}
       </main>
 
       <Footer />
