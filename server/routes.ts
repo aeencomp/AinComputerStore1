@@ -53,8 +53,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaultTechnician();
   await storage.initializeDefaultAdmin();
 
-  // Serve uploaded images
-  app.use("/uploads", (await import("express")).default.static(uploadDir));
+  // Serve uploaded images with no-cache headers to ensure fresh images
+  app.use("/uploads", (req, res, next) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+  }, (await import("express")).default.static(uploadDir));
 
   // Image upload route (admin only)
   app.post("/api/upload/image", (req, res, next) => {

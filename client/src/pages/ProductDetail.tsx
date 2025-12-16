@@ -128,7 +128,16 @@ export default function ProductDetail() {
 
   const productName = language === 'ar' ? product.nameAr : product.nameEn;
   const productDescription = language === 'ar' ? product.descriptionAr : product.descriptionEn;
-  const imageSrc = imageMap[product.image] || laptopImage;
+  
+  // Check if image is a URL, uploaded file, or mapped asset
+  const getImageSrc = () => {
+    if (!product.image) return laptopImage;
+    if (product.image.startsWith('/uploads/') || product.image.startsWith('http')) {
+      return product.image;
+    }
+    return imageMap[product.image] || laptopImage;
+  };
+  const imageSrc = getImageSrc();
   const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleUpdateQuantity = async (id: string, quantity: number) => {

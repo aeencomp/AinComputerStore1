@@ -29,7 +29,16 @@ const imageMap: Record<string, string> = {
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const { language, t } = useLanguage();
-  const imageSrc = imageMap[product.image] || laptopImage;
+  
+  // Check if image is a URL, uploaded file, or mapped asset
+  const getImageSrc = () => {
+    if (!product.image) return laptopImage;
+    if (product.image.startsWith('/uploads/') || product.image.startsWith('http')) {
+      return product.image;
+    }
+    return imageMap[product.image] || laptopImage;
+  };
+  const imageSrc = getImageSrc();
   const productName = language === 'ar' ? product.nameAr : product.nameEn;
   const productDescription = language === 'ar' ? product.descriptionAr : product.descriptionEn;
   

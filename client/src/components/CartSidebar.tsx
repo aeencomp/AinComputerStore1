@@ -108,7 +108,15 @@ export function CartSidebar({
             <div className="flex-1 overflow-auto py-4">
               <div className="space-y-4">
                 {items.map((item) => {
-                  const imageSrc = imageMap[item.product.image] || laptopImage;
+                  // Check if image is a URL, uploaded file, or mapped asset
+                  const getImageSrc = () => {
+                    if (!item.product.image) return laptopImage;
+                    if (item.product.image.startsWith('/uploads/') || item.product.image.startsWith('http')) {
+                      return item.product.image;
+                    }
+                    return imageMap[item.product.image] || laptopImage;
+                  };
+                  const imageSrc = getImageSrc();
                   return (
                   <div
                     key={item.product.id}
