@@ -136,6 +136,47 @@ Admin users can upload product images directly from their computer instead of ju
 - AdminProducts.tsx - Product image upload
 - AdminPrograms.tsx - Software/program image upload
 
+## Point of Sale (POS) System
+
+A comprehensive point-of-sale system for walk-in customers:
+
+**Admin POS Page (`/admin/pos`):**
+- Product search and filter by name or SKU
+- Product grid with stock quantities and images
+- Shopping cart with quantity adjustment and removal
+- Customer information capture (name, phone, email)
+- Multiple payment methods: Cash, Card, ZainCash, QiCard
+- Discount application with reason tracking
+- Receipt generation with print functionality
+- Stock validation before adding to cart
+
+**API Endpoints:**
+- `POST /api/admin/pos` - Create walk-in order (admin auth required)
+- Validates stock levels and adjusts inventory automatically
+- Sets order type to "walk-in" for tracking
+
+**Database Fields:**
+- `orders.orderType` - "online" or "walk-in"
+- `orders.discount` - Discount amount applied
+- `orders.discountReason` - Reason for discount
+- `orders.salespersonId` - Admin who processed the sale
+- `orders.notes` - Additional order notes
+
+## Sales Dashboard
+
+Unified sales reporting for both online and walk-in orders:
+
+**Admin Sales Page (`/admin/sales`):**
+- Date range filtering (today, week, month, year, custom)
+- Order type filtering (all, online, walk-in)
+- Payment method filtering
+- Summary statistics: total revenue, order count, average order value
+- Detailed orders table with all order information
+- Arabic-Indic numeral formatting for IQD amounts
+
+**API Endpoints:**
+- `GET /api/admin/orders` - Get all orders with full details (admin auth required)
+
 ## PC Builder Feature
 
 A step-by-step PC builder allows users to select components (CPU, Motherboard, RAM, GPU, Storage, PSU, Case, Cooler) with real-time compatibility checking. A sidebar displays a live-updating build summary, including total power consumption, recommended PSU wattage, and total price.
