@@ -51,9 +51,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize WebSocket server for admin notifications
   adminNotifications.initialize(httpServer);
   
-  // Initialize default admin technician and admin user
+  // Initialize default admin technician, admin user, and sales admin
   await storage.initializeDefaultTechnician();
   await storage.initializeDefaultAdmin();
+  await storage.initializeDefaultSalesAdmin();
 
   // Serve uploaded images with no-cache headers to ensure fresh images
   app.use("/uploads", (req, res, next) => {
@@ -312,6 +313,343 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error changing password:", error);
       return res.status(500).json({ error: "فشل تغيير كلمة المرور" });
+    }
+  });
+
+  // Sales Portal Authentication Routes
+  app.post("/api/sales/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "اسم المستخدم وكلمة المرور مطلوبان" });
+      }
+      
+      const salesUser = await storage.getSalesUserByUsername(username);
+      if (!salesUser) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+      
+      if (!salesUser.isActive) {
+        return res.status(401).json({ error: "الحساب غير نشط" });
+      }
+      
+      const validPassword = await bcrypt.compare(password, salesUser.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+      
+      // Set sales session
+      (req.session as any).salesUserId = salesUser.id;
+      (req.session as any).salesUsername = salesUser.username;
+      
+      return res.json({ 
+        success: true, 
+        user: { 
+          id: salesUser.id, 
+          username: salesUser.username, 
+          name: salesUser.name, 
+          role: salesUser.role,
+          permissions: {
+            canPos: salesUser.canPos,
+            canInventory: salesUser.canInventory,
+            canManageUsers: salesUser.canManageUsers,
+            canViewReports: salesUser.canViewReports,
+            canApplyDiscount: salesUser.canApplyDiscount,
+          }
+        } 
+      });
+    } catch (error) {
+      console.error("Sales login error:", error);
+      return res.status(500).json({ error: "فشل تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/sales/auth/logout", async (req, res) => {
+    try {
+      delete (req.session as any).salesUserId;
+      delete (req.session as any).salesUsername;
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Sales logout error:", error);
+      return res.status(500).json({ error: "فشل تسجيل الخروج" });
+    }
+  });
+
+  app.get("/api/sales/auth/me", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مسجل الدخول" });
+      }
+      
+      const salesUser = await storage.getSalesUser(salesUserId);
+      if (!salesUser || !salesUser.isActive) {
+        return res.status(401).json({ error: "المستخدم غير موجود أو غير نشط" });
+      }
+      
+      return res.json({ 
+        id: salesUser.id, 
+        username: salesUser.username, 
+        name: salesUser.name, 
+        role: salesUser.role,
+        permissions: {
+          canPos: salesUser.canPos,
+          canInventory: salesUser.canInventory,
+          canManageUsers: salesUser.canManageUsers,
+          canViewReports: salesUser.canViewReports,
+          canApplyDiscount: salesUser.canApplyDiscount,
+        }
+      });
+    } catch (error) {
+      console.error("Sales auth check error:", error);
+      return res.status(500).json({ error: "فشل التحقق من المستخدم" });
+    }
+  });
+
+  // Sales User Management Routes (requires canManageUsers permission)
+  app.get("/api/sales/users", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser || !currentUser.canManageUsers) {
+        return res.status(403).json({ error: "ليس لديك صلاحية إدارة المستخدمين" });
+      }
+      
+      const users = await storage.getSalesUsers();
+      const sanitizedUsers = users.map(u => ({
+        id: u.id,
+        username: u.username,
+        name: u.name,
+        role: u.role,
+        canPos: u.canPos,
+        canInventory: u.canInventory,
+        canManageUsers: u.canManageUsers,
+        canViewReports: u.canViewReports,
+        canApplyDiscount: u.canApplyDiscount,
+        isActive: u.isActive,
+        createdAt: u.createdAt,
+      }));
+      
+      return res.json(sanitizedUsers);
+    } catch (error) {
+      console.error("Error fetching sales users:", error);
+      return res.status(500).json({ error: "فشل جلب المستخدمين" });
+    }
+  });
+
+  app.post("/api/sales/users", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser || !currentUser.canManageUsers) {
+        return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
+      }
+      
+      const { username, password, name, role, canPos, canInventory, canManageUsers, canViewReports, canApplyDiscount, isActive } = req.body;
+      
+      if (!username || !password || !name) {
+        return res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم مطلوبين" });
+      }
+      
+      // Check if username already exists
+      const existing = await storage.getSalesUserByUsername(username);
+      if (existing) {
+        return res.status(400).json({ error: "اسم المستخدم موجود مسبقاً" });
+      }
+      
+      const newUser = await storage.createSalesUser({
+        username,
+        password,
+        name,
+        role: role || 'sales',
+        canPos: canPos ?? 1,
+        canInventory: canInventory ?? 0,
+        canManageUsers: canManageUsers ?? 0,
+        canViewReports: canViewReports ?? 0,
+        canApplyDiscount: canApplyDiscount ?? 0,
+        isActive: isActive ?? 1,
+        createdBy: salesUserId,
+      });
+      
+      return res.json({
+        id: newUser.id,
+        username: newUser.username,
+        name: newUser.name,
+        role: newUser.role,
+      });
+    } catch (error) {
+      console.error("Error creating sales user:", error);
+      return res.status(500).json({ error: "فشل إنشاء المستخدم" });
+    }
+  });
+
+  app.put("/api/sales/users/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser || !currentUser.canManageUsers) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل المستخدمين" });
+      }
+      
+      const { id } = req.params;
+      const updates = req.body;
+      
+      // Don't allow updating username to existing one
+      if (updates.username) {
+        const existing = await storage.getSalesUserByUsername(updates.username);
+        if (existing && existing.id !== id) {
+          return res.status(400).json({ error: "اسم المستخدم موجود مسبقاً" });
+        }
+      }
+      
+      const updated = await storage.updateSalesUser(id, updates);
+      if (!updated) {
+        return res.status(404).json({ error: "المستخدم غير موجود" });
+      }
+      
+      return res.json({
+        id: updated.id,
+        username: updated.username,
+        name: updated.name,
+        role: updated.role,
+      });
+    } catch (error) {
+      console.error("Error updating sales user:", error);
+      return res.status(500).json({ error: "فشل تعديل المستخدم" });
+    }
+  });
+
+  app.delete("/api/sales/users/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser || !currentUser.canManageUsers) {
+        return res.status(403).json({ error: "ليس لديك صلاحية حذف المستخدمين" });
+      }
+      
+      const { id } = req.params;
+      
+      // Prevent deleting self
+      if (id === salesUserId) {
+        return res.status(400).json({ error: "لا يمكنك حذف حسابك الخاص" });
+      }
+      
+      await storage.deleteSalesUser(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting sales user:", error);
+      return res.status(500).json({ error: "فشل حذف المستخدم" });
+    }
+  });
+
+  // Sales Portal POS endpoint (uses sales session)
+  app.post("/api/sales/pos", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser || !currentUser.canPos) {
+        return res.status(403).json({ error: "ليس لديك صلاحية استخدام نقطة البيع" });
+      }
+      
+      const { 
+        items, 
+        customerName, 
+        customerPhone, 
+        customerEmail,
+        paymentMethod, 
+        paymentStatus,
+        discount,
+        discountReason,
+        notes 
+      } = req.body;
+
+      if (!items || items.length === 0) {
+        return res.status(400).json({ error: "السلة فارغة" });
+      }
+
+      // Validate discount permission
+      if (discount && parseFloat(discount) > 0 && !currentUser.canApplyDiscount) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تطبيق الخصومات" });
+      }
+
+      // Calculate totals
+      let subtotal = 0;
+      for (const item of items) {
+        subtotal += parseFloat(item.price) * item.quantity;
+      }
+      
+      const discountAmount = parseFloat(discount || '0');
+      const total = subtotal - discountAmount;
+
+      const orderData = {
+        customerName: customerName || 'عميل في المتجر',
+        customerEmail: customerEmail || '',
+        customerPhone: customerPhone || '',
+        customerAddress: 'في المتجر',
+        customerCity: 'بغداد',
+        customerPostal: '',
+        items,
+        subtotal: subtotal.toString(),
+        shipping: '0',
+        total: total.toString(),
+        paymentMethod: paymentMethod || 'cash',
+        paymentStatus: paymentStatus || 'success',
+        status: 'completed',
+      };
+
+      const order = await storage.createOrder(orderData, `sales-${Date.now()}`, undefined);
+
+      // Update order with additional POS fields
+      await db.update(orders).set({
+        orderType: 'walk-in',
+        discount: discount || "0",
+        discountReason: discountReason || null,
+        salespersonId: salesUserId,
+        notes: notes || null,
+      }).where(eq(orders.id, order.id));
+
+      // Update inventory for each item sold
+      for (const item of items) {
+        try {
+          await storage.adjustProductStock(item.productId, -item.quantity, salesUserId, 'walk-in sale', order.orderNumber);
+        } catch (stockError) {
+          console.error(`Failed to adjust stock for product ${item.productId}:`, stockError);
+        }
+      }
+
+      return res.json({ 
+        success: true, 
+        order: {
+          ...order,
+          orderType: 'walk-in',
+          discount,
+          discountReason,
+        }
+      });
+    } catch (error) {
+      console.error("Error creating sales POS order:", error);
+      return res.status(500).json({ error: "فشل إنشاء الطلب" });
     }
   });
 

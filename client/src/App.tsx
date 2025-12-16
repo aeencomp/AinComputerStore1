@@ -23,6 +23,8 @@ import AdminExternalPrices from "@/pages/AdminExternalPrices";
 import AdminInventory from "@/pages/AdminInventory";
 import AdminPOS from "@/pages/AdminPOS";
 import AdminSales from "@/pages/AdminSales";
+import SalesLogin from "@/pages/SalesLogin";
+import SalesPortal from "@/pages/SalesPortal";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
 import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
 import TechnicianManagement from "@/pages/technician/TechnicianManagement";
@@ -58,6 +60,9 @@ function Router() {
       <Route path="/admin/inventory" component={AdminInventory}/>
       <Route path="/admin/pos" component={AdminPOS}/>
       <Route path="/admin/sales" component={AdminSales}/>
+      <Route path="/sales/login" component={SalesLogin}/>
+      <Route path="/sales" component={SalesPortal}/>
+      <Route path="/sales/:rest*" component={SalesPortal}/>
       <Route path="/technician/login" component={TechnicianLogin}/>
       <Route path="/technician/dashboard" component={TechnicianDashboard}/>
       <Route path="/technician" component={TechnicianDashboard}/>

@@ -1,6 +1,6 @@
 # Overview
 
-This project is an Arabic e-commerce platform named "العين لتجارة الحاسبات" (Al-Ain Computer Trading), specializing in computers and accessories. It's a full-stack web application with a React frontend and an Express.js backend, designed for right-to-left (RTL) Arabic language support. The platform allows customers to browse products, manage a shopping cart, complete orders, and receive email confirmations. Administrators can manage orders through a dedicated dashboard. The design is inspired by popular Arabic e-commerce sites, emphasizing clean product presentation and user-friendly navigation.
+This project is an Arabic e-commerce platform named "العين لتجارة الحاسبات" (Al-Ain Computer Trading), specializing in computers and accessories. It's a full-stack web application designed for the Iraqi market, supporting right-to-left (RTL) Arabic. The platform enables customers to browse products, manage a shopping cart, complete orders with local payment methods, and receive email confirmations. Administrators can manage orders, upload product images, customize store settings, and utilize a comprehensive POS system. Key features include a PC builder with compatibility checks, a market analysis tool for component prices, and PWA/Android app capabilities.
 
 # User Preferences
 
@@ -8,301 +8,41 @@ Preferred communication style: Simple, everyday language.
 
 # System Architecture
 
-## Frontend
-
-The frontend uses React 18 with TypeScript and Vite. It's a Single Page Application (SPA) with client-side routing via Wouter. Styling is handled by Tailwind CSS with a custom RTL configuration, built upon Shadcn/ui and Radix UI components. State management primarily uses TanStack Query for server state and caching, avoiding global state libraries. A key design principle is an RTL-first layout, Arabic-first content with Arabic numerals, and mobile responsiveness.
-
-## Backend
-
-The backend is built with Express.js and TypeScript, operating in dual-mode for development and production. It exposes a RESTful API with endpoints for products, categories, cart management, and user orders.
-
-## Database Strategy
-
-A PostgreSQL database, utilizing Neon serverless, provides full data persistence. Drizzle ORM is used for schema definition and database operations, with a schema that includes `products`, `cart_items`, `users`, `orders`, `store_settings`, and `repair_tickets` tables. Session-based authentication is implemented with a PostgreSQL session store, and user-specific shopping carts are stored in the database.
-
-## Authentication & Authorization
-
-The platform features separate session-based authentication systems for customers and administrators, both utilizing bcrypt for password hashing and PostgreSQL for session storage. Customer authentication enables user registration, login, protected checkout, and order history. Admin authentication provides access to a protected dashboard for managing orders and other administrative tasks, including user management.
-
-## Real-Time Admin Notifications
-
-A WebSocket-based system provides real-time new order notifications to the admin dashboard, including a notification bell and popover with order details.
-
-## Email Notifications
-
-Automated order confirmation emails are sent via Gmail SMTP after each successful order. These emails are in Arabic, RTL formatted, and include complete order details.
-
-## Design System
-
-The design system prioritizes an RTL-first approach, using the Cairo font for Arabic typography. It employs a consistent spacing system based on Tailwind units and a custom HSL-based color system, optimized for light mode.
-
-## Internationalization (i18n)
-
-A `LanguageContext` provides translation functionality for all UI text, supporting template interpolation. Store settings store bilingual content (Arabic/English), and a language toggle allows users to switch between Arabic and English, automatically adjusting RTL/LTR direction.
-
-## Admin Settings System
-
-A comprehensive admin settings system allows customization across six categories: Store information, Theme, SEO, Homepage content, Footer content (including dynamic link groups), and Shipping rules. These settings dynamically influence the frontend display.
-
-## Iraqi Market Features
-
-Specific features for the Iraqi market include a dropdown selector for 18 Iraqi governorates, local payment methods (Cash on Delivery, ZainCash, QiCard), an address format replacing postal codes with Neighborhood/Area fields, WhatsApp integration, and the use of Iraqi Dinar (IQD) currency with Arabic-Indic numerals. Dynamic shipping costs and free shipping thresholds are also configurable.
-
-## Zain Cash Payment Integration
-
-Full integration with ZainCash payment gateway for Iraqi Dinar (IQD) transactions:
-
-**Backend Implementation (`server/zaincash.ts`):**
-- JWT-based transaction initialization with ZainCash API
-- Supports both test and production environments
-- Transaction verification via callback tokens
-- Status checking for pending transactions
-
-**API Routes:**
-- `GET /api/zaincash/config` - Check if ZainCash is configured
-- `POST /api/zaincash/init` - Initialize payment for an order
-- `GET /api/zaincash/callback` - Handle ZainCash redirect after payment
-- `GET /api/zaincash/status/:orderNumber` - Check payment status
-
-**Frontend Flow:**
-1. Customer selects ZainCash at checkout
-2. Order is created with status "awaiting_payment"
-3. Customer is redirected to ZainCash payment page
-4. After payment, callback redirects to `/payment/zaincash/callback`
-5. Order status updated based on payment result
-
-**Required Environment Variables:**
-- `ZAINCASH_MERCHANT_ID` - Merchant ID from ZainCash
-- `ZAINCASH_MSISDN` - Wallet phone number (format: 9647XXXXXXXXX)
-- `ZAINCASH_SECRET` - Secret key for JWT encoding
-- `ZAINCASH_TEST_MODE` - Set to "true" for test environment
-
-**Database Fields:**
-- `orders.paymentStatus` - Payment status (pending, success, failed)
-- `orders.zaincashTransactionId` - ZainCash transaction ID
-
-## QiCard Payment Integration
-
-Full integration with QiCard payment gateway for card payments in Iraqi Dinar (IQD):
-
-**Backend Implementation (`server/qicard.ts`):**
-- REST API-based payment initialization
-- Supports both test and production environments
-- Payment verification via transaction ID
-- Webhook support for real-time payment notifications
-
-**API Routes:**
-- `GET /api/qicard/config` - Check if QiCard is configured
-- `POST /api/qicard/init` - Initialize payment for an order
-- `GET /api/qicard/callback` - Handle QiCard redirect after payment
-- `POST /api/qicard/webhook` - Receive server-to-server payment notifications
-- `GET /api/qicard/status/:orderNumber` - Check payment status
-
-**Frontend Flow:**
-1. Customer selects QiCard at checkout
-2. Order is created with status "awaiting_payment"
-3. Customer is redirected to QiCard payment page
-4. After payment, callback redirects to `/payment/qicard/callback`
-5. Order status updated based on payment result
-
-**Required Environment Variables:**
-- `QICARD_MERCHANT_ID` - Merchant ID from QiCard
-- `QICARD_API_KEY` - API key for authentication
-- `QICARD_SECRET_KEY` - Secret key for API requests
-- `QICARD_TEST_MODE` - Set to "false" for production (default is test mode)
-
-**Database Fields:**
-- `orders.paymentStatus` - Payment status (pending, success, failed)
-- `orders.qicardTransactionId` - QiCard transaction ID
-
-## Image Upload Feature
-
-Admin users can upload product images directly from their computer instead of just entering URLs:
-
-**Component (`client/src/components/ImageUpload.tsx`):**
-- Two tabs: URL input and file upload
-- Supports JPG, PNG, GIF, WebP formats
-- Maximum file size: 5MB
-- Shows image preview after selection
-- Bilingual error messages
-
-**Backend Route (`/api/upload/image`):**
-- Protected by admin session authentication
-- Uses multer for file handling
-- Files stored in `/uploads` directory
-- Returns URL path to uploaded file
-
-**Integration:**
-- AdminProducts.tsx - Product image upload
-- AdminPrograms.tsx - Software/program image upload
-
-## Point of Sale (POS) System
-
-A comprehensive point-of-sale system for walk-in customers:
-
-**Admin POS Page (`/admin/pos`):**
-- Product search and filter by name or SKU
-- Product grid with stock quantities and images
-- Shopping cart with quantity adjustment and removal
-- Customer information capture (name, phone, email)
-- Multiple payment methods: Cash, Card, ZainCash, QiCard
-- Discount application with reason tracking
-- Receipt generation with print functionality
-- Stock validation before adding to cart
-
-**API Endpoints:**
-- `POST /api/admin/pos` - Create walk-in order (admin auth required)
-- Validates stock levels and adjusts inventory automatically
-- Sets order type to "walk-in" for tracking
-
-**Database Fields:**
-- `orders.orderType` - "online" or "walk-in"
-- `orders.discount` - Discount amount applied
-- `orders.discountReason` - Reason for discount
-- `orders.salespersonId` - Admin who processed the sale
-- `orders.notes` - Additional order notes
-
-## Sales Dashboard
-
-Unified sales reporting for both online and walk-in orders:
-
-**Admin Sales Page (`/admin/sales`):**
-- Date range filtering (today, week, month, year, custom)
-- Order type filtering (all, online, walk-in)
-- Payment method filtering
-- Summary statistics: total revenue, order count, average order value
-- Detailed orders table with all order information
-- Arabic-Indic numeral formatting for IQD amounts
-
-**API Endpoints:**
-- `GET /api/admin/orders` - Get all orders with full details (admin auth required)
-
-## PC Builder Feature
-
-A step-by-step PC builder allows users to select components (CPU, Motherboard, RAM, GPU, Storage, PSU, Case, Cooler) with real-time compatibility checking. A sidebar displays a live-updating build summary, including total power consumption, recommended PSU wattage, and total price.
-
-## Market Analysis Feature
-
-A market price tracking system for RAM, SSD, and M.2 storage components with daily price updates and trend analysis:
-
-**Public View (`/market-analysis`):**
-- Tab-based navigation for RAM, SSD, and M.2 component types
-- Price cards showing brand, model, capacity, and current price
-- Price change indicators (green up arrow, red down arrow, neutral dash)
-- Last updated timestamps for each price entry
-- Full bilingual support (Arabic/English) with RTL layout
-
-**Admin Management (`/admin/market-prices`):**
-- Form to add new price entries with component type, brand, model, capacity, current/previous prices
-- Table view of all prices with edit and delete actions
-- Automatic previous price tracking when updating current prices
-- Protected by admin session authentication
-
-**API Routes:**
-- `GET /api/market-prices` - Get all prices (optional `type` filter for ram/ssd/m2)
-- `POST /api/market-prices` - Add new price (admin only)
-- `PUT /api/market-prices/:id` - Update price (admin only)
-- `DELETE /api/market-prices/:id` - Delete price (admin only)
-
-**Database Schema (`market_prices` table):**
-- `id` - Serial primary key
-- `componentType` - Enum: "ram", "ssd", "m2"
-- `brand` - Brand name (e.g., "Kingston", "Samsung")
-- `model` - Model name (e.g., "Fury Beast DDR4")
-- `capacity` - Storage capacity (e.g., "16GB", "1TB")
-- `currentPrice` - Current price in IQD
-- `previousPrice` - Previous price for trend calculation
-- `priceDate` - Date of latest price update
-- `nameAr` / `nameEn` - Bilingual display names
-
-## Progressive Web App (PWA)
-
-The application is a fully-featured PWA that can be installed on mobile devices:
-
-**Features:**
-- Installable on Android/iOS home screens
-- Offline support via service worker
-- Push notification support
-- App-like experience with standalone display mode
-- Custom app icons (72x72 to 512x512)
-- Splash screen with theme color
-
-**Files:**
-- `client/public/manifest.json` - Web app manifest
-- `client/public/sw.js` - Service worker for caching
-- `client/public/icons/` - App icons in various sizes
-- `client/src/components/PWAInstallPrompt.tsx` - Install prompt component
-
-**Service Worker Caching Strategy:**
-- Static assets: Cache first
-- API calls: Network first with fallback
-- Images: Cache first with network fallback
-
-## Android App (Capacitor)
-
-The app can be packaged as a native Android APK using Capacitor:
-
-**Configuration:**
-- `capacitor.config.ts` - Capacitor configuration
-- Package ID: `com.alain.computers`
-- Target SDK: 34 (Android 14)
-- Min SDK: 22 (Android 5.1)
-
-**Build Instructions:**
-See `android/README.md` for detailed build instructions.
-
-**Quick Build Steps:**
-1. `npm run build` - Build web app
-2. `npx cap add android` - Initialize Android project
-3. `npx cap copy android` - Copy web assets
-4. `npx cap sync android` - Sync plugins
-5. `npx cap open android` - Open in Android Studio
-6. Build APK in Android Studio
-
-**Plugins:**
-- `@capacitor/splash-screen` - Custom splash screen
-- `@capacitor/status-bar` - Status bar styling
-- `@capacitor/app` - App lifecycle management
+## UI/UX Decisions
+
+The design prioritizes an RTL-first layout with Arabic-first content and Arabic numerals. It uses the Cairo font, a consistent spacing system, and a custom HSL-based color system optimized for light mode. The application is mobile-responsive and built upon Shadcn/ui and Radix UI components with Tailwind CSS.
+
+## Technical Implementations
+
+-   **Frontend**: React 18 with TypeScript and Vite, using Wouter for client-side routing. TanStack Query manages server state and caching.
+-   **Backend**: Express.js with TypeScript, providing a RESTful API for products, categories, cart, and orders.
+-   **Database**: PostgreSQL (Neon serverless) with Drizzle ORM for schema definition and operations.
+-   **Authentication**: Session-based authentication for customers and administrators, using bcrypt for password hashing and PostgreSQL for session storage.
+-   **Real-time Notifications**: WebSocket-based system for new order notifications to the admin dashboard.
+-   **Email Notifications**: Automated, Arabic-formatted order confirmation emails via Gmail SMTP.
+-   **Internationalization (i18n)**: `LanguageContext` for UI text translation, supporting Arabic and English with dynamic RTL/LTR adjustment.
+-   **Image Upload**: Admin functionality to upload product images directly to the server.
+-   **PWA**: Installable on mobile, offline support via service worker, push notifications, and custom app icons.
+-   **Android App**: Packaged as a native Android APK using Capacitor.
+
+## Feature Specifications
+
+-   **Admin Settings System**: Customizable store information, theme, SEO, homepage/footer content, and shipping rules across six categories.
+-   **Iraqi Market Features**: Dropdown for 18 Iraqi governorates, local payment methods (Cash on Delivery, ZainCash, QiCard), address format without postal codes, WhatsApp integration, and Iraqi Dinar (IQD) currency with Arabic-Indic numerals. Dynamic shipping costs and free shipping thresholds.
+-   **Point of Sale (POS) System**: Admin page for walk-in customers with product search, cart management, customer info capture, multiple payment methods, discount application, receipt generation, and real-time stock validation.
+-   **Sales Portal**: Separate authenticated system for sales staff with POS, inventory view, user management, and reporting capabilities. Features role-based permissions and separate session management.
+-   **Sales Dashboard**: Unified reporting for online and walk-in orders with date range, order type, and payment method filtering, plus summary statistics.
+-   **PC Builder**: Step-by-step component selection with real-time compatibility checks, power consumption, and price summary.
+-   **Market Analysis Feature**: Public and admin views for tracking and updating prices of RAM, SSD, and M.2 components with trend indicators.
 
 # External Dependencies
 
-## Database & ORM
-
--   **Drizzle ORM v0.39.1**: Type-safe ORM for PostgreSQL.
--   **@neondatabase/serverless v0.10.4**: Neon PostgreSQL serverless driver.
--   **drizzle-zod v0.7.0**: Zod schema generation from Drizzle schemas.
-
-## UI Component Libraries
-
--   **@radix-ui/**: Headless accessible UI primitives.
--   **class-variance-authority**: Component variant management.
--   **tailwindcss**: Utility-first CSS framework.
--   **lucide-react**: Icon library.
-
-## State Management & Data Fetching
-
--   **@tanstack/react-query v5.60.5**: Async state management and caching.
-
-## Form Management
-
--   **react-hook-form**: Form state management.
--   **zod**: Schema validation.
-
-## Routing
-
--   **wouter**: Lightweight client-side routing.
-
-## Session Management
-
--   **express-session**: Session middleware.
--   **connect-pg-simple**: PostgreSQL session store.
-
-## Email
-
--   **nodemailer**: For sending email notifications.
-
-## Replit-Specific Integrations
-
--   **@replit/vite-plugin-runtime-error-modal**
--   **@replit/vite-plugin-cartographer**
--   **@replit/vite-plugin-dev-banner**
+-   **Database & ORM**: Drizzle ORM (v0.39.1), @neondatabase/serverless (v0.10.4), drizzle-zod (v0.7.0).
+-   **UI Component Libraries**: @radix-ui/, class-variance-authority, tailwindcss, lucide-react.
+-   **State Management & Data Fetching**: @tanstack/react-query (v5.60.5).
+-   **Form Management**: react-hook-form, zod.
+-   **Routing**: wouter.
+-   **Session Management**: express-session, connect-pg-simple.
+-   **Email**: nodemailer.
+-   **Payment Gateways**: ZainCash, QiCard.
+-   **Replit-Specific Integrations**: @replit/vite-plugin-runtime-error-modal, @replit/vite-plugin-cartographer, @replit/vite-plugin-dev-banner.
