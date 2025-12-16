@@ -10,6 +10,37 @@ import { adminNotifications } from "./admin-notifications";
 import { zaincash } from "./zaincash";
 import { qicard } from "./qicard";
 import Papa from "papaparse";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+const imageStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => {
+    cb(null, uploadDir);
+  },
+  filename: (_req, file, cb) => {
+    const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+
+const imageUpload = multer({
+  storage: imageStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type"));
+    }
+  },
+});
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
@@ -21,6 +52,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Initialize default admin technician and admin user
   await storage.initializeDefaultTechnician();
   await storage.initializeDefaultAdmin();
+
+  // Serve uploaded images
+  app.use("/uploads", (await import("express")).default.static(uploadDir));
+
+  // Image upload route
+  app.post("/api/upload/image", imageUpload.single("image"), (req, res) => {
+    try {
+      if (!req.file) {
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+      const url = `/uploads/${req.file.filename}`;
+      return res.json({ url, filename: req.file.filename });
+    } catch (error) {
+      console.error("Image upload error:", error);
+      return res.status(500).json({ error: "Failed to upload image" });
+    }
+  });
 
   // Admin Authentication Routes
   app.post("/api/admin/auth/login", async (req, res) => {
