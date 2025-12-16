@@ -42,6 +42,7 @@ import {
 } from "@/components/ui/select";
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { AdminNav } from "@/components/AdminNav";
+import { ImageUpload } from "@/components/ImageUpload";
 import type { Product, InsertProduct } from "@shared/schema";
 
 interface AdminUser {
@@ -350,17 +351,13 @@ export default function AdminProducts() {
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="image">{t('admin.products.image')}</Label>
-              <Input
-                id="image"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder={t('admin.products.imagePlaceholder')}
-                required
-                data-testid="input-image"
-              />
-            </div>
+            <ImageUpload
+              value={formData.image}
+              onChange={(url) => setFormData({ ...formData, image: url })}
+              label={t('admin.products.image')}
+              placeholder={t('admin.products.imagePlaceholder')}
+              required
+            />
 
             <div>
               <Label htmlFor="specs">{t('admin.products.specs')}</Label>

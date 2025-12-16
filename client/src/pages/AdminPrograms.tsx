@@ -36,6 +36,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, AppWindow, Loader2 } from "lucide-react";
 import { AdminNav } from "@/components/AdminNav";
+import { ImageUpload } from "@/components/ImageUpload";
 import type { Product, InsertProduct } from "@shared/schema";
 
 interface ProgramFormData {
@@ -427,17 +428,13 @@ export default function AdminPrograms() {
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="image">{t('admin.programs.imageUrl')}</Label>
-              <Input
-                id="image"
-                value={formData.image}
-                onChange={(e) => setFormData({ ...formData, image: e.target.value })}
-                placeholder={t('admin.programs.imageUrlPlaceholder')}
-                required
-                data-testid="input-program-image"
-              />
-            </div>
+            <ImageUpload
+              value={formData.image}
+              onChange={(url) => setFormData({ ...formData, image: url })}
+              label={t('admin.programs.imageUrl')}
+              placeholder={t('admin.programs.imageUrlPlaceholder')}
+              required
+            />
 
             <div>
               <Label htmlFor="badge">{t('admin.programs.badge')}</Label>
