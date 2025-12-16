@@ -639,15 +639,22 @@ export default function AdminPOS() {
           `}</style>
           
           <div className="print-receipt">
-            {/* Store Header */}
+            {/* Store Header with Logo */}
             <div className="text-center mb-6 border-b-2 border-dashed pb-4">
-              <h2 className="text-2xl font-bold mb-1">
+              <div className="flex justify-center mb-3">
+                <img 
+                  src="/icons/icon-128x128.png" 
+                  alt="Al-Ain Computer Trading" 
+                  className="w-16 h-16 object-contain print:w-20 print:h-20"
+                />
+              </div>
+              <h2 className="text-2xl font-bold mb-1 print:text-3xl">
                 {language === 'ar' ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
               </h2>
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground print:text-gray-600">
                 {language === 'ar' ? 'بغداد - العراق' : 'Baghdad - Iraq'}
               </p>
-              <p className="text-lg font-semibold mt-2 bg-muted inline-block px-4 py-1 rounded">
+              <p className="text-lg font-semibold mt-2 bg-muted inline-block px-4 py-1 rounded print:bg-gray-100">
                 {language === 'ar' ? 'إيصال بيع - في المتجر' : 'Sales Receipt - In-Store'}
               </p>
             </div>
