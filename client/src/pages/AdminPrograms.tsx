@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatPrice } from "@/lib/formatters";
@@ -39,6 +40,13 @@ import { AdminNav } from "@/components/AdminNav";
 import { ImageUpload } from "@/components/ImageUpload";
 import type { Product, InsertProduct } from "@shared/schema";
 
+interface AdminUser {
+  id: string;
+  username: string;
+  name: string;
+  role: string;
+}
+
 interface ProgramFormData {
   nameAr: string;
   nameEn: string;
@@ -55,6 +63,7 @@ interface ProgramFormData {
 }
 
 export default function AdminPrograms() {
+  const [, setLocation] = useLocation();
   const { t, language } = useLanguage();
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
   const [editingProgram, setEditingProgram] = useState<Product | null>(null);
@@ -75,8 +84,21 @@ export default function AdminPrograms() {
     version: "",
   });
 
+  const { data: currentAdmin, isLoading: authLoading, isError: authError } = useQuery<AdminUser>({
+    queryKey: ['/api/admin/auth/me'],
+    retry: false,
+  });
+
+  useEffect(() => {
+    if (!authLoading && (authError || !currentAdmin)) {
+      localStorage.removeItem("adminAuth");
+      setLocation("/admin/login");
+    }
+  }, [authLoading, authError, currentAdmin, setLocation]);
+
   const { data: allProducts = [], isLoading } = useQuery<Product[]>({
     queryKey: ["/api/products"],
+    enabled: !!currentAdmin,
   });
 
   const programs = allProducts.filter(p => p.category === "programs");
@@ -201,40 +223,39 @@ export default function AdminPrograms() {
     setFormData({ ...formData, specs: specsArray });
   };
 
-  if (isLoading) {
+  if (authLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-muted-foreground">{t('common.loading')}</p>
+        <Loader2 className="w-8 h-8 animate-spin" />
       </div>
     );
   }
 
+  if (!currentAdmin) {
+    return null;
+  }
+
   return (
-    <div className="min-h-screen bg-background p-8" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <div className="max-w-7xl mx-auto">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
-              <AppWindow className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
+    <div className="min-h-screen bg-background" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <AdminNav currentAdmin={currentAdmin} />
+      
+      <div className="p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+                <AppWindow className="w-6 h-6 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">{t('admin.programs.title')}</h1>
+                <p className="text-muted-foreground">{t('admin.programs.subtitle')}</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold">{t('admin.programs.title')}</h1>
-              <p className="text-muted-foreground">{t('admin.programs.subtitle')}</p>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            <Link href="/admin/dashboard">
-              <Button variant="outline" data-testid="link-back-dashboard">
-                <ArrowRight className="w-4 h-4 me-2" />
-                {t('admin.programs.backToDashboard')}
-              </Button>
-            </Link>
             <Button onClick={handleAdd} className="bg-cyan-600 hover:bg-cyan-700" data-testid="button-add-program">
               <Plus className="w-4 h-4 me-2" />
               {t('admin.programs.addNew')}
             </Button>
           </div>
-        </div>
 
         {programs.length === 0 ? (
           <Card>
@@ -307,6 +328,7 @@ export default function AdminPrograms() {
             </Table>
           </Card>
         )}
+        </div>
       </div>
 
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>

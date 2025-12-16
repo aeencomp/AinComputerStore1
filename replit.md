@@ -115,6 +115,27 @@ Full integration with QiCard payment gateway for card payments in Iraqi Dinar (I
 - `orders.paymentStatus` - Payment status (pending, success, failed)
 - `orders.qicardTransactionId` - QiCard transaction ID
 
+## Image Upload Feature
+
+Admin users can upload product images directly from their computer instead of just entering URLs:
+
+**Component (`client/src/components/ImageUpload.tsx`):**
+- Two tabs: URL input and file upload
+- Supports JPG, PNG, GIF, WebP formats
+- Maximum file size: 5MB
+- Shows image preview after selection
+- Bilingual error messages
+
+**Backend Route (`/api/upload/image`):**
+- Protected by admin session authentication
+- Uses multer for file handling
+- Files stored in `/uploads` directory
+- Returns URL path to uploaded file
+
+**Integration:**
+- AdminProducts.tsx - Product image upload
+- AdminPrograms.tsx - Software/program image upload
+
 ## PC Builder Feature
 
 A step-by-step PC builder allows users to select components (CPU, Motherboard, RAM, GPU, Storage, PSU, Case, Cooler) with real-time compatibility checking. A sidebar displays a live-updating build summary, including total power consumption, recommended PSU wattage, and total price.
