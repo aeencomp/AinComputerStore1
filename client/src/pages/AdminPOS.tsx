@@ -606,68 +606,168 @@ export default function AdminPOS() {
         </DialogContent>
       </Dialog>
 
-      {/* Receipt Dialog */}
+      {/* Receipt Dialog - Enhanced for Print */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="max-w-sm print:max-w-none print:shadow-none" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-          <div className="text-center mb-4 print:mb-2">
-            <h2 className="text-xl font-bold">{language === 'ar' ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}</h2>
-            <p className="text-sm text-muted-foreground">{language === 'ar' ? 'إيصال بيع' : 'Sales Receipt'}</p>
-          </div>
+        <DialogContent className="max-w-lg print:fixed print:inset-0 print:max-w-none print:shadow-none print:border-0 print:bg-white print:z-[9999]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <style>{`
+            @media print {
+              body > *:not([data-radix-portal]) { display: none !important; }
+              [data-radix-portal] > *:not([data-state="open"]) { display: none !important; }
+              .print-hide { display: none !important; }
+              .print-receipt { 
+                display: block !important; 
+                visibility: visible !important; 
+                position: static !important;
+                width: 100% !important;
+                padding: 10px !important;
+                background: white !important;
+                color: black !important;
+              }
+              .print-receipt * { 
+                visibility: visible !important; 
+                color: black !important;
+              }
+              [role="dialog"] {
+                position: fixed !important;
+                inset: 0 !important;
+                max-width: none !important;
+                border: none !important;
+                box-shadow: none !important;
+                background: white !important;
+              }
+            }
+          `}</style>
           
-          {completedOrder && (
-            <div className="space-y-4 print:space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>{language === 'ar' ? 'رقم الطلب:' : 'Order #:'}</span>
-                <span className="font-mono font-bold">{completedOrder.orderNumber}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>{language === 'ar' ? 'التاريخ:' : 'Date:'}</span>
-                <span>{completedOrder.createdAt.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span>{language === 'ar' ? 'الزبون:' : 'Customer:'}</span>
-                <span>{completedOrder.customerName}</span>
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-2">
-                {completedOrder.items.map((item, idx) => (
-                  <div key={idx} className="flex justify-between text-sm">
-                    <span className="flex-1 truncate">
-                      {language === 'ar' ? item.product.nameAr : item.product.nameEn} × {item.quantity}
-                    </span>
-                    <span className="ms-2">{formatPrice(parseFloat(item.product.price) * item.quantity)}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <Separator />
-              
-              <div className="space-y-1">
-                <div className="flex justify-between text-sm">
-                  <span>{language === 'ar' ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
-                  <span>{formatPrice(completedOrder.subtotal)}</span>
-                </div>
-                {completedOrder.discount > 0 && (
-                  <div className="flex justify-between text-sm text-green-600">
-                    <span>{language === 'ar' ? 'الخصم:' : 'Discount:'}</span>
-                    <span>-{formatPrice(completedOrder.discount)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold text-lg">
-                  <span>{language === 'ar' ? 'الإجمالي:' : 'Total:'}</span>
-                  <span>{formatPrice(completedOrder.total)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
-                </div>
-              </div>
-              
-              <div className="text-center text-sm text-muted-foreground mt-4 print:mt-2">
-                <p>{language === 'ar' ? 'شكراً لتسوقكم معنا!' : 'Thank you for shopping with us!'}</p>
-              </div>
+          <div className="print-receipt">
+            {/* Store Header */}
+            <div className="text-center mb-6 border-b-2 border-dashed pb-4">
+              <h2 className="text-2xl font-bold mb-1">
+                {language === 'ar' ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                {language === 'ar' ? 'بغداد - العراق' : 'Baghdad - Iraq'}
+              </p>
+              <p className="text-lg font-semibold mt-2 bg-muted inline-block px-4 py-1 rounded">
+                {language === 'ar' ? 'إيصال بيع - في المتجر' : 'Sales Receipt - In-Store'}
+              </p>
             </div>
-          )}
+            
+            {completedOrder && (
+              <div className="space-y-4">
+                {/* Order Info */}
+                <div className="grid grid-cols-2 gap-2 text-sm bg-muted/50 p-3 rounded">
+                  <div>
+                    <span className="text-muted-foreground">{language === 'ar' ? 'رقم الطلب:' : 'Order #:'}</span>
+                    <p className="font-mono font-bold text-lg">{completedOrder.orderNumber}</p>
+                  </div>
+                  <div className="text-end">
+                    <span className="text-muted-foreground">{language === 'ar' ? 'التاريخ:' : 'Date:'}</span>
+                    <p className="font-medium">{completedOrder.createdAt.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <span className="text-muted-foreground">{language === 'ar' ? 'الزبون:' : 'Customer:'}</span>
+                    <p className="font-medium">{completedOrder.customerName}</p>
+                    {completedOrder.customerPhone !== '-' && (
+                      <p className="text-muted-foreground">{completedOrder.customerPhone}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <Separator />
+                
+                {/* Products Table */}
+                <div>
+                  <h3 className="font-bold mb-2 text-sm">
+                    {language === 'ar' ? 'تفاصيل المنتجات' : 'Product Details'}
+                  </h3>
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b-2">
+                        <th className="text-start py-2 font-semibold">{language === 'ar' ? 'المنتج' : 'Product'}</th>
+                        <th className="text-center py-2 font-semibold w-16">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
+                        <th className="text-end py-2 font-semibold w-24">{language === 'ar' ? 'السعر' : 'Price'}</th>
+                        <th className="text-end py-2 font-semibold w-28">{language === 'ar' ? 'المجموع' : 'Total'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {completedOrder.items.map((item, idx) => {
+                        const unitPrice = parseFloat(item.product.price);
+                        const lineTotal = unitPrice * item.quantity;
+                        return (
+                          <tr key={idx} className="border-b">
+                            <td className="py-2">
+                              <div className="font-medium">
+                                {language === 'ar' ? item.product.nameAr : (item.product.nameEn || item.product.nameAr)}
+                              </div>
+                              {item.product.sku ? (
+                                <div className="text-xs text-muted-foreground print:text-gray-600">
+                                  SKU: {item.product.sku}
+                                </div>
+                              ) : null}
+                              {item.product.category ? (
+                                <div className="text-xs text-muted-foreground print:text-gray-600">
+                                  {language === 'ar' ? 'الفئة:' : 'Cat:'} {item.product.category}
+                                </div>
+                              ) : null}
+                            </td>
+                            <td className="py-2 text-center font-medium">{item.quantity}</td>
+                            <td className="py-2 text-end">{formatPrice(unitPrice || 0)}</td>
+                            <td className="py-2 text-end font-medium">{formatPrice(lineTotal || 0)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                
+                <Separator />
+                
+                {/* Totals */}
+                <div className="space-y-2 bg-muted/50 p-3 rounded">
+                  <div className="flex justify-between text-sm">
+                    <span>{language === 'ar' ? 'عدد المنتجات:' : 'Total Items:'}</span>
+                    <span className="font-medium">{completedOrder.items.reduce((sum, i) => sum + i.quantity, 0)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span>{language === 'ar' ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
+                    <span className="font-medium">{formatPrice(completedOrder.subtotal)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                  </div>
+                  {completedOrder.discount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>{language === 'ar' ? 'الخصم:' : 'Discount:'}</span>
+                      <span className="font-medium">-{formatPrice(completedOrder.discount)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between font-bold text-xl pt-2">
+                    <span>{language === 'ar' ? 'الإجمالي المستحق:' : 'Total Due:'}</span>
+                    <span className="text-primary">{formatPrice(completedOrder.total)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                  </div>
+                  <div className="flex justify-between text-sm text-muted-foreground">
+                    <span>{language === 'ar' ? 'طريقة الدفع:' : 'Payment Method:'}</span>
+                    <span className="font-medium">
+                      {completedOrder.paymentMethod === 'cash' 
+                        ? (language === 'ar' ? 'نقداً' : 'Cash')
+                        : completedOrder.paymentMethod === 'card'
+                        ? (language === 'ar' ? 'بطاقة' : 'Card')
+                        : completedOrder.paymentMethod
+                      }
+                    </span>
+                  </div>
+                </div>
+                
+                {/* Footer */}
+                <div className="text-center border-t-2 border-dashed pt-4 mt-4">
+                  <p className="font-semibold">{language === 'ar' ? 'شكراً لتسوقكم معنا!' : 'Thank you for shopping with us!'}</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {language === 'ar' ? 'يرجى الاحتفاظ بالإيصال للمراجعة' : 'Please keep this receipt for your records'}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
-          <DialogFooter className="gap-2 print:hidden">
+          <DialogFooter className="gap-2 print-hide">
             <Button variant="outline" onClick={() => setShowReceipt(false)}>
               {language === 'ar' ? 'إغلاق' : 'Close'}
             </Button>
