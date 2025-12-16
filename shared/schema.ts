@@ -37,6 +37,32 @@ export const insertAdminUserSchema = createInsertSchema(adminUsers).omit({
 export type InsertAdminUser = z.infer<typeof insertAdminUserSchema>;
 export type AdminUser = typeof adminUsers.$inferSelect;
 
+// Sales users with role-based permissions
+export const salesUsers = pgTable("sales_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("sales"), // sales, sales_admin
+  // Permissions
+  canPos: integer("can_pos").notNull().default(1), // Access to POS
+  canInventory: integer("can_inventory").notNull().default(0), // Access to Inventory
+  canManageUsers: integer("can_manage_users").notNull().default(0), // Can create/edit users
+  canViewReports: integer("can_view_reports").notNull().default(0), // Access to sales reports
+  canApplyDiscount: integer("can_apply_discount").notNull().default(0), // Can apply discounts
+  isActive: integer("is_active").notNull().default(1), // Account status
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  createdBy: varchar("created_by"), // Who created this user
+});
+
+export const insertSalesUserSchema = createInsertSchema(salesUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSalesUser = z.infer<typeof insertSalesUserSchema>;
+export type SalesUser = typeof salesUsers.$inferSelect;
+
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   nameAr: text("name_ar").notNull(),

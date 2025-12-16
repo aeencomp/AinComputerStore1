@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -60,6 +60,15 @@ export interface IStorage {
   updateAdminUser(id: string, updates: Partial<InsertAdminUser>): Promise<AdminUser | undefined>;
   deleteAdminUser(id: string): Promise<void>;
   initializeDefaultAdmin(): Promise<void>;
+  
+  // Sales user methods
+  createSalesUser(user: InsertSalesUser): Promise<SalesUser>;
+  getSalesUsers(): Promise<SalesUser[]>;
+  getSalesUser(id: string): Promise<SalesUser | undefined>;
+  getSalesUserByUsername(username: string): Promise<SalesUser | undefined>;
+  updateSalesUser(id: string, updates: Partial<InsertSalesUser>): Promise<SalesUser | undefined>;
+  deleteSalesUser(id: string): Promise<void>;
+  initializeDefaultSalesAdmin(): Promise<void>;
   
   // Market price methods
   getMarketPrices(): Promise<MarketPrice[]>;
@@ -539,6 +548,35 @@ export class MemStorage implements IStorage {
 
   async initializeDefaultAdmin(): Promise<void> {
     // MemStorage does not support admin users
+  }
+  
+  // Sales user methods (stubs for MemStorage)
+  async createSalesUser(user: InsertSalesUser): Promise<SalesUser> {
+    throw new Error("MemStorage does not support sales users");
+  }
+
+  async getSalesUsers(): Promise<SalesUser[]> {
+    return [];
+  }
+
+  async getSalesUser(id: string): Promise<SalesUser | undefined> {
+    return undefined;
+  }
+
+  async getSalesUserByUsername(username: string): Promise<SalesUser | undefined> {
+    return undefined;
+  }
+
+  async updateSalesUser(id: string, updates: Partial<InsertSalesUser>): Promise<SalesUser | undefined> {
+    return undefined;
+  }
+
+  async deleteSalesUser(id: string): Promise<void> {
+    // MemStorage does not support sales users
+  }
+
+  async initializeDefaultSalesAdmin(): Promise<void> {
+    // MemStorage does not support sales users
   }
   
   // Market price methods (stubs for MemStorage)

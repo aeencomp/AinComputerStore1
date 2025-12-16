@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -399,6 +399,69 @@ export class DrizzleStorage implements IStorage {
       }
     } catch (error) {
       console.error('Failed to initialize default admin:', error);
+    }
+  }
+
+  // Sales user methods
+  async createSalesUser(user: InsertSalesUser): Promise<SalesUser> {
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    const result = await db.insert(salesUsers).values({
+      ...user,
+      password: hashedPassword,
+    }).returning();
+    return result[0];
+  }
+
+  async getSalesUsers(): Promise<SalesUser[]> {
+    return await db.select().from(salesUsers);
+  }
+
+  async getSalesUser(id: string): Promise<SalesUser | undefined> {
+    const result = await db.select().from(salesUsers).where(eq(salesUsers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async getSalesUserByUsername(username: string): Promise<SalesUser | undefined> {
+    const result = await db.select().from(salesUsers).where(eq(salesUsers.username, username)).limit(1);
+    return result[0];
+  }
+
+  async updateSalesUser(id: string, updates: Partial<InsertSalesUser>): Promise<SalesUser | undefined> {
+    const updateData = { ...updates };
+    if (updates.password) {
+      updateData.password = await bcrypt.hash(updates.password, 10);
+    }
+    const result = await db.update(salesUsers)
+      .set(updateData)
+      .where(eq(salesUsers.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteSalesUser(id: string): Promise<void> {
+    await db.delete(salesUsers).where(eq(salesUsers.id, id));
+  }
+
+  async initializeDefaultSalesAdmin(): Promise<void> {
+    try {
+      const existing = await this.getSalesUserByUsername('salesadmin');
+      if (!existing) {
+        await this.createSalesUser({
+          username: 'salesadmin',
+          password: 'sales123',
+          name: 'مدير المبيعات',
+          role: 'sales_admin',
+          canPos: 1,
+          canInventory: 1,
+          canManageUsers: 1,
+          canViewReports: 1,
+          canApplyDiscount: 1,
+          isActive: 1,
+        });
+        console.log('Default sales admin created (username: salesadmin, password: sales123)');
+      }
+    } catch (error) {
+      console.error('Failed to initialize default sales admin:', error);
     }
   }
 
