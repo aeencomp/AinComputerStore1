@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, TrendingUp } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -293,16 +293,6 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               {t('header.pcBuilder')}
             </Button>
           </Link>
-          <Link href="/market-analysis">
-            <Button 
-              variant="ghost" 
-              className="gap-2 px-4 py-2 rounded-full hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400 transition-colors font-bold"
-              data-testid="link-market-analysis"
-            >
-              <TrendingUp className="h-4 w-4" />
-              {t('header.marketAnalysis')}
-            </Button>
-          </Link>
           <Link href="/track-order">
             <Button 
               variant="ghost" 
@@ -385,16 +375,6 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               >
                 <Cpu className="h-4 w-4" />
                 {t('header.pcBuilder')}
-              </Button>
-            </Link>
-            <Link href="/market-analysis" onClick={() => setMobileMenuOpen(false)}>
-              <Button 
-                variant="ghost" 
-                className="justify-start gap-3 w-full rounded-lg hover:bg-emerald-100 hover:text-emerald-700 dark:hover:bg-emerald-900/30 dark:hover:text-emerald-400 font-bold" 
-                data-testid="link-market-analysis-mobile"
-              >
-                <TrendingUp className="h-4 w-4" />
-                {t('header.marketAnalysis')}
               </Button>
             </Link>
             <Link href="/track-order" onClick={() => setMobileMenuOpen(false)}>
