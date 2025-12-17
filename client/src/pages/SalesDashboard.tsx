@@ -138,7 +138,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
     queryKey: ['/api/products'],
   });
 
-  // Calculate today's stats
+  // Calculate today's stats - filtered by current salesperson
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   
@@ -147,15 +147,19 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
     return orderDate >= today;
   });
 
-  const walkInOrders = todaysOrders.filter(o => o.orderType === 'walk-in');
+  // Filter walk-in orders by current salesperson only
+  const myWalkInOrders = todaysOrders.filter(o => 
+    o.orderType === 'walk-in' && o.salespersonId === user.id
+  );
   const onlineOrders = todaysOrders.filter(o => o.orderType === 'online');
   
-  const todaySales = walkInOrders.reduce((sum, order) => 
+  // Calculate stats based on current salesperson's orders only
+  const todaySales = myWalkInOrders.reduce((sum, order) => 
     sum + parseFloat(order.total || '0'), 0
   );
   
-  const avgTicket = walkInOrders.length > 0 
-    ? todaySales / walkInOrders.length 
+  const avgTicket = myWalkInOrders.length > 0 
+    ? todaySales / myWalkInOrders.length 
     : 0;
 
   // Low stock products (less than 5 items)
@@ -237,7 +241,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'ar' ? 'مبيعات اليوم' : "Today's Sales"}
+                  {language === 'ar' ? 'مبيعاتي اليوم' : "My Sales Today"}
                 </p>
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin mt-2" />
@@ -262,13 +266,13 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'ar' ? 'المعاملات' : 'Transactions'}
+                  {language === 'ar' ? 'معاملاتي' : 'My Transactions'}
                 </p>
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin mt-2" />
                 ) : (
                   <p className="text-2xl font-bold text-green-600">
-                    {walkInOrders.length}
+                    {myWalkInOrders.length}
                     <span className="text-sm font-normal text-muted-foreground me-1">
                       {language === 'ar' ? 'طلب' : 'orders'}
                     </span>
@@ -416,7 +420,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
           <CardHeader className="flex flex-row items-center justify-between pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />
-              {language === 'ar' ? 'آخر المبيعات' : 'Recent Sales'}
+              {language === 'ar' ? 'آخر مبيعاتي' : 'My Recent Sales'}
             </CardTitle>
             <Button variant="ghost" size="sm" className="gap-1">
               <RefreshCcw className="h-3.5 w-3.5" />
@@ -427,14 +431,14 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-            ) : walkInOrders.length === 0 ? (
+            ) : myWalkInOrders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Receipt className="h-12 w-12 mx-auto mb-3 opacity-20" />
                 <p>{language === 'ar' ? 'لا توجد مبيعات اليوم' : 'No sales today'}</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {walkInOrders.slice(0, 5).map((order) => (
+                {myWalkInOrders.slice(0, 5).map((order) => (
                   <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
@@ -532,7 +536,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Wallet className="h-5 w-5 text-primary" />
-            {language === 'ar' ? 'ملخص طرق الدفع' : 'Payment Methods Summary'}
+            {language === 'ar' ? 'مبيعاتي حسب طريقة الدفع' : 'My Sales by Payment Method'}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -543,7 +547,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {['cash', 'card', 'zaincash', 'qicard'].map((method) => {
-                const methodOrders = walkInOrders.filter(o => o.paymentMethod === method);
+                const methodOrders = myWalkInOrders.filter(o => o.paymentMethod === method);
                 const methodTotal = methodOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
                 const methodLabels: Record<string, { ar: string; en: string }> = {
                   cash: { ar: 'نقداً', en: 'Cash' },
