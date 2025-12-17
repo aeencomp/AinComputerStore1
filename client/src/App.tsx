@@ -17,6 +17,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import AdminProducts from "@/pages/AdminProducts";
 import AdminPrograms from "@/pages/AdminPrograms";
 import AdminCustomers from "@/pages/AdminCustomers";
+import AdminAttendance from "@/pages/AdminAttendance";
 import AdminSettings from "@/pages/AdminSettings";
 import AdminMarketPrices from "@/pages/AdminMarketPrices";
 import AdminExternalPrices from "@/pages/AdminExternalPrices";
@@ -54,6 +55,7 @@ function Router() {
       <Route path="/admin/products" component={AdminProducts}/>
       <Route path="/admin/programs" component={AdminPrograms}/>
       <Route path="/admin/customers" component={AdminCustomers}/>
+      <Route path="/admin/attendance" component={AdminAttendance}/>
       <Route path="/admin/settings" component={AdminSettings}/>
       <Route path="/admin/market-prices" component={AdminMarketPrices}/>
       <Route path="/admin/external-prices" component={AdminExternalPrices}/>

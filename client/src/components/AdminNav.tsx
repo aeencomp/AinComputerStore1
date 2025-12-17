@@ -11,7 +11,8 @@ import {
   LogOut,
   Loader2,
   ShoppingCart,
-  BarChart3
+  BarChart3,
+  Clock
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMutation } from "@tanstack/react-query";
@@ -43,6 +44,7 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
     { href: "/admin/products", icon: Package, labelAr: "المنتجات", labelEn: "Products" },
     { href: "/admin/inventory", icon: Warehouse, labelAr: "المخزون", labelEn: "Inventory" },
     { href: "/admin/customers", icon: Users, labelAr: "العملاء", labelEn: "Customers" },
+    { href: "/admin/attendance", icon: Clock, labelAr: "الحضور", labelEn: "Attendance" },
     { href: "/admin/market-prices", icon: TrendingUp, labelAr: "أسعار السوق", labelEn: "Market Prices" },
     { href: "/admin/programs", icon: GraduationCap, labelAr: "البرامج", labelEn: "Programs" },
     { href: "/admin/settings", icon: Settings, labelAr: "الإعدادات", labelEn: "Settings" },

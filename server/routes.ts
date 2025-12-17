@@ -2357,6 +2357,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer Management Routes (Admin panel)
   // ===============================
   
+  // Admin endpoint to view all sales staff attendance/shifts
+  app.get("/api/admin/shifts", async (req, res) => {
+    try {
+      const allShifts = await db.select().from(salesShifts).orderBy(desc(salesShifts.startTime));
+      return res.json(allShifts);
+    } catch (error) {
+      console.error("Error fetching shifts:", error);
+      return res.status(500).json({ error: "Failed to fetch shifts" });
+    }
+  });
+
   app.get("/api/admin/customers", async (req, res) => {
     try {
       const users = await storage.getUsers();
