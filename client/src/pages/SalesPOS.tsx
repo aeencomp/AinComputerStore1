@@ -64,18 +64,46 @@ export default function SalesPOS({ user }: SalesPOSProps) {
       const res = await apiRequest('POST', '/api/sales/pos', orderData);
       return res.json();
     },
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
+      // Build receipt order from local state (more reliable than API response)
+      const receiptOrder = {
+        orderNumber: data.order?.orderNumber || `TEMP-${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        customerName: customerName || (language === 'ar' ? 'عميل في المتجر' : 'Walk-in Customer'),
+        customerPhone: customerPhone || '',
+        items: cart.map(item => ({
+          nameAr: item.product.nameAr,
+          nameEn: item.product.nameEn,
+          sku: item.product.sku,
+          category: item.product.category,
+          price: item.product.price,
+          quantity: item.quantity,
+        })),
+        subtotal: subtotal.toString(),
+        discount: discount,
+        total: total.toString(),
+        paymentMethod: paymentMethod,
+      };
+      
+      setLastOrder(receiptOrder);
+      setShowReceipt(true);
+      
       toast({
         title: language === 'ar' ? 'تم إنشاء الطلب بنجاح' : 'Order created successfully',
+        description: language === 'ar' ? `رقم الطلب: ${receiptOrder.orderNumber}` : `Order #: ${receiptOrder.orderNumber}`,
       });
-      setLastOrder(data.order);
-      setShowReceipt(true);
+      
+      // Clear form after saving receipt data
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
       setDiscount("0");
       setDiscountReason("");
-      queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      
+      // Refresh products after state updates
+      setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+      }, 100);
     },
     onError: (error: any) => {
       toast({
@@ -419,8 +447,16 @@ export default function SalesPOS({ user }: SalesPOSProps) {
       </div>
 
       {/* Receipt Dialog - Enhanced for Print */}
-      <Dialog open={showReceipt} onOpenChange={setShowReceipt}>
-        <DialogContent className="max-w-lg print:fixed print:inset-0 print:max-w-none print:shadow-none print:border-0 print:bg-white print:z-[9999]" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <Dialog open={showReceipt} onOpenChange={setShowReceipt} modal={true}>
+        <DialogContent 
+          className="max-w-lg print:fixed print:inset-0 print:max-w-none print:shadow-none print:border-0 print:bg-white print:z-[9999]" 
+          dir={language === 'ar' ? 'rtl' : 'ltr'}
+          data-testid="receipt-dialog"
+          aria-describedby={undefined}
+        >
+          <DialogHeader className="sr-only">
+            <DialogTitle>{language === 'ar' ? 'إيصال البيع' : 'Sales Receipt'}</DialogTitle>
+          </DialogHeader>
           <style>{`
             @media print {
               body > *:not([data-radix-portal]) { display: none !important; }

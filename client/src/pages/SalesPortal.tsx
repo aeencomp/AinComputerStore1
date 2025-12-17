@@ -1,5 +1,5 @@
-import { useEffect } from "react";
-import { useLocation, Link, Route, Switch } from "wouter";
+import { useEffect, useState, useMemo } from "react";
+import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -15,7 +15,6 @@ import {
   Menu,
   X
 } from "lucide-react";
-import { useState } from "react";
 import SalesPOS from "./SalesPOS";
 import SalesInventory from "./SalesInventory";
 import SalesUsers from "./SalesUsers";
@@ -191,12 +190,10 @@ export default function SalesPortal() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <Switch>
-          <Route path="/sales" component={() => <SalesPOS user={currentUser} />} />
-          <Route path="/sales/inventory" component={() => <SalesInventory user={currentUser} />} />
-          <Route path="/sales/reports" component={() => <SalesReports user={currentUser} />} />
-          <Route path="/sales/users" component={() => <SalesUsers user={currentUser} />} />
-        </Switch>
+        {location === "/sales" && <SalesPOS user={currentUser} />}
+        {location === "/sales/inventory" && <SalesInventory user={currentUser} />}
+        {location === "/sales/reports" && <SalesReports user={currentUser} />}
+        {location === "/sales/users" && <SalesUsers user={currentUser} />}
       </main>
     </div>
   );
