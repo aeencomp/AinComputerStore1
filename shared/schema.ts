@@ -475,3 +475,51 @@ export const insertInventoryMovementSchema = createInsertSchema(inventoryMovemen
 
 export type InsertInventoryMovement = z.infer<typeof insertInventoryMovementSchema>;
 export type InventoryMovement = typeof inventoryMovements.$inferSelect;
+
+// Held orders for POS hold/recall functionality
+export const heldOrders = pgTable("held_orders", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  holdNumber: text("hold_number").notNull(),
+  salesUserId: varchar("sales_user_id").notNull(),
+  salesUserName: text("sales_user_name").notNull(),
+  customerName: text("customer_name"),
+  customerPhone: text("customer_phone"),
+  items: jsonb("items").notNull(), // Cart items JSON
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertHeldOrderSchema = createInsertSchema(heldOrders).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertHeldOrder = z.infer<typeof insertHeldOrderSchema>;
+export type HeldOrder = typeof heldOrders.$inferSelect;
+
+// Sales shift management
+export const salesShifts = pgTable("sales_shifts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  salesUserId: varchar("sales_user_id").notNull(),
+  salesUserName: text("sales_user_name").notNull(),
+  startTime: timestamp("start_time").defaultNow().notNull(),
+  endTime: timestamp("end_time"),
+  openingCash: decimal("opening_cash", { precision: 10, scale: 2 }).notNull().default("0"),
+  closingCash: decimal("closing_cash", { precision: 10, scale: 2 }),
+  expectedCash: decimal("expected_cash", { precision: 10, scale: 2 }),
+  cashDifference: decimal("cash_difference", { precision: 10, scale: 2 }),
+  totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default("0"),
+  totalTransactions: integer("total_transactions").default(0),
+  notes: text("notes"),
+  status: text("status").notNull().default("active"), // "active", "closed"
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSalesShiftSchema = createInsertSchema(salesShifts).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSalesShift = z.infer<typeof insertSalesShiftSchema>;
+export type SalesShift = typeof salesShifts.$inferSelect;

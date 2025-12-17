@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, desc, and, gte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
@@ -650,6 +650,248 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating sales POS order:", error);
       return res.status(500).json({ error: "فشل إنشاء الطلب" });
+    }
+  });
+
+  // Held Orders endpoints for POS hold/recall functionality
+  app.get("/api/sales/held-orders", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const heldOrdersList = await db.select().from(heldOrders).orderBy(desc(heldOrders.createdAt));
+      return res.json(heldOrdersList);
+    } catch (error) {
+      console.error("Error fetching held orders:", error);
+      return res.status(500).json({ error: "فشل جلب الطلبات المعلقة" });
+    }
+  });
+
+  // Sales customer lookup endpoint
+  app.get("/api/sales/customers", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      // Get all orders and aggregate customer data
+      const allOrders = await storage.getOrders();
+      
+      const customerMap = new Map<string, { phone: string; name: string; orderCount: number; totalSpent: number }>();
+      
+      for (const order of allOrders) {
+        if (order.customerPhone && order.customerPhone.trim() !== '') {
+          const existing = customerMap.get(order.customerPhone);
+          const orderTotal = parseFloat(order.total?.toString() || '0');
+          
+          if (existing) {
+            existing.orderCount++;
+            existing.totalSpent += orderTotal;
+          } else {
+            customerMap.set(order.customerPhone, {
+              phone: order.customerPhone,
+              name: order.customerName || '',
+              orderCount: 1,
+              totalSpent: orderTotal,
+            });
+          }
+        }
+      }
+      
+      // Convert to array and sort by order count
+      const customers = Array.from(customerMap.values())
+        .sort((a, b) => b.orderCount - a.orderCount);
+      
+      return res.json(customers);
+    } catch (error) {
+      console.error("Error fetching customers:", error);
+      return res.status(500).json({ error: "فشل جلب العملاء" });
+    }
+  });
+
+  app.post("/api/sales/held-orders", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser || !currentUser.canPos) {
+        return res.status(403).json({ error: "ليس لديك صلاحية" });
+      }
+      
+      const { items, customerName, customerPhone, subtotal, notes } = req.body;
+      
+      if (!items || items.length === 0) {
+        return res.status(400).json({ error: "السلة فارغة" });
+      }
+      
+      // Generate hold number
+      const holdNumber = `HOLD-${Date.now().toString(36).toUpperCase()}`;
+      
+      const [heldOrder] = await db.insert(heldOrders).values({
+        holdNumber,
+        salesUserId,
+        salesUserName: currentUser.name,
+        customerName: customerName || null,
+        customerPhone: customerPhone || null,
+        items: JSON.stringify(items),
+        subtotal: subtotal.toString(),
+        notes: notes || null,
+      }).returning();
+      
+      return res.json({ success: true, heldOrder });
+    } catch (error) {
+      console.error("Error creating held order:", error);
+      return res.status(500).json({ error: "فشل حفظ الطلب المعلق" });
+    }
+  });
+
+  app.delete("/api/sales/held-orders/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      
+      // Get the held order before deleting
+      const [heldOrder] = await db.select().from(heldOrders).where(eq(heldOrders.id, id));
+      
+      if (!heldOrder) {
+        return res.status(404).json({ error: "الطلب المعلق غير موجود" });
+      }
+      
+      await db.delete(heldOrders).where(eq(heldOrders.id, id));
+      
+      return res.json({ success: true, heldOrder });
+    } catch (error) {
+      console.error("Error deleting held order:", error);
+      return res.status(500).json({ error: "فشل حذف الطلب المعلق" });
+    }
+  });
+
+  // Sales Shifts endpoints
+  app.get("/api/sales/shifts/current", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const [activeShift] = await db.select().from(salesShifts)
+        .where(and(
+          eq(salesShifts.salesUserId, salesUserId),
+          eq(salesShifts.status, 'active')
+        ))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+      
+      return res.json(activeShift || null);
+    } catch (error) {
+      console.error("Error fetching current shift:", error);
+      return res.status(500).json({ error: "فشل جلب الوردية الحالية" });
+    }
+  });
+
+  app.post("/api/sales/shifts/start", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser) {
+        return res.status(403).json({ error: "المستخدم غير موجود" });
+      }
+      
+      // Check if there's already an active shift
+      const [existingShift] = await db.select().from(salesShifts)
+        .where(and(
+          eq(salesShifts.salesUserId, salesUserId),
+          eq(salesShifts.status, 'active')
+        ))
+        .limit(1);
+      
+      if (existingShift) {
+        return res.status(400).json({ error: "لديك وردية نشطة بالفعل", shift: existingShift });
+      }
+      
+      const { openingCash, notes } = req.body;
+      
+      const [newShift] = await db.insert(salesShifts).values({
+        salesUserId,
+        salesUserName: currentUser.name,
+        openingCash: (openingCash || 0).toString(),
+        notes: notes || null,
+        status: 'active',
+      }).returning();
+      
+      return res.json({ success: true, shift: newShift });
+    } catch (error) {
+      console.error("Error starting shift:", error);
+      return res.status(500).json({ error: "فشل بدء الوردية" });
+    }
+  });
+
+  app.post("/api/sales/shifts/end", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      // Get active shift
+      const [activeShift] = await db.select().from(salesShifts)
+        .where(and(
+          eq(salesShifts.salesUserId, salesUserId),
+          eq(salesShifts.status, 'active')
+        ))
+        .limit(1);
+      
+      if (!activeShift) {
+        return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      }
+      
+      const { closingCash, notes } = req.body;
+      
+      // Calculate expected cash (opening + sales during shift)
+      const shiftOrders = await db.select().from(orders)
+        .where(and(
+          eq(orders.salespersonId, salesUserId),
+          eq(orders.paymentMethod, 'cash'),
+          gte(orders.createdAt, activeShift.startTime)
+        ));
+      
+      const cashSales = shiftOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
+      const expectedCash = parseFloat(activeShift.openingCash || '0') + cashSales;
+      const closingCashNum = parseFloat(closingCash || '0');
+      const cashDifference = closingCashNum - expectedCash;
+      
+      const [updatedShift] = await db.update(salesShifts)
+        .set({
+          endTime: new Date(),
+          closingCash: closingCash?.toString() || null,
+          expectedCash: expectedCash.toString(),
+          cashDifference: cashDifference.toString(),
+          totalSales: cashSales.toString(),
+          totalTransactions: shiftOrders.length,
+          notes: notes || activeShift.notes,
+          status: 'closed',
+        })
+        .where(eq(salesShifts.id, activeShift.id))
+        .returning();
+      
+      return res.json({ success: true, shift: updatedShift });
+    } catch (error) {
+      console.error("Error ending shift:", error);
+      return res.status(500).json({ error: "فشل إنهاء الوردية" });
     }
   });
 
