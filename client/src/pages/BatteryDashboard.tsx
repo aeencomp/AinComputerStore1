@@ -181,34 +181,35 @@ export default function BatteryDashboard() {
               margin: 0;
               padding: 0;
               overflow: hidden;
+              background: white;
             }
             body {
               display: flex;
-              flex-direction: column;
               align-items: center;
               justify-content: center;
               font-family: Arial, sans-serif;
-              background: white;
             }
             .label-container {
-              width: 46mm;
-              height: 21mm;
+              width: 25mm;
+              height: 50mm;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              padding: 1mm;
+              transform: rotate(90deg);
+              transform-origin: center center;
             }
             .brand {
               font-size: 6pt;
               font-weight: bold;
-              margin-bottom: 0.5mm;
+              margin-bottom: 1mm;
               text-transform: uppercase;
               letter-spacing: 0.3px;
+              white-space: nowrap;
             }
             svg {
-              width: 44mm !important;
-              height: 14mm !important;
+              width: 21mm !important;
+              height: 40mm !important;
             }
             @media print {
               html, body {
@@ -228,14 +229,14 @@ export default function BatteryDashboard() {
           <script>
             JsBarcode("#barcode", "${barcodeValue}", {
               format: "CODE128",
-              width: 2,
-              height: 45,
+              width: 1.5,
+              height: 70,
               displayValue: true,
-              fontSize: 11,
+              fontSize: 10,
               font: "Arial",
               fontOptions: "bold",
               margin: 0,
-              textMargin: 1,
+              textMargin: 2,
               background: "#ffffff",
               lineColor: "#000000"
             });
