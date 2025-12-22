@@ -478,8 +478,8 @@ export default function BatteryDashboard() {
                       <div className="bg-white rounded-lg p-1 flex justify-center">
                         <Barcode 
                           value={battery.barcode || battery.serialNumber} 
-                          height={22} 
-                          width={0.9}
+                          height={25} 
+                          width={50}
                           fontSize={8}
                         />
                       </div>
