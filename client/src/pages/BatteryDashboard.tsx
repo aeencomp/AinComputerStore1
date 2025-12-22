@@ -157,102 +157,32 @@ export default function BatteryDashboard() {
   const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
     const barcodeValue = battery.barcode || battery.serialNumber;
-    const printWindow = window.open('', '_blank', 'width=200,height=400');
+    const printWindow = window.open('', '_blank', 'width=120,height=240');
     if (printWindow) {
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Print Barcode - ${battery.serialNumber}</title>
+          <title>${battery.serialNumber}</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
           <style>
-            * {
-              margin: 0;
-              padding: 0;
-              box-sizing: border-box;
-            }
-            @page {
-              size: 25mm 50mm;
-              margin: 0;
-            }
-            html, body {
-              width: 25mm;
-              height: 50mm;
-              margin: 0;
-              padding: 0;
-              overflow: hidden;
-              background: white;
-            }
-            body {
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              font-family: Arial, sans-serif;
-            }
-            .label-container {
-              width: 23mm;
-              height: 48mm;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
-              text-align: center;
-            }
-            .brand {
-              font-size: 5pt;
-              font-weight: bold;
-              margin-bottom: 1mm;
-              text-transform: uppercase;
-              word-break: break-all;
-              max-width: 22mm;
-            }
-            .serial {
-              font-size: 6pt;
-              font-weight: bold;
-              margin-bottom: 2mm;
-              word-break: break-all;
-              max-width: 22mm;
-            }
-            #barcode {
-              transform: rotate(90deg);
-              transform-origin: center center;
-            }
-            @media print {
-              html, body {
-                width: 25mm;
-                height: 50mm;
-                -webkit-print-color-adjust: exact;
-                print-color-adjust: exact;
-              }
-            }
+            *{margin:0;padding:0;box-sizing:border-box}
+            @page{size:25mm 50mm;margin:0}
+            html,body{width:25mm;height:50mm;margin:0;padding:0;overflow:hidden;background:#fff}
+            body{display:flex;align-items:center;justify-content:center}
+            .wrap{text-align:center}
+            .sn{font:bold 7pt Arial;margin-top:2mm}
+            svg{display:block;margin:0 auto}
           </style>
         </head>
         <body>
-          <div class="label-container">
-            <div class="brand">${battery.brand}</div>
-            <div class="serial">${battery.serialNumber}</div>
-            <svg id="barcode"></svg>
+          <div class="wrap">
+            <svg id="bc"></svg>
+            <div class="sn">${battery.serialNumber}</div>
           </div>
           <script>
-            JsBarcode("#barcode", "${barcodeValue}", {
-              format: "CODE128",
-              width: 1.2,
-              height: 50,
-              displayValue: true,
-              fontSize: 8,
-              font: "Arial",
-              fontOptions: "bold",
-              margin: 0,
-              textMargin: 1,
-              background: "#ffffff",
-              lineColor: "#000000"
-            });
-            window.onload = function() {
-              setTimeout(function() {
-                window.print();
-              }, 300);
-            };
+            JsBarcode("#bc","${barcodeValue}",{format:"CODE128",width:1,height:60,displayValue:false,margin:0,background:"#fff",lineColor:"#000"});
+            window.onload=function(){setTimeout(function(){window.print()},200)};
           </script>
         </body>
         </html>
