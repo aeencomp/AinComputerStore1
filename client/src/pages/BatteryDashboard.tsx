@@ -156,12 +156,14 @@ export default function BatteryDashboard() {
 
   const printBarcode = async (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
-    const barcodeValue = battery.barcode || battery.serialNumber;
+    const rawValue = battery.barcode || battery.serialNumber;
+    // Remove BAT- prefix if present for QR code
+    const qrValue = rawValue.replace(/^BAT-/i, '');
     const price = battery.sellingPrice || '';
     
     // Generate QR code as data URL
     const { toDataURL } = await import('qrcode');
-    const qrDataURL = await toDataURL(barcodeValue, { width: 100, margin: 1 });
+    const qrDataURL = await toDataURL(qrValue, { width: 50, margin: 0 });
     
     const printWindow = window.open('', '_blank');
     if (printWindow) {
@@ -170,20 +172,23 @@ export default function BatteryDashboard() {
 <head>
 <title>Print Label</title>
 <style>
-@page{size:50mm 75mm;margin:0}
+@page{size:50mm 25mm;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
-body{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff}
-.title{font-size:10pt;font-weight:bold;margin-bottom:3mm;text-align:center}
+body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
+.info{display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.title{font-size:7pt;font-weight:bold}
+.serial{font-size:6pt;font-weight:bold;margin-top:1mm}
+.price{font-size:9pt;font-weight:bold;margin-top:1mm}
 .qr{display:block}
-.serial{font-size:9pt;font-weight:bold;margin-top:3mm}
-.price{font-size:16pt;font-weight:bold;margin-top:2mm}
 </style>
 </head>
 <body>
-<div class="title">${battery.brand} ${battery.serialNumber}</div>
-<img class="qr" src="${qrDataURL}" width="110" height="110" />
-<div class="serial">${barcodeValue}</div>
+<img class="qr" src="${qrDataURL}" width="45" height="45" />
+<div class="info">
+<div class="title">${battery.brand}</div>
+<div class="serial">${qrValue}</div>
 <div class="price">${price}</div>
+</div>
 <script>setTimeout(function(){window.print();},300);</script>
 </body>
 </html>`);
