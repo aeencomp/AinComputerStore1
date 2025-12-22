@@ -3234,7 +3234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { serialNumber, partNumber, brand, compatibleLaptops, voltage, capacity, cells, stockQuantity, minStockLevel, purchasePrice, sellingPrice, supplier, location, notes } = req.body;
+      const { serialNumber, partNumber, barcode, brand, compatibleLaptops, voltage, capacity, cells, stockQuantity, minStockLevel, purchasePrice, sellingPrice, supplier, location, notes } = req.body;
       
       if (!serialNumber || !brand || !compatibleLaptops || compatibleLaptops.length === 0) {
         return res.status(400).json({ error: "الرقم التسلسلي والعلامة التجارية والأجهزة المتوافقة مطلوبة" });
@@ -3246,9 +3246,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
       }
       
+      // Auto-generate barcode from serial number if not provided
+      const generatedBarcode = barcode || `BAT-${serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`;
+      
       const battery = await storage.createLaptopBattery({
         serialNumber,
         partNumber: partNumber || null,
+        barcode: generatedBarcode,
         brand,
         compatibleLaptops,
         voltage: voltage || null,

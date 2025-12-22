@@ -548,6 +548,7 @@ export const laptopBatteries = pgTable("laptop_batteries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   serialNumber: text("serial_number").notNull().unique(), // Battery serial/part number
   partNumber: text("part_number"), // Alternative part numbers
+  barcode: text("barcode"), // Barcode for scanning (auto-generated if not provided)
   brand: text("brand").notNull(), // Battery brand (OEM, Replacement, etc.)
   compatibleLaptops: text("compatible_laptops").array().notNull(), // Array of compatible laptop models
   voltage: decimal("voltage", { precision: 4, scale: 2 }), // Voltage (e.g., 11.1V)

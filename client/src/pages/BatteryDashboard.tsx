@@ -40,6 +40,7 @@ import {
   PlusCircle
 } from "lucide-react";
 import type { LaptopBattery } from "@shared/schema";
+import Barcode from "@/components/Barcode";
 
 interface BatteryUserAuth {
   id: string;
@@ -473,7 +474,18 @@ export default function BatteryDashboard() {
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="mt-4 pt-4 border-t border-slate-100">
+                      <div className="bg-white rounded-lg p-2 flex justify-center">
+                        <Barcode 
+                          value={battery.barcode || battery.serialNumber} 
+                          height={35} 
+                          width={1.2}
+                          fontSize={10}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="mt-4 pt-2 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
                       <span className="text-xs font-bold text-primary flex items-center gap-1">
                         View Details <ChevronRight className="h-3 w-3" />
                       </span>
