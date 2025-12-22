@@ -157,7 +157,7 @@ export default function BatteryDashboard() {
   const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
     const barcodeValue = battery.barcode || battery.serialNumber;
-    const printWindow = window.open('', '_blank', 'width=400,height=300');
+    const printWindow = window.open('', '_blank', 'width=200,height=400');
     if (printWindow) {
       printWindow.document.write(`
         <!DOCTYPE html>
@@ -172,12 +172,12 @@ export default function BatteryDashboard() {
               box-sizing: border-box;
             }
             @page {
-              size: 50mm 25mm;
+              size: 25mm 50mm;
               margin: 0;
             }
             html, body {
-              width: 50mm;
-              height: 25mm;
+              width: 25mm;
+              height: 50mm;
               margin: 0;
               padding: 0;
               overflow: hidden;
@@ -185,36 +185,43 @@ export default function BatteryDashboard() {
             }
             body {
               display: flex;
+              flex-direction: column;
               align-items: center;
               justify-content: center;
               font-family: Arial, sans-serif;
             }
             .label-container {
-              width: 25mm;
-              height: 50mm;
+              width: 23mm;
+              height: 48mm;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              transform: rotate(90deg);
-              transform-origin: center center;
+              text-align: center;
             }
             .brand {
-              font-size: 6pt;
+              font-size: 5pt;
               font-weight: bold;
               margin-bottom: 1mm;
               text-transform: uppercase;
-              letter-spacing: 0.3px;
-              white-space: nowrap;
+              word-break: break-all;
+              max-width: 22mm;
             }
-            svg {
-              width: 21mm !important;
-              height: 40mm !important;
+            .serial {
+              font-size: 6pt;
+              font-weight: bold;
+              margin-bottom: 2mm;
+              word-break: break-all;
+              max-width: 22mm;
+            }
+            #barcode {
+              transform: rotate(90deg);
+              transform-origin: center center;
             }
             @media print {
               html, body {
-                width: 50mm;
-                height: 25mm;
+                width: 25mm;
+                height: 50mm;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
               }
@@ -223,20 +230,21 @@ export default function BatteryDashboard() {
         </head>
         <body>
           <div class="label-container">
-            <div class="brand">${battery.brand} | ${battery.serialNumber}</div>
+            <div class="brand">${battery.brand}</div>
+            <div class="serial">${battery.serialNumber}</div>
             <svg id="barcode"></svg>
           </div>
           <script>
             JsBarcode("#barcode", "${barcodeValue}", {
               format: "CODE128",
-              width: 1.5,
-              height: 70,
+              width: 1.2,
+              height: 50,
               displayValue: true,
-              fontSize: 10,
+              fontSize: 8,
               font: "Arial",
               fontOptions: "bold",
               margin: 0,
-              textMargin: 2,
+              textMargin: 1,
               background: "#ffffff",
               lineColor: "#000000"
             });
