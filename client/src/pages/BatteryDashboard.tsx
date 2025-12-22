@@ -180,30 +180,30 @@ export default function BatteryDashboard() {
 <html>
 <head>
 <title>QR Code</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 @page{size:75mm 50mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:2mm}
-.title{font:bold 11pt Arial;text-align:center;margin-bottom:1mm}
-.qr-container{display:flex;justify-content:center;align-items:center}
-.serial{font:bold 10pt Arial;text-align:center;margin-top:1mm}
+.title{font:bold 11pt Arial;text-align:center;margin-bottom:2mm}
+#qrcode{display:flex;justify-content:center;align-items:center}
+#qrcode img{display:block!important}
+.serial{font:bold 9pt Arial;text-align:center;margin-top:2mm}
 .price{font:bold 14pt Arial;text-align:center;margin-top:1mm}
 </style>
 </head>
 <body>
 <div class="label">
 <div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<div class="qr-container"><canvas id="qrcode"></canvas></div>
+<div id="qrcode"></div>
+<div class="serial">${barcodeValue}</div>
 <div class="price">${price}</div>
 </div>
 <script>
-QRCode.toCanvas(document.getElementById('qrcode'),"${barcodeValue}",{width:100,margin:1,color:{dark:'#000000',light:'#ffffff'}},function(error){
-if(error)console.error(error);
-setTimeout(function(){window.print();},200);
-});
+new QRCode(document.getElementById("qrcode"),{text:"${barcodeValue}",width:90,height:90,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+setTimeout(function(){window.print();},500);
 </script>
 </body>
 </html>`);
@@ -213,30 +213,30 @@ setTimeout(function(){window.print();},200);
 <html>
 <head>
 <title>QR Code</title>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 @page{size:50mm 75mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:3mm}
-.title{font:bold 10pt Arial;text-align:center;margin-bottom:2mm}
-.qr-container{display:flex;justify-content:center;align-items:center}
-.serial{font:bold 9pt Arial;text-align:center;margin-top:2mm}
+.title{font:bold 10pt Arial;text-align:center;margin-bottom:3mm}
+#qrcode{display:flex;justify-content:center;align-items:center}
+#qrcode img{display:block!important}
+.serial{font:bold 9pt Arial;text-align:center;margin-top:3mm}
 .price{font:bold 16pt Arial;text-align:center;margin-top:2mm}
 </style>
 </head>
 <body>
 <div class="label">
 <div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<div class="qr-container"><canvas id="qrcode"></canvas></div>
+<div id="qrcode"></div>
+<div class="serial">${barcodeValue}</div>
 <div class="price">${price}</div>
 </div>
 <script>
-QRCode.toCanvas(document.getElementById('qrcode'),"${barcodeValue}",{width:120,margin:1,color:{dark:'#000000',light:'#ffffff'}},function(error){
-if(error)console.error(error);
-setTimeout(function(){window.print();},200);
-});
+new QRCode(document.getElementById("qrcode"),{text:"${barcodeValue}",width:110,height:110,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
+setTimeout(function(){window.print();},500);
 </script>
 </body>
 </html>`);
