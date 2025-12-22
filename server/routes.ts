@@ -3054,6 +3054,312 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ==================== BATTERY SYSTEM ROUTES ====================
+  
+  // Initialize default battery user
+  await storage.initializeDefaultBatteryUser();
+  
+  // Battery system authentication
+  app.post("/api/battery/auth/login", async (req, res) => {
+    try {
+      const { username, password } = req.body;
+      
+      if (!username || !password) {
+        return res.status(400).json({ error: "اسم المستخدم وكلمة المرور مطلوبان" });
+      }
+      
+      const user = await storage.getBatteryUserByUsername(username);
+      if (!user) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+      
+      if (user.isActive !== 1) {
+        return res.status(401).json({ error: "الحساب معطل" });
+      }
+      
+      const validPassword = await bcrypt.compare(password, user.password);
+      if (!validPassword) {
+        return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
+      }
+      
+      // Set battery session
+      (req.session as any).batteryUserId = user.id;
+      (req.session as any).batteryUsername = user.username;
+      
+      return res.json({ 
+        success: true, 
+        user: { 
+          id: user.id, 
+          username: user.username, 
+          name: user.name, 
+          role: user.role 
+        } 
+      });
+    } catch (error) {
+      console.error("Battery login error:", error);
+      return res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+    }
+  });
+  
+  app.post("/api/battery/auth/logout", (req, res) => {
+    (req.session as any).batteryUserId = null;
+    (req.session as any).batteryUsername = null;
+    return res.json({ success: true });
+  });
+  
+  app.get("/api/battery/auth/me", async (req, res) => {
+    const batteryUserId = (req.session as any).batteryUserId;
+    if (!batteryUserId) {
+      return res.status(401).json({ error: "غير مصرح" });
+    }
+    
+    const user = await storage.getBatteryUser(batteryUserId);
+    if (!user) {
+      return res.status(401).json({ error: "المستخدم غير موجود" });
+    }
+    
+    return res.json({ 
+      id: user.id, 
+      username: user.username, 
+      name: user.name, 
+      role: user.role 
+    });
+  });
+  
+  // Battery CRUD operations
+  app.get("/api/battery/batteries", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const batteries = await storage.getLaptopBatteries();
+      return res.json(batteries);
+    } catch (error) {
+      console.error("Error getting batteries:", error);
+      return res.status(500).json({ error: "خطأ في جلب البطاريات" });
+    }
+  });
+  
+  app.get("/api/battery/batteries/low-stock", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const batteries = await storage.getLowStockBatteries();
+      return res.json(batteries);
+    } catch (error) {
+      console.error("Error getting low stock batteries:", error);
+      return res.status(500).json({ error: "خطأ في جلب البطاريات" });
+    }
+  });
+  
+  app.get("/api/battery/batteries/search", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { q, type } = req.query;
+      
+      if (!q || typeof q !== 'string') {
+        return res.json([]);
+      }
+      
+      let results: any[] = [];
+      
+      if (type === 'serial') {
+        // Search by battery serial number
+        const battery = await storage.getLaptopBatteryBySerial(q);
+        if (battery) {
+          results = [battery];
+        } else {
+          // Partial match
+          const allBatteries = await storage.getLaptopBatteries();
+          results = allBatteries.filter(b => 
+            b.serialNumber.toLowerCase().includes(q.toLowerCase()) ||
+            (b.partNumber && b.partNumber.toLowerCase().includes(q.toLowerCase()))
+          );
+        }
+      } else if (type === 'laptop') {
+        // Search by laptop model
+        results = await storage.searchBatteriesByLaptopModel(q);
+      } else {
+        // Search both
+        const allBatteries = await storage.getLaptopBatteries();
+        const searchLower = q.toLowerCase();
+        results = allBatteries.filter(b => 
+          b.serialNumber.toLowerCase().includes(searchLower) ||
+          (b.partNumber && b.partNumber.toLowerCase().includes(searchLower)) ||
+          b.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(searchLower))
+        );
+      }
+      
+      return res.json(results);
+    } catch (error) {
+      console.error("Error searching batteries:", error);
+      return res.status(500).json({ error: "خطأ في البحث" });
+    }
+  });
+  
+  app.get("/api/battery/batteries/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const battery = await storage.getLaptopBattery(req.params.id);
+      if (!battery) {
+        return res.status(404).json({ error: "البطارية غير موجودة" });
+      }
+      return res.json(battery);
+    } catch (error) {
+      console.error("Error getting battery:", error);
+      return res.status(500).json({ error: "خطأ في جلب البطارية" });
+    }
+  });
+  
+  app.post("/api/battery/batteries", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { serialNumber, partNumber, brand, compatibleLaptops, voltage, capacity, cells, stockQuantity, minStockLevel, purchasePrice, sellingPrice, supplier, location, notes } = req.body;
+      
+      if (!serialNumber || !brand || !compatibleLaptops || compatibleLaptops.length === 0) {
+        return res.status(400).json({ error: "الرقم التسلسلي والعلامة التجارية والأجهزة المتوافقة مطلوبة" });
+      }
+      
+      // Check if serial number already exists
+      const existing = await storage.getLaptopBatteryBySerial(serialNumber);
+      if (existing) {
+        return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+      }
+      
+      const battery = await storage.createLaptopBattery({
+        serialNumber,
+        partNumber: partNumber || null,
+        brand,
+        compatibleLaptops,
+        voltage: voltage || null,
+        capacity: capacity || null,
+        cells: cells || null,
+        stockQuantity: stockQuantity || 0,
+        minStockLevel: minStockLevel || 2,
+        purchasePrice: purchasePrice || null,
+        sellingPrice: sellingPrice || null,
+        supplier: supplier || null,
+        location: location || null,
+        notes: notes || null,
+        isActive: 1
+      });
+      
+      return res.json(battery);
+    } catch (error) {
+      console.error("Error creating battery:", error);
+      return res.status(500).json({ error: "خطأ في إضافة البطارية" });
+    }
+  });
+  
+  app.put("/api/battery/batteries/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const battery = await storage.updateLaptopBattery(req.params.id, req.body);
+      if (!battery) {
+        return res.status(404).json({ error: "البطارية غير موجودة" });
+      }
+      return res.json(battery);
+    } catch (error) {
+      console.error("Error updating battery:", error);
+      return res.status(500).json({ error: "خطأ في تحديث البطارية" });
+    }
+  });
+  
+  app.delete("/api/battery/batteries/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      await storage.deleteLaptopBattery(req.params.id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting battery:", error);
+      return res.status(500).json({ error: "خطأ في حذف البطارية" });
+    }
+  });
+  
+  // Battery users management (admin only)
+  app.get("/api/battery/users", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getBatteryUser(batteryUserId);
+      if (!currentUser || currentUser.role !== 'admin') {
+        return res.status(403).json({ error: "غير مسموح" });
+      }
+      
+      const users = await storage.getBatteryUsers();
+      return res.json(users.map(u => ({ ...u, password: undefined })));
+    } catch (error) {
+      console.error("Error getting battery users:", error);
+      return res.status(500).json({ error: "خطأ في جلب المستخدمين" });
+    }
+  });
+  
+  app.post("/api/battery/users", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const currentUser = await storage.getBatteryUser(batteryUserId);
+      if (!currentUser || currentUser.role !== 'admin') {
+        return res.status(403).json({ error: "غير مسموح" });
+      }
+      
+      const { username, password, name, role } = req.body;
+      
+      if (!username || !password || !name) {
+        return res.status(400).json({ error: "جميع الحقول مطلوبة" });
+      }
+      
+      const existing = await storage.getBatteryUserByUsername(username);
+      if (existing) {
+        return res.status(400).json({ error: "اسم المستخدم موجود مسبقاً" });
+      }
+      
+      const user = await storage.createBatteryUser({
+        username,
+        password,
+        name,
+        role: role || 'staff',
+        isActive: 1
+      });
+      
+      return res.json({ ...user, password: undefined });
+    } catch (error) {
+      console.error("Error creating battery user:", error);
+      return res.status(500).json({ error: "خطأ في إنشاء المستخدم" });
+    }
+  });
+
   // POS - Create walk-in order
   app.post("/api/admin/pos/order", async (req, res) => {
     try {

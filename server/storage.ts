@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -98,6 +98,25 @@ export interface IStorage {
   getInventoryMovements(productId?: string): Promise<InventoryMovement[]>;
   createInventoryMovement(movement: InsertInventoryMovement): Promise<InventoryMovement>;
   bulkUpdateStock(updates: Array<{ productId: string; quantity: number }>): Promise<void>;
+  
+  // Battery system user methods
+  createBatteryUser(user: InsertBatteryUser): Promise<BatteryUser>;
+  getBatteryUsers(): Promise<BatteryUser[]>;
+  getBatteryUser(id: string): Promise<BatteryUser | undefined>;
+  getBatteryUserByUsername(username: string): Promise<BatteryUser | undefined>;
+  updateBatteryUser(id: string, updates: Partial<InsertBatteryUser>): Promise<BatteryUser | undefined>;
+  deleteBatteryUser(id: string): Promise<void>;
+  initializeDefaultBatteryUser(): Promise<void>;
+  
+  // Laptop battery methods
+  getLaptopBatteries(): Promise<LaptopBattery[]>;
+  getLaptopBattery(id: string): Promise<LaptopBattery | undefined>;
+  getLaptopBatteryBySerial(serialNumber: string): Promise<LaptopBattery | undefined>;
+  searchBatteriesByLaptopModel(laptopModel: string): Promise<LaptopBattery[]>;
+  getLowStockBatteries(): Promise<LaptopBattery[]>;
+  createLaptopBattery(battery: InsertLaptopBattery): Promise<LaptopBattery>;
+  updateLaptopBattery(id: string, updates: Partial<InsertLaptopBattery>): Promise<LaptopBattery | undefined>;
+  deleteLaptopBattery(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {

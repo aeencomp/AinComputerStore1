@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -650,5 +650,106 @@ export class DrizzleStorage implements IStorage {
     for (const update of updates) {
       await this.updateProductStock(update.productId, update.quantity);
     }
+  }
+  
+  // Battery system user methods
+  async createBatteryUser(user: InsertBatteryUser): Promise<BatteryUser> {
+    const hashedPassword = await bcrypt.hash(user.password, 10);
+    const result = await db.insert(batteryUsers).values({
+      ...user,
+      password: hashedPassword
+    }).returning();
+    return result[0];
+  }
+  
+  async getBatteryUsers(): Promise<BatteryUser[]> {
+    return await db.select().from(batteryUsers).orderBy(desc(batteryUsers.createdAt));
+  }
+  
+  async getBatteryUser(id: string): Promise<BatteryUser | undefined> {
+    const result = await db.select().from(batteryUsers).where(eq(batteryUsers.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async getBatteryUserByUsername(username: string): Promise<BatteryUser | undefined> {
+    const result = await db.select().from(batteryUsers).where(eq(batteryUsers.username, username)).limit(1);
+    return result[0];
+  }
+  
+  async updateBatteryUser(id: string, updates: Partial<InsertBatteryUser>): Promise<BatteryUser | undefined> {
+    if (updates.password) {
+      updates.password = await bcrypt.hash(updates.password, 10);
+    }
+    const result = await db.update(batteryUsers).set(updates).where(eq(batteryUsers.id, id)).returning();
+    return result[0];
+  }
+  
+  async deleteBatteryUser(id: string): Promise<void> {
+    await db.delete(batteryUsers).where(eq(batteryUsers.id, id));
+  }
+  
+  async initializeDefaultBatteryUser(): Promise<void> {
+    const existingUser = await this.getBatteryUserByUsername("battery");
+    if (!existingUser) {
+      await db.insert(batteryUsers).values({
+        username: "battery",
+        password: await bcrypt.hash("battery123", 10),
+        name: "مدير البطاريات",
+        role: "admin",
+        isActive: 1
+      });
+      console.log("Default battery user created: battery / battery123");
+    }
+  }
+  
+  // Laptop battery methods
+  async getLaptopBatteries(): Promise<LaptopBattery[]> {
+    return await db.select().from(laptopBatteries).where(eq(laptopBatteries.isActive, 1)).orderBy(desc(laptopBatteries.createdAt));
+  }
+  
+  async getLaptopBattery(id: string): Promise<LaptopBattery | undefined> {
+    const result = await db.select().from(laptopBatteries).where(eq(laptopBatteries.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async getLaptopBatteryBySerial(serialNumber: string): Promise<LaptopBattery | undefined> {
+    const result = await db.select().from(laptopBatteries).where(eq(laptopBatteries.serialNumber, serialNumber)).limit(1);
+    return result[0];
+  }
+  
+  async searchBatteriesByLaptopModel(laptopModel: string): Promise<LaptopBattery[]> {
+    // Search batteries where any of the compatible laptops match the search term
+    const allBatteries = await db.select().from(laptopBatteries).where(eq(laptopBatteries.isActive, 1));
+    const searchLower = laptopModel.toLowerCase();
+    return allBatteries.filter(battery => 
+      battery.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(searchLower))
+    );
+  }
+  
+  async getLowStockBatteries(): Promise<LaptopBattery[]> {
+    return await db.select().from(laptopBatteries).where(
+      and(
+        eq(laptopBatteries.isActive, 1),
+        sql`${laptopBatteries.stockQuantity} <= ${laptopBatteries.minStockLevel}`
+      )
+    );
+  }
+  
+  async createLaptopBattery(battery: InsertLaptopBattery): Promise<LaptopBattery> {
+    const result = await db.insert(laptopBatteries).values(battery).returning();
+    return result[0];
+  }
+  
+  async updateLaptopBattery(id: string, updates: Partial<InsertLaptopBattery>): Promise<LaptopBattery | undefined> {
+    const result = await db.update(laptopBatteries)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(laptopBatteries.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteLaptopBattery(id: string): Promise<void> {
+    // Soft delete
+    await db.update(laptopBatteries).set({ isActive: 0 }).where(eq(laptopBatteries.id, id));
   }
 }

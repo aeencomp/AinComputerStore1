@@ -523,3 +523,53 @@ export const insertSalesShiftSchema = createInsertSchema(salesShifts).omit({
 
 export type InsertSalesShift = z.infer<typeof insertSalesShiftSchema>;
 export type SalesShift = typeof salesShifts.$inferSelect;
+
+// Battery system users with separate authentication
+export const batteryUsers = pgTable("battery_users", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  name: text("name").notNull(),
+  role: text("role").notNull().default("staff"), // staff, admin
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertBatteryUserSchema = createInsertSchema(batteryUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBatteryUser = z.infer<typeof insertBatteryUserSchema>;
+export type BatteryUser = typeof batteryUsers.$inferSelect;
+
+// Laptop batteries inventory with compatibility tracking
+export const laptopBatteries = pgTable("laptop_batteries", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serialNumber: text("serial_number").notNull().unique(), // Battery serial/part number
+  partNumber: text("part_number"), // Alternative part numbers
+  brand: text("brand").notNull(), // Battery brand (OEM, Replacement, etc.)
+  compatibleLaptops: text("compatible_laptops").array().notNull(), // Array of compatible laptop models
+  voltage: decimal("voltage", { precision: 4, scale: 2 }), // Voltage (e.g., 11.1V)
+  capacity: integer("capacity"), // Capacity in mAh
+  cells: integer("cells"), // Number of cells (3, 4, 6, 9)
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(2), // Alert threshold
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  supplier: text("supplier"),
+  location: text("location"), // Storage location in warehouse
+  notes: text("notes"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLaptopBatterySchema = createInsertSchema(laptopBatteries).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLaptopBattery = z.infer<typeof insertLaptopBatterySchema>;
+export type LaptopBattery = typeof laptopBatteries.$inferSelect;
