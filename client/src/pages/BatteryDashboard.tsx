@@ -154,10 +154,19 @@ export default function BatteryDashboard() {
     });
   };
 
-  const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
+  const printBarcode = (battery: LaptopBattery, orientation: 'landscape' | 'portrait', e: React.MouseEvent) => {
     e.stopPropagation();
     const barcodeValue = battery.barcode || battery.serialNumber;
     const printWindow = window.open('', '_blank');
+    
+    const isLandscape = orientation === 'landscape';
+    const pageSize = isLandscape ? '50mm 20mm' : '20mm 50mm';
+    const labelWidth = isLandscape ? '50mm' : '20mm';
+    const labelHeight = isLandscape ? '20mm' : '50mm';
+    const barcodeWidth = isLandscape ? 1 : 0.8;
+    const barcodeHeight = isLandscape ? 22 : 35;
+    const barcodeRotate = isLandscape ? '' : 'transform:rotate(90deg);';
+    
     if (printWindow) {
       printWindow.document.write(`<!DOCTYPE html>
 <html>
@@ -165,12 +174,12 @@ export default function BatteryDashboard() {
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:50mm 20mm;margin:0!important;padding:0!important}
+@page{size:${pageSize};margin:0!important;padding:0!important}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:50mm;height:20mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:50mm;height:20mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
+html,body{width:${labelWidth};height:${labelHeight};margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:${labelWidth};height:${labelHeight};display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
 .info{font:bold 6pt Arial;margin-bottom:0.5mm}
-#barcode{display:block}
+#barcode{display:block;${barcodeRotate}}
 </style>
 </head>
 <body>
@@ -179,7 +188,7 @@ html,body{width:50mm;height:20mm;margin:0!important;padding:0!important;backgrou
 <svg id="barcode"></svg>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1,height:22,displayValue:true,fontSize:6,margin:0,textMargin:0,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:${barcodeWidth},height:${barcodeHeight},displayValue:true,fontSize:6,margin:0,textMargin:0,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
@@ -520,16 +529,26 @@ setTimeout(function(){window.print();},200);
                           />
                         </div>
                       </div>
-                      <div className="flex justify-center mt-2">
+                      <div className="flex justify-center gap-2 mt-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => printBarcode(battery, e)}
+                          onClick={(e) => printBarcode(battery, 'landscape', e)}
                           className="text-xs gap-1"
-                          data-testid={`button-print-barcode-${battery.id}`}
+                          data-testid={`button-print-landscape-${battery.id}`}
                         >
                           <Printer className="h-3 w-3" />
-                          {language === 'ar' ? 'طباعة' : 'Print'}
+                          {language === 'ar' ? 'أفقي' : 'Landscape'}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => printBarcode(battery, 'portrait', e)}
+                          className="text-xs gap-1"
+                          data-testid={`button-print-portrait-${battery.id}`}
+                        >
+                          <Printer className="h-3 w-3" />
+                          {language === 'ar' ? 'عمودي' : 'Portrait'}
                         </Button>
                       </div>
                     </div>
