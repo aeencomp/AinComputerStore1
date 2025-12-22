@@ -154,10 +154,14 @@ export default function BatteryDashboard() {
     });
   };
 
-  const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
+  const printBarcode = async (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
     const barcodeValue = battery.barcode || battery.serialNumber;
     const price = battery.sellingPrice || '';
+    
+    // Generate QR code as data URL
+    const { toDataURL } = await import('qrcode');
+    const qrDataURL = await toDataURL(barcodeValue, { width: 100, margin: 1 });
     
     const printWindow = window.open('', '_blank');
     if (printWindow) {
@@ -165,24 +169,22 @@ export default function BatteryDashboard() {
 <html>
 <head>
 <title>Print Label</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
 @page{size:75mm 50mm;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff}
-.title{font-size:11pt;font-weight:bold;margin-bottom:3mm;text-align:center}
-svg{max-width:70mm}
-.price{font-size:14pt;font-weight:bold;margin-top:2mm}
+.title{font-size:11pt;font-weight:bold;margin-bottom:2mm;text-align:center}
+.qr{display:block}
+.serial{font-size:9pt;font-weight:bold;margin-top:2mm}
+.price{font-size:14pt;font-weight:bold;margin-top:1mm}
 </style>
 </head>
 <body>
 <div class="title">${battery.brand} ${battery.serialNumber}</div>
-<svg id="barcode"></svg>
+<img class="qr" src="${qrDataURL}" width="90" height="90" />
+<div class="serial">${barcodeValue}</div>
 <div class="price">${price}</div>
-<script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2,height:40,displayValue:true,fontSize:12,margin:5});
-setTimeout(function(){window.print();},400);
-</script>
+<script>setTimeout(function(){window.print();},300);</script>
 </body>
 </html>`);
       printWindow.document.close();
@@ -529,7 +531,7 @@ setTimeout(function(){window.print();},400);
                           data-testid={`button-print-barcode-${battery.id}`}
                         >
                           <Printer className="h-3 w-3" />
-                          {language === 'ar' ? 'طباعة' : 'Print'}
+                          {language === 'ar' ? 'طباعة QR' : 'Print QR'}
                         </Button>
                       </div>
                     </div>
