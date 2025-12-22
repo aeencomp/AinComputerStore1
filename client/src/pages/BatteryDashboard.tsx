@@ -163,39 +163,29 @@ export default function BatteryDashboard() {
         <!DOCTYPE html>
         <html>
         <head>
-          <title>Print Barcode</title>
+          <title>Barcode</title>
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
           <style>
-            @page {
-              size: 20mm 50mm landscape;
-              margin: 0;
+            @media print {
+              @page { size: 50mm 20mm; margin: 0; }
+              html, body { width: 50mm !important; height: 20mm !important; }
             }
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body {
-              background: #fff;
-              width: 50mm;
-              height: 20mm;
-              overflow: hidden;
-            }
+            * { margin: 0; padding: 0; }
+            html, body { background: white; }
             .label {
               width: 50mm;
               height: 20mm;
-              background: #fff;
+              background: white;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
-              padding: 1mm;
+              font-family: Arial, sans-serif;
             }
             .info {
-              text-align: center;
-              font-size: 6pt;
+              font-size: 7pt;
               font-weight: bold;
-              font-family: Arial, sans-serif;
               margin-bottom: 1mm;
-            }
-            #barcode {
-              max-width: 48mm;
             }
           </style>
         </head>
@@ -207,18 +197,16 @@ export default function BatteryDashboard() {
           <script>
             JsBarcode("#barcode", "${barcodeValue}", {
               format: "CODE128",
-              width: 1.5,
-              height: 30,
+              width: 1.2,
+              height: 25,
               displayValue: true,
-              fontSize: 8,
+              fontSize: 7,
               margin: 0,
-              textMargin: 1,
-              background: "#ffffff",
-              lineColor: "#000000"
+              textMargin: 0,
+              background: "#fff",
+              lineColor: "#000"
             });
-            setTimeout(function() {
-              window.print();
-            }, 300);
+            setTimeout(function() { window.print(); }, 250);
           </script>
         </body>
         </html>
