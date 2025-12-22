@@ -558,6 +558,7 @@ export const laptopBatteries = pgTable("laptop_batteries", {
   minStockLevel: integer("min_stock_level").notNull().default(2), // Alert threshold
   purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
   sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
   supplier: text("supplier"),
   location: text("location"), // Storage location in warehouse
   notes: text("notes"),

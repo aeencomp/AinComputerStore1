@@ -50,6 +50,7 @@ export default function BatteryManage() {
     minStockLevel: "2",
     purchasePrice: "",
     sellingPrice: "",
+    wholesalePrice: "",
     supplier: "",
     location: "",
     notes: "",
@@ -83,6 +84,7 @@ export default function BatteryManage() {
           minStockLevel: (battery.minStockLevel || 2).toString(),
           purchasePrice: battery.purchasePrice?.toString() || "",
           sellingPrice: battery.sellingPrice?.toString() || "",
+          wholesalePrice: battery.wholesalePrice?.toString() || "",
           supplier: battery.supplier || "",
           location: battery.location || "",
           notes: battery.notes || "",
@@ -154,6 +156,7 @@ export default function BatteryManage() {
       minStockLevel: "2",
       purchasePrice: "",
       sellingPrice: "",
+      wholesalePrice: "",
       supplier: "",
       location: "",
       notes: "",
@@ -204,6 +207,7 @@ export default function BatteryManage() {
       minStockLevel: parseInt(formData.minStockLevel) || 2,
       purchasePrice: formData.purchasePrice || null,
       sellingPrice: formData.sellingPrice || null,
+      wholesalePrice: formData.wholesalePrice || null,
       supplier: formData.supplier || null,
       location: formData.location || null,
       notes: formData.notes || null,
@@ -330,6 +334,7 @@ export default function BatteryManage() {
                                 minStockLevel: (battery.minStockLevel || 2).toString(),
                                 purchasePrice: battery.purchasePrice?.toString() || "",
                                 sellingPrice: battery.sellingPrice?.toString() || "",
+                                wholesalePrice: battery.wholesalePrice?.toString() || "",
                                 supplier: battery.supplier || "",
                                 location: battery.location || "",
                                 notes: battery.notes || "",
@@ -493,7 +498,7 @@ export default function BatteryManage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-2">
                     <Label>{language === 'ar' ? 'سعر الشراء (IQD)' : 'Purchase Price (IQD)'}</Label>
                     <Input
@@ -501,6 +506,15 @@ export default function BatteryManage() {
                       value={formData.purchasePrice}
                       onChange={(e) => setFormData({ ...formData, purchasePrice: e.target.value })}
                       data-testid="input-purchase-price"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{language === 'ar' ? 'سعر الجملة (IQD)' : 'Wholesale Price (IQD)'}</Label>
+                    <Input
+                      type="number"
+                      value={formData.wholesalePrice}
+                      onChange={(e) => setFormData({ ...formData, wholesalePrice: e.target.value })}
+                      data-testid="input-wholesale-price"
                     />
                   </div>
                   <div className="space-y-2">

@@ -72,6 +72,7 @@ export default function BatteryDashboard() {
     minStockLevel: "2",
     purchasePrice: "",
     sellingPrice: "",
+    wholesalePrice: "",
     supplier: "",
     location: "",
   });
@@ -149,6 +150,7 @@ export default function BatteryDashboard() {
       minStockLevel: "2",
       purchasePrice: "",
       sellingPrice: "",
+      wholesalePrice: "",
       supplier: "",
       location: "",
     });
@@ -243,6 +245,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       minStockLevel: parseInt(newBattery.minStockLevel) || 2,
       purchasePrice: newBattery.purchasePrice || null,
       sellingPrice: newBattery.sellingPrice || null,
+      wholesalePrice: newBattery.wholesalePrice || null,
       supplier: newBattery.supplier.trim() || null,
       location: newBattery.location.trim() || null,
     });
@@ -707,7 +710,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="purchasePrice">
                   {language === 'ar' ? 'سعر الشراء (د.ع)' : 'Purchase Price (IQD)'}
@@ -719,6 +722,19 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                   onChange={(e) => setNewBattery(prev => ({ ...prev, purchasePrice: e.target.value }))}
                   placeholder="25000"
                   data-testid="input-purchase-price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="wholesalePrice">
+                  {language === 'ar' ? 'سعر الجملة (د.ع)' : 'Wholesale Price (IQD)'}
+                </Label>
+                <Input
+                  id="wholesalePrice"
+                  type="number"
+                  value={newBattery.wholesalePrice}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, wholesalePrice: e.target.value }))}
+                  placeholder="35000"
+                  data-testid="input-wholesale-price"
                 />
               </div>
               <div className="space-y-2">
