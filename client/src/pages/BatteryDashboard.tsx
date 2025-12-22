@@ -157,26 +157,26 @@ export default function BatteryDashboard() {
   const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
     const barcodeValue = battery.barcode || battery.serialNumber;
-    const printWindow = window.open('', '_blank', 'width=189,height=94');
+    const printWindow = window.open('', '_blank', 'width=94,height=189');
     if (printWindow) {
       printWindow.document.write(`<!DOCTYPE html><html><head><title>${battery.serialNumber}</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-@page{size:50mm 25mm;margin:0}
-html,body{width:50mm;height:25mm;margin:0;padding:0;overflow:hidden;background:#fff;font-family:Arial,sans-serif}
+@page{size:25mm 50mm;margin:0}
+html,body{width:25mm;height:50mm;margin:0;padding:0;overflow:hidden;background:#fff;font-family:Arial,sans-serif}
 body{display:flex;align-items:center;justify-content:center}
-.container{width:48mm;height:23mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.sn{font-size:6pt;font-weight:bold;margin-top:1mm}
-svg{max-width:46mm;max-height:16mm}
-@media print{html,body{width:50mm;height:25mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+.container{width:21mm;height:46mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.sn{font-size:7pt;font-weight:bold;margin-top:2mm}
+svg{width:21mm;height:38mm}
+@media print{html,body{width:25mm;height:50mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 </style></head><body>
 <div class="container">
 <svg id="bc"></svg>
 <div class="sn">${battery.serialNumber}</div>
 </div>
 <script>
-JsBarcode("#bc","${barcodeValue}",{format:"CODE128",width:0.8,height:40,displayValue:false,margin:0,background:"#fff",lineColor:"#000"});
+JsBarcode("#bc","${barcodeValue}",{format:"CODE128",width:0.5,height:80,displayValue:false,margin:0,background:"#fff",lineColor:"#000"});
 window.onload=function(){setTimeout(function(){window.print()},250)};
 <\/script></body></html>`);
       printWindow.document.close();
