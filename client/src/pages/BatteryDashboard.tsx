@@ -183,7 +183,7 @@ html,body{width:50mm;height:20mm;margin:0!important;padding:0!important;backgrou
 <svg id="barcode"></svg>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1,height:22,displayValue:true,fontSize:6,margin:0,textMargin:0,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1.5,height:125,displayValue:true,fontSize:10,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
@@ -211,7 +211,7 @@ html,body{width:20mm;height:50mm;margin:0!important;padding:0!important;backgrou
 <div class="serial">${battery.serialNumber}</div>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1,height:30,displayValue:true,fontSize:6,margin:0,textMargin:0,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1.5,height:125,displayValue:true,fontSize:10,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
