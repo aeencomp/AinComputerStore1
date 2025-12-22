@@ -184,7 +184,7 @@ export default function BatteryDashboard() {
 html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
 .info{font:bold 10pt Arial;margin-bottom:2mm;text-align:center}
-#barcode{display:block}
+#barcode{display:block;transform:rotate(90deg)}
 </style>
 </head>
 <body>
