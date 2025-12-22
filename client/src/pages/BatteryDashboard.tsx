@@ -189,7 +189,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 <div class="serial">${qrValue}</div>
 <div class="price">${price}</div>
 </div>
-<script>setTimeout(function(){window.print();},300);</script>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
 </body>
 </html>`);
       printWindow.document.close();
