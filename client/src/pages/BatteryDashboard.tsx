@@ -163,7 +163,7 @@ export default function BatteryDashboard() {
     
     // Generate QR code as data URL
     const { toDataURL } = await import('qrcode');
-    const qrDataURL = await toDataURL(qrValue, { width: 50, margin: 0 });
+    const qrDataURL = await toDataURL(qrValue, { width: 70, margin: 0 });
     
     const printWindow = window.open('', '_blank');
     if (printWindow) {
@@ -183,7 +183,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 </style>
 </head>
 <body>
-<img class="qr" src="${qrDataURL}" width="45" height="45" />
+<img class="qr" src="${qrDataURL}" width="60" height="60" />
 <div class="info">
 <div class="title">${battery.brand}</div>
 <div class="serial">${qrValue}</div>
