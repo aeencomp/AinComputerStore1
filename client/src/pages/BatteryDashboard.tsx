@@ -174,11 +174,11 @@ export default function BatteryDashboard() {
 <style>
 @page{size:50mm 25mm;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
-body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
+body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
 .info{display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
-.title{font-size:7pt;font-weight:bold}
-.serial{font-size:6pt;font-weight:bold;margin-top:1mm}
-.price{font-size:9pt;font-weight:bold;margin-top:1mm}
+.title{font-size:8pt;font-weight:900;letter-spacing:0.5px}
+.serial{font-size:7pt;font-weight:700;margin-top:1mm;letter-spacing:0.3px}
+.price{font-size:10pt;font-weight:900;margin-top:1mm}
 .qr{display:block}
 </style>
 </head>
