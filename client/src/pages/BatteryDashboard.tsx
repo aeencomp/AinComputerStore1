@@ -176,38 +176,35 @@ export default function BatteryDashboard() {
               width: 20mm;
               height: 50mm;
               overflow: hidden;
+              display: flex;
+              align-items: center;
+              justify-content: center;
             }
             .label {
               width: 20mm;
               height: 50mm;
               background: #fff;
-              position: relative;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
             }
             .brand {
-              position: absolute;
-              top: 1mm;
-              left: 0;
-              right: 0;
               text-align: center;
               font-size: 5pt;
               font-weight: bold;
               font-family: Arial, sans-serif;
+              margin-bottom: 2mm;
             }
             .serial {
-              position: absolute;
-              bottom: 1mm;
-              left: 0;
-              right: 0;
               text-align: center;
               font-size: 5pt;
               font-weight: bold;
               font-family: Arial, sans-serif;
+              margin-top: 2mm;
             }
             .barcode-wrap {
-              position: absolute;
-              top: 50%;
-              left: 50%;
-              transform: translate(-50%, -50%) rotate(90deg);
+              transform: rotate(90deg);
             }
           </style>
         </head>
