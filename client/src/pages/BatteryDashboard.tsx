@@ -178,13 +178,13 @@ export default function BatteryDashboard() {
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:75mm 50mm;margin:0!important;padding:0!important}
+@page{size:75mm 50mm landscape;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
 .info{font:bold 10pt Arial;margin-bottom:2mm;text-align:center}
-#barcode{display:block;transform:rotate(90deg)}
+#barcode{display:block}
 </style>
 </head>
 <body>
@@ -205,7 +205,7 @@ setTimeout(function(){window.print();},200);
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:50mm 75mm;margin:0!important;padding:0!important}
+@page{size:50mm 75mm portrait;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
