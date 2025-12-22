@@ -170,18 +170,18 @@ export default function BatteryDashboard() {
 <head>
 <title>Print Label</title>
 <style>
-@page{size:75mm 50mm;margin:0}
+@page{size:50mm 75mm;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
-body{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff}
-.title{font-size:11pt;font-weight:bold;margin-bottom:2mm;text-align:center}
+body{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff}
+.title{font-size:10pt;font-weight:bold;margin-bottom:3mm;text-align:center}
 .qr{display:block}
-.serial{font-size:9pt;font-weight:bold;margin-top:2mm}
-.price{font-size:14pt;font-weight:bold;margin-top:1mm}
+.serial{font-size:9pt;font-weight:bold;margin-top:3mm}
+.price{font-size:16pt;font-weight:bold;margin-top:2mm}
 </style>
 </head>
 <body>
 <div class="title">${battery.brand} ${battery.serialNumber}</div>
-<img class="qr" src="${qrDataURL}" width="90" height="90" />
+<img class="qr" src="${qrDataURL}" width="110" height="110" />
 <div class="serial">${barcodeValue}</div>
 <div class="price">${price}</div>
 <script>setTimeout(function(){window.print();},300);</script>
