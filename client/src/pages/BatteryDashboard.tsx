@@ -41,7 +41,7 @@ import {
   Printer
 } from "lucide-react";
 import type { LaptopBattery } from "@shared/schema";
-import Barcode from "@/components/Barcode";
+import QRCode from "@/components/QRCode";
 
 interface BatteryUserAuth {
   id: string;
@@ -171,7 +171,7 @@ export default function BatteryDashboard() {
     const isLandscape = orientation === 'landscape';
     
     if (printWindow) {
-      // Label format like sample: Title on top, barcode in middle, serial below, price at bottom
+      // Label format: Title on top, QR code in middle, serial below, price at bottom
       const price = printBattery.sellingPrice || '';
       
       if (isLandscape) {
@@ -179,8 +179,8 @@ export default function BatteryDashboard() {
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
-<title>Barcode</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<title>QR Code</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 @page{size:75mm 50mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
@@ -188,29 +188,32 @@ export default function BatteryDashboard() {
 html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:2mm}
 .title{font:bold 11pt Arial;text-align:center;margin-bottom:1mm}
-.barcode-container{display:flex;justify-content:center;align-items:center}
+.qr-container{display:flex;justify-content:center;align-items:center}
+.serial{font:bold 10pt Arial;text-align:center;margin-top:1mm}
 .price{font:bold 14pt Arial;text-align:center;margin-top:1mm}
 </style>
 </head>
 <body>
 <div class="label">
 <div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<div class="barcode-container"><svg id="barcode"></svg></div>
+<div class="qr-container"><canvas id="qrcode"></canvas></div>
 <div class="price">${price}</div>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2.5,height:35,displayValue:true,fontSize:12,margin:5,textMargin:2,background:"#fff",lineColor:"#000"});
+QRCode.toCanvas(document.getElementById('qrcode'),"${barcodeValue}",{width:100,margin:1,color:{dark:'#000000',light:'#ffffff'}},function(error){
+if(error)console.error(error);
 setTimeout(function(){window.print();},200);
+});
 </script>
 </body>
 </html>`);
       } else {
-        // Portrait: 50mm x 75mm vertical label (like the sample image)
+        // Portrait: 50mm x 75mm vertical label
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
-<title>Barcode</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<title>QR Code</title>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <style>
 @page{size:50mm 75mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
@@ -218,19 +221,22 @@ setTimeout(function(){window.print();},200);
 html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:3mm}
 .title{font:bold 10pt Arial;text-align:center;margin-bottom:2mm}
-.barcode-container{display:flex;justify-content:center;align-items:center}
+.qr-container{display:flex;justify-content:center;align-items:center}
+.serial{font:bold 9pt Arial;text-align:center;margin-top:2mm}
 .price{font:bold 16pt Arial;text-align:center;margin-top:2mm}
 </style>
 </head>
 <body>
 <div class="label">
 <div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<div class="barcode-container"><svg id="barcode"></svg></div>
+<div class="qr-container"><canvas id="qrcode"></canvas></div>
 <div class="price">${price}</div>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2,height:45,displayValue:true,fontSize:11,margin:5,textMargin:2,background:"#fff",lineColor:"#000"});
+QRCode.toCanvas(document.getElementById('qrcode'),"${barcodeValue}",{width:120,margin:1,color:{dark:'#000000',light:'#ffffff'}},function(error){
+if(error)console.error(error);
 setTimeout(function(){window.print();},200);
+});
 </script>
 </body>
 </html>`);
@@ -563,14 +569,13 @@ setTimeout(function(){window.print();},200);
                     </div>
 
                     <div className="mt-4 pt-3 border-t border-slate-100">
-                      <div className="bg-white rounded-lg p-1 flex justify-center">
-                        <div style={{ width: '50mm', height: '20mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <Barcode 
-                            value={battery.barcode || battery.serialNumber} 
-                            height={70} 
-                            width={1.2}
-                            fontSize={9}
-                          />
+                      <div className="bg-white rounded-lg p-3 flex flex-col items-center justify-center">
+                        <QRCode 
+                          value={battery.barcode || battery.serialNumber} 
+                          size={80}
+                        />
+                        <div className="text-xs text-slate-500 mt-1 font-mono">
+                          {battery.barcode || battery.serialNumber}
                         </div>
                       </div>
                       <div className="flex justify-center mt-2">
@@ -579,10 +584,10 @@ setTimeout(function(){window.print();},200);
                           variant="outline"
                           onClick={(e) => openPrintDialog(battery, e)}
                           className="text-xs gap-1"
-                          data-testid={`button-print-barcode-${battery.id}`}
+                          data-testid={`button-print-qrcode-${battery.id}`}
                         >
                           <Printer className="h-3 w-3" />
-                          {language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}
+                          {language === 'ar' ? 'طباعة QR' : 'Print QR'}
                         </Button>
                       </div>
                     </div>
