@@ -37,7 +37,8 @@ import {
   Loader2,
   Settings,
   ChevronRight,
-  PlusCircle
+  PlusCircle,
+  Printer
 } from "lucide-react";
 import type { LaptopBattery } from "@shared/schema";
 import Barcode from "@/components/Barcode";
@@ -151,6 +152,81 @@ export default function BatteryDashboard() {
       supplier: "",
       location: "",
     });
+  };
+
+  const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const barcodeValue = battery.barcode || battery.serialNumber;
+    const printWindow = window.open('', '_blank', 'width=400,height=300');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Print Barcode - ${battery.serialNumber}</title>
+          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+          <style>
+            @page {
+              size: 50mm 25mm;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 2mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              width: 50mm;
+              height: 25mm;
+              box-sizing: border-box;
+              font-family: Arial, sans-serif;
+            }
+            .label-container {
+              text-align: center;
+              width: 100%;
+            }
+            .brand {
+              font-size: 7pt;
+              font-weight: bold;
+              margin-bottom: 1mm;
+            }
+            svg {
+              max-width: 100%;
+              height: auto;
+            }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="label-container">
+            <div class="brand">${battery.brand} - ${battery.serialNumber}</div>
+            <svg id="barcode"></svg>
+          </div>
+          <script>
+            JsBarcode("#barcode", "${barcodeValue}", {
+              format: "CODE128",
+              width: 1.5,
+              height: 40,
+              displayValue: true,
+              fontSize: 10,
+              margin: 2,
+              textMargin: 1
+            });
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 300);
+            };
+          </script>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
   };
 
   const openAddModal = () => {
@@ -484,6 +560,18 @@ export default function BatteryDashboard() {
                             fontSize={9}
                           />
                         </div>
+                      </div>
+                      <div className="flex justify-center mt-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => printBarcode(battery, e)}
+                          className="text-xs gap-1"
+                          data-testid={`button-print-barcode-${battery.id}`}
+                        >
+                          <Printer className="h-3 w-3" />
+                          {language === 'ar' ? 'طباعة' : 'Print'}
+                        </Button>
                       </div>
                     </div>
 
