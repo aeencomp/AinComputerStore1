@@ -171,18 +171,20 @@ export default function BatteryDashboard() {
     const isLandscape = orientation === 'landscape';
     
     if (printWindow) {
+      // Both use same page size (50mm x 75mm) - content is rotated for landscape
       if (isLandscape) {
+        // Landscape: rotate entire content 90deg to print horizontally on vertical label
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:75mm 50mm landscape;margin:0!important;padding:0!important}
+@page{size:50mm 75mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
+html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:75mm;height:50mm;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-90deg);display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
 .info{font:bold 10pt Arial;margin-bottom:2mm;text-align:center}
 #barcode{display:block}
 </style>
@@ -193,19 +195,20 @@ html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;backgrou
 <svg id="barcode"></svg>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2,height:60,displayValue:true,fontSize:12,margin:0,textMargin:2,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2,height:50,displayValue:true,fontSize:12,margin:0,textMargin:2,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
 </html>`);
       } else {
+        // Portrait: content stays vertical, barcode rotated 90deg
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:50mm 75mm portrait;margin:0!important;padding:0!important}
+@page{size:50mm 75mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
