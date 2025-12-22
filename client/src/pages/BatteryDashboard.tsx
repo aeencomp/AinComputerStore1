@@ -171,37 +171,41 @@ export default function BatteryDashboard() {
     const isLandscape = orientation === 'landscape';
     
     if (printWindow) {
-      // Both use same page size (50mm x 75mm) - content is rotated for landscape
+      // Label format like sample: Title on top, barcode in middle, serial below, price at bottom
+      const price = printBattery.sellingPrice || '';
+      
       if (isLandscape) {
-        // Landscape: rotate entire content 90deg to print horizontally on vertical label
+        // Landscape: 75mm x 50mm horizontal label
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:50mm 75mm;margin:0!important;padding:0!important}
+@page{size:75mm 50mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:75mm;height:50mm;position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(-90deg);display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
-.info{font:bold 10pt Arial;margin-bottom:2mm;text-align:center}
-#barcode{display:block}
+html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:2mm}
+.title{font:bold 11pt Arial;text-align:center;margin-bottom:1mm}
+.barcode-container{display:flex;justify-content:center;align-items:center}
+.price{font:bold 14pt Arial;text-align:center;margin-top:1mm}
 </style>
 </head>
 <body>
 <div class="label">
-<div class="info">${printBattery.brand} | ${printBattery.serialNumber}</div>
-<svg id="barcode"></svg>
+<div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
+<div class="barcode-container"><svg id="barcode"></svg></div>
+<div class="price">${price}</div>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:3,height:80,displayValue:true,fontSize:14,margin:10,textMargin:3,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2.5,height:35,displayValue:true,fontSize:12,margin:5,textMargin:2,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
 </html>`);
       } else {
-        // Portrait: content stays vertical, barcode rotated 90deg
+        // Portrait: 50mm x 75mm vertical label (like the sample image)
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
@@ -212,20 +216,20 @@ setTimeout(function(){window.print();},200);
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;position:relative}
-.info{font:bold 9pt Arial;text-align:center;position:absolute;top:3mm;left:0;right:0}
-.serial{font:bold 9pt Arial;text-align:center;position:absolute;bottom:3mm;left:0;right:0}
-.barcode-wrap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg)}
+.label{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:3mm}
+.title{font:bold 10pt Arial;text-align:center;margin-bottom:2mm}
+.barcode-container{display:flex;justify-content:center;align-items:center}
+.price{font:bold 16pt Arial;text-align:center;margin-top:2mm}
 </style>
 </head>
 <body>
 <div class="label">
-<div class="info">${printBattery.brand}</div>
-<div class="barcode-wrap"><svg id="barcode"></svg></div>
-<div class="serial">${printBattery.serialNumber}</div>
+<div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
+<div class="barcode-container"><svg id="barcode"></svg></div>
+<div class="price">${price}</div>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:3,height:100,displayValue:true,fontSize:14,margin:10,textMargin:3,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2,height:45,displayValue:true,fontSize:11,margin:5,textMargin:2,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
