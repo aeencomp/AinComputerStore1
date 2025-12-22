@@ -163,24 +163,61 @@ export default function BatteryDashboard() {
     setShowPrintDialog(true);
   };
 
-  const printBarcode = (orientation: 'landscape' | 'portrait') => {
+  const printBarcode = async (orientation: 'landscape' | 'portrait') => {
     if (!printBattery) return;
     const barcodeValue = printBattery.barcode || printBattery.serialNumber;
-    const printWindow = window.open('', '_blank');
+    
+    // Generate QR code as data URL using canvas
+    const generateQRDataURL = (text: string, size: number): Promise<string> => {
+      return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        import('qrcode.react').then(() => {
+          // Use a simple QR generation approach
+          const qrSize = size;
+          canvas.width = qrSize;
+          canvas.height = qrSize;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            // Create QR using the existing QRCodeSVG and convert
+            const tempDiv = document.createElement('div');
+            tempDiv.style.position = 'absolute';
+            tempDiv.style.left = '-9999px';
+            document.body.appendChild(tempDiv);
+            
+            // Use dynamic import for QR code generation
+            import('qrcode').then((QRCode) => {
+              QRCode.toDataURL(text, { width: size, margin: 1 }, (err: any, url: string) => {
+                document.body.removeChild(tempDiv);
+                resolve(url || '');
+              });
+            }).catch(() => {
+              document.body.removeChild(tempDiv);
+              resolve('');
+            });
+          } else {
+            resolve('');
+          }
+        });
+      });
+    };
     
     const isLandscape = orientation === 'landscape';
+    const qrSize = isLandscape ? 90 : 110;
+    
+    // Generate QR code data URL
+    const { toDataURL } = await import('qrcode');
+    const qrDataURL = await toDataURL(barcodeValue, { width: qrSize, margin: 1 });
+    
+    const printWindow = window.open('', '_blank');
     
     if (printWindow) {
-      // Label format: Title on top, QR code in middle, serial below, price at bottom
       const price = printBattery.sellingPrice || '';
       
       if (isLandscape) {
-        // Landscape: 75mm x 50mm horizontal label
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <title>QR Code</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 @page{size:75mm 50mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
@@ -188,8 +225,7 @@ export default function BatteryDashboard() {
 html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:2mm}
 .title{font:bold 11pt Arial;text-align:center;margin-bottom:2mm}
-#qrcode{display:flex;justify-content:center;align-items:center}
-#qrcode img{display:block!important}
+.qr-img{display:block}
 .serial{font:bold 9pt Arial;text-align:center;margin-top:2mm}
 .price{font:bold 14pt Arial;text-align:center;margin-top:1mm}
 </style>
@@ -197,23 +233,18 @@ html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;backgrou
 <body>
 <div class="label">
 <div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<div id="qrcode"></div>
+<img class="qr-img" src="${qrDataURL}" width="90" height="90" />
 <div class="serial">${barcodeValue}</div>
 <div class="price">${price}</div>
 </div>
-<script>
-new QRCode(document.getElementById("qrcode"),{text:"${barcodeValue}",width:90,height:90,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
-setTimeout(function(){window.print();},500);
-</script>
+<script>setTimeout(function(){window.print();},300);</script>
 </body>
 </html>`);
       } else {
-        // Portrait: 50mm x 75mm vertical label
         printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <title>QR Code</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <style>
 @page{size:50mm 75mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
@@ -221,8 +252,7 @@ setTimeout(function(){window.print();},500);
 html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:3mm}
 .title{font:bold 10pt Arial;text-align:center;margin-bottom:3mm}
-#qrcode{display:flex;justify-content:center;align-items:center}
-#qrcode img{display:block!important}
+.qr-img{display:block}
 .serial{font:bold 9pt Arial;text-align:center;margin-top:3mm}
 .price{font:bold 16pt Arial;text-align:center;margin-top:2mm}
 </style>
@@ -230,14 +260,11 @@ html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;backgrou
 <body>
 <div class="label">
 <div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<div id="qrcode"></div>
+<img class="qr-img" src="${qrDataURL}" width="110" height="110" />
 <div class="serial">${barcodeValue}</div>
 <div class="price">${price}</div>
 </div>
-<script>
-new QRCode(document.getElementById("qrcode"),{text:"${barcodeValue}",width:110,height:110,colorDark:"#000000",colorLight:"#ffffff",correctLevel:QRCode.CorrectLevel.M});
-setTimeout(function(){window.print();},500);
-</script>
+<script>setTimeout(function(){window.print();},300);</script>
 </body>
 </html>`);
       }
