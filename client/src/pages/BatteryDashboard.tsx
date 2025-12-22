@@ -169,10 +169,6 @@ export default function BatteryDashboard() {
     const printWindow = window.open('', '_blank');
     
     const isLandscape = orientation === 'landscape';
-    const pageWidth = isLandscape ? '185px' : '125px';
-    const pageHeight = isLandscape ? '125px' : '185px';
-    const barcodeHeight = isLandscape ? 80 : 120;
-    const barcodeWidth = isLandscape ? 1.2 : 1;
     
     if (printWindow) {
       if (isLandscape) {
@@ -182,12 +178,12 @@ export default function BatteryDashboard() {
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:185px 125px;margin:0!important;padding:0!important}
+@page{size:75mm 50mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:185px;height:125px;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:185px;height:125px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
-.info{font:bold 8px Arial;margin-bottom:2px;text-align:center}
+html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
+.info{font:bold 10pt Arial;margin-bottom:2mm;text-align:center}
 #barcode{display:block}
 </style>
 </head>
@@ -197,7 +193,7 @@ html,body{width:185px;height:125px;margin:0!important;padding:0!important;backgr
 <svg id="barcode"></svg>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:${barcodeWidth},height:${barcodeHeight},displayValue:true,fontSize:10,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2,height:60,displayValue:true,fontSize:12,margin:0,textMargin:2,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
@@ -209,13 +205,13 @@ setTimeout(function(){window.print();},200);
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:125px 185px;margin:0!important;padding:0!important}
+@page{size:50mm 75mm;margin:0!important;padding:0!important}
 @media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:125px;height:185px;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:125px;height:185px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;position:relative}
-.info{font:bold 7px Arial;text-align:center;position:absolute;top:4px;left:0;right:0}
-.serial{font:bold 7px Arial;text-align:center;position:absolute;bottom:4px;left:0;right:0}
+html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;position:relative}
+.info{font:bold 9pt Arial;text-align:center;position:absolute;top:3mm;left:0;right:0}
+.serial{font:bold 9pt Arial;text-align:center;position:absolute;bottom:3mm;left:0;right:0}
 .barcode-wrap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg)}
 </style>
 </head>
@@ -226,7 +222,7 @@ html,body{width:125px;height:185px;margin:0!important;padding:0!important;backgr
 <div class="serial">${printBattery.serialNumber}</div>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:${barcodeWidth},height:${barcodeHeight},displayValue:true,fontSize:9,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1.8,height:80,displayValue:true,fontSize:11,margin:0,textMargin:2,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
@@ -606,8 +602,8 @@ setTimeout(function(){window.print();},200);
             </DialogTitle>
             <DialogDescription className="text-center">
               {language === 'ar' 
-                ? 'حجم الملصق: 185×125 بكسل'
-                : 'Label size: 185×125 pixels'
+                ? 'حجم الملصق: 75×50 ملم'
+                : 'Label size: 75×50 mm'
               }
             </DialogDescription>
           </DialogHeader>
@@ -620,7 +616,7 @@ setTimeout(function(){window.print();},200);
               <Printer className="h-5 w-5" />
               <div className="flex flex-col items-start">
                 <span>{language === 'ar' ? 'أفقي' : 'Landscape'}</span>
-                <span className="text-xs opacity-70">185 × 125 px</span>
+                <span className="text-xs opacity-70">75 × 50 mm</span>
               </div>
             </Button>
             <Button
@@ -632,7 +628,7 @@ setTimeout(function(){window.print();},200);
               <Printer className="h-5 w-5" />
               <div className="flex flex-col items-start">
                 <span>{language === 'ar' ? 'عمودي' : 'Portrait'}</span>
-                <span className="text-xs opacity-70">125 × 185 px</span>
+                <span className="text-xs opacity-70">50 × 75 mm</span>
               </div>
             </Button>
           </div>
