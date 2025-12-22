@@ -170,52 +170,64 @@ export default function BatteryDashboard() {
               size: 20mm 50mm;
               margin: 0;
             }
-            * {
-              margin: 0;
-              padding: 0;
-            }
+            * { margin: 0; padding: 0; box-sizing: border-box; }
             html, body {
               background: #fff;
               width: 20mm;
               height: 50mm;
+              overflow: hidden;
             }
             .label {
               width: 20mm;
               height: 50mm;
               background: #fff;
-              text-align: center;
-              padding-top: 2mm;
-              font-family: Arial, sans-serif;
-              display: flex;
-              flex-direction: column;
-              align-items: center;
-              justify-content: center;
+              position: relative;
             }
-            .title {
+            .brand {
+              position: absolute;
+              top: 1mm;
+              left: 0;
+              right: 0;
+              text-align: center;
               font-size: 5pt;
               font-weight: bold;
-              margin-bottom: 1mm;
-              writing-mode: horizontal-tb;
+              font-family: Arial, sans-serif;
             }
-            #barcode {
-              transform: rotate(90deg);
-              transform-origin: center center;
+            .serial {
+              position: absolute;
+              bottom: 1mm;
+              left: 0;
+              right: 0;
+              text-align: center;
+              font-size: 5pt;
+              font-weight: bold;
+              font-family: Arial, sans-serif;
+            }
+            .barcode-wrap {
+              position: absolute;
+              top: 50%;
+              left: 50%;
+              transform: translate(-50%, -50%) rotate(90deg);
             }
           </style>
         </head>
         <body>
           <div class="label">
-            <div class="title">${battery.brand}</div>
-            <svg id="barcode"></svg>
-            <div class="title" style="margin-top: 1mm;">${battery.serialNumber}</div>
+            <div class="brand">${battery.brand}</div>
+            <div class="barcode-wrap">
+              <svg id="barcode"></svg>
+            </div>
+            <div class="serial">${battery.serialNumber}</div>
           </div>
           <script>
             JsBarcode("#barcode", "${barcodeValue}", {
               format: "CODE128",
-              width: 1,
-              height: 30,
-              displayValue: false,
+              width: 1.2,
+              height: 35,
+              displayValue: true,
+              fontSize: 8,
               margin: 0,
+              textMargin: 1,
               background: "#ffffff",
               lineColor: "#000000"
             });
