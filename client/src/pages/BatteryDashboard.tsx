@@ -167,7 +167,7 @@ export default function BatteryDashboard() {
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
           <style>
             @page {
-              size: 50mm 25mm;
+              size: 50mm 20mm;
               margin: 0;
             }
             * {
@@ -177,20 +177,20 @@ export default function BatteryDashboard() {
             html, body {
               background: #fff;
               width: 50mm;
-              height: 25mm;
+              height: 20mm;
             }
             .label {
               width: 50mm;
-              height: 25mm;
+              height: 20mm;
               background: #fff;
               text-align: center;
-              padding-top: 1mm;
+              padding-top: 0.5mm;
               font-family: Arial, sans-serif;
             }
             .title {
-              font-size: 7pt;
+              font-size: 6pt;
               font-weight: bold;
-              margin-bottom: 1mm;
+              margin-bottom: 0.5mm;
             }
             #barcode {
               display: block;
@@ -206,12 +206,12 @@ export default function BatteryDashboard() {
           <script>
             JsBarcode("#barcode", "${barcodeValue}", {
               format: "CODE128",
-              width: 1.5,
-              height: 45,
+              width: 1.3,
+              height: 35,
               displayValue: true,
-              fontSize: 9,
-              margin: 2,
-              textMargin: 2,
+              fontSize: 8,
+              margin: 1,
+              textMargin: 1,
               background: "#ffffff",
               lineColor: "#000000"
             });
@@ -549,7 +549,7 @@ export default function BatteryDashboard() {
 
                     <div className="mt-4 pt-3 border-t border-slate-100">
                       <div className="bg-white rounded-lg p-1 flex justify-center">
-                        <div style={{ width: '50mm', height: '25mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '50mm', height: '20mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Barcode 
                             value={battery.barcode || battery.serialNumber} 
                             height={70} 
