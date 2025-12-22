@@ -3174,29 +3174,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (type === 'serial') {
         // Search by battery serial number
-        const battery = await storage.getLaptopBatteryBySerial(q);
-        if (battery) {
-          results = [battery];
-        } else {
-          // Partial match
-          const allBatteries = await storage.getLaptopBatteries();
-          results = allBatteries.filter(b => 
-            b.serialNumber.toLowerCase().includes(q.toLowerCase()) ||
-            (b.partNumber && b.partNumber.toLowerCase().includes(q.toLowerCase()))
-          );
-        }
-      } else if (type === 'laptop') {
-        // Search by laptop model
-        results = await storage.searchBatteriesByLaptopModel(q);
-      } else {
-        // Search both
-        const allBatteries = await storage.getLaptopBatteries();
         const searchLower = q.toLowerCase();
+        const allBatteries = await storage.getLaptopBatteries();
         results = allBatteries.filter(b => 
           b.serialNumber.toLowerCase().includes(searchLower) ||
           (b.partNumber && b.partNumber.toLowerCase().includes(searchLower)) ||
+          b.brand.toLowerCase().includes(searchLower)
+        );
+      } else if (type === 'laptop') {
+        // Search by laptop model
+        const searchLower = q.toLowerCase();
+        const allBatteries = await storage.getLaptopBatteries();
+        results = allBatteries.filter(b => 
           b.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(searchLower))
         );
+      } else {
+        // Advanced Fuzzy-like Search
+        const searchLower = q.toLowerCase();
+        const allBatteries = await storage.getLaptopBatteries();
+        
+        // Multi-term search support (e.g. "Dell Latitude")
+        const terms = searchLower.split(/\s+/).filter(t => t.length > 0);
+        
+        results = allBatteries.filter(b => {
+          const batteryStr = `${b.serialNumber} ${b.partNumber || ''} ${b.brand} ${b.compatibleLaptops.join(' ')}`.toLowerCase();
+          return terms.every(term => batteryStr.includes(term));
+        });
       }
       
       return res.json(results);
