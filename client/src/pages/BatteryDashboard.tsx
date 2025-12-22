@@ -165,7 +165,7 @@ export default function BatteryDashboard() {
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:50mm 20mm landscape;margin:0!important;padding:0!important}
+@page{size:50mm 20mm;margin:0!important;padding:0!important}
 *{margin:0;padding:0;box-sizing:border-box}
 html,body{width:50mm;height:20mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
 .label{width:50mm;height:20mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
