@@ -167,7 +167,7 @@ export default function BatteryDashboard() {
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
           <style>
             @media print {
-              @page { size: 50mm 20mm; margin: 0; }
+              @page { size: 50mm 20mm landscape; margin: 0; }
               html, body { width: 50mm !important; height: 20mm !important; }
             }
             * { margin: 0; padding: 0; }
