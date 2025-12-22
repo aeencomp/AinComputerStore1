@@ -170,7 +170,7 @@ export default function BatteryDashboard() {
 <head>
 <title>Print Label</title>
 <style>
-@page{size:50mm 75mm;margin:0}
+@page{size:50mm 75mm;margin:1in}
 *{margin:0;padding:0;box-sizing:border-box}
 body{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff}
 .title{font-size:10pt;font-weight:bold;margin-bottom:3mm;text-align:center}
