@@ -7,6 +7,24 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { 
   Battery, 
   Search, 
@@ -18,7 +36,8 @@ import {
   Plus,
   Loader2,
   Settings,
-  ChevronRight
+  ChevronRight,
+  PlusCircle
 } from "lucide-react";
 import type { LaptopBattery } from "@shared/schema";
 
@@ -29,12 +48,31 @@ interface BatteryUserAuth {
   role: string;
 }
 
+const BRANDS = ['Apple', 'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Sony', 'Samsung', 'Toshiba', 'MSI', 'Razer', 'Other'];
+
 export default function BatteryDashboard() {
   const { language } = useLanguage();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [searchQuery, setSearchQuery] = useState("");
   const [searchType, setSearchType] = useState<'all' | 'serial' | 'laptop'>('all');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newBattery, setNewBattery] = useState({
+    serialNumber: "",
+    partNumber: "",
+    brand: "",
+    compatibleLaptops: "",
+    voltage: "",
+    capacity: "",
+    cells: "",
+    stockQuantity: "1",
+    minStockLevel: "2",
+    purchasePrice: "",
+    sellingPrice: "",
+    supplier: "",
+    location: "",
+  });
 
   const { data: currentUser, isLoading: authLoading } = useQuery<BatteryUserAuth>({
     queryKey: ['/api/battery/auth/me'],
@@ -71,6 +109,100 @@ export default function BatteryDashboard() {
       setLocation("/battery/login");
     },
   });
+
+  const addBatteryMutation = useMutation({
+    mutationFn: async (batteryData: any) => {
+      return await apiRequest('POST', '/api/battery/batteries', batteryData);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/search'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
+      setShowAddModal(false);
+      resetNewBattery();
+      toast({
+        title: language === 'ar' ? 'تمت الإضافة بنجاح' : 'Battery Added',
+        description: language === 'ar' ? 'تمت إضافة البطارية للمخزون' : 'The battery has been added to inventory',
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: error.message || (language === 'ar' ? 'فشل في إضافة البطارية' : 'Failed to add battery'),
+        variant: "destructive",
+      });
+    },
+  });
+
+  const resetNewBattery = () => {
+    setNewBattery({
+      serialNumber: "",
+      partNumber: "",
+      brand: "",
+      compatibleLaptops: "",
+      voltage: "",
+      capacity: "",
+      cells: "",
+      stockQuantity: "1",
+      minStockLevel: "2",
+      purchasePrice: "",
+      sellingPrice: "",
+      supplier: "",
+      location: "",
+    });
+  };
+
+  const openAddModal = () => {
+    if (searchType === 'serial' && searchQuery.trim()) {
+      setNewBattery(prev => ({ ...prev, serialNumber: searchQuery.trim() }));
+    } else if (searchType === 'laptop' && searchQuery.trim()) {
+      setNewBattery(prev => ({ ...prev, compatibleLaptops: searchQuery.trim() }));
+    } else if (searchQuery.trim()) {
+      setNewBattery(prev => ({ ...prev, serialNumber: searchQuery.trim() }));
+    }
+    setShowAddModal(true);
+  };
+
+  const handleAddBattery = () => {
+    if (!newBattery.serialNumber.trim() || !newBattery.brand) {
+      toast({
+        title: language === 'ar' ? 'بيانات ناقصة' : 'Missing Data',
+        description: language === 'ar' ? 'الرقم التسلسلي والماركة مطلوبان' : 'Serial number and brand are required',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const laptops = newBattery.compatibleLaptops
+      .split(',')
+      .map(l => l.trim())
+      .filter(l => l.length > 0);
+
+    if (laptops.length === 0) {
+      toast({
+        title: language === 'ar' ? 'بيانات ناقصة' : 'Missing Data',
+        description: language === 'ar' ? 'أضف جهاز واحد متوافق على الأقل' : 'Add at least one compatible laptop',
+        variant: "destructive",
+      });
+      return;
+    }
+
+    addBatteryMutation.mutate({
+      serialNumber: newBattery.serialNumber.trim(),
+      partNumber: newBattery.partNumber.trim() || null,
+      brand: newBattery.brand,
+      compatibleLaptops: laptops,
+      voltage: newBattery.voltage ? newBattery.voltage : null,
+      capacity: newBattery.capacity ? parseInt(newBattery.capacity) : null,
+      cells: newBattery.cells ? parseInt(newBattery.cells) : null,
+      stockQuantity: parseInt(newBattery.stockQuantity) || 1,
+      minStockLevel: parseInt(newBattery.minStockLevel) || 2,
+      purchasePrice: newBattery.purchasePrice || null,
+      sellingPrice: newBattery.sellingPrice || null,
+      supplier: newBattery.supplier.trim() || null,
+      location: newBattery.location.trim() || null,
+    });
+  };
 
   if (authLoading) {
     return (
@@ -241,11 +373,31 @@ export default function BatteryDashboard() {
               <p className="text-sm font-medium text-slate-500">Loading your database...</p>
             </div>
           ) : displayBatteries.length === 0 ? (
-            <div className="text-center py-24 border-2 border-dashed border-slate-200 rounded-3xl bg-white">
+            <div className="text-center py-24 border-2 border-dashed border-slate-200 rounded-3xl bg-white" data-testid="empty-state-container">
               <div className="bg-slate-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                 <Search className="h-8 w-8 text-slate-300" />
               </div>
-              <h3 className="text-lg font-bold text-slate-900">No results found</h3>
+              <h3 className="text-lg font-bold text-slate-900 mb-2">
+                {language === 'ar' ? 'لم يتم العثور على نتائج' : 'No results found'}
+              </h3>
+              {searchQuery.trim() && (
+                <>
+                  <p className="text-slate-500 mb-6 max-w-md mx-auto">
+                    {language === 'ar' 
+                      ? `لا توجد بطارية مطابقة لـ "${searchQuery}". هل تريد إضافتها؟`
+                      : `No battery matching "${searchQuery}" found. Would you like to add it?`
+                    }
+                  </p>
+                  <Button 
+                    onClick={openAddModal}
+                    className="bg-primary hover:bg-primary/90 text-white rounded-xl px-8"
+                    data-testid="button-quick-add-battery"
+                  >
+                    <PlusCircle className="h-4 w-4 me-2" />
+                    {language === 'ar' ? 'إضافة بطارية جديدة' : 'Add New Battery'}
+                  </Button>
+                </>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -333,6 +485,241 @@ export default function BatteryDashboard() {
           )}
         </div>
       </main>
+
+      <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">
+              {language === 'ar' ? 'إضافة بطارية جديدة' : 'Add New Battery'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'ar' 
+                ? 'أدخل معلومات البطارية لإضافتها للمخزون'
+                : 'Enter battery information to add it to inventory'
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="serialNumber">
+                  {language === 'ar' ? 'الرقم التسلسلي *' : 'Serial Number *'}
+                </Label>
+                <Input
+                  id="serialNumber"
+                  value={newBattery.serialNumber}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, serialNumber: e.target.value }))}
+                  placeholder="e.g. A1405, MU06"
+                  data-testid="input-serial-number"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="brand">
+                  {language === 'ar' ? 'الماركة *' : 'Brand *'}
+                </Label>
+                <Select 
+                  value={newBattery.brand} 
+                  onValueChange={(val) => setNewBattery(prev => ({ ...prev, brand: val }))}
+                >
+                  <SelectTrigger data-testid="select-brand">
+                    <SelectValue placeholder={language === 'ar' ? 'اختر الماركة' : 'Select brand'} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {BRANDS.map(brand => (
+                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="partNumber">
+                {language === 'ar' ? 'أرقام القطع البديلة' : 'Alternative Part Numbers'}
+              </Label>
+              <Input
+                id="partNumber"
+                value={newBattery.partNumber}
+                onChange={(e) => setNewBattery(prev => ({ ...prev, partNumber: e.target.value }))}
+                placeholder="e.g. 020-7379-A, 661-6055"
+                data-testid="input-part-number"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="compatibleLaptops">
+                {language === 'ar' ? 'الأجهزة المتوافقة * (مفصولة بفواصل)' : 'Compatible Laptops * (comma-separated)'}
+              </Label>
+              <Textarea
+                id="compatibleLaptops"
+                value={newBattery.compatibleLaptops}
+                onChange={(e) => setNewBattery(prev => ({ ...prev, compatibleLaptops: e.target.value }))}
+                placeholder="e.g. MacBook Air 13, Dell Inspiron 15, HP Pavilion 14"
+                rows={2}
+                data-testid="input-compatible-laptops"
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="voltage">
+                  {language === 'ar' ? 'الفولتية (V)' : 'Voltage (V)'}
+                </Label>
+                <Input
+                  id="voltage"
+                  value={newBattery.voltage}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, voltage: e.target.value }))}
+                  placeholder="11.1"
+                  data-testid="input-voltage"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="capacity">
+                  {language === 'ar' ? 'السعة (mAh)' : 'Capacity (mAh)'}
+                </Label>
+                <Input
+                  id="capacity"
+                  type="number"
+                  value={newBattery.capacity}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, capacity: e.target.value }))}
+                  placeholder="4400"
+                  data-testid="input-capacity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cells">
+                  {language === 'ar' ? 'عدد الخلايا' : 'Cells'}
+                </Label>
+                <Select 
+                  value={newBattery.cells} 
+                  onValueChange={(val) => setNewBattery(prev => ({ ...prev, cells: val }))}
+                >
+                  <SelectTrigger data-testid="select-cells">
+                    <SelectValue placeholder="-" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="2">2</SelectItem>
+                    <SelectItem value="3">3</SelectItem>
+                    <SelectItem value="4">4</SelectItem>
+                    <SelectItem value="6">6</SelectItem>
+                    <SelectItem value="8">8</SelectItem>
+                    <SelectItem value="9">9</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="stockQuantity">
+                  {language === 'ar' ? 'الكمية' : 'Stock Quantity'}
+                </Label>
+                <Input
+                  id="stockQuantity"
+                  type="number"
+                  value={newBattery.stockQuantity}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, stockQuantity: e.target.value }))}
+                  min="0"
+                  data-testid="input-stock-quantity"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="minStockLevel">
+                  {language === 'ar' ? 'الحد الأدنى للتنبيه' : 'Min Stock Alert'}
+                </Label>
+                <Input
+                  id="minStockLevel"
+                  type="number"
+                  value={newBattery.minStockLevel}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, minStockLevel: e.target.value }))}
+                  min="0"
+                  data-testid="input-min-stock"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="purchasePrice">
+                  {language === 'ar' ? 'سعر الشراء (د.ع)' : 'Purchase Price (IQD)'}
+                </Label>
+                <Input
+                  id="purchasePrice"
+                  type="number"
+                  value={newBattery.purchasePrice}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, purchasePrice: e.target.value }))}
+                  placeholder="25000"
+                  data-testid="input-purchase-price"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="sellingPrice">
+                  {language === 'ar' ? 'سعر البيع (د.ع)' : 'Selling Price (IQD)'}
+                </Label>
+                <Input
+                  id="sellingPrice"
+                  type="number"
+                  value={newBattery.sellingPrice}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, sellingPrice: e.target.value }))}
+                  placeholder="40000"
+                  data-testid="input-selling-price"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="supplier">
+                  {language === 'ar' ? 'المورد' : 'Supplier'}
+                </Label>
+                <Input
+                  id="supplier"
+                  value={newBattery.supplier}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, supplier: e.target.value }))}
+                  placeholder="e.g. Global Tech"
+                  data-testid="input-supplier"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="location">
+                  {language === 'ar' ? 'الموقع في المخزن' : 'Warehouse Location'}
+                </Label>
+                <Input
+                  id="location"
+                  value={newBattery.location}
+                  onChange={(e) => setNewBattery(prev => ({ ...prev, location: e.target.value }))}
+                  placeholder="e.g. Shelf A1"
+                  data-testid="input-location"
+                />
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowAddModal(false)}
+              data-testid="button-cancel-add"
+            >
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button 
+              onClick={handleAddBattery}
+              disabled={addBatteryMutation.isPending}
+              className="bg-primary"
+              data-testid="button-submit-add"
+            >
+              {addBatteryMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin me-2" />
+              ) : (
+                <Plus className="h-4 w-4 me-2" />
+              )}
+              {language === 'ar' ? 'إضافة' : 'Add Battery'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
