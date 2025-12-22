@@ -154,124 +154,39 @@ export default function BatteryDashboard() {
     });
   };
 
-  const [printBattery, setPrintBattery] = useState<LaptopBattery | null>(null);
-  const [showPrintDialog, setShowPrintDialog] = useState(false);
-
-  const openPrintDialog = (battery: LaptopBattery, e: React.MouseEvent) => {
+  const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
-    setPrintBattery(battery);
-    setShowPrintDialog(true);
-  };
-
-  const printBarcode = async (orientation: 'landscape' | 'portrait') => {
-    if (!printBattery) return;
-    const barcodeValue = printBattery.barcode || printBattery.serialNumber;
-    
-    // Generate QR code as data URL using canvas
-    const generateQRDataURL = (text: string, size: number): Promise<string> => {
-      return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        import('qrcode.react').then(() => {
-          // Use a simple QR generation approach
-          const qrSize = size;
-          canvas.width = qrSize;
-          canvas.height = qrSize;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            // Create QR using the existing QRCodeSVG and convert
-            const tempDiv = document.createElement('div');
-            tempDiv.style.position = 'absolute';
-            tempDiv.style.left = '-9999px';
-            document.body.appendChild(tempDiv);
-            
-            // Use dynamic import for QR code generation
-            import('qrcode').then((QRCode) => {
-              QRCode.toDataURL(text, { width: size, margin: 1 }, (err: any, url: string) => {
-                document.body.removeChild(tempDiv);
-                resolve(url || '');
-              });
-            }).catch(() => {
-              document.body.removeChild(tempDiv);
-              resolve('');
-            });
-          } else {
-            resolve('');
-          }
-        });
-      });
-    };
-    
-    const isLandscape = orientation === 'landscape';
-    const qrSize = isLandscape ? 90 : 110;
-    
-    // Generate QR code data URL
-    const { toDataURL } = await import('qrcode');
-    const qrDataURL = await toDataURL(barcodeValue, { width: qrSize, margin: 1 });
+    const barcodeValue = battery.barcode || battery.serialNumber;
+    const price = battery.sellingPrice || '';
     
     const printWindow = window.open('', '_blank');
-    
     if (printWindow) {
-      const price = printBattery.sellingPrice || '';
-      
-      if (isLandscape) {
-        printWindow.document.write(`<!DOCTYPE html>
+      printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
-<title>QR Code</title>
+<title>Print Label</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:75mm 50mm;margin:0!important;padding:0!important}
-@media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+@page{size:75mm 50mm;margin:0}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:75mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:2mm}
-.title{font:bold 11pt Arial;text-align:center;margin-bottom:2mm}
-.qr-img{display:block}
-.serial{font:bold 9pt Arial;text-align:center;margin-top:2mm}
-.price{font:bold 14pt Arial;text-align:center;margin-top:1mm}
+body{width:75mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Arial,sans-serif;background:#fff}
+.title{font-size:11pt;font-weight:bold;margin-bottom:3mm;text-align:center}
+svg{max-width:70mm}
+.price{font-size:14pt;font-weight:bold;margin-top:2mm}
 </style>
 </head>
 <body>
-<div class="label">
-<div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<img class="qr-img" src="${qrDataURL}" width="90" height="90" />
-<div class="serial">${barcodeValue}</div>
+<div class="title">${battery.brand} ${battery.serialNumber}</div>
+<svg id="barcode"></svg>
 <div class="price">${price}</div>
-</div>
-<script>setTimeout(function(){window.print();},300);</script>
+<script>
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:2,height:40,displayValue:true,fontSize:12,margin:5});
+setTimeout(function(){window.print();},400);
+</script>
 </body>
 </html>`);
-      } else {
-        printWindow.document.write(`<!DOCTYPE html>
-<html>
-<head>
-<title>QR Code</title>
-<style>
-@page{size:50mm 75mm;margin:0!important;padding:0!important}
-@media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:50mm;height:75mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;padding:3mm}
-.title{font:bold 10pt Arial;text-align:center;margin-bottom:3mm}
-.qr-img{display:block}
-.serial{font:bold 9pt Arial;text-align:center;margin-top:3mm}
-.price{font:bold 16pt Arial;text-align:center;margin-top:2mm}
-</style>
-</head>
-<body>
-<div class="label">
-<div class="title">${printBattery.brand} ${printBattery.serialNumber}</div>
-<img class="qr-img" src="${qrDataURL}" width="110" height="110" />
-<div class="serial">${barcodeValue}</div>
-<div class="price">${price}</div>
-</div>
-<script>setTimeout(function(){window.print();},300);</script>
-</body>
-</html>`);
-      }
       printWindow.document.close();
     }
-    setShowPrintDialog(false);
-    setPrintBattery(null);
   };
 
   const openAddModal = () => {
@@ -609,12 +524,12 @@ html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;backgrou
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => openPrintDialog(battery, e)}
+                          onClick={(e) => printBarcode(battery, e)}
                           className="text-xs gap-1"
-                          data-testid={`button-print-qrcode-${battery.id}`}
+                          data-testid={`button-print-barcode-${battery.id}`}
                         >
                           <Printer className="h-3 w-3" />
-                          {language === 'ar' ? 'طباعة QR' : 'Print QR'}
+                          {language === 'ar' ? 'طباعة' : 'Print'}
                         </Button>
                       </div>
                     </div>
@@ -631,48 +546,6 @@ html,body{width:50mm;height:75mm;margin:0!important;padding:0!important;backgrou
           )}
         </div>
       </main>
-
-      {/* Print Orientation Dialog */}
-      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-center">
-              {language === 'ar' ? 'اختر اتجاه الطباعة' : 'Choose Print Orientation'}
-            </DialogTitle>
-            <DialogDescription className="text-center">
-              {language === 'ar' 
-                ? 'حجم الملصق: 75×50 ملم'
-                : 'Label size: 75×50 mm'
-              }
-            </DialogDescription>
-          </DialogHeader>
-          <div className="flex flex-col gap-3 py-4">
-            <Button
-              onClick={() => printBarcode('landscape')}
-              className="h-16 text-lg gap-3"
-              data-testid="button-print-landscape"
-            >
-              <Printer className="h-5 w-5" />
-              <div className="flex flex-col items-start">
-                <span>{language === 'ar' ? 'أفقي' : 'Landscape'}</span>
-                <span className="text-xs opacity-70">75 × 50 mm</span>
-              </div>
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => printBarcode('portrait')}
-              className="h-16 text-lg gap-3"
-              data-testid="button-print-portrait"
-            >
-              <Printer className="h-5 w-5" />
-              <div className="flex flex-col items-start">
-                <span>{language === 'ar' ? 'عمودي' : 'Portrait'}</span>
-                <span className="text-xs opacity-70">50 × 75 mm</span>
-              </div>
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
