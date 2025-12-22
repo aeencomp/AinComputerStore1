@@ -160,26 +160,21 @@ export default function BatteryDashboard() {
     const printWindow = window.open('', '_blank');
     
     const isLandscape = orientation === 'landscape';
-    const pageSize = isLandscape ? '50mm 20mm' : '20mm 50mm';
-    const labelWidth = isLandscape ? '50mm' : '20mm';
-    const labelHeight = isLandscape ? '20mm' : '50mm';
-    const barcodeWidth = isLandscape ? 1 : 0.8;
-    const barcodeHeight = isLandscape ? 22 : 35;
-    const barcodeRotate = isLandscape ? '' : 'transform:rotate(90deg);';
     
     if (printWindow) {
-      printWindow.document.write(`<!DOCTYPE html>
+      if (isLandscape) {
+        printWindow.document.write(`<!DOCTYPE html>
 <html>
 <head>
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:${pageSize};margin:0!important;padding:0!important}
+@page{size:50mm 20mm;margin:0!important;padding:0!important}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:${labelWidth};height:${labelHeight};margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:${labelWidth};height:${labelHeight};display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
+html,body{width:50mm;height:20mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:50mm;height:20mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
 .info{font:bold 6pt Arial;margin-bottom:0.5mm}
-#barcode{display:block;${barcodeRotate}}
+#barcode{display:block}
 </style>
 </head>
 <body>
@@ -188,11 +183,40 @@ html,body{width:${labelWidth};height:${labelHeight};margin:0!important;padding:0
 <svg id="barcode"></svg>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:${barcodeWidth},height:${barcodeHeight},displayValue:true,fontSize:6,margin:0,textMargin:0,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1,height:22,displayValue:true,fontSize:6,margin:0,textMargin:0,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
 </html>`);
+      } else {
+        printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>Barcode</title>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+<style>
+@page{size:20mm 50mm;margin:0!important;padding:0!important}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{width:20mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.label{width:20mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;position:absolute;top:0;left:0;right:0;bottom:0}
+.info{font:bold 5pt Arial;text-align:center;position:absolute;top:2mm;left:0;right:0}
+.serial{font:bold 5pt Arial;text-align:center;position:absolute;bottom:2mm;left:0;right:0}
+.barcode-wrap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg)}
+</style>
+</head>
+<body>
+<div class="label">
+<div class="info">${battery.brand}</div>
+<div class="barcode-wrap"><svg id="barcode"></svg></div>
+<div class="serial">${battery.serialNumber}</div>
+</div>
+<script>
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1,height:30,displayValue:true,fontSize:6,margin:0,textMargin:0,background:"#fff",lineColor:"#000"});
+setTimeout(function(){window.print();},200);
+</script>
+</body>
+</html>`);
+      }
       printWindow.document.close();
     }
   };
