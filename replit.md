@@ -34,6 +34,12 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
 -   **Sales Dashboard**: Unified reporting for online and walk-in orders with date range, order type, and payment method filtering, plus summary statistics.
 -   **PC Builder**: Step-by-step component selection with real-time compatibility checks, power consumption, and price summary.
 -   **Market Analysis Feature**: Public and admin views for tracking and updating prices of RAM, SSD, and M.2 components with trend indicators.
+-   **Laptop Battery Compatibility System**: Separate authenticated portal (/battery) for managing laptop batteries inventory with:
+    - Separate authentication system (battery_users table, default: battery/battery123)
+    - Two-way search: find batteries by serial number OR find compatible batteries by laptop model
+    - Stock tracking with low-stock alerts (configurable thresholds)
+    - Full CRUD for battery inventory with compatible laptops list, voltage, capacity, pricing
+    - Routes: /battery/login, /battery (dashboard), /battery/manage
 
 # External Dependencies
 
