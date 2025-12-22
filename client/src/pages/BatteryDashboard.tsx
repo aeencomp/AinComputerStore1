@@ -154,12 +154,25 @@ export default function BatteryDashboard() {
     });
   };
 
-  const printBarcode = (battery: LaptopBattery, orientation: 'landscape' | 'portrait', e: React.MouseEvent) => {
+  const [printBattery, setPrintBattery] = useState<LaptopBattery | null>(null);
+  const [showPrintDialog, setShowPrintDialog] = useState(false);
+
+  const openPrintDialog = (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
-    const barcodeValue = battery.barcode || battery.serialNumber;
+    setPrintBattery(battery);
+    setShowPrintDialog(true);
+  };
+
+  const printBarcode = (orientation: 'landscape' | 'portrait') => {
+    if (!printBattery) return;
+    const barcodeValue = printBattery.barcode || printBattery.serialNumber;
     const printWindow = window.open('', '_blank');
     
     const isLandscape = orientation === 'landscape';
+    const pageWidth = isLandscape ? '185px' : '125px';
+    const pageHeight = isLandscape ? '125px' : '185px';
+    const barcodeHeight = isLandscape ? 80 : 120;
+    const barcodeWidth = isLandscape ? 1.2 : 1;
     
     if (printWindow) {
       if (isLandscape) {
@@ -169,21 +182,22 @@ export default function BatteryDashboard() {
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:50mm 20mm;margin:0!important;padding:0!important}
+@page{size:185px 125px;margin:0!important;padding:0!important}
+@media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:50mm;height:20mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
-.label{width:50mm;height:20mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
-.info{font:bold 6pt Arial;margin-bottom:0.5mm}
+html,body{width:185px;height:125px;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:185px;height:125px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff}
+.info{font:bold 8px Arial;margin-bottom:2px;text-align:center}
 #barcode{display:block}
 </style>
 </head>
 <body>
 <div class="label">
-<div class="info">${battery.brand} | ${battery.serialNumber}</div>
+<div class="info">${printBattery.brand} | ${printBattery.serialNumber}</div>
 <svg id="barcode"></svg>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1.5,height:125,displayValue:true,fontSize:10,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:${barcodeWidth},height:${barcodeHeight},displayValue:true,fontSize:10,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
@@ -195,23 +209,24 @@ setTimeout(function(){window.print();},200);
 <title>Barcode</title>
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
 <style>
-@page{size:20mm 50mm;margin:0!important;padding:0!important}
+@page{size:125px 185px;margin:0!important;padding:0!important}
+@media print{html,body{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{width:20mm;height:50mm;margin:0!important;padding:0!important;background:#fff;overflow:hidden;display:flex;align-items:center;justify-content:center}
-.label{width:20mm;height:50mm;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;position:absolute;top:0;left:0;right:0;bottom:0}
-.info{font:bold 5pt Arial;text-align:center;position:absolute;top:2mm;left:0;right:0}
-.serial{font:bold 5pt Arial;text-align:center;position:absolute;bottom:2mm;left:0;right:0}
+html,body{width:125px;height:185px;margin:0!important;padding:0!important;background:#fff;overflow:hidden}
+.label{width:125px;height:185px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;position:relative}
+.info{font:bold 7px Arial;text-align:center;position:absolute;top:4px;left:0;right:0}
+.serial{font:bold 7px Arial;text-align:center;position:absolute;bottom:4px;left:0;right:0}
 .barcode-wrap{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) rotate(90deg)}
 </style>
 </head>
 <body>
 <div class="label">
-<div class="info">${battery.brand}</div>
+<div class="info">${printBattery.brand}</div>
 <div class="barcode-wrap"><svg id="barcode"></svg></div>
-<div class="serial">${battery.serialNumber}</div>
+<div class="serial">${printBattery.serialNumber}</div>
 </div>
 <script>
-JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:1.5,height:125,displayValue:true,fontSize:10,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
+JsBarcode("#barcode","${barcodeValue}",{format:"CODE128",width:${barcodeWidth},height:${barcodeHeight},displayValue:true,fontSize:9,margin:0,textMargin:1,background:"#fff",lineColor:"#000"});
 setTimeout(function(){window.print();},200);
 </script>
 </body>
@@ -219,6 +234,8 @@ setTimeout(function(){window.print();},200);
       }
       printWindow.document.close();
     }
+    setShowPrintDialog(false);
+    setPrintBattery(null);
   };
 
   const openAddModal = () => {
@@ -553,26 +570,16 @@ setTimeout(function(){window.print();},200);
                           />
                         </div>
                       </div>
-                      <div className="flex justify-center gap-2 mt-2">
+                      <div className="flex justify-center mt-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={(e) => printBarcode(battery, 'landscape', e)}
+                          onClick={(e) => openPrintDialog(battery, e)}
                           className="text-xs gap-1"
-                          data-testid={`button-print-landscape-${battery.id}`}
+                          data-testid={`button-print-barcode-${battery.id}`}
                         >
                           <Printer className="h-3 w-3" />
-                          {language === 'ar' ? 'أفقي' : 'Landscape'}
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={(e) => printBarcode(battery, 'portrait', e)}
-                          className="text-xs gap-1"
-                          data-testid={`button-print-portrait-${battery.id}`}
-                        >
-                          <Printer className="h-3 w-3" />
-                          {language === 'ar' ? 'عمودي' : 'Portrait'}
+                          {language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}
                         </Button>
                       </div>
                     </div>
@@ -589,6 +596,48 @@ setTimeout(function(){window.print();},200);
           )}
         </div>
       </main>
+
+      {/* Print Orientation Dialog */}
+      <Dialog open={showPrintDialog} onOpenChange={setShowPrintDialog}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="text-center">
+              {language === 'ar' ? 'اختر اتجاه الطباعة' : 'Choose Print Orientation'}
+            </DialogTitle>
+            <DialogDescription className="text-center">
+              {language === 'ar' 
+                ? 'حجم الملصق: 185×125 بكسل'
+                : 'Label size: 185×125 pixels'
+              }
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-4">
+            <Button
+              onClick={() => printBarcode('landscape')}
+              className="h-16 text-lg gap-3"
+              data-testid="button-print-landscape"
+            >
+              <Printer className="h-5 w-5" />
+              <div className="flex flex-col items-start">
+                <span>{language === 'ar' ? 'أفقي' : 'Landscape'}</span>
+                <span className="text-xs opacity-70">185 × 125 px</span>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => printBarcode('portrait')}
+              className="h-16 text-lg gap-3"
+              data-testid="button-print-portrait"
+            >
+              <Printer className="h-5 w-5" />
+              <div className="flex flex-col items-start">
+                <span>{language === 'ar' ? 'عمودي' : 'Portrait'}</span>
+                <span className="text-xs opacity-70">125 × 185 px</span>
+              </div>
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
