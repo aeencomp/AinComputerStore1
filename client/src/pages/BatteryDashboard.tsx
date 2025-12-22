@@ -157,28 +157,74 @@ export default function BatteryDashboard() {
   const printBarcode = (battery: LaptopBattery, e: React.MouseEvent) => {
     e.stopPropagation();
     const barcodeValue = battery.barcode || battery.serialNumber;
-    const printWindow = window.open('', '_blank', 'width=76,height=310');
+    const printWindow = window.open('', '_blank', 'width=400,height=300');
     if (printWindow) {
-      printWindow.document.write(`<!DOCTYPE html><html><head><title>${battery.serialNumber}</title>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-@page{size:20mm 82mm;margin:0}
-html,body{width:20mm;height:82mm;margin:0;padding:0;overflow:hidden;background:#fff;font-family:Arial,sans-serif}
-body{display:flex;align-items:center;justify-content:center}
-.container{width:18mm;height:78mm;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.sn{font-size:6pt;font-weight:bold;margin-top:2mm;word-break:break-all;max-width:16mm}
-svg{width:18mm;height:65mm}
-@media print{html,body{width:20mm;height:82mm;-webkit-print-color-adjust:exact;print-color-adjust:exact}}
-</style></head><body>
-<div class="container">
-<svg id="bc"></svg>
-<div class="sn">${battery.serialNumber}</div>
-</div>
-<script>
-JsBarcode("#bc","${barcodeValue}",{format:"CODE128",width:0.35,height:120,displayValue:false,margin:0,background:"#fff",lineColor:"#000"});
-window.onload=function(){setTimeout(function(){window.print()},250)};
-<\/script></body></html>`);
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Print Barcode - ${battery.serialNumber}</title>
+          <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+          <style>
+            @page {
+              size: 50mm 25mm;
+              margin: 0;
+            }
+            body {
+              margin: 0;
+              padding: 2mm;
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+              justify-content: center;
+              width: 50mm;
+              height: 25mm;
+              box-sizing: border-box;
+              font-family: Arial, sans-serif;
+            }
+            .label-container {
+              text-align: center;
+              width: 100%;
+            }
+            .brand {
+              font-size: 7pt;
+              font-weight: bold;
+              margin-bottom: 1mm;
+            }
+            svg {
+              max-width: 100%;
+              height: auto;
+            }
+            @media print {
+              body { -webkit-print-color-adjust: exact; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="label-container">
+            <div class="brand">${battery.brand} - ${battery.serialNumber}</div>
+            <svg id="barcode"></svg>
+          </div>
+          <script>
+            JsBarcode("#barcode", "${barcodeValue}", {
+              format: "CODE128",
+              width: 1.5,
+              height: 40,
+              displayValue: true,
+              fontSize: 10,
+              margin: 2,
+              textMargin: 1
+            });
+            window.onload = function() {
+              setTimeout(function() {
+                window.print();
+                window.close();
+              }, 300);
+            };
+          </script>
+        </body>
+        </html>
+      `);
       printWindow.document.close();
     }
   };
