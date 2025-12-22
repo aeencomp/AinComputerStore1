@@ -167,60 +167,48 @@ export default function BatteryDashboard() {
           <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
           <style>
             @page {
-              size: 20mm 50mm;
+              size: 50mm 20mm;
               margin: 0;
             }
             * { margin: 0; padding: 0; box-sizing: border-box; }
             html, body {
               background: #fff;
-              width: 20mm;
-              height: 50mm;
+              width: 50mm;
+              height: 20mm;
               overflow: hidden;
-              display: flex;
-              align-items: center;
-              justify-content: center;
             }
             .label {
-              width: 20mm;
-              height: 50mm;
+              width: 50mm;
+              height: 20mm;
               background: #fff;
               display: flex;
               flex-direction: column;
               align-items: center;
               justify-content: center;
+              padding: 1mm;
             }
-            .brand {
+            .info {
               text-align: center;
-              font-size: 5pt;
+              font-size: 6pt;
               font-weight: bold;
               font-family: Arial, sans-serif;
-              margin-bottom: 2mm;
+              margin-bottom: 1mm;
             }
-            .serial {
-              text-align: center;
-              font-size: 5pt;
-              font-weight: bold;
-              font-family: Arial, sans-serif;
-              margin-top: 2mm;
-            }
-            .barcode-wrap {
-              transform: rotate(90deg);
+            #barcode {
+              max-width: 48mm;
             }
           </style>
         </head>
         <body>
           <div class="label">
-            <div class="brand">${battery.brand}</div>
-            <div class="barcode-wrap">
-              <svg id="barcode"></svg>
-            </div>
-            <div class="serial">${battery.serialNumber}</div>
+            <div class="info">${battery.brand} | ${battery.serialNumber}</div>
+            <svg id="barcode"></svg>
           </div>
           <script>
             JsBarcode("#barcode", "${barcodeValue}", {
               format: "CODE128",
-              width: 1.2,
-              height: 35,
+              width: 1.5,
+              height: 30,
               displayValue: true,
               fontSize: 8,
               margin: 0,
@@ -562,7 +550,7 @@ export default function BatteryDashboard() {
 
                     <div className="mt-4 pt-3 border-t border-slate-100">
                       <div className="bg-white rounded-lg p-1 flex justify-center">
-                        <div style={{ width: '20mm', height: '50mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ width: '50mm', height: '20mm', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                           <Barcode 
                             value={battery.barcode || battery.serialNumber} 
                             height={70} 
