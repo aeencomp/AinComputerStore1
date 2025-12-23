@@ -17,6 +17,7 @@ import { useMutation, useQuery as useAuthQuery } from "@tanstack/react-query";
 import type { Product, User, CartItem } from "@shared/schema";
 import { ShoppingCart, ArrowLeft, Check } from "lucide-react";
 import { Link } from "wouter";
+import { ProductReviews } from "@/components/ProductReviews";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -341,6 +342,9 @@ export default function ProductDetail() {
             </div>
           </div>
         </div>
+
+        {/* Customer Reviews Section */}
+        <ProductReviews productId={productId} />
 
         {/* Related Products Section */}
         {relatedProducts.length > 0 && (

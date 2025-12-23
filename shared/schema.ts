@@ -210,6 +210,7 @@ export const orders = pgTable("orders", {
   status: text("status").notNull().default("pending"),
   orderType: text("order_type").notNull().default("online"), // "online" or "walk-in"
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
+  discountCode: text("discount_code"),
   discountReason: text("discount_reason"),
   salespersonId: varchar("salesperson_id"), // Admin who created walk-in order
   notes: text("notes"), // Internal notes for the order

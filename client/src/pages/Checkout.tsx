@@ -16,8 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CartItem, StoreSettings, User } from "@shared/schema";
-import { Banknote, Smartphone, CreditCard, Loader2 } from "lucide-react";
+import { Banknote, Smartphone, CreditCard, Loader2, Tag, X, Check } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import type { DiscountCode } from "@shared/schema";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -106,6 +107,13 @@ export default function Checkout() {
   });
 
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [discountCode, setDiscountCode] = useState("");
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: DiscountCode;
+    discountAmount: number;
+  } | null>(null);
+  const [discountError, setDiscountError] = useState<string | null>(null);
+  const [isValidatingCode, setIsValidatingCode] = useState(false);
 
   const createOrderMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues) => {
@@ -132,6 +140,10 @@ export default function Checkout() {
           ? (language === 'ar' ? selectedGovernorate.ar : selectedGovernorate.en)
           : data.customerCity;
 
+        // Calculate discount from appliedDiscount state
+        const discountAmt = appliedDiscount?.discountAmount || 0;
+        const orderTotal = subtotal - discountAmt + calculatedShipping;
+
         const orderPayload = {
           customerName: data.customerName,
           customerEmail: data.customerEmail,
@@ -143,7 +155,9 @@ export default function Checkout() {
           items: items,
           subtotal: subtotal.toString(),
           shipping: calculatedShipping.toString(),
-          total: (subtotal + calculatedShipping).toString(),
+          discount: discountAmt.toString(),
+          discountCode: appliedDiscount?.code.code || null,
+          total: orderTotal.toString(),
           status: (data.paymentMethod === 'zaincash' || data.paymentMethod === 'qicard') ? 'awaiting_payment' : 'pending',
         };
 
@@ -265,6 +279,85 @@ export default function Checkout() {
     (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
     0
   );
+
+  const validateDiscountCode = async () => {
+    if (!discountCode.trim()) return;
+    
+    setIsValidatingCode(true);
+    setDiscountError(null);
+    
+    // Calculate the pre-discount order total (subtotal + shipping) for minimum order validation
+    const calculatedShipping = enableFreeShipping && subtotal >= freeShippingThreshold ? 0 : shippingCost;
+    const preDiscountTotal = subtotal + calculatedShipping;
+    
+    try {
+      const response = await apiRequest('POST', '/api/discount-codes/validate', { 
+        code: discountCode, 
+        orderTotal: preDiscountTotal 
+      });
+      
+      const result = await response.json();
+      
+      if (response.ok && result.valid) {
+        setAppliedDiscount({
+          code: result.discountCode,
+          discountAmount: result.discountAmount,
+        });
+        setDiscountCode("");
+        toast({
+          title: language === 'ar' ? "تم تطبيق الخصم!" : "Discount Applied!",
+          description: language === 'ar' 
+            ? `تم خصم ${result.discountAmount.toLocaleString()} د.ع من طلبك`
+            : `${result.discountAmount.toLocaleString()} IQD discount applied to your order`,
+        });
+      } else {
+        setDiscountError(result.error);
+      }
+    } catch (error) {
+      setDiscountError(language === 'ar' ? 'فشل في التحقق من الكود' : 'Failed to validate code');
+    } finally {
+      setIsValidatingCode(false);
+    }
+  };
+
+  const removeDiscount = () => {
+    setAppliedDiscount(null);
+    setDiscountCode("");
+  };
+
+  // Invalidate discount code when cart changes (items added/removed or quantities changed)
+  useEffect(() => {
+    if (appliedDiscount && cartItems.length > 0) {
+      // Recalculate subtotal from current cart
+      const newSubtotal = cartItems.reduce(
+        (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+        0
+      );
+      const newShipping = enableFreeShipping && newSubtotal >= freeShippingThreshold ? 0 : shippingCost;
+      const newOrderTotal = newSubtotal + newShipping;
+      
+      // Check if minimum order amount is still met
+      if (appliedDiscount.code.minOrderAmount && 
+          newOrderTotal < parseFloat(appliedDiscount.code.minOrderAmount)) {
+        setAppliedDiscount(null);
+        toast({
+          title: language === 'ar' ? 'تم إزالة الخصم' : 'Discount Removed',
+          description: language === 'ar' 
+            ? 'لم يعد طلبك يستوفي الحد الأدنى لهذا الكود'
+            : 'Your order no longer meets the minimum amount for this discount',
+          variant: "destructive",
+        });
+      }
+    }
+    // Also remove discount if cart becomes empty
+    if (appliedDiscount && cartItems.length === 0) {
+      setAppliedDiscount(null);
+    }
+  }, [cartItems, appliedDiscount, enableFreeShipping, freeShippingThreshold, shippingCost, language, toast]);
+
+  const discountAmount = appliedDiscount?.discountAmount || 0;
+  const shippingAmount = enableFreeShipping && subtotal >= freeShippingThreshold ? 0 : shippingCost;
+  const total = subtotal - discountAmount + shippingAmount;
 
   if (userLoading || cartLoading) {
     return (
@@ -495,10 +588,78 @@ export default function Checkout() {
                   </div>
                 ))}
                 <Separator />
+                
+                {/* Discount Code Input */}
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-1">
+                    <Tag className="h-4 w-4" />
+                    {language === 'ar' ? 'كود الخصم' : 'Discount Code'}
+                  </Label>
+                  {appliedDiscount ? (
+                    <div className="flex items-center justify-between bg-green-50 dark:bg-green-900/20 p-3 rounded-md border border-green-200 dark:border-green-800">
+                      <div className="flex items-center gap-2">
+                        <Check className="h-4 w-4 text-green-600" />
+                        <span className="font-medium text-green-700 dark:text-green-400">
+                          {appliedDiscount.code.code}
+                        </span>
+                        <span className="text-sm text-green-600">
+                          (-{appliedDiscount.discountAmount.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')} {t('common.currency')})
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="ghost"
+                        onClick={removeDiscount}
+                        className="h-6 w-6"
+                        data-testid="button-remove-discount"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <Input
+                        value={discountCode}
+                        onChange={(e) => {
+                          setDiscountCode(e.target.value.toUpperCase());
+                          setDiscountError(null);
+                        }}
+                        placeholder={language === 'ar' ? 'أدخل كود الخصم' : 'Enter code'}
+                        className="uppercase"
+                        data-testid="input-discount-code"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={validateDiscountCode}
+                        disabled={isValidatingCode || !discountCode.trim()}
+                        data-testid="button-apply-discount"
+                      >
+                        {isValidatingCode ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          language === 'ar' ? 'تطبيق' : 'Apply'
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                  {discountError && (
+                    <p className="text-sm text-destructive">{discountError}</p>
+                  )}
+                </div>
+
+                <Separator />
                 <div className="flex justify-between">
                   <span>{t('checkout.subtotal')}</span>
                   <span data-testid="text-subtotal">{subtotal.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
                 </div>
+                {appliedDiscount && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
+                    <span data-testid="text-discount">-{discountAmount.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span>{t('checkout.shipping')}</span>
                   <span data-testid="text-shipping" className={enableFreeShipping && subtotal >= freeShippingThreshold ? "text-green-600 font-medium" : ""}>
@@ -517,7 +678,7 @@ export default function Checkout() {
                 <div className="flex justify-between text-lg font-bold">
                   <span>{t('cart.total')}</span>
                   <span data-testid="text-order-total">
-                    {(subtotal + (enableFreeShipping && subtotal >= freeShippingThreshold ? 0 : shippingCost)).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}
+                    {total.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}
                   </span>
                 </div>
               </CardContent>

@@ -1347,6 +1347,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const order = await storage.createOrder(validatedData, sessionId, userId);
       console.log("Created order:", order.id);
       
+      // Increment discount code usage if a discount code was applied
+      if (validatedData.discountCode) {
+        try {
+          const discountCodeObj = await storage.getDiscountCodeByCode(validatedData.discountCode);
+          if (discountCodeObj) {
+            await storage.incrementDiscountUsage(discountCodeObj.id);
+            console.log(`Incremented usage count for discount code: ${discountCodeObj.code}`);
+          }
+        } catch (discountError) {
+          console.error("Warning: Failed to update discount code usage:", discountError);
+        }
+      }
+      
       try {
         await storage.clearCart(sessionId);
       } catch (clearError) {
