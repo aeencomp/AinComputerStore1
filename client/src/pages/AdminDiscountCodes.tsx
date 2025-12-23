@@ -127,8 +127,13 @@ export default function AdminDiscountCodes() {
   const createMutation = useMutation({
     mutationFn: async (data: DiscountCodeFormData) => {
       return apiRequest('POST', '/api/admin/discount-codes', {
-        ...data,
+        code: data.code,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        minOrderAmount: data.minOrderAmount || null,
+        maxUses: data.maxUses ? parseInt(data.maxUses) : null,
         expiresAt: data.expiresAt ? new Date(data.expiresAt).toISOString() : null,
+        isActive: data.isActive,
       });
     },
     onSuccess: () => {
@@ -152,8 +157,13 @@ export default function AdminDiscountCodes() {
   const updateMutation = useMutation({
     mutationFn: async ({ id, data }: { id: string; data: Partial<DiscountCodeFormData> }) => {
       return apiRequest('PATCH', `/api/admin/discount-codes/${id}`, {
-        ...data,
+        code: data.code,
+        discountType: data.discountType,
+        discountValue: data.discountValue,
+        minOrderAmount: data.minOrderAmount || null,
+        maxUses: data.maxUses ? parseInt(data.maxUses) : null,
         expiresAt: data.expiresAt ? new Date(data.expiresAt).toISOString() : null,
+        isActive: data.isActive,
       });
     },
     onSuccess: () => {
