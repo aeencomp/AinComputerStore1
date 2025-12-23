@@ -268,10 +268,12 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   const totalStock = batteries.reduce((sum, b) => sum + (b.stockQuantity || 0), 0);
 
   const formatNumber = (num: number) => {
+    // Remove trailing .00 for whole numbers
+    const formatted = Number.isInteger(num) ? num.toString() : num.toString().replace(/\.00$/, '');
     if (language === 'ar') {
-      return num.toString().replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]);
+      return formatted.replace(/[0-9]/g, d => '٠١٢٣٤٥٦٧٨٩'[parseInt(d)]);
     }
-    return num.toString();
+    return formatted;
   };
 
   return (
