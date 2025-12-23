@@ -12,8 +12,14 @@ import {
   Loader2,
   ShoppingCart,
   BarChart3,
-  Clock
+  Clock,
+  Battery,
+  Store,
+  ExternalLink,
+  Tag,
+  MessageSquare
 } from "lucide-react";
+import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -47,7 +53,14 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
     { href: "/admin/attendance", icon: Clock, labelAr: "الحضور", labelEn: "Attendance" },
     { href: "/admin/market-prices", icon: TrendingUp, labelAr: "أسعار السوق", labelEn: "Market Prices" },
     { href: "/admin/programs", icon: GraduationCap, labelAr: "البرامج", labelEn: "Programs" },
+    { href: "/admin/discount-codes", icon: Tag, labelAr: "أكواد الخصم", labelEn: "Discount Codes" },
+    { href: "/admin/reviews", icon: MessageSquare, labelAr: "التقييمات", labelEn: "Reviews" },
     { href: "/admin/settings", icon: Settings, labelAr: "الإعدادات", labelEn: "Settings" },
+  ];
+
+  const externalSections = [
+    { href: "/battery", icon: Battery, labelAr: "البطاريات", labelEn: "Battery", color: "text-green-600" },
+    { href: "/sales", icon: Store, labelAr: "بوابة المبيعات", labelEn: "Sales Portal", color: "text-blue-600" },
   ];
 
   return (
@@ -70,6 +83,29 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
                     <span className="hidden md:inline">
                       {language === 'ar' ? item.labelAr : item.labelEn}
                     </span>
+                  </Button>
+                </Link>
+              );
+            })}
+            
+            {/* Separator and External Sections */}
+            <Separator orientation="vertical" className="h-6 mx-2 hidden md:block" />
+            
+            {externalSections.map((section) => {
+              const Icon = section.icon;
+              return (
+                <Link key={section.href} href={section.href}>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    className={`gap-1 ${section.color}`}
+                    data-testid={`nav-external-${section.href.split('/').pop()}`}
+                  >
+                    <Icon className="w-4 h-4" />
+                    <span className="hidden md:inline">
+                      {language === 'ar' ? section.labelAr : section.labelEn}
+                    </span>
+                    <ExternalLink className="w-3 h-3 opacity-50" />
                   </Button>
                 </Link>
               );
