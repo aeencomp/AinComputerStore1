@@ -3234,7 +3234,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { serialNumber, partNumber, barcode, brand, compatibleLaptops, voltage, capacity, cells, stockQuantity, minStockLevel, purchasePrice, sellingPrice, supplier, location, notes } = req.body;
+      const { serialNumber, partNumber, barcode, brand, compatibleLaptops, voltage, capacity, cells, stockQuantity, minStockLevel, purchasePrice, wholesalePrice, sellingPrice, supplier, location, notes } = req.body;
       
       if (!serialNumber || !brand || !compatibleLaptops || compatibleLaptops.length === 0) {
         return res.status(400).json({ error: "الرقم التسلسلي والعلامة التجارية والأجهزة المتوافقة مطلوبة" });
@@ -3261,6 +3261,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         stockQuantity: stockQuantity || 0,
         minStockLevel: minStockLevel || 2,
         purchasePrice: purchasePrice || null,
+        wholesalePrice: wholesalePrice || null,
         sellingPrice: sellingPrice || null,
         supplier: supplier || null,
         location: location || null,
