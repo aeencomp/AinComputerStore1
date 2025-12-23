@@ -3582,8 +3582,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     try {
-      const result = insertDiscountCodeSchema.safeParse(req.body);
+      console.log("Creating discount code with data:", JSON.stringify(req.body, null, 2));
+      
+      // Transform incoming data to proper types
+      const transformedData = {
+        ...req.body,
+        maxUses: req.body.maxUses ? parseInt(req.body.maxUses) : null,
+        expiresAt: req.body.expiresAt ? new Date(req.body.expiresAt) : null,
+      };
+      
+      const result = insertDiscountCodeSchema.safeParse(transformedData);
       if (!result.success) {
+        console.log("Validation errors:", JSON.stringify(result.error.errors, null, 2));
         return res.status(400).json({ error: result.error.message });
       }
       
