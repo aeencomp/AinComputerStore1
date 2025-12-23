@@ -20,7 +20,9 @@ import {
   Save,
   X,
   Loader2,
-  Laptop
+  Laptop,
+  Search,
+  AlertTriangle
 } from "lucide-react";
 import type { LaptopBattery } from "@shared/schema";
 
@@ -31,11 +33,15 @@ export default function BatteryManage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   
-  const editId = new URLSearchParams(searchParams).get('edit');
+  const urlParams = new URLSearchParams(searchParams);
+  const editId = urlParams.get('edit');
+  const lowstockParam = urlParams.get('lowstock');
   
   const [showForm, setShowForm] = useState(false);
   const [editingBattery, setEditingBattery] = useState<LaptopBattery | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showLowStockOnly, setShowLowStockOnly] = useState(lowstockParam === 'true');
   
   const [formData, setFormData] = useState({
     serialNumber: "",
@@ -260,20 +266,54 @@ export default function BatteryManage() {
       <main className="max-w-4xl mx-auto p-4 space-y-6">
         {!showForm ? (
           <>
-            <Button 
-              onClick={() => setShowForm(true)}
-              className="bg-green-600 hover:bg-green-700"
-              data-testid="button-new-battery"
-            >
-              <Plus className="h-4 w-4 me-2" />
-              {language === 'ar' ? 'إضافة بطارية جديدة' : 'Add New Battery'}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+              <Button 
+                onClick={() => setShowForm(true)}
+                className="bg-green-600 hover:bg-green-700"
+                data-testid="button-new-battery"
+              >
+                <Plus className="h-4 w-4 me-2" />
+                {language === 'ar' ? 'إضافة بطارية جديدة' : 'Add New Battery'}
+              </Button>
+              
+              {/* Low Stock Filter Button */}
+              {batteries.filter(b => (b.stockQuantity || 0) <= (b.minStockLevel || 2)).length > 0 && (
+                <Button
+                  variant={showLowStockOnly ? "destructive" : "outline"}
+                  onClick={() => setShowLowStockOnly(!showLowStockOnly)}
+                  className="gap-2"
+                  data-testid="button-low-stock-filter"
+                >
+                  <AlertTriangle className="h-4 w-4" />
+                  {language === 'ar' ? 'نقص المخزون' : 'Low Stock'}
+                  <Badge variant="secondary" className={showLowStockOnly ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}>
+                    {batteries.filter(b => (b.stockQuantity || 0) <= (b.minStockLevel || 2)).length}
+                  </Badge>
+                </Button>
+              )}
+            </div>
 
             <Card>
               <CardHeader>
-                <CardTitle>
-                  {language === 'ar' ? 'جميع البطاريات' : 'All Batteries'}
-                </CardTitle>
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                  <CardTitle>
+                    {showLowStockOnly 
+                      ? (language === 'ar' ? 'بطاريات نقص المخزون' : 'Low Stock Batteries')
+                      : (language === 'ar' ? 'جميع البطاريات' : 'All Batteries')
+                    }
+                  </CardTitle>
+                  {/* Search Field */}
+                  <div className="relative w-full sm:w-64">
+                    <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder={language === 'ar' ? 'بحث...' : 'Search...'}
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="ps-9"
+                      data-testid="input-search-batteries"
+                    />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 {batteriesLoading ? (
@@ -284,9 +324,39 @@ export default function BatteryManage() {
                   <p className="text-center text-muted-foreground py-8">
                     {language === 'ar' ? 'لا توجد بطاريات مضافة' : 'No batteries added'}
                   </p>
-                ) : (
+                ) : (() => {
+                  // Filter batteries based on search and low stock filter
+                  let filteredBatteries = batteries;
+                  
+                  // Apply low stock filter
+                  if (showLowStockOnly) {
+                    filteredBatteries = filteredBatteries.filter(b => 
+                      (b.stockQuantity || 0) <= (b.minStockLevel || 2)
+                    );
+                  }
+                  
+                  // Apply search filter
+                  if (searchQuery.trim()) {
+                    const query = searchQuery.toLowerCase();
+                    filteredBatteries = filteredBatteries.filter(b => 
+                      b.serialNumber.toLowerCase().includes(query) ||
+                      b.brand.toLowerCase().includes(query) ||
+                      b.partNumber?.toLowerCase().includes(query) ||
+                      b.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(query))
+                    );
+                  }
+                  
+                  if (filteredBatteries.length === 0) {
+                    return (
+                      <p className="text-center text-muted-foreground py-8">
+                        {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
+                      </p>
+                    );
+                  }
+                  
+                  return (
                   <div className="space-y-3">
-                    {batteries.map((battery) => (
+                    {filteredBatteries.map((battery) => (
                       <div 
                         key={battery.id}
                         className="flex items-center justify-between p-3 border rounded-lg hover-elevate"
@@ -357,7 +427,8 @@ export default function BatteryManage() {
                       </div>
                     ))}
                   </div>
-                )}
+                  );
+                })()}
               </CardContent>
             </Card>
           </>

@@ -326,30 +326,39 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
               value: batteries.length, 
               icon: Battery, 
               color: 'text-primary',
-              bg: 'bg-primary/5'
+              bg: 'bg-primary/5',
+              clickable: false
             },
             { 
               label: language === 'ar' ? 'إجمالي المخزون' : 'Total Units', 
               value: totalStock, 
               icon: Package, 
               color: 'text-blue-600',
-              bg: 'bg-blue-50'
+              bg: 'bg-blue-50',
+              clickable: false
             },
             { 
               label: language === 'ar' ? 'نقص المخزون' : 'Low Stock', 
               value: lowStockBatteries.length, 
               icon: AlertTriangle, 
               color: lowStockBatteries.length > 0 ? 'text-red-600' : 'text-slate-400',
-              bg: lowStockBatteries.length > 0 ? 'bg-red-50' : 'bg-slate-50'
+              bg: lowStockBatteries.length > 0 ? 'bg-red-50' : 'bg-slate-50',
+              clickable: lowStockBatteries.length > 0,
+              onClick: () => setLocation("/battery/manage?lowstock=true")
             }
           ].map((stat, i) => (
-            <Card key={i} className="border-slate-200 shadow-sm">
+            <Card 
+              key={i} 
+              className={`border-slate-200 shadow-sm ${stat.clickable ? 'cursor-pointer hover:border-red-300 hover:shadow-md transition-all' : ''}`}
+              onClick={stat.clickable ? stat.onClick : undefined}
+              data-testid={stat.clickable ? 'card-low-stock-clickable' : undefined}
+            >
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">
                   <div className={`p-3 rounded-xl ${stat.bg}`}>
                     <stat.icon className={`h-6 w-6 ${stat.color}`} />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">
                       {stat.label}
                     </p>
@@ -357,6 +366,9 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       {formatNumber(stat.value)}
                     </p>
                   </div>
+                  {stat.clickable && (
+                    <ChevronRight className="h-5 w-5 text-slate-400" />
+                  )}
                 </div>
               </CardContent>
             </Card>
