@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -751,5 +751,92 @@ export class DrizzleStorage implements IStorage {
   async deleteLaptopBattery(id: string): Promise<void> {
     // Soft delete
     await db.update(laptopBatteries).set({ isActive: 0 }).where(eq(laptopBatteries.id, id));
+  }
+  
+  // Product Review Methods
+  async getProductReviews(productId: string): Promise<ProductReview[]> {
+    return await db.select().from(productReviews)
+      .where(eq(productReviews.productId, productId))
+      .orderBy(desc(productReviews.createdAt));
+  }
+  
+  async getApprovedProductReviews(productId: string): Promise<ProductReview[]> {
+    return await db.select().from(productReviews)
+      .where(and(
+        eq(productReviews.productId, productId),
+        eq(productReviews.isApproved, 1)
+      ))
+      .orderBy(desc(productReviews.createdAt));
+  }
+  
+  async getAllReviews(): Promise<ProductReview[]> {
+    return await db.select().from(productReviews).orderBy(desc(productReviews.createdAt));
+  }
+  
+  async createProductReview(review: InsertProductReview): Promise<ProductReview> {
+    const result = await db.insert(productReviews).values(review).returning();
+    return result[0];
+  }
+  
+  async updateProductReview(id: string, updates: Partial<InsertProductReview>): Promise<ProductReview | undefined> {
+    const result = await db.update(productReviews)
+      .set(updates)
+      .where(eq(productReviews.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteProductReview(id: string): Promise<void> {
+    await db.delete(productReviews).where(eq(productReviews.id, id));
+  }
+  
+  async approveProductReview(id: string): Promise<ProductReview | undefined> {
+    const result = await db.update(productReviews)
+      .set({ isApproved: 1 })
+      .where(eq(productReviews.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  // Discount Code Methods
+  async getDiscountCodes(): Promise<DiscountCode[]> {
+    return await db.select().from(discountCodes).orderBy(desc(discountCodes.createdAt));
+  }
+  
+  async getDiscountCode(id: string): Promise<DiscountCode | undefined> {
+    const result = await db.select().from(discountCodes).where(eq(discountCodes.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined> {
+    const result = await db.select().from(discountCodes)
+      .where(eq(discountCodes.code, code))
+      .limit(1);
+    return result[0];
+  }
+  
+  async createDiscountCode(code: InsertDiscountCode): Promise<DiscountCode> {
+    const result = await db.insert(discountCodes).values(code).returning();
+    return result[0];
+  }
+  
+  async updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined> {
+    const result = await db.update(discountCodes)
+      .set(updates)
+      .where(eq(discountCodes.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteDiscountCode(id: string): Promise<void> {
+    await db.delete(discountCodes).where(eq(discountCodes.id, id));
+  }
+  
+  async incrementDiscountUsage(id: string): Promise<DiscountCode | undefined> {
+    const result = await db.update(discountCodes)
+      .set({ usedCount: sql`${discountCodes.usedCount} + 1` })
+      .where(eq(discountCodes.id, id))
+      .returning();
+    return result[0];
   }
 }

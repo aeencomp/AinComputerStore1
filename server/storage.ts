@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -117,6 +117,24 @@ export interface IStorage {
   createLaptopBattery(battery: InsertLaptopBattery): Promise<LaptopBattery>;
   updateLaptopBattery(id: string, updates: Partial<InsertLaptopBattery>): Promise<LaptopBattery | undefined>;
   deleteLaptopBattery(id: string): Promise<void>;
+  
+  // Product review methods
+  getProductReviews(productId: string): Promise<ProductReview[]>;
+  getApprovedProductReviews(productId: string): Promise<ProductReview[]>;
+  getAllReviews(): Promise<ProductReview[]>;
+  createProductReview(review: InsertProductReview): Promise<ProductReview>;
+  updateProductReview(id: string, updates: Partial<InsertProductReview>): Promise<ProductReview | undefined>;
+  deleteProductReview(id: string): Promise<void>;
+  approveProductReview(id: string): Promise<ProductReview | undefined>;
+  
+  // Discount code methods
+  getDiscountCodes(): Promise<DiscountCode[]>;
+  getDiscountCode(id: string): Promise<DiscountCode | undefined>;
+  getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined>;
+  createDiscountCode(code: InsertDiscountCode): Promise<DiscountCode>;
+  updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined>;
+  deleteDiscountCode(id: string): Promise<void>;
+  incrementDiscountUsage(id: string): Promise<DiscountCode | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -701,6 +719,64 @@ export class MemStorage implements IStorage {
     for (const update of updates) {
       await this.updateProductStock(update.productId, update.quantity);
     }
+  }
+  
+  // Product review stubs for MemStorage
+  async getProductReviews(productId: string): Promise<ProductReview[]> {
+    return [];
+  }
+  
+  async getApprovedProductReviews(productId: string): Promise<ProductReview[]> {
+    return [];
+  }
+  
+  async getAllReviews(): Promise<ProductReview[]> {
+    return [];
+  }
+  
+  async createProductReview(review: InsertProductReview): Promise<ProductReview> {
+    throw new Error("MemStorage does not support product reviews");
+  }
+  
+  async updateProductReview(id: string, updates: Partial<InsertProductReview>): Promise<ProductReview | undefined> {
+    return undefined;
+  }
+  
+  async deleteProductReview(id: string): Promise<void> {
+    // Not implemented
+  }
+  
+  async approveProductReview(id: string): Promise<ProductReview | undefined> {
+    return undefined;
+  }
+  
+  // Discount code stubs for MemStorage
+  async getDiscountCodes(): Promise<DiscountCode[]> {
+    return [];
+  }
+  
+  async getDiscountCode(id: string): Promise<DiscountCode | undefined> {
+    return undefined;
+  }
+  
+  async getDiscountCodeByCode(code: string): Promise<DiscountCode | undefined> {
+    return undefined;
+  }
+  
+  async createDiscountCode(code: InsertDiscountCode): Promise<DiscountCode> {
+    throw new Error("MemStorage does not support discount codes");
+  }
+  
+  async updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined> {
+    return undefined;
+  }
+  
+  async deleteDiscountCode(id: string): Promise<void> {
+    // Not implemented
+  }
+  
+  async incrementDiscountUsage(id: string): Promise<DiscountCode | undefined> {
+    return undefined;
   }
 }
 

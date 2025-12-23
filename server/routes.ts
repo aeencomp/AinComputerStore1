@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { z } from "zod";
@@ -3452,6 +3452,222 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating POS order:", error);
       return res.status(500).json({ error: "فشل في إنشاء الطلب" });
+    }
+  });
+
+  // ========================================
+  // PRODUCT REVIEWS ROUTES
+  // ========================================
+  
+  // Get approved reviews for a product (public)
+  app.get("/api/products/:productId/reviews", async (req, res) => {
+    try {
+      const reviews = await storage.getApprovedProductReviews(req.params.productId);
+      return res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      return res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  });
+  
+  // Submit a review (public)
+  app.post("/api/products/:productId/reviews", async (req, res) => {
+    try {
+      const result = insertProductReviewSchema.safeParse({
+        ...req.body,
+        productId: req.params.productId,
+      });
+      
+      if (!result.success) {
+        return res.status(400).json({ error: result.error.message });
+      }
+      
+      const review = await storage.createProductReview(result.data);
+      return res.status(201).json(review);
+    } catch (error) {
+      console.error("Error creating review:", error);
+      return res.status(500).json({ error: "Failed to create review" });
+    }
+  });
+  
+  // Get all reviews (admin only)
+  app.get("/api/admin/reviews", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const reviews = await storage.getAllReviews();
+      return res.json(reviews);
+    } catch (error) {
+      console.error("Error fetching reviews:", error);
+      return res.status(500).json({ error: "Failed to fetch reviews" });
+    }
+  });
+  
+  // Approve a review (admin only)
+  app.post("/api/admin/reviews/:id/approve", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const review = await storage.approveProductReview(req.params.id);
+      if (!review) {
+        return res.status(404).json({ error: "Review not found" });
+      }
+      return res.json(review);
+    } catch (error) {
+      console.error("Error approving review:", error);
+      return res.status(500).json({ error: "Failed to approve review" });
+    }
+  });
+  
+  // Delete a review (admin only)
+  app.delete("/api/admin/reviews/:id", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      await storage.deleteProductReview(req.params.id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting review:", error);
+      return res.status(500).json({ error: "Failed to delete review" });
+    }
+  });
+  
+  // ========================================
+  // DISCOUNT CODES ROUTES
+  // ========================================
+  
+  // Get all discount codes (admin only)
+  app.get("/api/admin/discount-codes", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const codes = await storage.getDiscountCodes();
+      return res.json(codes);
+    } catch (error) {
+      console.error("Error fetching discount codes:", error);
+      return res.status(500).json({ error: "Failed to fetch discount codes" });
+    }
+  });
+  
+  // Create a discount code (admin only)
+  app.post("/api/admin/discount-codes", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const result = insertDiscountCodeSchema.safeParse(req.body);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error.message });
+      }
+      
+      const code = await storage.createDiscountCode(result.data);
+      return res.status(201).json(code);
+    } catch (error) {
+      console.error("Error creating discount code:", error);
+      return res.status(500).json({ error: "Failed to create discount code" });
+    }
+  });
+  
+  // Update a discount code (admin only)
+  app.patch("/api/admin/discount-codes/:id", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const code = await storage.updateDiscountCode(req.params.id, req.body);
+      if (!code) {
+        return res.status(404).json({ error: "Discount code not found" });
+      }
+      return res.json(code);
+    } catch (error) {
+      console.error("Error updating discount code:", error);
+      return res.status(500).json({ error: "Failed to update discount code" });
+    }
+  });
+  
+  // Delete a discount code (admin only)
+  app.delete("/api/admin/discount-codes/:id", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      await storage.deleteDiscountCode(req.params.id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting discount code:", error);
+      return res.status(500).json({ error: "Failed to delete discount code" });
+    }
+  });
+  
+  // Validate and apply a discount code (public)
+  app.post("/api/discount-codes/validate", async (req, res) => {
+    try {
+      const { code, orderTotal } = req.body;
+      
+      if (!code) {
+        return res.status(400).json({ error: "Code is required" });
+      }
+      
+      const discountCode = await storage.getDiscountCodeByCode(code.toUpperCase());
+      
+      if (!discountCode) {
+        return res.status(404).json({ error: "كود الخصم غير موجود" });
+      }
+      
+      if (discountCode.isActive !== 1) {
+        return res.status(400).json({ error: "كود الخصم غير فعال" });
+      }
+      
+      if (discountCode.expiresAt && new Date(discountCode.expiresAt) < new Date()) {
+        return res.status(400).json({ error: "كود الخصم منتهي الصلاحية" });
+      }
+      
+      if (discountCode.maxUses && discountCode.usedCount >= discountCode.maxUses) {
+        return res.status(400).json({ error: "تم استخدام الحد الأقصى لهذا الكود" });
+      }
+      
+      if (discountCode.minOrderAmount && orderTotal < parseFloat(discountCode.minOrderAmount)) {
+        return res.status(400).json({ 
+          error: `الحد الأدنى للطلب ${discountCode.minOrderAmount} د.ع` 
+        });
+      }
+      
+      // Calculate discount
+      let discountAmount = 0;
+      if (discountCode.discountType === 'percentage') {
+        discountAmount = (orderTotal * parseFloat(discountCode.discountValue)) / 100;
+      } else {
+        discountAmount = parseFloat(discountCode.discountValue);
+      }
+      
+      return res.json({
+        valid: true,
+        discountCode: discountCode,
+        discountAmount,
+        discountType: discountCode.discountType,
+        discountValue: discountCode.discountValue,
+      });
+    } catch (error) {
+      console.error("Error validating discount code:", error);
+      return res.status(500).json({ error: "Failed to validate discount code" });
     }
   });
 
