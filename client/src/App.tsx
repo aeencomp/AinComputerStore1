@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
+import { WhatsAppButton } from "@/components/WhatsAppButton";
 import Home from "@/pages/Home";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
@@ -99,6 +100,7 @@ function App() {
             <Toaster />
             <Router />
             <PWAInstallPrompt />
+            <WhatsAppButton />
           </TooltipProvider>
         </CartProvider>
       </LanguageProvider>
