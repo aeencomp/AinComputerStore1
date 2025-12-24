@@ -619,3 +619,45 @@ export const insertDiscountCodeSchema = createInsertSchema(discountCodes).omit({
 
 export type InsertDiscountCode = z.infer<typeof insertDiscountCodeSchema>;
 export type DiscountCode = typeof discountCodes.$inferSelect;
+
+// Battery POS Sales
+export const batterySales = pgTable("battery_sales", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleNumber: text("sale_number").notNull().unique(), // e.g., BSALE-20241224-001
+  batteryUserId: varchar("battery_user_id").notNull(), // Staff who made the sale
+  customerName: text("customer_name"), // Optional for walk-in
+  customerPhone: text("customer_phone"), // Optional
+  subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
+  total: decimal("total", { precision: 10, scale: 2 }).notNull(),
+  paymentMethod: text("payment_method").notNull().default("cash"), // cash, zaincash, qicard
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertBatterySaleSchema = createInsertSchema(batterySales).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertBatterySale = z.infer<typeof insertBatterySaleSchema>;
+export type BatterySale = typeof batterySales.$inferSelect;
+
+// Battery Sale Items
+export const batterySaleItems = pgTable("battery_sale_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull(),
+  batteryId: varchar("battery_id").notNull(),
+  serialNumber: text("serial_number").notNull(), // Snapshot of battery serial
+  brand: text("brand").notNull(), // Snapshot of brand
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertBatterySaleItemSchema = createInsertSchema(batterySaleItems).omit({
+  id: true,
+});
+
+export type InsertBatterySaleItem = z.infer<typeof insertBatterySaleItemSchema>;
+export type BatterySaleItem = typeof batterySaleItems.$inferSelect;
