@@ -305,12 +305,6 @@ export default function BatteryPOS() {
     
     const formatPriceForPrint = (price: number) => price.toLocaleString('ar-IQ') + ' د.ع';
     
-    const printWindow = window.open('', '_blank', 'width=400,height=600');
-    if (!printWindow) {
-      alert(isRTL ? 'يرجى السماح بالنوافذ المنبثقة للطباعة' : 'Please allow popups to print');
-      return;
-    }
-    
     const itemsHtml = lastSaleData.items.map(item => `
       <tr style="border-bottom: 1px solid #eee;">
         <td style="padding: 4px 0;">
@@ -322,21 +316,19 @@ export default function BatteryPOS() {
       </tr>
     `).join('');
     
-    const qrData = `SALE:${lastSaleData.saleNumber}|DATE:${lastSaleData.saleDate.toISOString()}|TOTAL:${lastSaleData.total}`;
-    
-    printWindow.document.write(`
+    const receiptHtml = `
       <!DOCTYPE html>
       <html dir="rtl">
       <head>
         <meta charset="UTF-8">
         <title>Receipt - ${lastSaleData.saleNumber}</title>
-        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { 
             font-family: 'Segoe UI', Tahoma, Arial, sans-serif; 
             font-size: 11px; 
             width: 80mm; 
+            max-width: 80mm;
             padding: 3mm;
             background: white;
             color: black;
@@ -344,8 +336,7 @@ export default function BatteryPOS() {
           .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 8px; margin-bottom: 8px; }
           .header h2 { font-size: 14px; margin-bottom: 2px; }
           .header p { font-size: 9px; color: #666; }
-          .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
-          .qr-section { text-align: left; }
+          .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: flex-start; }
           .date-box { background: #f5f5f5; padding: 6px; border-radius: 4px; margin-bottom: 8px; font-size: 10px; }
           .date-row { display: flex; justify-content: space-between; }
           table { width: 100%; border-collapse: collapse; font-size: 10px; }
@@ -363,8 +354,9 @@ export default function BatteryPOS() {
           .warranty-date-row { display: flex; justify-content: space-between; color: #92400e; }
           .footer { text-align: center; border-top: 2px dashed #ccc; padding-top: 8px; margin-top: 8px; }
           .footer p { font-size: 9px; color: #666; }
+          .qr-placeholder { width: 60px; height: 60px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 8px; text-align: center; }
           @media print {
-            body { width: 80mm; }
+            body { width: 80mm; max-width: 80mm; }
             @page { size: 80mm auto; margin: 2mm; }
           }
         </style>
@@ -381,8 +373,8 @@ export default function BatteryPOS() {
             <p style="font-weight: 600;">رقم الوصل:</p>
             <p style="font-family: monospace; font-size: 10px;">${lastSaleData.saleNumber}</p>
           </div>
-          <div class="qr-section">
-            <canvas id="qrcode" width="60" height="60"></canvas>
+          <div class="qr-placeholder">
+            <span>QR<br/>${lastSaleData.saleNumber.slice(-6)}</span>
           </div>
         </div>
         
@@ -462,17 +454,43 @@ export default function BatteryPOS() {
           <p>شكراً لتسوقكم معنا</p>
           <p style="font-size: 8px; margin-top: 2px;">يرجى الاحتفاظ بالوصل لغرض الضمان</p>
         </div>
-        
-        <script>
-          QRCode.toCanvas(document.getElementById('qrcode'), '${qrData}', { width: 60, margin: 0 }, function(error) {
-            if (error) console.error(error);
-            setTimeout(function() { window.print(); }, 300);
-          });
-        </script>
       </body>
       </html>
-    `);
-    printWindow.document.close();
+    `;
+    
+    // Create hidden iframe for printing
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.top = '-10000px';
+    iframe.style.left = '-10000px';
+    iframe.style.width = '80mm';
+    iframe.style.height = '0';
+    document.body.appendChild(iframe);
+    
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (iframeDoc) {
+      iframeDoc.open();
+      iframeDoc.write(receiptHtml);
+      iframeDoc.close();
+      
+      // Wait for content to load then print
+      iframe.onload = () => {
+        setTimeout(() => {
+          iframe.contentWindow?.focus();
+          iframe.contentWindow?.print();
+          // Remove iframe after printing
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+          }, 1000);
+        }, 100);
+      };
+      
+      // Fallback if onload doesn't fire
+      setTimeout(() => {
+        iframe.contentWindow?.focus();
+        iframe.contentWindow?.print();
+      }, 500);
+    }
   };
 
   if (authLoading) {
