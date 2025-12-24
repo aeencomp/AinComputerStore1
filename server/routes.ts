@@ -3381,6 +3381,123 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Battery POS Routes
+  app.get("/api/battery/pos/sales", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const sales = await storage.getBatterySales();
+      return res.json(sales);
+    } catch (error) {
+      console.error("Error getting battery sales:", error);
+      return res.status(500).json({ error: "خطأ في جلب المبيعات" });
+    }
+  });
+
+  app.get("/api/battery/pos/sales/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const sale = await storage.getBatterySale(req.params.id);
+      if (!sale) {
+        return res.status(404).json({ error: "لم يتم العثور على عملية البيع" });
+      }
+      
+      const items = await storage.getBatterySaleItems(sale.id);
+      return res.json({ ...sale, items });
+    } catch (error) {
+      console.error("Error getting battery sale:", error);
+      return res.status(500).json({ error: "خطأ في جلب عملية البيع" });
+    }
+  });
+
+  app.post("/api/battery/pos/sales", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { customerName, customerPhone, items, subtotal, discount, total, paymentMethod, notes } = req.body;
+      
+      if (!items || items.length === 0) {
+        return res.status(400).json({ error: "يجب إضافة بطاريات للطلب" });
+      }
+      
+      // Validate stock for each item
+      for (const item of items) {
+        const battery = await storage.getLaptopBattery(item.batteryId);
+        if (!battery) {
+          return res.status(400).json({ error: `البطارية غير موجودة: ${item.batteryId}` });
+        }
+        if (battery.stockQuantity < item.quantity) {
+          return res.status(400).json({ 
+            error: `المخزون غير كافي للبطارية ${battery.serialNumber}. المتاح: ${battery.stockQuantity}` 
+          });
+        }
+      }
+      
+      // Generate sale number
+      const saleNumber = await storage.generateBatterySaleNumber();
+      
+      // Create the sale
+      const saleData = {
+        saleNumber,
+        customerName: customerName || 'زبون متجر',
+        customerPhone: customerPhone || '',
+        subtotal: subtotal.toString(),
+        discount: (discount || 0).toString(),
+        total: total.toString(),
+        paymentMethod: paymentMethod || 'cash',
+        paymentStatus: 'success',
+        status: 'completed',
+        notes: notes || null,
+        soldBy: batteryUserId,
+      };
+      
+      const saleItems = items.map((item: any) => ({
+        batteryId: item.batteryId,
+        batteryName: item.batteryName || item.serialNumber,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice.toString(),
+        priceType: item.priceType || 'selling',
+        totalPrice: item.totalPrice.toString(),
+      }));
+      
+      const sale = await storage.createBatterySale(saleData, saleItems);
+      
+      return res.json({
+        success: true,
+        saleNumber: sale.saleNumber,
+        saleId: sale.id,
+      });
+    } catch (error) {
+      console.error("Error creating battery sale:", error);
+      return res.status(500).json({ error: "خطأ في إنشاء عملية البيع" });
+    }
+  });
+
+  app.get("/api/battery/pos/generate-number", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const saleNumber = await storage.generateBatterySaleNumber();
+      return res.json({ saleNumber });
+    } catch (error) {
+      console.error("Error generating sale number:", error);
+      return res.status(500).json({ error: "خطأ في إنشاء رقم البيع" });
+    }
+  });
+
   // POS - Create walk-in order
   app.post("/api/admin/pos/order", async (req, res) => {
     try {
