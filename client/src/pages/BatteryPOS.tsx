@@ -301,7 +301,178 @@ export default function BatteryPOS() {
   };
 
   const handlePrintReceipt = () => {
-    window.print();
+    if (!lastSaleData) return;
+    
+    const formatPriceForPrint = (price: number) => price.toLocaleString('ar-IQ') + ' د.ع';
+    
+    const printWindow = window.open('', '_blank', 'width=400,height=600');
+    if (!printWindow) {
+      alert(isRTL ? 'يرجى السماح بالنوافذ المنبثقة للطباعة' : 'Please allow popups to print');
+      return;
+    }
+    
+    const itemsHtml = lastSaleData.items.map(item => `
+      <tr style="border-bottom: 1px solid #eee;">
+        <td style="padding: 4px 0;">
+          <div style="font-weight: 500;">${item.battery.brand}</div>
+          <div style="font-size: 9px; color: #666;">${item.battery.serialNumber}</div>
+        </td>
+        <td style="text-align: center;">${item.quantity}</td>
+        <td style="text-align: left;">${formatPriceForPrint(item.unitPrice * item.quantity)}</td>
+      </tr>
+    `).join('');
+    
+    const qrData = `SALE:${lastSaleData.saleNumber}|DATE:${lastSaleData.saleDate.toISOString()}|TOTAL:${lastSaleData.total}`;
+    
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="rtl">
+      <head>
+        <meta charset="UTF-8">
+        <title>Receipt - ${lastSaleData.saleNumber}</title>
+        <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { 
+            font-family: 'Segoe UI', Tahoma, Arial, sans-serif; 
+            font-size: 11px; 
+            width: 80mm; 
+            padding: 3mm;
+            background: white;
+            color: black;
+          }
+          .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 8px; margin-bottom: 8px; }
+          .header h2 { font-size: 14px; margin-bottom: 2px; }
+          .header p { font-size: 9px; color: #666; }
+          .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+          .qr-section { text-align: left; }
+          .date-box { background: #f5f5f5; padding: 6px; border-radius: 4px; margin-bottom: 8px; font-size: 10px; }
+          .date-row { display: flex; justify-content: space-between; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; }
+          th { text-align: right; padding-bottom: 4px; border-bottom: 1px solid #ccc; }
+          th:nth-child(2) { text-align: center; }
+          th:nth-child(3) { text-align: left; }
+          .totals { margin: 8px 0; font-size: 11px; }
+          .total-row { display: flex; justify-content: space-between; padding: 2px 0; }
+          .total-final { font-weight: bold; font-size: 13px; border-top: 1px solid #ccc; padding-top: 6px; }
+          .payment { background: #f5f5f5; padding: 6px; text-align: center; border-radius: 4px; margin-bottom: 8px; }
+          .warranty { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px; text-align: center; margin-bottom: 8px; }
+          .warranty-title { font-weight: bold; color: #92400e; font-size: 12px; margin-bottom: 4px; }
+          .warranty-text { font-size: 9px; color: #a16207; margin-bottom: 6px; }
+          .warranty-dates { border-top: 1px solid #fcd34d; padding-top: 6px; font-size: 10px; }
+          .warranty-date-row { display: flex; justify-content: space-between; color: #92400e; }
+          .footer { text-align: center; border-top: 2px dashed #ccc; padding-top: 8px; margin-top: 8px; }
+          .footer p { font-size: 9px; color: #666; }
+          @media print {
+            body { width: 80mm; }
+            @page { size: 80mm auto; margin: 2mm; }
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <h2>العين لتجارة الحاسبات</h2>
+          <p>Al-Ain Computer Trading</p>
+          <p>بغداد - العراق</p>
+        </div>
+        
+        <div class="info-row">
+          <div>
+            <p style="font-weight: 600;">رقم الوصل:</p>
+            <p style="font-family: monospace; font-size: 10px;">${lastSaleData.saleNumber}</p>
+          </div>
+          <div class="qr-section">
+            <canvas id="qrcode" width="60" height="60"></canvas>
+          </div>
+        </div>
+        
+        <div class="date-box">
+          <div class="date-row">
+            <span>تاريخ البيع:</span>
+            <span style="font-weight: 600;">${lastSaleData.saleDate.toLocaleDateString('ar-IQ')}</span>
+          </div>
+          <div class="date-row">
+            <span>الوقت:</span>
+            <span>${lastSaleData.saleDate.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}</span>
+          </div>
+        </div>
+        
+        ${lastSaleData.customerName || lastSaleData.customerPhone ? `
+          <div style="border-top: 1px solid #eee; padding-top: 6px; margin-bottom: 8px; font-size: 10px;">
+            ${lastSaleData.customerName ? `<div class="date-row"><span>الزبون:</span><span>${lastSaleData.customerName}</span></div>` : ''}
+            ${lastSaleData.customerPhone ? `<div class="date-row"><span>الهاتف:</span><span dir="ltr">${lastSaleData.customerPhone}</span></div>` : ''}
+          </div>
+        ` : ''}
+        
+        <div style="border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: 6px 0; margin-bottom: 8px;">
+          <table>
+            <thead>
+              <tr>
+                <th>المنتج</th>
+                <th>الكمية</th>
+                <th>السعر</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemsHtml}
+            </tbody>
+          </table>
+        </div>
+        
+        <div class="totals">
+          <div class="total-row">
+            <span>المجموع:</span>
+            <span>${formatPriceForPrint(lastSaleData.subtotal)}</span>
+          </div>
+          ${lastSaleData.discount > 0 ? `
+            <div class="total-row" style="color: #16a34a;">
+              <span>الخصم (${lastSaleData.discount}%):</span>
+              <span>-${formatPriceForPrint(lastSaleData.discountAmount)}</span>
+            </div>
+          ` : ''}
+          <div class="total-row total-final">
+            <span>الإجمالي:</span>
+            <span>${formatPriceForPrint(lastSaleData.total)}</span>
+          </div>
+        </div>
+        
+        <div class="payment">
+          <span>طريقة الدفع: </span>
+          <span style="font-weight: 600;">
+            ${lastSaleData.paymentMethod === 'cash' ? 'نقدي' : lastSaleData.paymentMethod === 'card' ? 'بطاقة' : 'زين كاش'}
+          </span>
+        </div>
+        
+        <div class="warranty">
+          <div class="warranty-title">🔋 ضمان شهر واحد</div>
+          <p class="warranty-text">جميع البطاريات تشمل ضمان لمدة شهر واحد من تاريخ الشراء</p>
+          <div class="warranty-dates">
+            <div class="warranty-date-row">
+              <span>تاريخ الشراء:</span>
+              <span style="font-weight: 600;">${lastSaleData.saleDate.toLocaleDateString('ar-IQ')}</span>
+            </div>
+            <div class="warranty-date-row">
+              <span>انتهاء الضمان:</span>
+              <span style="font-weight: 600;">${lastSaleData.warrantyEndDate.toLocaleDateString('ar-IQ')}</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="footer">
+          <p>شكراً لتسوقكم معنا</p>
+          <p style="font-size: 8px; margin-top: 2px;">يرجى الاحتفاظ بالوصل لغرض الضمان</p>
+        </div>
+        
+        <script>
+          QRCode.toCanvas(document.getElementById('qrcode'), '${qrData}', { width: 60, margin: 0 }, function(error) {
+            if (error) console.error(error);
+            setTimeout(function() { window.print(); }, 300);
+          });
+        </script>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   if (authLoading) {
