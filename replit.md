@@ -39,7 +39,16 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
     - Two-way search: find batteries by serial number OR find compatible batteries by laptop model
     - Stock tracking with low-stock alerts (configurable thresholds)
     - Full CRUD for battery inventory with compatible laptops list, voltage, capacity, pricing
-    - Routes: /battery/login, /battery (dashboard), /battery/manage
+    - **Battery POS System**: Dedicated point-of-sale for walk-in battery sales with:
+      - Product search and quick add to cart
+      - Three-tier pricing (purchase, wholesale, selling)
+      - Quantity controls with real-time stock validation
+      - Percentage discount application
+      - Multiple payment methods (Cash, Card, ZainCash)
+      - Customer info capture (optional)
+      - Receipt generation with sale number
+      - Automatic stock deduction on sale completion
+    - Routes: /battery/login, /battery (dashboard), /battery/manage, /battery/pos
 
 # External Dependencies
 
