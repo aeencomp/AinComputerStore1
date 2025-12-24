@@ -301,7 +301,11 @@ export default function BatteryPOS() {
   };
 
   const handlePrintReceipt = () => {
-    if (!lastSaleData) return;
+    console.log("Print receipt clicked", lastSaleData);
+    if (!lastSaleData) {
+      console.log("No lastSaleData");
+      return;
+    }
     
     const formatPriceForPrint = (price: number) => price.toLocaleString('ar-IQ') + ' د.ع';
     
@@ -471,21 +475,34 @@ th:nth-child(3) { text-align: left; }
 </body>
 </html>`;
     
-    // Create blob URL and open
+    // Try multiple methods
+    console.log("Attempting to open receipt...");
+    
+    // Method 1: Try window.open directly
+    try {
+      const newWindow = window.open('about:blank', '_blank');
+      if (newWindow) {
+        console.log("Window opened successfully");
+        newWindow.document.write(receiptHtml);
+        newWindow.document.close();
+        newWindow.focus();
+        return;
+      }
+    } catch (e) {
+      console.log("Method 1 failed:", e);
+    }
+    
+    // Method 2: Download as HTML file
+    console.log("Falling back to download method");
     const blob = new Blob([receiptHtml], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    
-    // Create a link and click it
     const link = document.createElement('a');
     link.href = url;
-    link.target = '_blank';
-    link.rel = 'noopener noreferrer';
+    link.download = `receipt-${lastSaleData.saleNumber}.html`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
-    // Clean up blob URL after a delay
-    setTimeout(() => URL.revokeObjectURL(url), 10000);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   };
 
   if (authLoading) {
