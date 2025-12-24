@@ -83,7 +83,7 @@ export default function BatteryReceiptPrint() {
         <div className="text-center border-b-2 border-dashed border-gray-400 pb-3 mb-3">
           <h2 className="font-bold text-lg">العين لتجارة الحاسبات</h2>
           <p className="text-xs text-gray-600">Al-Ain Computer Trading</p>
-          <p className="text-xs text-gray-500 mt-1">بغداد - العراق</p>
+          <p className="text-xs text-gray-500 mt-1">كربلاء - العراق</p>
         </div>
 
         <div className="flex justify-between items-start mb-3">
