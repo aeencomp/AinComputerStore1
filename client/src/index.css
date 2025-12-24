@@ -345,3 +345,45 @@
   animation: wrench 2s ease-in-out infinite;
   transform-origin: center center;
 }
+
+/* Print styles for Battery POS Receipt */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  
+  #receipt-content,
+  #receipt-content * {
+    visibility: visible;
+  }
+  
+  #receipt-content {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 80mm;
+    max-width: 80mm;
+    margin: 0;
+    padding: 5mm;
+    background: white !important;
+    color: black !important;
+    font-size: 10pt;
+  }
+  
+  .print\\:hidden {
+    display: none !important;
+  }
+  
+  .print\\:border-0 {
+    border: none !important;
+  }
+  
+  .print\\:p-0 {
+    padding: 0 !important;
+  }
+  
+  @page {
+    size: 80mm auto;
+    margin: 5mm;
+  }
+}

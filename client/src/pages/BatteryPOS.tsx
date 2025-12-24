@@ -47,7 +47,22 @@ import {
   Package,
   ChevronLeft
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import type { LaptopBattery } from "@shared/schema";
+
+interface SaleData {
+  saleNumber: string;
+  saleDate: Date;
+  customerName: string;
+  customerPhone: string;
+  items: CartItem[];
+  subtotal: number;
+  discount: number;
+  discountAmount: number;
+  total: number;
+  paymentMethod: string;
+  warrantyEndDate: Date;
+}
 
 interface BatteryUserAuth {
   id: string;
@@ -83,8 +98,8 @@ export default function BatteryPOS() {
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
   const [notes, setNotes] = useState("");
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [lastSaleNumber, setLastSaleNumber] = useState("");
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [lastSaleData, setLastSaleData] = useState<SaleData | null>(null);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<BatteryUserAuth>({
     queryKey: ['/api/battery/auth/me'],
@@ -118,9 +133,26 @@ export default function BatteryPOS() {
       return await apiRequest('POST', '/api/battery/pos/sales', saleData);
     },
     onSuccess: (data: any) => {
-      setLastSaleNumber(data.saleNumber);
+      const saleDate = new Date();
+      const warrantyEndDate = new Date(saleDate);
+      warrantyEndDate.setMonth(warrantyEndDate.getMonth() + 1);
+      
+      const discountAmount = subtotal * (discount / 100);
+      setLastSaleData({
+        saleNumber: data.saleNumber,
+        saleDate,
+        customerName,
+        customerPhone,
+        items: [...cart],
+        subtotal,
+        discount,
+        discountAmount,
+        total: subtotal - discountAmount,
+        paymentMethod,
+        warrantyEndDate,
+      });
       setShowCheckoutModal(false);
-      setShowSuccessModal(true);
+      setShowReceiptModal(true);
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
     },
@@ -263,8 +295,13 @@ export default function BatteryPOS() {
     setCustomerPhone("");
     setPaymentMethod("cash");
     setNotes("");
-    setShowSuccessModal(false);
+    setShowReceiptModal(false);
+    setLastSaleData(null);
     setSearchQuery("");
+  };
+
+  const handlePrintReceipt = () => {
+    window.print();
   };
 
   if (authLoading) {
@@ -650,30 +687,183 @@ export default function BatteryPOS() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={showSuccessModal} onOpenChange={setShowSuccessModal}>
-        <DialogContent className={`${isRTL ? 'rtl' : ''} text-center`}>
-          <div className="py-6">
-            <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 mx-auto mb-4 flex items-center justify-center">
-              <Check className="w-8 h-8 text-green-600" />
-            </div>
-            <DialogTitle className="text-xl mb-2">
+      {/* Receipt Modal with Print Support */}
+      <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
+        <DialogContent className={`${isRTL ? 'rtl' : ''} max-w-md max-h-[90vh] overflow-y-auto`}>
+          <DialogHeader className="print:hidden">
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <Check className="w-4 h-4 text-green-600" />
+              </div>
               {isRTL ? 'تمت عملية البيع بنجاح!' : 'Sale Completed!'}
             </DialogTitle>
-            <DialogDescription className="text-base">
-              {isRTL ? 'رقم الفاتورة:' : 'Receipt Number:'} <span className="font-bold text-foreground">{lastSaleNumber}</span>
-            </DialogDescription>
-          </div>
+          </DialogHeader>
 
-          <div className="flex justify-center gap-3">
-            <Button variant="outline" className="gap-2" onClick={resetAfterSale}>
+          {lastSaleData && (
+            <div id="receipt-content" className="bg-white text-black p-4 rounded-lg border print:border-0 print:p-0">
+              {/* Store Header */}
+              <div className="text-center border-b-2 border-dashed border-gray-300 pb-3 mb-3">
+                <h2 className="font-bold text-lg">العين لتجارة الحاسبات</h2>
+                <p className="text-xs text-gray-600">Al-Ain Computer Trading</p>
+                <p className="text-xs text-gray-500 mt-1">بغداد - العراق</p>
+              </div>
+
+              {/* Receipt Info */}
+              <div className="flex justify-between items-start mb-3 text-sm">
+                <div>
+                  <p className="font-semibold">{isRTL ? 'رقم الوصل:' : 'Receipt #:'}</p>
+                  <p className="font-mono text-xs">{lastSaleData.saleNumber}</p>
+                </div>
+                <div className="text-left">
+                  <QRCodeSVG 
+                    value={`SALE:${lastSaleData.saleNumber}|DATE:${lastSaleData.saleDate.toISOString()}|TOTAL:${lastSaleData.total}`}
+                    size={60}
+                    level="M"
+                  />
+                </div>
+              </div>
+
+              {/* Date/Time */}
+              <div className="bg-gray-50 rounded p-2 mb-3 text-xs">
+                <div className="flex justify-between">
+                  <span>{isRTL ? 'تاريخ البيع:' : 'Sale Date:'}</span>
+                  <span className="font-semibold">
+                    {lastSaleData.saleDate.toLocaleDateString('ar-IQ', {
+                      year: 'numeric',
+                      month: '2-digit',
+                      day: '2-digit'
+                    })}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>{isRTL ? 'الوقت:' : 'Time:'}</span>
+                  <span>
+                    {lastSaleData.saleDate.toLocaleTimeString('ar-IQ', {
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+              </div>
+
+              {/* Customer Info */}
+              {(lastSaleData.customerName || lastSaleData.customerPhone) && (
+                <div className="border-t border-gray-200 pt-2 mb-3 text-xs">
+                  {lastSaleData.customerName && (
+                    <div className="flex justify-between">
+                      <span>{isRTL ? 'الزبون:' : 'Customer:'}</span>
+                      <span>{lastSaleData.customerName}</span>
+                    </div>
+                  )}
+                  {lastSaleData.customerPhone && (
+                    <div className="flex justify-between">
+                      <span>{isRTL ? 'الهاتف:' : 'Phone:'}</span>
+                      <span dir="ltr">{lastSaleData.customerPhone}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Items */}
+              <div className="border-t border-b border-gray-300 py-2 mb-3">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-start pb-1">{isRTL ? 'المنتج' : 'Product'}</th>
+                      <th className="text-center pb-1">{isRTL ? 'الكمية' : 'Qty'}</th>
+                      <th className="text-end pb-1">{isRTL ? 'السعر' : 'Price'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lastSaleData.items.map((item, idx) => (
+                      <tr key={idx} className="border-b border-gray-100">
+                        <td className="py-1">
+                          <div className="font-medium">{item.battery.brand}</div>
+                          <div className="text-gray-500 text-[10px]">{item.battery.serialNumber}</div>
+                        </td>
+                        <td className="text-center">{item.quantity}</td>
+                        <td className="text-end">{formatPrice(item.unitPrice * item.quantity)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals */}
+              <div className="space-y-1 text-sm mb-3">
+                <div className="flex justify-between">
+                  <span>{isRTL ? 'المجموع:' : 'Subtotal:'}</span>
+                  <span>{formatPrice(lastSaleData.subtotal)}</span>
+                </div>
+                {lastSaleData.discount > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{isRTL ? 'الخصم' : 'Discount'} ({lastSaleData.discount}%):</span>
+                    <span>-{formatPrice(lastSaleData.discountAmount)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-base border-t border-gray-300 pt-2">
+                  <span>{isRTL ? 'الإجمالي:' : 'Total:'}</span>
+                  <span>{formatPrice(lastSaleData.total)}</span>
+                </div>
+              </div>
+
+              {/* Payment Method */}
+              <div className="bg-gray-50 rounded p-2 mb-3 text-xs text-center">
+                <span className="text-gray-600">{isRTL ? 'طريقة الدفع:' : 'Payment:'} </span>
+                <span className="font-semibold">
+                  {lastSaleData.paymentMethod === 'cash' ? (isRTL ? 'نقدي' : 'Cash') :
+                   lastSaleData.paymentMethod === 'card' ? (isRTL ? 'بطاقة' : 'Card') :
+                   (isRTL ? 'زين كاش' : 'ZainCash')}
+                </span>
+              </div>
+
+              {/* Warranty Notice */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
+                <div className="flex items-center justify-center gap-2 mb-1">
+                  <Battery className="w-4 h-4 text-amber-600" />
+                  <span className="font-bold text-amber-800 text-sm">
+                    {isRTL ? 'ضمان شهر واحد' : '1 Month Warranty'}
+                  </span>
+                </div>
+                <p className="text-xs text-amber-700">
+                  {isRTL ? 'جميع البطاريات تشمل ضمان لمدة شهر واحد من تاريخ الشراء' : 
+                   'All batteries include 1 month warranty from purchase date'}
+                </p>
+                <div className="mt-2 pt-2 border-t border-amber-200 text-xs">
+                  <div className="flex justify-between text-amber-800">
+                    <span>{isRTL ? 'تاريخ الشراء:' : 'Purchase Date:'}</span>
+                    <span className="font-semibold">
+                      {lastSaleData.saleDate.toLocaleDateString('ar-IQ')}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-amber-800">
+                    <span>{isRTL ? 'انتهاء الضمان:' : 'Warranty Until:'}</span>
+                    <span className="font-semibold">
+                      {lastSaleData.warrantyEndDate.toLocaleDateString('ar-IQ')}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="text-center mt-3 pt-3 border-t border-dashed border-gray-300">
+                <p className="text-xs text-gray-500">
+                  {isRTL ? 'شكراً لتسوقكم معنا' : 'Thank you for your purchase'}
+                </p>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {isRTL ? 'يرجى الاحتفاظ بالوصل لغرض الضمان' : 'Please keep this receipt for warranty purposes'}
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-center gap-3 print:hidden pt-2">
+            <Button variant="outline" className="gap-2" onClick={resetAfterSale} data-testid="button-new-sale">
               {isRTL ? 'عملية جديدة' : 'New Sale'}
             </Button>
-            <Button className="gap-2" onClick={() => {
-              resetAfterSale();
-              window.print();
-            }}>
+            <Button className="gap-2" onClick={handlePrintReceipt} data-testid="button-print-receipt">
               <Printer className="w-4 h-4" />
-              {isRTL ? 'طباعة' : 'Print'}
+              {isRTL ? 'طباعة الوصل' : 'Print Receipt'}
             </Button>
           </div>
         </DialogContent>
