@@ -30,6 +30,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { AdminNav } from "@/components/AdminNav";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 import {
   Popover,
@@ -330,54 +331,13 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 z-50 bg-background">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold">{t('admin.dashboard.title')}</h1>
-            {currentAdmin && (
-              <span className="text-sm text-muted-foreground bg-muted px-2 py-1 rounded">
-                {currentAdmin.name}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <Link href="/admin/products">
-              <Button variant="outline" size="sm" data-testid="link-admin-products">
-                <Package className="w-4 h-4 ms-2" />
-                {t('admin.products.manageProducts')}
-              </Button>
-            </Link>
-            <Link href="/admin/programs">
-              <Button variant="outline" size="sm" className="border-cyan-300 text-cyan-700 hover:bg-cyan-50 dark:border-cyan-700 dark:text-cyan-400 dark:hover:bg-cyan-900/20" data-testid="link-admin-programs">
-                <AppWindow className="w-4 h-4 ms-2" />
-                {t('admin.programs.managePrograms')}
-              </Button>
-            </Link>
-            <Link href="/admin/customers">
-              <Button variant="outline" size="sm" className="border-green-300 text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400 dark:hover:bg-green-900/20" data-testid="link-admin-customers">
-                <Users className="w-4 h-4 ms-2" />
-                {t('admin.customers.manageCustomers')}
-              </Button>
-            </Link>
-            <Link href="/admin/market-prices">
-              <Button variant="outline" size="sm" className="border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-700 dark:text-emerald-400 dark:hover:bg-emerald-900/20" data-testid="link-admin-market-prices">
-                <TrendingUp className="w-4 h-4 ms-2" />
-                {t('admin.marketPrices.title', 'تحليل الأسعار')}
-              </Button>
-            </Link>
-            <Link href="/admin/inventory">
-              <Button variant="outline" size="sm" className="border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-700 dark:text-orange-400 dark:hover:bg-orange-900/20" data-testid="link-admin-inventory">
-                <Warehouse className="w-4 h-4 ms-2" />
-                {language === 'ar' ? 'المخزون' : 'Inventory'}
-              </Button>
-            </Link>
-            <Link href="/admin/settings">
-              <Button variant="outline" size="sm" data-testid="link-admin-settings">
-                <Settings className="w-4 h-4 ms-2" />
-                {t('admin.settings.manageSettings')}
-              </Button>
-            </Link>
-            
+      <AdminNav currentAdmin={currentAdmin} />
+      
+      {/* Sub-header with page title and notifications */}
+      <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center">
+          <h1 className="text-xl font-bold">{t('admin.dashboard.title')}</h1>
+          <div className="flex items-center gap-2">
             {/* Notification Bell */}
             <Popover open={notificationsOpen} onOpenChange={setNotificationsOpen}>
               <PopoverTrigger asChild>
@@ -467,23 +427,9 @@ export default function AdminDashboard() {
               </PopoverContent>
             </Popover>
 
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleLogout}
-              disabled={logoutMutation.isPending}
-              data-testid="button-admin-logout"
-            >
-              {logoutMutation.isPending ? (
-                <Loader2 className="w-4 h-4 animate-spin ms-2" />
-              ) : (
-                <LogOut className="w-4 h-4 ms-2" />
-              )}
-              {t('admin.dashboard.logout')}
-            </Button>
           </div>
         </div>
-      </header>
+      </div>
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
