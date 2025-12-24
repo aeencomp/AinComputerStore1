@@ -306,190 +306,181 @@ export default function BatteryPOS() {
     const formatPriceForPrint = (price: number) => price.toLocaleString('ar-IQ') + ' د.ع';
     
     const itemsHtml = lastSaleData.items.map(item => `
-      <tr style="border-bottom: 1px solid #eee;">
-        <td style="padding: 4px 0;">
+      <tr>
+        <td style="padding: 4px 2px; border-bottom: 1px solid #ddd;">
           <div style="font-weight: 500;">${item.battery.brand}</div>
           <div style="font-size: 9px; color: #666;">${item.battery.serialNumber}</div>
         </td>
-        <td style="text-align: center;">${item.quantity}</td>
-        <td style="text-align: left;">${formatPriceForPrint(item.unitPrice * item.quantity)}</td>
+        <td style="padding: 4px 2px; text-align: center; border-bottom: 1px solid #ddd;">${item.quantity}</td>
+        <td style="padding: 4px 2px; text-align: left; border-bottom: 1px solid #ddd;">${formatPriceForPrint(item.unitPrice * item.quantity)}</td>
       </tr>
     `).join('');
     
-    const receiptHtml = `
-      <!DOCTYPE html>
-      <html dir="rtl">
-      <head>
-        <meta charset="UTF-8">
-        <title>Receipt - ${lastSaleData.saleNumber}</title>
-        <style>
-          * { margin: 0; padding: 0; box-sizing: border-box; }
-          body { 
-            font-family: 'Segoe UI', Tahoma, Arial, sans-serif; 
-            font-size: 11px; 
-            width: 80mm; 
-            max-width: 80mm;
-            padding: 3mm;
-            background: white;
-            color: black;
-          }
-          .header { text-align: center; border-bottom: 2px dashed #ccc; padding-bottom: 8px; margin-bottom: 8px; }
-          .header h2 { font-size: 14px; margin-bottom: 2px; }
-          .header p { font-size: 9px; color: #666; }
-          .info-row { display: flex; justify-content: space-between; margin-bottom: 8px; align-items: flex-start; }
-          .date-box { background: #f5f5f5; padding: 6px; border-radius: 4px; margin-bottom: 8px; font-size: 10px; }
-          .date-row { display: flex; justify-content: space-between; }
-          table { width: 100%; border-collapse: collapse; font-size: 10px; }
-          th { text-align: right; padding-bottom: 4px; border-bottom: 1px solid #ccc; }
-          th:nth-child(2) { text-align: center; }
-          th:nth-child(3) { text-align: left; }
-          .totals { margin: 8px 0; font-size: 11px; }
-          .total-row { display: flex; justify-content: space-between; padding: 2px 0; }
-          .total-final { font-weight: bold; font-size: 13px; border-top: 1px solid #ccc; padding-top: 6px; }
-          .payment { background: #f5f5f5; padding: 6px; text-align: center; border-radius: 4px; margin-bottom: 8px; }
-          .warranty { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 6px; padding: 8px; text-align: center; margin-bottom: 8px; }
-          .warranty-title { font-weight: bold; color: #92400e; font-size: 12px; margin-bottom: 4px; }
-          .warranty-text { font-size: 9px; color: #a16207; margin-bottom: 6px; }
-          .warranty-dates { border-top: 1px solid #fcd34d; padding-top: 6px; font-size: 10px; }
-          .warranty-date-row { display: flex; justify-content: space-between; color: #92400e; }
-          .footer { text-align: center; border-top: 2px dashed #ccc; padding-top: 8px; margin-top: 8px; }
-          .footer p { font-size: 9px; color: #666; }
-          .qr-placeholder { width: 60px; height: 60px; border: 1px solid #ccc; display: flex; align-items: center; justify-content: center; font-size: 8px; text-align: center; }
-          @media print {
-            body { width: 80mm; max-width: 80mm; }
-            @page { size: 80mm auto; margin: 2mm; }
-          }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h2>العين لتجارة الحاسبات</h2>
-          <p>Al-Ain Computer Trading</p>
-          <p>بغداد - العراق</p>
-        </div>
-        
-        <div class="info-row">
-          <div>
-            <p style="font-weight: 600;">رقم الوصل:</p>
-            <p style="font-family: monospace; font-size: 10px;">${lastSaleData.saleNumber}</p>
-          </div>
-          <div class="qr-placeholder">
-            <span>QR<br/>${lastSaleData.saleNumber.slice(-6)}</span>
-          </div>
-        </div>
-        
-        <div class="date-box">
-          <div class="date-row">
-            <span>تاريخ البيع:</span>
-            <span style="font-weight: 600;">${lastSaleData.saleDate.toLocaleDateString('ar-IQ')}</span>
-          </div>
-          <div class="date-row">
-            <span>الوقت:</span>
-            <span>${lastSaleData.saleDate.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}</span>
-          </div>
-        </div>
-        
-        ${lastSaleData.customerName || lastSaleData.customerPhone ? `
-          <div style="border-top: 1px solid #eee; padding-top: 6px; margin-bottom: 8px; font-size: 10px;">
-            ${lastSaleData.customerName ? `<div class="date-row"><span>الزبون:</span><span>${lastSaleData.customerName}</span></div>` : ''}
-            ${lastSaleData.customerPhone ? `<div class="date-row"><span>الهاتف:</span><span dir="ltr">${lastSaleData.customerPhone}</span></div>` : ''}
-          </div>
-        ` : ''}
-        
-        <div style="border-top: 1px solid #ccc; border-bottom: 1px solid #ccc; padding: 6px 0; margin-bottom: 8px;">
-          <table>
-            <thead>
-              <tr>
-                <th>المنتج</th>
-                <th>الكمية</th>
-                <th>السعر</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemsHtml}
-            </tbody>
-          </table>
-        </div>
-        
-        <div class="totals">
-          <div class="total-row">
-            <span>المجموع:</span>
-            <span>${formatPriceForPrint(lastSaleData.subtotal)}</span>
-          </div>
-          ${lastSaleData.discount > 0 ? `
-            <div class="total-row" style="color: #16a34a;">
-              <span>الخصم (${lastSaleData.discount}%):</span>
-              <span>-${formatPriceForPrint(lastSaleData.discountAmount)}</span>
-            </div>
-          ` : ''}
-          <div class="total-row total-final">
-            <span>الإجمالي:</span>
-            <span>${formatPriceForPrint(lastSaleData.total)}</span>
-          </div>
-        </div>
-        
-        <div class="payment">
-          <span>طريقة الدفع: </span>
-          <span style="font-weight: 600;">
-            ${lastSaleData.paymentMethod === 'cash' ? 'نقدي' : lastSaleData.paymentMethod === 'card' ? 'بطاقة' : 'زين كاش'}
-          </span>
-        </div>
-        
-        <div class="warranty">
-          <div class="warranty-title">🔋 ضمان شهر واحد</div>
-          <p class="warranty-text">جميع البطاريات تشمل ضمان لمدة شهر واحد من تاريخ الشراء</p>
-          <div class="warranty-dates">
-            <div class="warranty-date-row">
-              <span>تاريخ الشراء:</span>
-              <span style="font-weight: 600;">${lastSaleData.saleDate.toLocaleDateString('ar-IQ')}</span>
-            </div>
-            <div class="warranty-date-row">
-              <span>انتهاء الضمان:</span>
-              <span style="font-weight: 600;">${lastSaleData.warrantyEndDate.toLocaleDateString('ar-IQ')}</span>
-            </div>
-          </div>
-        </div>
-        
-        <div class="footer">
-          <p>شكراً لتسوقكم معنا</p>
-          <p style="font-size: 8px; margin-top: 2px;">يرجى الاحتفاظ بالوصل لغرض الضمان</p>
-        </div>
-      </body>
-      </html>
-    `;
+    const receiptHtml = `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>وصل - ${lastSaleData.saleNumber}</title>
+<style>
+@media print {
+  @page { size: 80mm auto; margin: 2mm; }
+  body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { 
+  font-family: 'Segoe UI', Tahoma, Arial, sans-serif; 
+  font-size: 11px; 
+  line-height: 1.4;
+  width: 80mm; 
+  max-width: 80mm;
+  padding: 8px;
+  background: #fff;
+  color: #000;
+  direction: rtl;
+}
+.receipt-container { width: 100%; }
+.header { text-align: center; border-bottom: 2px dashed #999; padding-bottom: 10px; margin-bottom: 10px; }
+.header h2 { font-size: 16px; margin-bottom: 4px; font-weight: bold; }
+.header p { font-size: 10px; color: #444; margin: 2px 0; }
+.info-section { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+.sale-info p { margin: 2px 0; }
+.sale-number { font-family: monospace; font-size: 11px; font-weight: bold; }
+.qr-box { width: 55px; height: 55px; border: 1px solid #999; display: flex; align-items: center; justify-content: center; font-size: 7px; text-align: center; background: #f9f9f9; }
+.date-section { background: #f0f0f0; padding: 8px; margin-bottom: 10px; font-size: 10px; }
+.date-row { display: flex; justify-content: space-between; margin: 2px 0; }
+.customer-section { border-top: 1px solid #ddd; padding-top: 8px; margin-bottom: 10px; font-size: 10px; }
+.items-section { border-top: 1px solid #999; border-bottom: 1px solid #999; padding: 8px 0; margin-bottom: 10px; }
+table { width: 100%; border-collapse: collapse; font-size: 10px; }
+th { text-align: right; padding: 4px 2px; border-bottom: 2px solid #999; font-weight: bold; }
+th:nth-child(2) { text-align: center; }
+th:nth-child(3) { text-align: left; }
+.totals-section { margin-bottom: 10px; font-size: 11px; }
+.total-row { display: flex; justify-content: space-between; padding: 3px 0; }
+.total-final { font-weight: bold; font-size: 14px; border-top: 2px solid #999; padding-top: 8px; margin-top: 4px; }
+.payment-section { background: #f0f0f0; padding: 8px; text-align: center; margin-bottom: 10px; font-size: 11px; }
+.warranty-section { background: #fff8e1; border: 2px solid #ffc107; padding: 10px; text-align: center; margin-bottom: 10px; }
+.warranty-title { font-weight: bold; color: #795548; font-size: 13px; margin-bottom: 6px; }
+.warranty-text { font-size: 9px; color: #6d4c41; margin-bottom: 8px; }
+.warranty-dates { border-top: 1px solid #ffc107; padding-top: 8px; font-size: 10px; }
+.warranty-date-row { display: flex; justify-content: space-between; color: #795548; margin: 3px 0; }
+.footer { text-align: center; border-top: 2px dashed #999; padding-top: 10px; }
+.footer p { font-size: 10px; color: #444; margin: 3px 0; }
+.print-btn { display: block; width: 100%; padding: 12px; margin-top: 15px; background: #4CAF50; color: white; border: none; font-size: 14px; cursor: pointer; font-weight: bold; }
+.print-btn:hover { background: #45a049; }
+@media print { .print-btn { display: none !important; } }
+</style>
+</head>
+<body>
+<div class="receipt-container">
+  <div class="header">
+    <h2>العين لتجارة الحاسبات</h2>
+    <p>Al-Ain Computer Trading</p>
+    <p>بغداد - العراق</p>
+  </div>
+  
+  <div class="info-section">
+    <div class="sale-info">
+      <p style="font-weight: bold;">رقم الوصل:</p>
+      <p class="sale-number">${lastSaleData.saleNumber}</p>
+    </div>
+    <div class="qr-box">
+      <span>QR<br>${lastSaleData.saleNumber.slice(-6)}</span>
+    </div>
+  </div>
+  
+  <div class="date-section">
+    <div class="date-row">
+      <span>تاريخ البيع:</span>
+      <span style="font-weight: bold;">${lastSaleData.saleDate.toLocaleDateString('ar-IQ')}</span>
+    </div>
+    <div class="date-row">
+      <span>الوقت:</span>
+      <span>${lastSaleData.saleDate.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}</span>
+    </div>
+  </div>
+  
+  ${lastSaleData.customerName || lastSaleData.customerPhone ? `
+  <div class="customer-section">
+    ${lastSaleData.customerName ? `<div class="date-row"><span>الزبون:</span><span>${lastSaleData.customerName}</span></div>` : ''}
+    ${lastSaleData.customerPhone ? `<div class="date-row"><span>الهاتف:</span><span dir="ltr">${lastSaleData.customerPhone}</span></div>` : ''}
+  </div>
+  ` : ''}
+  
+  <div class="items-section">
+    <table>
+      <thead>
+        <tr>
+          <th>المنتج</th>
+          <th>الكمية</th>
+          <th>السعر</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${itemsHtml}
+      </tbody>
+    </table>
+  </div>
+  
+  <div class="totals-section">
+    <div class="total-row">
+      <span>المجموع:</span>
+      <span>${formatPriceForPrint(lastSaleData.subtotal)}</span>
+    </div>
+    ${lastSaleData.discount > 0 ? `
+    <div class="total-row" style="color: green;">
+      <span>الخصم (${lastSaleData.discount}%):</span>
+      <span>-${formatPriceForPrint(lastSaleData.discountAmount)}</span>
+    </div>
+    ` : ''}
+    <div class="total-row total-final">
+      <span>الإجمالي:</span>
+      <span>${formatPriceForPrint(lastSaleData.total)}</span>
+    </div>
+  </div>
+  
+  <div class="payment-section">
+    <span>طريقة الدفع: </span>
+    <span style="font-weight: bold;">
+      ${lastSaleData.paymentMethod === 'cash' ? 'نقدي' : lastSaleData.paymentMethod === 'card' ? 'بطاقة' : 'زين كاش'}
+    </span>
+  </div>
+  
+  <div class="warranty-section">
+    <div class="warranty-title">ضمان شهر واحد</div>
+    <p class="warranty-text">جميع البطاريات تشمل ضمان لمدة شهر واحد من تاريخ الشراء</p>
+    <div class="warranty-dates">
+      <div class="warranty-date-row">
+        <span>تاريخ الشراء:</span>
+        <span style="font-weight: bold;">${lastSaleData.saleDate.toLocaleDateString('ar-IQ')}</span>
+      </div>
+      <div class="warranty-date-row">
+        <span>انتهاء الضمان:</span>
+        <span style="font-weight: bold;">${lastSaleData.warrantyEndDate.toLocaleDateString('ar-IQ')}</span>
+      </div>
+    </div>
+  </div>
+  
+  <div class="footer">
+    <p>شكراً لتسوقكم معنا</p>
+    <p style="font-size: 8px;">يرجى الاحتفاظ بالوصل لغرض الضمان</p>
+  </div>
+  
+  <button class="print-btn" onclick="window.print()">طباعة الوصل</button>
+</div>
+</body>
+</html>`;
     
-    // Create hidden iframe for printing
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.top = '-10000px';
-    iframe.style.left = '-10000px';
-    iframe.style.width = '80mm';
-    iframe.style.height = '0';
-    document.body.appendChild(iframe);
-    
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (iframeDoc) {
-      iframeDoc.open();
-      iframeDoc.write(receiptHtml);
-      iframeDoc.close();
-      
-      // Wait for content to load then print
-      iframe.onload = () => {
-        setTimeout(() => {
-          iframe.contentWindow?.focus();
-          iframe.contentWindow?.print();
-          // Remove iframe after printing
-          setTimeout(() => {
-            document.body.removeChild(iframe);
-          }, 1000);
-        }, 100);
-      };
-      
-      // Fallback if onload doesn't fire
-      setTimeout(() => {
-        iframe.contentWindow?.focus();
-        iframe.contentWindow?.print();
-      }, 500);
+    // Open in new tab
+    const printTab = window.open('', '_blank');
+    if (printTab) {
+      printTab.document.write(receiptHtml);
+      printTab.document.close();
+    } else {
+      // Fallback: create blob and open
+      const blob = new Blob([receiptHtml], { type: 'text/html' });
+      const url = URL.createObjectURL(blob);
+      window.open(url, '_blank');
     }
   };
 
