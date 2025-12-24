@@ -3390,7 +3390,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const sales = await storage.getBatterySales();
-      return res.json(sales);
+      // Include items for each sale
+      const salesWithItems = await Promise.all(
+        sales.map(async (sale) => {
+          const items = await storage.getBatterySaleItems(sale.id);
+          return { ...sale, items };
+        })
+      );
+      return res.json(salesWithItems);
     } catch (error) {
       console.error("Error getting battery sales:", error);
       return res.status(500).json({ error: "خطأ في جلب المبيعات" });

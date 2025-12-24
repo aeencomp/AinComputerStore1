@@ -46,6 +46,7 @@ import {
   Loader2,
   ShoppingCart,
   Trash2,
+  Printer,
 } from "lucide-react";
 import type { BatterySale, BatterySaleItem } from "@shared/schema";
 
@@ -216,6 +217,35 @@ export default function BatterySalesReport() {
       zainCash: { ar: 'زين كاش', en: 'ZainCash' },
     };
     return labels[method]?.[isRTL ? 'ar' : 'en'] || method;
+  };
+
+  const handlePrintReceipt = (sale: SaleWithItems) => {
+    // Calculate warranty end date (1 month from sale date)
+    const saleDate = new Date(sale.createdAt);
+    const warrantyEndDate = new Date(saleDate);
+    warrantyEndDate.setMonth(warrantyEndDate.getMonth() + 1);
+
+    const receiptData = {
+      saleNumber: sale.saleNumber,
+      saleDate: saleDate.toISOString(),
+      customerName: sale.customerName || undefined,
+      customerPhone: sale.customerPhone || undefined,
+      items: (sale.items || []).map(item => ({
+        brand: item.brand || 'Battery',
+        serialNumber: item.serialNumber || '',
+        quantity: item.quantity || 1,
+        unitPrice: parseFloat(item.unitPrice || '0'),
+      })),
+      subtotal: parseFloat(sale.subtotal || '0'),
+      discount: 0,
+      discountAmount: parseFloat(sale.discount || '0'),
+      total: parseFloat(sale.total || '0'),
+      paymentMethod: sale.paymentMethod || 'cash',
+      warrantyEndDate: warrantyEndDate.toISOString(),
+    };
+
+    sessionStorage.setItem("battery_receipt_print", JSON.stringify(receiptData));
+    setLocation("/battery/pos/print");
   };
 
   if (authLoading) {
@@ -515,6 +545,7 @@ export default function BatterySalesReport() {
                       <TableHead>{isRTL ? 'طريقة الدفع' : 'Payment'}</TableHead>
                       <TableHead>{isRTL ? 'الخصم' : 'Discount'}</TableHead>
                       <TableHead>{isRTL ? 'الإجمالي' : 'Total'}</TableHead>
+                      <TableHead>{isRTL ? 'طباعة' : 'Print'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -547,6 +578,16 @@ export default function BatterySalesReport() {
                         </TableCell>
                         <TableCell className="font-bold text-green-600">
                           {formatCurrency(parseFloat(sale.total || '0'))}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handlePrintReceipt(sale)}
+                            data-testid={`button-print-${sale.id}`}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
