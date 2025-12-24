@@ -1062,7 +1062,17 @@ th:nth-child(3) { text-align: left; }
             <Button variant="outline" className="gap-2" onClick={resetAfterSale} data-testid="button-new-sale">
               {isRTL ? 'عملية جديدة' : 'New Sale'}
             </Button>
-            <Button className="gap-2" onClick={handlePrintReceipt} data-testid="button-print-receipt">
+            <Button 
+              className="gap-2" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                alert("Print button clicked!");
+                handlePrintReceipt();
+              }} 
+              data-testid="button-print-receipt"
+              type="button"
+            >
               <Printer className="w-4 h-4" />
               {isRTL ? 'طباعة الوصل' : 'Print Receipt'}
             </Button>
