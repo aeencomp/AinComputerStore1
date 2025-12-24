@@ -208,19 +208,47 @@ export default function BatteryReceiptPrint() {
             size: 80mm auto;
             margin: 2mm;
           }
-          body {
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+            color-adjust: exact !important;
+          }
+          html, body {
             background: white !important;
             margin: 0 !important;
+            padding: 0 !important;
+            width: 80mm !important;
+          }
+          body > * {
+            display: none !important;
+          }
+          body > #root {
+            display: block !important;
+          }
+          #root > * {
+            display: none !important;
+          }
+          #root .min-h-screen {
+            display: block !important;
+            min-height: auto !important;
+            background: white !important;
             padding: 0 !important;
           }
           .print\\:hidden {
             display: none !important;
           }
           #printable-receipt {
+            display: block !important;
+            visibility: visible !important;
             max-width: 100% !important;
+            width: 100% !important;
             margin: 0 !important;
             padding: 2mm !important;
             box-shadow: none !important;
+            background: white !important;
+          }
+          #printable-receipt * {
+            visibility: visible !important;
           }
         }
       `}</style>
