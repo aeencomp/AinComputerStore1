@@ -348,53 +348,39 @@
 
 /* Print styles for Battery POS Receipt */
 @media print {
+  /* Reset everything */
+  * {
+    visibility: hidden !important;
+  }
+  
   html, body {
-    visibility: visible !important;
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
-  }
-  
-  body > *:not([data-radix-portal]) {
-    display: none !important;
-  }
-  
-  [data-radix-portal] {
-    display: block !important;
-    visibility: visible !important;
-    position: static !important;
-  }
-  
-  [data-radix-portal] > * {
-    display: block !important;
-    visibility: visible !important;
-  }
-  
-  [role="dialog"] {
-    position: static !important;
-    transform: none !important;
     width: 100% !important;
-    max-width: 100% !important;
-    max-height: none !important;
-    border: none !important;
-    box-shadow: none !important;
-    background: white !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    height: auto !important;
   }
   
-  [data-state="open"][role="dialog"]::before,
-  [data-state="open"][role="dialog"]::after {
+  /* Hide dialog overlay/backdrop */
+  [data-radix-dialog-overlay],
+  [data-state="open"][data-radix-dialog-overlay] {
     display: none !important;
+    visibility: hidden !important;
+  }
+  
+  /* Show only receipt content */
+  #receipt-content,
+  #receipt-content * {
+    visibility: visible !important;
   }
   
   #receipt-content {
-    display: block !important;
-    visibility: visible !important;
-    position: static !important;
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
     width: 80mm !important;
     max-width: 80mm !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     padding: 3mm !important;
     background: white !important;
     color: black !important;
@@ -403,18 +389,27 @@
     box-shadow: none !important;
   }
   
-  #receipt-content * {
-    visibility: visible !important;
-    color: black !important;
-    background: white !important;
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-  
+  /* Preserve specific background colors */
   #receipt-content .bg-amber-50 {
     background: #fffbeb !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+  
+  #receipt-content .border-amber-200 {
+    border-color: #fde68a !important;
+  }
+  
+  #receipt-content .text-amber-800 {
+    color: #92400e !important;
+  }
+  
+  #receipt-content .text-amber-700 {
+    color: #b45309 !important;
+  }
+  
+  #receipt-content .text-amber-600 {
+    color: #d97706 !important;
   }
   
   #receipt-content .bg-gray-50 {
@@ -423,8 +418,12 @@
     print-color-adjust: exact !important;
   }
   
-  .print\\:hidden {
+  /* Hide print buttons and dialog headers */
+  .print\\:hidden,
+  [data-testid="button-print-receipt"],
+  [data-testid="button-new-sale"] {
     display: none !important;
+    visibility: hidden !important;
   }
   
   @page {
