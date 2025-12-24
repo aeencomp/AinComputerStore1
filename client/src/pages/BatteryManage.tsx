@@ -457,7 +457,6 @@ export default function BatteryManage() {
                       onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
                       placeholder="PA3817U-1BRS"
                       required
-                      disabled={!!editingBattery}
                       data-testid="input-serial-number"
                     />
                   </div>
