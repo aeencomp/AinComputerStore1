@@ -3461,14 +3461,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         batteryUserId: batteryUserId,
       };
       
-      const saleItems = items.map((item: any) => ({
-        batteryId: item.batteryId,
-        batteryName: item.batteryName || item.serialNumber,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice.toString(),
-        priceType: item.priceType || 'selling',
-        totalPrice: item.totalPrice.toString(),
-      }));
+      // Build sale items with battery info
+      const saleItems = [];
+      for (const item of items) {
+        const battery = await storage.getLaptopBattery(item.batteryId);
+        saleItems.push({
+          batteryId: item.batteryId,
+          serialNumber: battery?.serialNumber || 'N/A',
+          brand: battery?.brand || 'Unknown',
+          quantity: item.quantity,
+          unitPrice: item.unitPrice.toString(),
+          lineTotal: (item.unitPrice * item.quantity).toString(),
+        });
+      }
       
       const sale = await storage.createBatterySale(saleData, saleItems);
       
