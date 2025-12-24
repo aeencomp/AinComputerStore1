@@ -348,42 +348,87 @@
 
 /* Print styles for Battery POS Receipt */
 @media print {
-  body * {
-    visibility: hidden;
+  html, body {
+    visibility: visible !important;
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   
-  #receipt-content,
-  #receipt-content * {
-    visibility: visible;
+  body > *:not([data-radix-portal]) {
+    display: none !important;
+  }
+  
+  [data-radix-portal] {
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+  }
+  
+  [data-radix-portal] > * {
+    display: block !important;
+    visibility: visible !important;
+  }
+  
+  [role="dialog"] {
+    position: static !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  [data-state="open"][role="dialog"]::before,
+  [data-state="open"][role="dialog"]::after {
+    display: none !important;
   }
   
   #receipt-content {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 80mm;
-    max-width: 80mm;
-    margin: 0;
-    padding: 5mm;
+    display: block !important;
+    visibility: visible !important;
+    position: static !important;
+    width: 80mm !important;
+    max-width: 80mm !important;
+    margin: 0 auto !important;
+    padding: 3mm !important;
     background: white !important;
     color: black !important;
-    font-size: 10pt;
+    font-size: 9pt !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+  
+  #receipt-content * {
+    visibility: visible !important;
+    color: black !important;
+    background: white !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  #receipt-content .bg-amber-50 {
+    background: #fffbeb !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  #receipt-content .bg-gray-50 {
+    background: #f9fafb !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   
   .print\\:hidden {
     display: none !important;
   }
   
-  .print\\:border-0 {
-    border: none !important;
-  }
-  
-  .print\\:p-0 {
-    padding: 0 !important;
-  }
-  
   @page {
     size: 80mm auto;
-    margin: 5mm;
+    margin: 2mm;
   }
 }
