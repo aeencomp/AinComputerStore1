@@ -471,17 +471,21 @@ th:nth-child(3) { text-align: left; }
 </body>
 </html>`;
     
-    // Open in new tab
-    const printTab = window.open('', '_blank');
-    if (printTab) {
-      printTab.document.write(receiptHtml);
-      printTab.document.close();
-    } else {
-      // Fallback: create blob and open
-      const blob = new Blob([receiptHtml], { type: 'text/html' });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    }
+    // Create blob URL and open
+    const blob = new Blob([receiptHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    
+    // Create a link and click it
+    const link = document.createElement('a');
+    link.href = url;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    // Clean up blob URL after a delay
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
   if (authLoading) {
