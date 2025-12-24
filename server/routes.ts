@@ -3319,7 +3319,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const battery = await storage.updateLaptopBattery(req.params.id, req.body);
+      const updateData = { ...req.body };
+      
+      // Auto-regenerate barcode when serial number changes
+      if (updateData.serialNumber) {
+        updateData.barcode = `BAT-${updateData.serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`;
+      }
+      
+      const battery = await storage.updateLaptopBattery(req.params.id, updateData);
       if (!battery) {
         return res.status(404).json({ error: "البطارية غير موجودة" });
       }
