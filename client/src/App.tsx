@@ -46,6 +46,7 @@ import BatteryLogin from "@/pages/BatteryLogin";
 import BatteryDashboard from "@/pages/BatteryDashboard";
 import BatteryManage from "@/pages/BatteryManage";
 import BatteryPOS from "@/pages/BatteryPOS";
+import BatterySalesReport from "@/pages/BatterySalesReport";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -92,6 +93,7 @@ function Router() {
       <Route path="/battery" component={BatteryDashboard}/>
       <Route path="/battery/manage" component={BatteryManage}/>
       <Route path="/battery/pos" component={BatteryPOS}/>
+      <Route path="/battery/reports" component={BatterySalesReport}/>
       <Route component={NotFound} />
     </Switch>
   );
