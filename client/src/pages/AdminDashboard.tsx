@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse, Battery, Printer } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AdminNav } from "@/components/AdminNav";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
@@ -59,6 +59,28 @@ interface AdminUser {
   name: string;
   role: string;
   createdAt: string;
+}
+
+interface BatterySaleItem {
+  id: string;
+  brand: string;
+  serialNumber: string;
+  quantity: number;
+  unitPrice: string;
+  lineTotal: string;
+}
+
+interface BatterySale {
+  id: string;
+  saleNumber: string;
+  customerName: string | null;
+  customerPhone: string | null;
+  subtotal: string;
+  discount: string;
+  total: string;
+  paymentMethod: string;
+  createdAt: string;
+  items?: BatterySaleItem[];
 }
 
 export default function AdminDashboard() {
@@ -102,6 +124,11 @@ export default function AdminDashboard() {
 
   const { data: adminUsers = [], isLoading: adminUsersLoading } = useQuery<AdminUser[]>({
     queryKey: ['/api/admin/users'],
+    enabled: !!currentAdmin,
+  });
+
+  const { data: batterySales = [], isLoading: batterySalesLoading } = useQuery<BatterySale[]>({
+    queryKey: ['/api/admin/battery-sales'],
     enabled: !!currentAdmin,
   });
 
@@ -438,6 +465,10 @@ export default function AdminDashboard() {
               <Package className="w-4 h-4 me-2" />
               الطلبات
             </TabsTrigger>
+            <TabsTrigger value="battery-sales" data-testid="tab-battery-sales">
+              <Battery className="w-4 h-4 me-2" />
+              مبيعات البطاريات
+            </TabsTrigger>
             <TabsTrigger value="admins" data-testid="tab-admins">
               <ShieldCheck className="w-4 h-4 me-2" />
               المديرين
@@ -537,6 +568,155 @@ export default function AdminDashboard() {
                           {t('admin.dashboard.delete')}
                         </Button>
                       </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          <TabsContent value="battery-sales">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold mb-2">مبيعات البطاريات</h2>
+              <p className="text-muted-foreground">
+                عدد المبيعات: {batterySales.length}
+              </p>
+            </div>
+
+            {batterySalesLoading ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="w-8 h-8 animate-spin" />
+              </div>
+            ) : batterySales.length === 0 ? (
+              <Card>
+                <CardContent className="py-8">
+                  <p className="text-center text-muted-foreground">لا توجد مبيعات بطاريات حالياً</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {/* Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-blue-100 rounded-lg">
+                          <Battery className="h-5 w-5 text-blue-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">إجمالي المبيعات</p>
+                          <p className="text-2xl font-bold">{batterySales.length}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-green-100 rounded-lg">
+                          <TrendingUp className="h-5 w-5 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">إجمالي الإيرادات</p>
+                          <p className="text-xl font-bold text-green-600">
+                            {batterySales.reduce((sum, sale) => sum + parseFloat(sale.total || '0'), 0).toLocaleString('ar-IQ')} د.ع
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  <Card>
+                    <CardContent className="pt-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                          <Package className="h-5 w-5 text-amber-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">إجمالي البطاريات المباعة</p>
+                          <p className="text-2xl font-bold">
+                            {batterySales.reduce((sum, sale) => sum + (sale.items?.reduce((itemSum, item) => itemSum + item.quantity, 0) || 0), 0)}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Sales List */}
+                {batterySales.map((sale) => (
+                  <Card key={sale.id} data-testid={`battery-sale-card-${sale.id}`}>
+                    <CardHeader>
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <CardTitle className="text-lg">
+                            {sale.customerName || 'زبون متجر'}
+                          </CardTitle>
+                          <p className="text-sm font-semibold text-primary mt-1">
+                            رقم الفاتورة: {sale.saleNumber}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-bold text-lg text-green-600">
+                            {parseFloat(sale.total).toLocaleString('ar-IQ')} د.ع
+                          </p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {new Date(sale.createdAt).toLocaleDateString('ar-IQ')}
+                          </p>
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid md:grid-cols-3 gap-4">
+                        {sale.customerPhone && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">رقم الهاتف</p>
+                            <p dir="ltr" className="text-start">{sale.customerPhone}</p>
+                          </div>
+                        )}
+                        <div>
+                          <p className="text-sm text-muted-foreground">طريقة الدفع</p>
+                          <p>
+                            {sale.paymentMethod === 'cash' ? 'نقدي' : 
+                             sale.paymentMethod === 'card' ? 'بطاقة' : 'زين كاش'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-sm text-muted-foreground">عدد العناصر</p>
+                          <p>{sale.items?.length || 0} بطارية</p>
+                        </div>
+                      </div>
+
+                      {sale.items && sale.items.length > 0 && (
+                        <>
+                          <Separator />
+                          <div>
+                            <p className="text-sm font-semibold mb-2">البطاريات المباعة:</p>
+                            <div className="space-y-2">
+                              {sale.items.map((item, idx) => (
+                                <div key={idx} className="flex justify-between items-center bg-muted/50 p-2 rounded">
+                                  <div>
+                                    <span className="font-medium">{item.brand}</span>
+                                    <span className="text-sm text-muted-foreground mx-2">|</span>
+                                    <span className="text-sm font-mono">{item.serialNumber}</span>
+                                  </div>
+                                  <div className="text-end">
+                                    <span className="text-sm">الكمية: {item.quantity}</span>
+                                    <span className="text-sm text-muted-foreground mx-2">|</span>
+                                    <span className="font-medium">{parseFloat(item.lineTotal).toLocaleString('ar-IQ')} د.ع</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      )}
+
+                      {parseFloat(sale.discount) > 0 && (
+                        <div className="flex justify-between text-sm">
+                          <span className="text-muted-foreground">الخصم:</span>
+                          <span className="text-red-600">-{parseFloat(sale.discount).toLocaleString('ar-IQ')} د.ع</span>
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 ))}

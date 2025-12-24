@@ -2370,6 +2370,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Customer Management Routes (Admin panel)
   // ===============================
   
+  // Admin endpoint to view battery sales
+  app.get("/api/admin/battery-sales", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const sales = await storage.getBatterySales();
+      // Include items for each sale
+      const salesWithItems = await Promise.all(
+        sales.map(async (sale) => {
+          const items = await storage.getBatterySaleItems(sale.id);
+          return { ...sale, items };
+        })
+      );
+      return res.json(salesWithItems);
+    } catch (error) {
+      console.error("Error getting battery sales for admin:", error);
+      return res.status(500).json({ error: "خطأ في جلب مبيعات البطاريات" });
+    }
+  });
+
   // Admin endpoint to view all sales staff attendance/shifts
   app.get("/api/admin/shifts", async (req, res) => {
     try {
