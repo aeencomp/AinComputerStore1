@@ -303,8 +303,28 @@ export default function BatteryPOS() {
   const handlePrintReceipt = () => {
     if (!lastSaleData) return;
     
-    // Use window.print() on the current page - most reliable method
-    window.print();
+    // Save receipt data to sessionStorage and navigate to print page
+    const receiptData = {
+      saleNumber: lastSaleData.saleNumber,
+      saleDate: lastSaleData.saleDate.toISOString(),
+      customerName: lastSaleData.customerName,
+      customerPhone: lastSaleData.customerPhone,
+      items: lastSaleData.items.map(item => ({
+        brand: item.battery.brand,
+        serialNumber: item.battery.serialNumber,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+      })),
+      subtotal: lastSaleData.subtotal,
+      discount: lastSaleData.discount,
+      discountAmount: lastSaleData.discountAmount,
+      total: lastSaleData.total,
+      paymentMethod: lastSaleData.paymentMethod,
+      warrantyEndDate: lastSaleData.warrantyEndDate.toISOString(),
+    };
+    
+    sessionStorage.setItem("battery_receipt_print", JSON.stringify(receiptData));
+    setLocation("/battery/pos/print");
   };
 
   if (authLoading) {
