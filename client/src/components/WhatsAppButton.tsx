@@ -14,7 +14,15 @@ export function WhatsAppButton() {
     return null;
   }
 
-  const whatsappNumber = settings.whatsappNumber.replace(/\D/g, '');
+  // Format Iraqi phone number: remove leading 0, add 964 country code
+  const formatIraqiPhone = (phone: string) => {
+    const digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('964')) return digits;
+    if (digits.startsWith('0')) return '964' + digits.slice(1);
+    return '964' + digits;
+  };
+  
+  const whatsappNumber = formatIraqiPhone(settings.whatsappNumber);
   const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
     language === 'ar' 
       ? 'السلام عليكم ورحمة الله وبركاته، أود الاستفسار عن...'

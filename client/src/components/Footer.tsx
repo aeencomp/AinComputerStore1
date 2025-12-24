@@ -153,20 +153,28 @@ export function Footer() {
                 <span dir="ltr">{phone}</span>
               </a>
 
-              {settings?.whatsappNumber && (
-                <a 
-                  href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 text-sm text-muted-foreground hover:text-green-600 transition-colors group"
-                  data-testid="link-footer-whatsapp"
-                >
-                  <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
-                    <SiWhatsapp className="h-4 w-4 text-green-600" />
-                  </div>
-                  <span>{t('footer.whatsapp')}</span>
-                </a>
-              )}
+              {settings?.whatsappNumber && (() => {
+                const formatIraqiPhone = (phone: string) => {
+                  const digits = phone.replace(/\D/g, '');
+                  if (digits.startsWith('964')) return digits;
+                  if (digits.startsWith('0')) return '964' + digits.slice(1);
+                  return '964' + digits;
+                };
+                return (
+                  <a 
+                    href={`https://wa.me/${formatIraqiPhone(settings.whatsappNumber)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 text-sm text-muted-foreground hover:text-green-600 transition-colors group"
+                    data-testid="link-footer-whatsapp"
+                  >
+                    <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                      <SiWhatsapp className="h-4 w-4 text-green-600" />
+                    </div>
+                    <span>{t('footer.whatsapp')}</span>
+                  </a>
+                );
+              })()}
 
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
@@ -181,17 +189,25 @@ export function Footer() {
               <div className="pt-2">
                 <p className="text-sm font-medium mb-3">{t('footer.followUs')}</p>
                 <div className="flex gap-2">
-                  {settings?.whatsappNumber && (
-                    <a 
-                      href={`https://wa.me/${settings.whatsappNumber.replace(/[^0-9]/g, '')}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 hover:bg-green-500 hover:text-white transition-all duration-300"
-                      data-testid="button-social-whatsapp"
-                    >
-                      <SiWhatsapp className="h-5 w-5" />
-                    </a>
-                  )}
+                  {settings?.whatsappNumber && (() => {
+                    const formatIraqiPhone = (phone: string) => {
+                      const digits = phone.replace(/\D/g, '');
+                      if (digits.startsWith('964')) return digits;
+                      if (digits.startsWith('0')) return '964' + digits.slice(1);
+                      return '964' + digits;
+                    };
+                    return (
+                      <a 
+                        href={`https://wa.me/${formatIraqiPhone(settings.whatsappNumber)}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 hover:bg-green-500 hover:text-white transition-all duration-300"
+                        data-testid="button-social-whatsapp"
+                      >
+                        <SiWhatsapp className="h-5 w-5" />
+                      </a>
+                    );
+                  })()}
                   {settings?.facebookUrl && (
                     <a 
                       href={settings.facebookUrl} 
