@@ -48,7 +48,14 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
       - Customer info capture (optional)
       - Receipt generation with sale number
       - Automatic stock deduction on sale completion
-    - Routes: /battery/login, /battery (dashboard), /battery/manage, /battery/pos
+    - **Battery Sales Reports**: Analytics page with:
+      - Period filters (Today, Last 7 Days, This Month, Custom date range)
+      - Statistics cards (total sales, revenue, average sale value, discounts)
+      - Daily breakdown with revenue per day
+      - Payment methods breakdown
+      - Recent sales summary
+      - Full sales log table with filtering
+    - Routes: /battery/login, /battery (dashboard), /battery/manage, /battery/pos, /battery/reports
 
 # External Dependencies
 
