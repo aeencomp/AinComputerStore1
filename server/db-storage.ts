@@ -845,6 +845,13 @@ export class DrizzleStorage implements IStorage {
     return await db.select().from(batterySales).orderBy(desc(batterySales.createdAt));
   }
   
+  async clearAllBatterySales(): Promise<void> {
+    // Delete all sale items first (foreign key constraint)
+    await db.delete(batterySaleItems);
+    // Then delete all sales
+    await db.delete(batterySales);
+  }
+  
   async getBatterySale(id: string): Promise<BatterySale | undefined> {
     const result = await db.select().from(batterySales).where(eq(batterySales.id, id)).limit(1);
     return result[0];

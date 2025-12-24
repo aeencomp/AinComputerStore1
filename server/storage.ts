@@ -138,6 +138,7 @@ export interface IStorage {
   
   // Battery POS sales methods
   getBatterySales(): Promise<BatterySale[]>;
+  clearAllBatterySales(): Promise<void>;
   getBatterySale(id: string): Promise<BatterySale | undefined>;
   getBatterySaleByNumber(saleNumber: string): Promise<BatterySale | undefined>;
   createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[]): Promise<BatterySale>;
@@ -790,6 +791,10 @@ export class MemStorage implements IStorage {
   // Battery POS stubs for MemStorage
   async getBatterySales(): Promise<BatterySale[]> {
     return [];
+  }
+  
+  async clearAllBatterySales(): Promise<void> {
+    // Not implemented for MemStorage
   }
   
   async getBatterySale(id: string): Promise<BatterySale | undefined> {

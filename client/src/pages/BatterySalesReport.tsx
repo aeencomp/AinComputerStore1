@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +24,16 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { 
   ArrowLeft,
   ArrowRight,
@@ -33,6 +45,7 @@ import {
   BarChart3,
   Loader2,
   ShoppingCart,
+  Trash2,
 } from "lucide-react";
 import type { BatterySale, BatterySaleItem } from "@shared/schema";
 
@@ -52,6 +65,8 @@ type ReportPeriod = 'today' | 'week' | 'month' | 'custom';
 export default function BatterySalesReport() {
   const { language } = useLanguage();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const isRTL = language === 'ar';
   
   const [period, setPeriod] = useState<ReportPeriod>('today');
@@ -63,6 +78,7 @@ export default function BatterySalesReport() {
     const today = new Date();
     return today.toISOString().split('T')[0];
   });
+  const [showClearDialog, setShowClearDialog] = useState(false);
 
   const { data: currentUser, isLoading: authLoading } = useQuery<BatteryUserAuth>({
     queryKey: ['/api/battery/auth/me'],
@@ -72,6 +88,27 @@ export default function BatterySalesReport() {
   const { data: salesData = [], isLoading: salesLoading } = useQuery<SaleWithItems[]>({
     queryKey: ['/api/battery/pos/sales'],
     enabled: !!currentUser,
+  });
+
+  const clearSalesMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('DELETE', '/api/battery/pos/sales/clear-all');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/pos/sales'] });
+      setShowClearDialog(false);
+      toast({
+        title: isRTL ? 'تم المسح بنجاح' : 'Cleared Successfully',
+        description: isRTL ? 'تم مسح جميع سجلات المبيعات' : 'All sales records have been cleared',
+      });
+    },
+    onError: () => {
+      toast({
+        title: isRTL ? 'خطأ' : 'Error',
+        description: isRTL ? 'فشل في مسح السجلات' : 'Failed to clear records',
+        variant: 'destructive',
+      });
+    },
   });
 
   // Calculate date range based on period
@@ -216,9 +253,22 @@ export default function BatterySalesReport() {
               </h1>
             </div>
           </div>
-          <Badge variant="secondary" className="text-sm">
-            {currentUser.name}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowClearDialog(true)}
+              className="border-red-200 text-red-600 hover:bg-red-50"
+              disabled={salesData.length === 0}
+              data-testid="button-clear-all-sales"
+            >
+              <Trash2 className="h-4 w-4 me-2" />
+              {isRTL ? 'مسح الكل' : 'Clear All'}
+            </Button>
+            <Badge variant="secondary" className="text-sm">
+              {currentUser.name}
+            </Badge>
+          </div>
         </div>
 
         {/* Period Filter */}
@@ -507,6 +557,42 @@ export default function BatterySalesReport() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Clear All Confirmation Dialog */}
+      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
+        <AlertDialogContent className={isRTL ? 'rtl' : ''}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-600" />
+              {isRTL ? 'تأكيد مسح جميع المبيعات' : 'Confirm Clear All Sales'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRTL 
+                ? 'هل أنت متأكد من مسح جميع سجلات المبيعات؟ هذا الإجراء لا يمكن التراجع عنه.'
+                : 'Are you sure you want to clear all sales records? This action cannot be undone.'
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className={isRTL ? 'flex-row-reverse gap-2' : ''}>
+            <AlertDialogCancel data-testid="button-cancel-clear">
+              {isRTL ? 'إلغاء' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => clearSalesMutation.mutate()}
+              className="bg-red-600 hover:bg-red-700"
+              disabled={clearSalesMutation.isPending}
+              data-testid="button-confirm-clear"
+            >
+              {clearSalesMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin me-2" />
+              ) : (
+                <Trash2 className="h-4 w-4 me-2" />
+              )}
+              {isRTL ? 'مسح الكل' : 'Clear All'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

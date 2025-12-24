@@ -3503,6 +3503,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.delete("/api/battery/pos/sales/clear-all", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      await storage.clearAllBatterySales();
+      return res.json({ success: true, message: "تم مسح جميع المبيعات بنجاح" });
+    } catch (error) {
+      console.error("Error clearing battery sales:", error);
+      return res.status(500).json({ error: "خطأ في مسح المبيعات" });
+    }
+  });
+
   // POS - Create walk-in order
   app.post("/api/admin/pos/order", async (req, res) => {
     try {
