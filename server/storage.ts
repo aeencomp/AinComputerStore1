@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -135,6 +135,14 @@ export interface IStorage {
   updateDiscountCode(id: string, updates: Partial<InsertDiscountCode>): Promise<DiscountCode | undefined>;
   deleteDiscountCode(id: string): Promise<void>;
   incrementDiscountUsage(id: string): Promise<DiscountCode | undefined>;
+  
+  // Battery POS sales methods
+  getBatterySales(): Promise<BatterySale[]>;
+  getBatterySale(id: string): Promise<BatterySale | undefined>;
+  getBatterySaleByNumber(saleNumber: string): Promise<BatterySale | undefined>;
+  createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[]): Promise<BatterySale>;
+  getBatterySaleItems(saleId: string): Promise<BatterySaleItem[]>;
+  generateBatterySaleNumber(): Promise<string>;
 }
 
 export class MemStorage implements IStorage {
@@ -777,6 +785,33 @@ export class MemStorage implements IStorage {
   
   async incrementDiscountUsage(id: string): Promise<DiscountCode | undefined> {
     return undefined;
+  }
+  
+  // Battery POS stubs for MemStorage
+  async getBatterySales(): Promise<BatterySale[]> {
+    return [];
+  }
+  
+  async getBatterySale(id: string): Promise<BatterySale | undefined> {
+    return undefined;
+  }
+  
+  async getBatterySaleByNumber(saleNumber: string): Promise<BatterySale | undefined> {
+    return undefined;
+  }
+  
+  async createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[]): Promise<BatterySale> {
+    throw new Error("MemStorage does not support battery sales");
+  }
+  
+  async getBatterySaleItems(saleId: string): Promise<BatterySaleItem[]> {
+    return [];
+  }
+  
+  async generateBatterySaleNumber(): Promise<string> {
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0,10).replace(/-/g, '');
+    return `BSALE-${dateStr}-001`;
   }
 }
 

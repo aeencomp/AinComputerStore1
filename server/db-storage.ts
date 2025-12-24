@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -838,5 +838,60 @@ export class DrizzleStorage implements IStorage {
       .where(eq(discountCodes.id, id))
       .returning();
     return result[0];
+  }
+  
+  // Battery POS Sales Methods
+  async getBatterySales(): Promise<BatterySale[]> {
+    return await db.select().from(batterySales).orderBy(desc(batterySales.createdAt));
+  }
+  
+  async getBatterySale(id: string): Promise<BatterySale | undefined> {
+    const result = await db.select().from(batterySales).where(eq(batterySales.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async getBatterySaleByNumber(saleNumber: string): Promise<BatterySale | undefined> {
+    const result = await db.select().from(batterySales)
+      .where(eq(batterySales.saleNumber, saleNumber))
+      .limit(1);
+    return result[0];
+  }
+  
+  async createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[]): Promise<BatterySale> {
+    // Create the sale
+    const saleResult = await db.insert(batterySales).values(sale).returning();
+    const createdSale = saleResult[0];
+    
+    // Create sale items and update stock
+    for (const item of items) {
+      await db.insert(batterySaleItems).values({
+        ...item,
+        saleId: createdSale.id,
+      });
+      
+      // Decrement stock for each battery
+      await db.update(laptopBatteries)
+        .set({ stockQuantity: sql`${laptopBatteries.stockQuantity} - ${item.quantity}` })
+        .where(eq(laptopBatteries.id, item.batteryId));
+    }
+    
+    return createdSale;
+  }
+  
+  async getBatterySaleItems(saleId: string): Promise<BatterySaleItem[]> {
+    return await db.select().from(batterySaleItems).where(eq(batterySaleItems.saleId, saleId));
+  }
+  
+  async generateBatterySaleNumber(): Promise<string> {
+    const date = new Date();
+    const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    
+    // Get count of sales for today
+    const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todaySales = await db.select().from(batterySales)
+      .where(sql`${batterySales.createdAt} >= ${todayStart}`);
+    
+    const count = todaySales.length + 1;
+    return `BSALE-${dateStr}-${String(count).padStart(3, '0')}`;
   }
 }
