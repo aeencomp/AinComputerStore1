@@ -38,7 +38,8 @@ import {
   Settings,
   ChevronRight,
   PlusCircle,
-  Printer
+  Printer,
+  Receipt
 } from "lucide-react";
 import type { LaptopBattery } from "@shared/schema";
 import QRCode from "@/components/QRCode";
@@ -295,6 +296,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="default"
+              size="sm"
+              onClick={() => setLocation("/battery/pos")}
+              className="bg-green-600 hover:bg-green-700"
+              data-testid="button-battery-pos"
+            >
+              <Receipt className="h-4 w-4 me-2" />
+              {language === 'ar' ? 'نقطة البيع' : 'POS'}
+            </Button>
             <Button
               variant="ghost"
               size="sm"

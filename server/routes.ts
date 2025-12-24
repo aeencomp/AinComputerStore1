@@ -3458,7 +3458,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus: 'success',
         status: 'completed',
         notes: notes || null,
-        soldBy: batteryUserId,
+        batteryUserId: batteryUserId,
       };
       
       const saleItems = items.map((item: any) => ({
