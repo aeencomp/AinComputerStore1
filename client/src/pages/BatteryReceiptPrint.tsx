@@ -79,7 +79,7 @@ export default function BatteryReceiptPrint() {
       <div 
         id="printable-receipt" 
         className="max-w-[72mm] mx-auto bg-white shadow-lg print:shadow-none print:max-w-none text-black"
-        style={{ fontFamily: "'Segoe UI', Tahoma, Arial, sans-serif" }}
+        style={{ fontFamily: "'Inter', 'SF Pro Display', 'Helvetica Neue', system-ui, -apple-system, sans-serif" }}
       >
         {/* Modern Header */}
         <div className="bg-black text-white p-4 text-center">
@@ -227,7 +227,7 @@ export default function BatteryReceiptPrint() {
             margin: 0 !important;
             padding: 0 !important;
             width: 72.1mm !important;
-            font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
+            font-family: 'Inter', 'SF Pro Display', 'Helvetica Neue', system-ui, -apple-system, sans-serif !important;
           }
           body > * {
             display: none !important;
@@ -256,9 +256,10 @@ export default function BatteryReceiptPrint() {
             padding: 0 !important;
             box-shadow: none !important;
             background: white !important;
-            font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
+            font-family: 'Inter', 'SF Pro Display', 'Helvetica Neue', system-ui, -apple-system, sans-serif !important;
             -webkit-font-smoothing: antialiased !important;
             text-rendering: optimizeLegibility !important;
+            letter-spacing: -0.01em !important;
           }
           #printable-receipt * {
             visibility: visible !important;
