@@ -889,6 +889,14 @@ export class DrizzleStorage implements IStorage {
     return await db.select().from(batterySaleItems).where(eq(batterySaleItems.saleId, saleId));
   }
   
+  async updateBatterySale(id: string, data: Partial<InsertBatterySale>): Promise<BatterySale | undefined> {
+    const result = await db.update(batterySales)
+      .set(data)
+      .where(eq(batterySales.id, id))
+      .returning();
+    return result[0];
+  }
+  
   async generateBatterySaleNumber(): Promise<string> {
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');

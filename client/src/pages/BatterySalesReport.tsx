@@ -1,7 +1,9 @@
 import { useState, useMemo } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -22,6 +24,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { 
   ArrowLeft,
   ArrowRight,
@@ -34,6 +44,7 @@ import {
   Loader2,
   ShoppingCart,
   Printer,
+  Edit,
 } from "lucide-react";
 import type { BatterySale, BatterySaleItem } from "@shared/schema";
 
@@ -53,9 +64,18 @@ type ReportPeriod = 'today' | 'week' | 'month' | 'custom';
 export default function BatterySalesReport() {
   const { language } = useLanguage();
   const [, setLocation] = useLocation();
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const isRTL = language === 'ar';
   
   const [period, setPeriod] = useState<ReportPeriod>('today');
+  const [editingSale, setEditingSale] = useState<SaleWithItems | null>(null);
+  const [editForm, setEditForm] = useState({
+    customerName: '',
+    customerPhone: '',
+    paymentMethod: 'cash',
+    discount: '0',
+  });
   const [startDate, setStartDate] = useState(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -73,6 +93,54 @@ export default function BatterySalesReport() {
     queryKey: ['/api/battery/pos/sales'],
     enabled: !!currentUser,
   });
+
+  const updateSaleMutation = useMutation({
+    mutationFn: async (data: { id: string; customerName: string; customerPhone: string; paymentMethod: string; discount: number; total: number }) => {
+      return await apiRequest('PATCH', `/api/battery/pos/sales/${data.id}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/pos/sales'] });
+      setEditingSale(null);
+      toast({
+        title: isRTL ? 'تم التحديث بنجاح' : 'Updated Successfully',
+        description: isRTL ? 'تم تحديث بيانات الفاتورة' : 'Receipt has been updated',
+      });
+    },
+    onError: () => {
+      toast({
+        title: isRTL ? 'خطأ' : 'Error',
+        description: isRTL ? 'فشل في تحديث الفاتورة' : 'Failed to update receipt',
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const openEditModal = (sale: SaleWithItems) => {
+    setEditForm({
+      customerName: sale.customerName || '',
+      customerPhone: sale.customerPhone || '',
+      paymentMethod: sale.paymentMethod || 'cash',
+      discount: sale.discount || '0',
+    });
+    setEditingSale(sale);
+  };
+
+  const handleSaveEdit = () => {
+    if (!editingSale) return;
+    
+    const discountAmount = parseFloat(editForm.discount) || 0;
+    const subtotal = parseFloat(editingSale.subtotal || '0');
+    const newTotal = subtotal - discountAmount;
+    
+    updateSaleMutation.mutate({
+      id: editingSale.id,
+      customerName: editForm.customerName,
+      customerPhone: editForm.customerPhone,
+      paymentMethod: editForm.paymentMethod,
+      discount: discountAmount,
+      total: newTotal,
+    });
+  };
 
   // Calculate date range based on period
   const dateRange = useMemo(() => {
@@ -531,14 +599,24 @@ export default function BatterySalesReport() {
                           {formatCurrency(parseFloat(sale.total || '0'))}
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => handlePrintReceipt(sale)}
-                            data-testid={`button-print-${sale.id}`}
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
+                          <div className="flex gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => openEditModal(sale)}
+                              data-testid={`button-edit-${sale.id}`}
+                            >
+                              <Edit className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => handlePrintReceipt(sale)}
+                              data-testid={`button-print-${sale.id}`}
+                            >
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -549,6 +627,112 @@ export default function BatterySalesReport() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Edit Sale Modal */}
+      <Dialog open={!!editingSale} onOpenChange={(open) => !open && setEditingSale(null)}>
+        <DialogContent className={`max-w-md ${isRTL ? 'rtl' : ''}`}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              {isRTL ? 'تعديل الفاتورة' : 'Edit Receipt'}
+            </DialogTitle>
+            <DialogDescription>
+              {isRTL 
+                ? `رقم الفاتورة: ${editingSale?.saleNumber}`
+                : `Receipt #: ${editingSale?.saleNumber}`
+              }
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4">
+            <div className="space-y-2">
+              <Label>{isRTL ? 'اسم الزبون' : 'Customer Name'}</Label>
+              <Input
+                value={editForm.customerName}
+                onChange={(e) => setEditForm(prev => ({ ...prev, customerName: e.target.value }))}
+                placeholder={isRTL ? 'زبون متجر' : 'Walk-in Customer'}
+                data-testid="input-edit-customer-name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{isRTL ? 'رقم الهاتف' : 'Phone Number'}</Label>
+              <Input
+                value={editForm.customerPhone}
+                onChange={(e) => setEditForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                placeholder="07XXXXXXXXX"
+                dir="ltr"
+                data-testid="input-edit-customer-phone"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</Label>
+              <Select 
+                value={editForm.paymentMethod} 
+                onValueChange={(v) => setEditForm(prev => ({ ...prev, paymentMethod: v }))}
+              >
+                <SelectTrigger data-testid="select-edit-payment-method">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">{isRTL ? 'نقدي' : 'Cash'}</SelectItem>
+                  <SelectItem value="card">{isRTL ? 'بطاقة' : 'Card'}</SelectItem>
+                  <SelectItem value="zaincash">{isRTL ? 'زين كاش' : 'ZainCash'}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label>{isRTL ? 'الخصم (د.ع)' : 'Discount (IQD)'}</Label>
+              <Input
+                type="number"
+                value={editForm.discount}
+                onChange={(e) => setEditForm(prev => ({ ...prev, discount: e.target.value }))}
+                min="0"
+                data-testid="input-edit-discount"
+              />
+            </div>
+
+            {editingSale && (
+              <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">{isRTL ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
+                  <span>{formatCurrency(parseFloat(editingSale.subtotal || '0'))}</span>
+                </div>
+                <div className="flex justify-between text-red-600">
+                  <span>{isRTL ? 'الخصم:' : 'Discount:'}</span>
+                  <span>-{formatCurrency(parseFloat(editForm.discount) || 0)}</span>
+                </div>
+                <div className="flex justify-between font-bold text-lg pt-1 border-t">
+                  <span>{isRTL ? 'الإجمالي:' : 'Total:'}</span>
+                  <span className="text-green-600">
+                    {formatCurrency(parseFloat(editingSale.subtotal || '0') - (parseFloat(editForm.discount) || 0))}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <DialogFooter className={isRTL ? 'flex-row-reverse gap-2' : ''}>
+            <Button
+              variant="outline"
+              onClick={() => setEditingSale(null)}
+              data-testid="button-cancel-edit"
+            >
+              {isRTL ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={updateSaleMutation.isPending}
+              data-testid="button-save-edit"
+            >
+              {updateSaleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+              {isRTL ? 'حفظ التغييرات' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -3454,6 +3454,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/battery/pos/sales/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      const { customerName, customerPhone, paymentMethod, discount, total } = req.body;
+      
+      const existingSale = await storage.getBatterySale(id);
+      if (!existingSale) {
+        return res.status(404).json({ error: "لم يتم العثور على عملية البيع" });
+      }
+      
+      const updateData: any = {};
+      if (customerName !== undefined) updateData.customerName = customerName;
+      if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
+      if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
+      if (discount !== undefined) updateData.discount = discount.toString();
+      if (total !== undefined) updateData.total = total.toString();
+      
+      const updatedSale = await storage.updateBatterySale(id, updateData);
+      if (!updatedSale) {
+        return res.status(500).json({ error: "فشل في تحديث عملية البيع" });
+      }
+      
+      const items = await storage.getBatterySaleItems(updatedSale.id);
+      return res.json({ ...updatedSale, items });
+    } catch (error) {
+      console.error("Error updating battery sale:", error);
+      return res.status(500).json({ error: "خطأ في تحديث عملية البيع" });
+    }
+  });
+
   app.post("/api/battery/pos/sales", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
