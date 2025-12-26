@@ -214,7 +214,7 @@ export default function BatteryReceiptPrint() {
       <style>{`
         @media print {
           @page {
-            size: 72.1mm 297mm;
+            size: 72.1mm 210mm;
             margin: 2mm;
           }
           * {
