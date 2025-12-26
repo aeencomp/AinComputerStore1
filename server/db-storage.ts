@@ -896,6 +896,13 @@ export class DrizzleStorage implements IStorage {
       .returning();
     return result[0];
   }
+
+  async deleteBatterySale(id: string): Promise<boolean> {
+    // First delete sale items, then delete the sale
+    await db.delete(batterySaleItems).where(eq(batterySaleItems.saleId, id));
+    const result = await db.delete(batterySales).where(eq(batterySales.id, id)).returning();
+    return result.length > 0;
+  }
   
   async generateBatterySaleNumber(): Promise<string> {
     const date = new Date();

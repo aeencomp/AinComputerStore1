@@ -45,7 +45,18 @@ import {
   ShoppingCart,
   Printer,
   Edit,
+  Trash2,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { BatterySale, BatterySaleItem } from "@shared/schema";
 
 interface BatteryUserAuth {
@@ -70,6 +81,7 @@ export default function BatterySalesReport() {
   
   const [period, setPeriod] = useState<ReportPeriod>('today');
   const [editingSale, setEditingSale] = useState<SaleWithItems | null>(null);
+  const [deletingSale, setDeletingSale] = useState<SaleWithItems | null>(null);
   const [editForm, setEditForm] = useState({
     customerName: '',
     customerPhone: '',
@@ -120,6 +132,27 @@ export default function BatterySalesReport() {
     },
   });
 
+  const deleteSaleMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return await apiRequest('DELETE', `/api/battery/pos/sales/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/pos/sales'] });
+      setDeletingSale(null);
+      toast({
+        title: isRTL ? 'تم الحذف بنجاح' : 'Deleted Successfully',
+        description: isRTL ? 'تم حذف الفاتورة' : 'Receipt has been deleted',
+      });
+    },
+    onError: () => {
+      toast({
+        title: isRTL ? 'خطأ' : 'Error',
+        description: isRTL ? 'فشل في حذف الفاتورة' : 'Failed to delete receipt',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const openEditModal = (sale: SaleWithItems) => {
     setEditForm({
       customerName: sale.customerName || '',
@@ -128,6 +161,11 @@ export default function BatterySalesReport() {
       discount: sale.discount || '0',
     });
     setEditingSale(sale);
+  };
+
+  const handleConfirmDelete = () => {
+    if (!deletingSale) return;
+    deleteSaleMutation.mutate(deletingSale.id);
   };
 
   const handleSaveEdit = () => {
@@ -629,6 +667,15 @@ export default function BatterySalesReport() {
                             >
                               <Printer className="h-4 w-4" />
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setDeletingSale(sale)}
+                              className="text-red-500 hover:text-red-700"
+                              data-testid={`button-delete-${sale.id}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -746,6 +793,38 @@ export default function BatterySalesReport() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deletingSale} onOpenChange={(open) => !open && setDeletingSale(null)}>
+        <AlertDialogContent className={isRTL ? 'rtl' : ''}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Trash2 className="h-5 w-5 text-red-500" />
+              {isRTL ? 'تأكيد الحذف' : 'Confirm Delete'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isRTL 
+                ? `هل أنت متأكد من حذف الفاتورة رقم ${deletingSale?.saleNumber}؟ لا يمكن التراجع عن هذا الإجراء.`
+                : `Are you sure you want to delete receipt #${deletingSale?.saleNumber}? This action cannot be undone.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className={isRTL ? 'flex-row-reverse gap-2' : ''}>
+            <AlertDialogCancel data-testid="button-cancel-delete">
+              {isRTL ? 'إلغاء' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-red-500 hover:bg-red-600"
+              disabled={deleteSaleMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteSaleMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+              {isRTL ? 'حذف' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

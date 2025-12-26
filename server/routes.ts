@@ -3515,6 +3515,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Delete a battery sale
+  app.delete("/api/battery/pos/sales/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { id } = req.params;
+      
+      const existingSale = await storage.getBatterySale(id);
+      if (!existingSale) {
+        return res.status(404).json({ error: "لم يتم العثور على عملية البيع" });
+      }
+      
+      const deleted = await storage.deleteBatterySale(id);
+      if (!deleted) {
+        return res.status(500).json({ error: "فشل في حذف عملية البيع" });
+      }
+      
+      return res.json({ success: true, message: "تم حذف عملية البيع بنجاح" });
+    } catch (error) {
+      console.error("Error deleting battery sale:", error);
+      return res.status(500).json({ error: "خطأ في حذف عملية البيع" });
+    }
+  });
+
   app.post("/api/battery/pos/sales", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
