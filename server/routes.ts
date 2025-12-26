@@ -3462,19 +3462,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { id } = req.params;
-      const { customerName, customerPhone, paymentMethod, discount, total } = req.body;
+      
+      // Validate editable fields only
+      const editSchema = z.object({
+        customerName: z.string().optional(),
+        customerPhone: z.string().optional(),
+        paymentMethod: z.enum(['cash', 'card', 'zaincash']).optional(),
+        discount: z.number().min(0).optional(),
+      });
+      
+      const validationResult = editSchema.safeParse(req.body);
+      if (!validationResult.success) {
+        return res.status(400).json({ error: "بيانات غير صالحة", details: validationResult.error.errors });
+      }
+      
+      const { customerName, customerPhone, paymentMethod, discount } = validationResult.data;
       
       const existingSale = await storage.getBatterySale(id);
       if (!existingSale) {
         return res.status(404).json({ error: "لم يتم العثور على عملية البيع" });
       }
       
+      // Build update data - only allowed fields
       const updateData: any = {};
       if (customerName !== undefined) updateData.customerName = customerName;
       if (customerPhone !== undefined) updateData.customerPhone = customerPhone;
       if (paymentMethod !== undefined) updateData.paymentMethod = paymentMethod;
-      if (discount !== undefined) updateData.discount = discount.toString();
-      if (total !== undefined) updateData.total = total.toString();
+      
+      // Recalculate total server-side if discount is provided
+      if (discount !== undefined) {
+        const subtotal = parseFloat(existingSale.subtotal || '0');
+        
+        // Validate discount doesn't exceed subtotal
+        if (discount > subtotal) {
+          return res.status(400).json({ error: "الخصم لا يمكن أن يتجاوز المجموع الفرعي" });
+        }
+        
+        updateData.discount = discount.toString();
+        updateData.total = (subtotal - discount).toString();
+      }
       
       const updatedSale = await storage.updateBatterySale(id, updateData);
       if (!updatedSale) {

@@ -95,8 +95,13 @@ export default function BatterySalesReport() {
   });
 
   const updateSaleMutation = useMutation({
-    mutationFn: async (data: { id: string; customerName: string; customerPhone: string; paymentMethod: string; discount: number; total: number }) => {
-      return await apiRequest('PATCH', `/api/battery/pos/sales/${data.id}`, data);
+    mutationFn: async (data: { id: string; customerName: string; customerPhone: string; paymentMethod: string; discount: number }) => {
+      return await apiRequest('PATCH', `/api/battery/pos/sales/${data.id}`, {
+        customerName: data.customerName,
+        customerPhone: data.customerPhone,
+        paymentMethod: data.paymentMethod,
+        discount: data.discount,
+      });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/battery/pos/sales'] });
@@ -130,7 +135,16 @@ export default function BatterySalesReport() {
     
     const discountAmount = parseFloat(editForm.discount) || 0;
     const subtotal = parseFloat(editingSale.subtotal || '0');
-    const newTotal = subtotal - discountAmount;
+    
+    // Validate discount doesn't exceed subtotal
+    if (discountAmount > subtotal) {
+      toast({
+        title: isRTL ? 'خطأ' : 'Error',
+        description: isRTL ? 'الخصم لا يمكن أن يتجاوز المجموع الفرعي' : 'Discount cannot exceed subtotal',
+        variant: 'destructive',
+      });
+      return;
+    }
     
     updateSaleMutation.mutate({
       id: editingSale.id,
@@ -138,7 +152,6 @@ export default function BatterySalesReport() {
       customerPhone: editForm.customerPhone,
       paymentMethod: editForm.paymentMethod,
       discount: discountAmount,
-      total: newTotal,
     });
   };
 
