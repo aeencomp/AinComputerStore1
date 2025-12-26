@@ -207,8 +207,8 @@ export default function BatteryReceiptPrint() {
       <style>{`
         @media print {
           @page {
-            size: 80mm auto;
-            margin: 2mm;
+            size: 80mm 297mm;
+            margin: 3mm;
           }
           * {
             -webkit-print-color-adjust: exact !important;
@@ -220,6 +220,7 @@ export default function BatteryReceiptPrint() {
             margin: 0 !important;
             padding: 0 !important;
             width: 80mm !important;
+            min-height: 297mm !important;
             font-family: 'Segoe UI', Tahoma, Arial, sans-serif !important;
           }
           body > * {
