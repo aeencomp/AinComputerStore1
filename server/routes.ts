@@ -3192,6 +3192,152 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "خطأ في جلب البطاريات" });
     }
   });
+
+  // Battery Backup - Export all batteries as JSON
+  app.get("/api/battery/batteries/backup", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const batteries = await storage.getLaptopBatteries();
+      
+      const backupData = {
+        schemaVersion: "1.0",
+        generatedAt: new Date().toISOString(),
+        rowCount: batteries.length,
+        data: batteries.map(b => ({
+          serialNumber: b.serialNumber,
+          partNumber: b.partNumber,
+          barcode: b.barcode,
+          brand: b.brand,
+          compatibleLaptops: b.compatibleLaptops,
+          voltage: b.voltage,
+          capacity: b.capacity,
+          cells: b.cells,
+          stockQuantity: b.stockQuantity,
+          minStockLevel: b.minStockLevel,
+          purchasePrice: b.purchasePrice,
+          sellingPrice: b.sellingPrice,
+          wholesalePrice: b.wholesalePrice,
+          supplier: b.supplier,
+          location: b.location,
+          notes: b.notes,
+          isActive: b.isActive,
+        })),
+      };
+      
+      const filename = `battery-backup-${new Date().toISOString().split('T')[0]}.json`;
+      res.setHeader('Content-Type', 'application/json');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.json(backupData);
+    } catch (error) {
+      console.error("Error creating backup:", error);
+      return res.status(500).json({ error: "خطأ في إنشاء النسخة الاحتياطية" });
+    }
+  });
+
+  // Battery Restore - Import batteries from JSON backup
+  app.post("/api/battery/batteries/restore", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { schemaVersion, data, mode = 'merge' } = req.body;
+      
+      if (!schemaVersion || !data || !Array.isArray(data)) {
+        return res.status(400).json({ error: "ملف النسخة الاحتياطية غير صالح" });
+      }
+      
+      if (schemaVersion !== "1.0") {
+        return res.status(400).json({ error: "إصدار النسخة الاحتياطية غير مدعوم" });
+      }
+      
+      const results = {
+        added: 0,
+        updated: 0,
+        skipped: 0,
+        errors: [] as string[],
+      };
+      
+      for (const item of data) {
+        try {
+          if (!item.serialNumber || !item.brand || !item.compatibleLaptops) {
+            results.errors.push(`بيانات ناقصة للبطارية: ${item.serialNumber || 'غير معروف'}`);
+            results.skipped++;
+            continue;
+          }
+          
+          // Check if battery exists
+          const existing = await storage.getLaptopBatteryBySerial(item.serialNumber);
+          
+          if (existing) {
+            if (mode === 'merge') {
+              // Update existing battery
+              await storage.updateLaptopBattery(existing.id, {
+                partNumber: item.partNumber,
+                barcode: item.barcode,
+                brand: item.brand,
+                compatibleLaptops: item.compatibleLaptops,
+                voltage: item.voltage,
+                capacity: item.capacity,
+                cells: item.cells,
+                stockQuantity: item.stockQuantity,
+                minStockLevel: item.minStockLevel,
+                purchasePrice: item.purchasePrice,
+                sellingPrice: item.sellingPrice,
+                wholesalePrice: item.wholesalePrice,
+                supplier: item.supplier,
+                location: item.location,
+                notes: item.notes,
+                isActive: item.isActive,
+              });
+              results.updated++;
+            } else {
+              results.skipped++;
+            }
+          } else {
+            // Create new battery
+            await storage.createLaptopBattery({
+              serialNumber: item.serialNumber,
+              partNumber: item.partNumber,
+              barcode: item.barcode,
+              brand: item.brand,
+              compatibleLaptops: item.compatibleLaptops,
+              voltage: item.voltage,
+              capacity: item.capacity,
+              cells: item.cells,
+              stockQuantity: item.stockQuantity || 0,
+              minStockLevel: item.minStockLevel || 2,
+              purchasePrice: item.purchasePrice,
+              sellingPrice: item.sellingPrice,
+              wholesalePrice: item.wholesalePrice,
+              supplier: item.supplier,
+              location: item.location,
+              notes: item.notes,
+              isActive: item.isActive ?? 1,
+            });
+            results.added++;
+          }
+        } catch (itemError: any) {
+          results.errors.push(`خطأ في ${item.serialNumber}: ${itemError.message}`);
+          results.skipped++;
+        }
+      }
+      
+      return res.json({
+        success: true,
+        message: `تمت الاستعادة: ${results.added} جديد، ${results.updated} محدث، ${results.skipped} تخطي`,
+        ...results,
+      });
+    } catch (error) {
+      console.error("Error restoring backup:", error);
+      return res.status(500).json({ error: "خطأ في استعادة النسخة الاحتياطية" });
+    }
+  });
   
   app.get("/api/battery/batteries/search", async (req, res) => {
     try {

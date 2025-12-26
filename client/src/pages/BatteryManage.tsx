@@ -22,8 +22,21 @@ import {
   Loader2,
   Laptop,
   Search,
-  AlertTriangle
+  AlertTriangle,
+  Download,
+  Upload,
+  Database,
 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import type { LaptopBattery } from "@shared/schema";
 
 export default function BatteryManage() {
@@ -42,6 +55,17 @@ export default function BatteryManage() {
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [showLowStockOnly, setShowLowStockOnly] = useState(lowstockParam === 'true');
+  const [showRestoreDialog, setShowRestoreDialog] = useState(false);
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restoreResult, setRestoreResult] = useState<{
+    success: boolean;
+    message: string;
+    added: number;
+    updated: number;
+    skipped: number;
+    errors: string[];
+  } | null>(null);
+  const [isBackingUp, setIsBackingUp] = useState(false);
   
   const [formData, setFormData] = useState({
     serialNumber: "",
@@ -147,6 +171,87 @@ export default function BatteryManage() {
       toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
     },
   });
+
+  const restoreMutation = useMutation({
+    mutationFn: async (backupData: any) => {
+      const res = await apiRequest('POST', '/api/battery/batteries/restore', backupData);
+      return res.json();
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
+      setRestoreResult(result);
+      setRestoreFile(null);
+    },
+    onError: (error: any) => {
+      toast({ 
+        title: language === 'ar' ? 'خطأ في الاستعادة' : 'Restore Error', 
+        description: error.message, 
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const handleBackup = async () => {
+    setIsBackingUp(true);
+    try {
+      const response = await fetch('/api/battery/batteries/backup', {
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        throw new Error('Backup failed');
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `battery-backup-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      toast({ 
+        title: language === 'ar' ? 'تم إنشاء النسخة الاحتياطية' : 'Backup Created',
+        description: language === 'ar' ? 'تم تحميل الملف بنجاح' : 'File downloaded successfully',
+      });
+    } catch (error) {
+      toast({ 
+        title: language === 'ar' ? 'خطأ' : 'Error', 
+        description: language === 'ar' ? 'فشل في إنشاء النسخة الاحتياطية' : 'Failed to create backup',
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsBackingUp(false);
+    }
+  };
+
+  const handleRestoreFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setRestoreFile(file);
+      setShowRestoreDialog(true);
+    }
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!restoreFile) return;
+    
+    try {
+      const text = await restoreFile.text();
+      const backupData = JSON.parse(text);
+      backupData.mode = 'merge'; // Always use merge mode
+      restoreMutation.mutate(backupData);
+    } catch (error) {
+      toast({ 
+        title: language === 'ar' ? 'خطأ' : 'Error', 
+        description: language === 'ar' ? 'ملف غير صالح' : 'Invalid file format',
+        variant: 'destructive' 
+      });
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -267,14 +372,47 @@ export default function BatteryManage() {
         {!showForm ? (
           <>
             <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
-              <Button 
-                onClick={() => setShowForm(true)}
-                className="bg-green-600 hover:bg-green-700"
-                data-testid="button-new-battery"
-              >
-                <Plus className="h-4 w-4 me-2" />
-                {language === 'ar' ? 'إضافة بطارية جديدة' : 'Add New Battery'}
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                <Button 
+                  onClick={() => setShowForm(true)}
+                  className="bg-green-600 hover:bg-green-700"
+                  data-testid="button-new-battery"
+                >
+                  <Plus className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'إضافة بطارية جديدة' : 'Add New Battery'}
+                </Button>
+                
+                <Button 
+                  onClick={handleBackup}
+                  variant="outline"
+                  disabled={isBackingUp}
+                  data-testid="button-backup"
+                >
+                  {isBackingUp ? (
+                    <Loader2 className="h-4 w-4 me-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 me-2" />
+                  )}
+                  {language === 'ar' ? 'نسخ احتياطي' : 'Backup'}
+                </Button>
+                
+                <div className="relative">
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleRestoreFile}
+                    className="absolute inset-0 opacity-0 cursor-pointer"
+                    data-testid="input-restore-file"
+                  />
+                  <Button 
+                    variant="outline"
+                    data-testid="button-restore"
+                  >
+                    <Upload className="h-4 w-4 me-2" />
+                    {language === 'ar' ? 'استعادة' : 'Restore'}
+                  </Button>
+                </div>
+              </div>
               
               {/* Low Stock Filter Button */}
               {batteries.filter(b => (b.stockQuantity || 0) <= (b.minStockLevel || 2)).length > 0 && (
@@ -676,6 +814,95 @@ export default function BatteryManage() {
             >
               {deleteMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
               {language === 'ar' ? 'حذف' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Restore Confirmation Dialog */}
+      <AlertDialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
+        <AlertDialogContent className={language === 'ar' ? 'rtl' : ''}>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              {language === 'ar' ? 'تأكيد الاستعادة' : 'Confirm Restore'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {language === 'ar' 
+                ? `سيتم استعادة البيانات من الملف "${restoreFile?.name}". البطاريات الموجودة بنفس الرقم التسلسلي سيتم تحديثها، والجديدة ستضاف.`
+                : `Data will be restored from "${restoreFile?.name}". Existing batteries with the same serial number will be updated, new ones will be added.`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className={language === 'ar' ? 'flex-row-reverse gap-2' : ''}>
+            <AlertDialogCancel onClick={() => { setShowRestoreDialog(false); setRestoreFile(null); }}>
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmRestore}
+              disabled={restoreMutation.isPending}
+            >
+              {restoreMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+              {language === 'ar' ? 'استعادة' : 'Restore'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Restore Result Dialog */}
+      <Dialog open={!!restoreResult} onOpenChange={() => setRestoreResult(null)}>
+        <DialogContent className={language === 'ar' ? 'rtl' : ''}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5 text-green-600" />
+              {language === 'ar' ? 'نتيجة الاستعادة' : 'Restore Result'}
+            </DialogTitle>
+          </DialogHeader>
+          {restoreResult && (
+            <div className="space-y-4">
+              <p className="text-muted-foreground">{restoreResult.message}</p>
+              
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div className="p-3 bg-green-100 dark:bg-green-900/30 rounded-lg">
+                  <div className="text-2xl font-bold text-green-600">{restoreResult.added}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {language === 'ar' ? 'جديد' : 'Added'}
+                  </div>
+                </div>
+                <div className="p-3 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <div className="text-2xl font-bold text-blue-600">{restoreResult.updated}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {language === 'ar' ? 'محدث' : 'Updated'}
+                  </div>
+                </div>
+                <div className="p-3 bg-gray-100 dark:bg-gray-900/30 rounded-lg">
+                  <div className="text-2xl font-bold text-gray-600">{restoreResult.skipped}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {language === 'ar' ? 'تخطي' : 'Skipped'}
+                  </div>
+                </div>
+              </div>
+              
+              {restoreResult.errors.length > 0 && (
+                <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                  <div className="font-semibold text-red-600 mb-2">
+                    {language === 'ar' ? 'أخطاء:' : 'Errors:'}
+                  </div>
+                  <ul className="text-sm text-red-600 space-y-1">
+                    {restoreResult.errors.slice(0, 5).map((err, i) => (
+                      <li key={i}>{err}</li>
+                    ))}
+                    {restoreResult.errors.length > 5 && (
+                      <li>... {language === 'ar' ? `و ${restoreResult.errors.length - 5} أخطاء أخرى` : `and ${restoreResult.errors.length - 5} more errors`}</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
+          <DialogFooter>
+            <Button onClick={() => setRestoreResult(null)}>
+              {language === 'ar' ? 'حسناً' : 'OK'}
             </Button>
           </DialogFooter>
         </DialogContent>
