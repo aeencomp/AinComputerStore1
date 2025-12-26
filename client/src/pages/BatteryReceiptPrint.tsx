@@ -199,6 +199,7 @@ export default function BatteryReceiptPrint() {
         <div className="text-center border-t-2 border-dashed border-gray-400 pt-3">
           <p className="text-xs text-gray-500">شكراً لتسوقكم معنا</p>
           <p className="text-[10px] text-gray-400 mt-1">يرجى الاحتفاظ بالوصل لغرض الضمان</p>
+          <p className="text-xs text-gray-600 mt-2 font-semibold" dir="ltr">07702428818</p>
         </div>
       </div>
 
