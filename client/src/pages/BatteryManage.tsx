@@ -476,9 +476,14 @@ export default function BatteryManage() {
       return;
     }
 
+    // Auto-generate serial number if not editing (ADP-XXXXXX format)
+    const serialNumber = editingAdapter 
+      ? adapterFormData.serialNumber 
+      : `ADP-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+
     const data = {
-      serialNumber: adapterFormData.serialNumber,
-      partNumber: adapterFormData.partNumber || null,
+      serialNumber,
+      partNumber: null,
       brand: adapterFormData.brand,
       compatibleLaptops: adapterFormData.compatibleLaptops,
       inputVoltage: adapterFormData.inputVoltage || null,
@@ -487,7 +492,7 @@ export default function BatteryManage() {
       wattage: adapterFormData.wattage ? parseInt(adapterFormData.wattage) : null,
       connectorType: adapterFormData.connectorType || null,
       tipSize: adapterFormData.tipSize || null,
-      plugType: adapterFormData.plugType || null,
+      plugType: null,
       stockQuantity: parseInt(adapterFormData.stockQuantity) || 0,
       minStockLevel: parseInt(adapterFormData.minStockLevel) || 2,
       purchasePrice: adapterFormData.purchasePrice || null,
@@ -1183,28 +1188,6 @@ export default function BatteryManage() {
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAdapterSubmit} className="space-y-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>{language === 'ar' ? 'الرقم التسلسلي *' : 'Serial Number *'}</Label>
-                        <Input
-                          value={adapterFormData.serialNumber}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, serialNumber: e.target.value })}
-                          placeholder="DA130PM130"
-                          required
-                          data-testid="input-adapter-serial-number"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>{language === 'ar' ? 'رقم القطعة البديل' : 'Part Number'}</Label>
-                        <Input
-                          value={adapterFormData.partNumber}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, partNumber: e.target.value })}
-                          placeholder="0VJCH5"
-                          data-testid="input-adapter-part-number"
-                        />
-                      </div>
-                    </div>
-
                     <div className="space-y-2">
                       <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
                       <Input
@@ -1295,7 +1278,7 @@ export default function BatteryManage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>{language === 'ar' ? 'نوع الموصل' : 'Connector Type'}</Label>
                         <Input
@@ -1312,15 +1295,6 @@ export default function BatteryManage() {
                           onChange={(e) => setAdapterFormData({ ...adapterFormData, tipSize: e.target.value })}
                           placeholder="4.5mm x 3.0mm"
                           data-testid="input-adapter-tip-size"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>{language === 'ar' ? 'نوع القابس' : 'Plug Type'}</Label>
-                        <Input
-                          value={adapterFormData.plugType}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, plugType: e.target.value })}
-                          placeholder="2-prong / 3-prong"
-                          data-testid="input-adapter-plug-type"
                         />
                       </div>
                     </div>
