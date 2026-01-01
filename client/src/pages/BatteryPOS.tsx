@@ -45,10 +45,20 @@ import {
   Percent,
   FileText,
   Package,
-  ChevronLeft
+  ChevronLeft,
+  Plug
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { LaptopBattery } from "@shared/schema";
+import type { LaptopBattery, AcAdapter } from "@shared/schema";
+
+interface CartItem {
+  productType: 'battery' | 'adapter';
+  battery?: LaptopBattery;
+  adapter?: AcAdapter;
+  quantity: number;
+  priceType: 'purchase' | 'wholesale' | 'selling';
+  unitPrice: number;
+}
 
 interface SaleData {
   saleNumber: string;
@@ -71,13 +81,6 @@ interface BatteryUserAuth {
   role: string;
 }
 
-interface CartItem {
-  battery: LaptopBattery;
-  quantity: number;
-  priceType: 'purchase' | 'wholesale' | 'selling';
-  unitPrice: number;
-}
-
 function formatPrice(price: string | number): string {
   const num = typeof price === 'string' ? parseFloat(price) : price;
   return num.toLocaleString('ar-IQ') + ' د.ع';
@@ -90,6 +93,7 @@ export default function BatteryPOS() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
+  const [productType, setProductType] = useState<'battery' | 'adapter'>('battery');
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
@@ -117,6 +121,11 @@ export default function BatteryPOS() {
     enabled: !!currentUser,
   });
 
+  const { data: adapters = [], isLoading: adaptersLoading } = useQuery<AcAdapter[]>({
+    queryKey: ['/api/battery/adapters'],
+    enabled: !!currentUser,
+  });
+
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<LaptopBattery[]>({
     queryKey: ['/api/battery/batteries/search', searchQuery],
     queryFn: async () => {
@@ -125,7 +134,18 @@ export default function BatteryPOS() {
       if (!res.ok) throw new Error('Search failed');
       return res.json();
     },
-    enabled: !!currentUser && searchQuery.length > 0,
+    enabled: !!currentUser && searchQuery.length > 0 && productType === 'battery',
+  });
+
+  const { data: adapterSearchResults = [], isLoading: adapterSearchLoading } = useQuery<AcAdapter[]>({
+    queryKey: ['/api/battery/adapters/search', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/battery/adapters/search?q=${encodeURIComponent(searchQuery)}&type=all`);
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
+    enabled: !!currentUser && searchQuery.length > 0 && productType === 'adapter',
   });
 
   const createSaleMutation = useMutation({
@@ -155,6 +175,7 @@ export default function BatteryPOS() {
       setShowReceiptModal(true);
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
     },
     onError: (error: any) => {
       toast({
@@ -166,8 +187,9 @@ export default function BatteryPOS() {
   });
 
   const displayBatteries = searchQuery.trim() ? searchResults : batteries.filter(b => b.stockQuantity > 0).slice(0, 20);
+  const displayAdapters = searchQuery.trim() ? adapterSearchResults : adapters.filter(a => a.stockQuantity > 0).slice(0, 20);
 
-  const addToCart = (battery: LaptopBattery, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
+  const addBatteryToCart = (battery: LaptopBattery, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
     if (battery.stockQuantity <= 0) {
       toast({
         title: isRTL ? "لا يوجد مخزون" : "Out of Stock",
@@ -177,7 +199,11 @@ export default function BatteryPOS() {
       return;
     }
 
-    const existingIndex = cart.findIndex(item => item.battery.id === battery.id && item.priceType === priceType);
+    const existingIndex = cart.findIndex(item => 
+      item.productType === 'battery' && 
+      item.battery?.id === battery.id && 
+      item.priceType === priceType
+    );
     
     if (existingIndex >= 0) {
       const currentQty = cart[existingIndex].quantity;
@@ -200,7 +226,54 @@ export default function BatteryPOS() {
         : parseFloat(battery.sellingPrice || '0');
       
       setCart([...cart, {
+        productType: 'battery',
         battery,
+        quantity: 1,
+        priceType,
+        unitPrice: price,
+      }]);
+    }
+  };
+
+  const addAdapterToCart = (adapter: AcAdapter, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
+    if (adapter.stockQuantity <= 0) {
+      toast({
+        title: isRTL ? "لا يوجد مخزون" : "Out of Stock",
+        description: isRTL ? "هذا الشاحن غير متوفر" : "This adapter is not available",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const existingIndex = cart.findIndex(item => 
+      item.productType === 'adapter' && 
+      item.adapter?.id === adapter.id && 
+      item.priceType === priceType
+    );
+    
+    if (existingIndex >= 0) {
+      const currentQty = cart[existingIndex].quantity;
+      if (currentQty >= adapter.stockQuantity) {
+        toast({
+          title: isRTL ? "الحد الأقصى" : "Maximum Reached",
+          description: isRTL ? `الكمية المتاحة: ${adapter.stockQuantity}` : `Available quantity: ${adapter.stockQuantity}`,
+          variant: "destructive",
+        });
+        return;
+      }
+      const newCart = [...cart];
+      newCart[existingIndex].quantity += 1;
+      setCart(newCart);
+    } else {
+      const price = priceType === 'purchase' 
+        ? parseFloat(adapter.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(adapter.wholesalePrice || '0')
+        : parseFloat(adapter.sellingPrice || '0');
+      
+      setCart([...cart, {
+        productType: 'adapter',
+        adapter,
         quantity: 1,
         priceType,
         unitPrice: price,
@@ -213,12 +286,16 @@ export default function BatteryPOS() {
     const item = newCart[index];
     const newQty = item.quantity + delta;
     
+    const maxStock = item.productType === 'battery' 
+      ? item.battery?.stockQuantity || 0 
+      : item.adapter?.stockQuantity || 0;
+    
     if (newQty <= 0) {
       newCart.splice(index, 1);
-    } else if (newQty > item.battery.stockQuantity) {
+    } else if (newQty > maxStock) {
       toast({
         title: isRTL ? "الحد الأقصى" : "Maximum Reached",
-        description: isRTL ? `الكمية المتاحة: ${item.battery.stockQuantity}` : `Available quantity: ${item.battery.stockQuantity}`,
+        description: isRTL ? `الكمية المتاحة: ${maxStock}` : `Available quantity: ${maxStock}`,
         variant: "destructive",
       });
       return;
@@ -237,13 +314,23 @@ export default function BatteryPOS() {
   const changePriceType = (index: number, priceType: 'purchase' | 'wholesale' | 'selling') => {
     const newCart = [...cart];
     const item = newCart[index];
-    const battery = item.battery;
     
-    const price = priceType === 'purchase' 
-      ? parseFloat(battery.purchasePrice || '0')
-      : priceType === 'wholesale'
-      ? parseFloat(battery.wholesalePrice || '0')
-      : parseFloat(battery.sellingPrice || '0');
+    let price: number;
+    if (item.productType === 'battery' && item.battery) {
+      price = priceType === 'purchase' 
+        ? parseFloat(item.battery.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(item.battery.wholesalePrice || '0')
+        : parseFloat(item.battery.sellingPrice || '0');
+    } else if (item.productType === 'adapter' && item.adapter) {
+      price = priceType === 'purchase' 
+        ? parseFloat(item.adapter.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(item.adapter.wholesalePrice || '0')
+        : parseFloat(item.adapter.sellingPrice || '0');
+    } else {
+      return;
+    }
     
     newCart[index].priceType = priceType;
     newCart[index].unitPrice = price;
@@ -258,7 +345,7 @@ export default function BatteryPOS() {
     if (cart.length === 0) {
       toast({
         title: isRTL ? "السلة فارغة" : "Cart Empty",
-        description: isRTL ? "أضف بطاريات للسلة أولاً" : "Add batteries to cart first",
+        description: isRTL ? "أضف منتجات للسلة أولاً" : "Add products to cart first",
         variant: "destructive",
       });
       return;
@@ -267,12 +354,23 @@ export default function BatteryPOS() {
   };
 
   const confirmSale = () => {
+    const batteryItems = cart.filter(item => item.productType === 'battery');
+    const adapterItems = cart.filter(item => item.productType === 'adapter');
+
     const saleData = {
       customerName: customerName || (isRTL ? 'زبون متجر' : 'Walk-in Customer'),
       customerPhone,
-      items: cart.map(item => ({
-        batteryId: item.battery.id,
-        batteryName: `${item.battery.brand} ${item.battery.serialNumber}`,
+      items: batteryItems.map(item => ({
+        batteryId: item.battery!.id,
+        batteryName: `${item.battery!.brand} ${item.battery!.serialNumber}`,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        priceType: item.priceType,
+        totalPrice: item.unitPrice * item.quantity,
+      })),
+      adapterItems: adapterItems.map(item => ({
+        adapterId: item.adapter!.id,
+        adapterName: `${item.adapter!.brand} ${item.adapter!.serialNumber}${item.adapter!.wattage ? ` ${item.adapter!.wattage}W` : ''}`,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         priceType: item.priceType,
@@ -303,18 +401,32 @@ export default function BatteryPOS() {
   const handlePrintReceipt = () => {
     if (!lastSaleData) return;
     
-    // Save receipt data to sessionStorage and navigate to print page
     const receiptData = {
       saleNumber: lastSaleData.saleNumber,
       saleDate: lastSaleData.saleDate.toISOString(),
       customerName: lastSaleData.customerName,
       customerPhone: lastSaleData.customerPhone,
-      items: lastSaleData.items.map(item => ({
-        brand: item.battery.brand,
-        serialNumber: item.battery.serialNumber,
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-      })),
+      items: lastSaleData.items.map(item => {
+        if (item.productType === 'battery' && item.battery) {
+          return {
+            type: 'battery',
+            brand: item.battery.brand,
+            serialNumber: item.battery.serialNumber,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          };
+        } else if (item.productType === 'adapter' && item.adapter) {
+          return {
+            type: 'adapter',
+            brand: item.adapter.brand,
+            serialNumber: item.adapter.serialNumber,
+            wattage: item.adapter.wattage,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          };
+        }
+        return null;
+      }).filter(Boolean),
       subtotal: lastSaleData.subtotal,
       discount: lastSaleData.discount,
       discountAmount: lastSaleData.discountAmount,
@@ -325,6 +437,24 @@ export default function BatteryPOS() {
     
     sessionStorage.setItem("battery_receipt_print", JSON.stringify(receiptData));
     setLocation("/battery/pos/print");
+  };
+
+  const getCartItemName = (item: CartItem): string => {
+    if (item.productType === 'battery' && item.battery) {
+      return item.battery.brand;
+    } else if (item.productType === 'adapter' && item.adapter) {
+      return `${item.adapter.brand}${item.adapter.wattage ? ` ${item.adapter.wattage}W` : ''}`;
+    }
+    return '';
+  };
+
+  const getCartItemSerial = (item: CartItem): string => {
+    if (item.productType === 'battery' && item.battery) {
+      return item.battery.serialNumber;
+    } else if (item.productType === 'adapter' && item.adapter) {
+      return item.adapter.serialNumber;
+    }
+    return '';
   };
 
   if (authLoading) {
@@ -338,6 +468,10 @@ export default function BatteryPOS() {
   if (!currentUser) {
     return null;
   }
+
+  const isLoading = productType === 'battery' 
+    ? batteriesLoading || searchLoading 
+    : adaptersLoading || adapterSearchLoading;
 
   return (
     <div className={`min-h-screen bg-muted/30 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
@@ -358,7 +492,7 @@ export default function BatteryPOS() {
               </div>
               <div>
                 <h1 className="font-bold text-lg">{isRTL ? 'نقطة البيع' : 'Point of Sale'}</h1>
-                <p className="text-xs text-muted-foreground">{isRTL ? 'مبيعات البطاريات' : 'Battery Sales'}</p>
+                <p className="text-xs text-muted-foreground">{isRTL ? 'مبيعات البطاريات والشواحن' : 'Battery & Adapter Sales'}</p>
               </div>
             </div>
           </div>
@@ -376,20 +510,47 @@ export default function BatteryPOS() {
           <div className="lg:col-span-2 space-y-4">
             <Card>
               <CardHeader className="pb-3">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <Search className="w-4 h-4" />
-                  {isRTL ? 'البحث عن البطاريات' : 'Search Batteries'}
-                </CardTitle>
+                <div className="flex items-center justify-between gap-4 flex-wrap">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Search className="w-4 h-4" />
+                    {isRTL ? 'البحث عن المنتجات' : 'Search Products'}
+                  </CardTitle>
+                  <div className="flex border rounded-lg overflow-hidden">
+                    <Button
+                      variant={productType === 'battery' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="rounded-none gap-1"
+                      onClick={() => { setProductType('battery'); setSearchQuery(''); }}
+                      data-testid="toggle-product-type-battery"
+                    >
+                      <Battery className="w-4 h-4" />
+                      {isRTL ? 'البطاريات' : 'Batteries'}
+                    </Button>
+                    <Button
+                      variant={productType === 'adapter' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="rounded-none gap-1"
+                      onClick={() => { setProductType('adapter'); setSearchQuery(''); }}
+                      data-testid="toggle-product-type-adapter"
+                    >
+                      <Plug className="w-4 h-4" />
+                      {isRTL ? 'الشواحن' : 'AC Adapters'}
+                    </Button>
+                  </div>
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="relative">
                   <Search className={`absolute top-3 ${isRTL ? 'right-3' : 'left-3'} w-4 h-4 text-muted-foreground`} />
                   <Input
-                    placeholder={isRTL ? "ابحث بالرقم التسلسلي أو الموديل..." : "Search by serial or model..."}
+                    placeholder={productType === 'battery' 
+                      ? (isRTL ? "ابحث بالرقم التسلسلي أو الموديل..." : "Search by serial or model...")
+                      : (isRTL ? "ابحث بالرقم التسلسلي أو العلامة التجارية..." : "Search by serial or brand...")
+                    }
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className={`${isRTL ? 'pr-10' : 'pl-10'}`}
-                    data-testid="input-search-battery"
+                    data-testid="input-search-product"
                   />
                 </div>
               </CardContent>
@@ -399,45 +560,93 @@ export default function BatteryPOS() {
               <CardHeader className="pb-3">
                 <CardTitle className="text-base flex items-center gap-2">
                   <Package className="w-4 h-4" />
-                  {isRTL ? 'البطاريات المتاحة' : 'Available Batteries'}
-                  <Badge variant="secondary" className="ms-auto">{displayBatteries.length}</Badge>
+                  {productType === 'battery' 
+                    ? (isRTL ? 'البطاريات المتاحة' : 'Available Batteries')
+                    : (isRTL ? 'الشواحن المتاحة' : 'Available AC Adapters')
+                  }
+                  <Badge variant="secondary" className="ms-auto">
+                    {productType === 'battery' ? displayBatteries.length : displayAdapters.length}
+                  </Badge>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {batteriesLoading || searchLoading ? (
+                {isLoading ? (
                   <div className="flex items-center justify-center py-8">
                     <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
                   </div>
-                ) : displayBatteries.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <Battery className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                    <p>{isRTL ? 'لا توجد بطاريات' : 'No batteries found'}</p>
-                  </div>
-                ) : (
-                  <div className="grid sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
-                    {displayBatteries.map((battery) => (
-                      <div
-                        key={battery.id}
-                        className="p-3 border rounded-lg hover-elevate cursor-pointer transition-all"
-                        onClick={() => addToCart(battery)}
-                        data-testid={`battery-item-${battery.id}`}
-                      >
-                        <div className="flex items-start justify-between gap-2 mb-2">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm truncate">{battery.brand}</p>
-                            <p className="text-xs text-muted-foreground truncate">{battery.serialNumber}</p>
+                ) : productType === 'battery' ? (
+                  displayBatteries.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Battery className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>{isRTL ? 'لا توجد بطاريات' : 'No batteries found'}</p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                      {displayBatteries.map((battery) => (
+                        <div
+                          key={battery.id}
+                          className="p-3 border rounded-lg hover-elevate cursor-pointer transition-all"
+                          onClick={() => addBatteryToCart(battery)}
+                          data-testid={`battery-item-${battery.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{battery.brand}</p>
+                              <p className="text-xs text-muted-foreground truncate">{battery.serialNumber}</p>
+                            </div>
+                            <Badge variant={battery.stockQuantity <= (battery.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">
+                              {battery.stockQuantity}
+                            </Badge>
                           </div>
-                          <Badge variant={battery.stockQuantity <= (battery.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">
-                            {battery.stockQuantity}
-                          </Badge>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground truncate">{battery.partNumber}</span>
+                            <span className="font-bold text-primary">{formatPrice(battery.sellingPrice || '0')}</span>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between gap-2 text-xs">
-                          <span className="text-muted-foreground truncate">{battery.partNumber}</span>
-                          <span className="font-bold text-primary">{formatPrice(battery.sellingPrice || '0')}</span>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  displayAdapters.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Plug className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>{isRTL ? 'لا توجد شواحن' : 'No adapters found'}</p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                      {displayAdapters.map((adapter) => (
+                        <div
+                          key={adapter.id}
+                          className="p-3 border rounded-lg hover-elevate cursor-pointer transition-all"
+                          onClick={() => addAdapterToCart(adapter)}
+                          data-testid={`adapter-item-${adapter.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">
+                                {adapter.brand}
+                                {adapter.wattage && <span className="text-primary ms-1">{adapter.wattage}W</span>}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">{adapter.serialNumber}</p>
+                            </div>
+                            <Badge variant={adapter.stockQuantity <= (adapter.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">
+                              {adapter.stockQuantity}
+                            </Badge>
+                          </div>
+                          {adapter.compatibleLaptops && adapter.compatibleLaptops.length > 0 && (
+                            <p className="text-xs text-muted-foreground truncate mb-1">
+                              {adapter.compatibleLaptops.slice(0, 2).join(', ')}
+                              {adapter.compatibleLaptops.length > 2 && ` +${adapter.compatibleLaptops.length - 2}`}
+                            </p>
+                          )}
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground truncate">{adapter.connectorType || adapter.partNumber}</span>
+                            <span className="font-bold text-primary">{formatPrice(adapter.sellingPrice || '0')}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )
                 )}
               </CardContent>
             </Card>
@@ -459,16 +668,27 @@ export default function BatteryPOS() {
                   <div className="text-center py-12 text-muted-foreground">
                     <ShoppingCart className="w-10 h-10 mx-auto mb-2 opacity-50" />
                     <p className="text-sm">{isRTL ? 'السلة فارغة' : 'Cart is empty'}</p>
-                    <p className="text-xs mt-1">{isRTL ? 'اضغط على بطارية لإضافتها' : 'Click a battery to add it'}</p>
+                    <p className="text-xs mt-1">{isRTL ? 'اضغط على منتج لإضافته' : 'Click a product to add it'}</p>
                   </div>
                 ) : (
                   <div className="divide-y max-h-[40vh] overflow-y-auto">
                     {cart.map((item, index) => (
-                      <div key={`${item.battery.id}-${item.priceType}`} className="p-3">
+                      <div key={`${item.productType}-${item.productType === 'battery' ? item.battery?.id : item.adapter?.id}-${item.priceType}`} className="p-3">
                         <div className="flex items-start gap-2 mb-2">
+                          <div className="flex items-center gap-1">
+                            {item.productType === 'battery' ? (
+                              <Battery className="w-3 h-3 text-muted-foreground" />
+                            ) : (
+                              <Plug className="w-3 h-3 text-muted-foreground" />
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{item.battery.brand}</p>
-                            <p className="text-xs text-muted-foreground">{item.battery.serialNumber}</p>
+                            <p className="text-sm font-medium truncate" data-testid={`cart-item-name-${index}`}>
+                              {getCartItemName(item)}
+                            </p>
+                            <p className="text-xs text-muted-foreground" data-testid={`cart-item-serial-${index}`}>
+                              {getCartItemSerial(item)}
+                            </p>
                           </div>
                           <Button
                             variant="ghost"
@@ -486,7 +706,7 @@ export default function BatteryPOS() {
                             value={item.priceType}
                             onValueChange={(val) => changePriceType(index, val as any)}
                           >
-                            <SelectTrigger className="h-7 text-xs flex-1">
+                            <SelectTrigger className="h-7 text-xs flex-1" data-testid={`select-price-type-${index}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -505,7 +725,7 @@ export default function BatteryPOS() {
                             >
                               <Minus className="w-3 h-3" />
                             </Button>
-                            <span className="w-8 text-center text-sm font-medium">{item.quantity}</span>
+                            <span className="w-8 text-center text-sm font-medium" data-testid={`text-quantity-${index}`}>{item.quantity}</span>
                             <Button
                               variant="ghost"
                               size="icon"
@@ -520,7 +740,7 @@ export default function BatteryPOS() {
                         
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-muted-foreground">{formatPrice(item.unitPrice)} × {item.quantity}</span>
-                          <span className="font-bold">{formatPrice(item.unitPrice * item.quantity)}</span>
+                          <span className="font-bold" data-testid={`text-item-total-${index}`}>{formatPrice(item.unitPrice * item.quantity)}</span>
                         </div>
                       </div>
                     ))}
@@ -546,17 +766,17 @@ export default function BatteryPOS() {
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
                         <span className="text-muted-foreground">{isRTL ? 'المجموع الفرعي' : 'Subtotal'}</span>
-                        <span>{formatPrice(subtotal)}</span>
+                        <span data-testid="text-subtotal">{formatPrice(subtotal)}</span>
                       </div>
                       {discount > 0 && (
                         <div className="flex justify-between text-green-600">
                           <span>{isRTL ? 'الخصم' : 'Discount'} ({discount}%)</span>
-                          <span>-{formatPrice(discountAmount)}</span>
+                          <span data-testid="text-discount-amount">-{formatPrice(discountAmount)}</span>
                         </div>
                       )}
                       <div className="flex justify-between font-bold text-lg pt-2 border-t">
                         <span>{isRTL ? 'الإجمالي' : 'Total'}</span>
-                        <span className="text-primary">{formatPrice(total)}</span>
+                        <span className="text-primary" data-testid="text-total">{formatPrice(total)}</span>
                       </div>
                     </div>
 
@@ -670,7 +890,7 @@ export default function BatteryPOS() {
             <div className="bg-muted rounded-lg p-4 space-y-2">
               <div className="flex justify-between text-sm">
                 <span>{isRTL ? 'عدد الأصناف' : 'Items'}</span>
-                <span>{cart.reduce((sum, i) => sum + i.quantity, 0)}</span>
+                <span data-testid="text-checkout-items-count">{cart.reduce((sum, i) => sum + i.quantity, 0)}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span>{isRTL ? 'المجموع الفرعي' : 'Subtotal'}</span>
@@ -710,7 +930,6 @@ export default function BatteryPOS() {
         </DialogContent>
       </Dialog>
 
-      {/* Receipt Modal with Print Support */}
       <Dialog open={showReceiptModal} onOpenChange={setShowReceiptModal}>
         <DialogContent className={`${isRTL ? 'rtl' : ''} max-w-md max-h-[90vh] overflow-y-auto`}>
           <DialogHeader className="print:hidden">
@@ -724,18 +943,16 @@ export default function BatteryPOS() {
 
           {lastSaleData && (
             <div id="receipt-content" className="bg-white text-black p-4 rounded-lg border print:border-0 print:p-0">
-              {/* Store Header */}
               <div className="text-center border-b-2 border-dashed border-gray-300 pb-3 mb-3">
                 <h2 className="font-bold text-lg">العين لتجارة الحاسبات</h2>
                 <p className="text-xs text-gray-600">Al-Ain Computer Trading</p>
                 <p className="text-xs text-gray-500 mt-1">بغداد - العراق</p>
               </div>
 
-              {/* Receipt Info */}
               <div className="flex justify-between items-start mb-3 text-sm">
                 <div>
                   <p className="font-semibold">{isRTL ? 'رقم الوصل:' : 'Receipt #:'}</p>
-                  <p className="font-mono text-xs">{lastSaleData.saleNumber}</p>
+                  <p className="font-mono text-xs" data-testid="text-receipt-number">{lastSaleData.saleNumber}</p>
                 </div>
                 <div className="text-left">
                   <QRCodeSVG 
@@ -746,7 +963,6 @@ export default function BatteryPOS() {
                 </div>
               </div>
 
-              {/* Date/Time */}
               <div className="bg-gray-50 rounded p-2 mb-3 text-xs">
                 <div className="flex justify-between">
                   <span>{isRTL ? 'تاريخ البيع:' : 'Sale Date:'}</span>
@@ -769,7 +985,6 @@ export default function BatteryPOS() {
                 </div>
               </div>
 
-              {/* Customer Info */}
               {(lastSaleData.customerName || lastSaleData.customerPhone) && (
                 <div className="border-t border-gray-200 pt-2 mb-3 text-xs">
                   {lastSaleData.customerName && (
@@ -787,7 +1002,6 @@ export default function BatteryPOS() {
                 </div>
               )}
 
-              {/* Items */}
               <div className="border-t border-b border-gray-300 py-2 mb-3">
                 <table className="w-full text-xs">
                   <thead>
@@ -799,10 +1013,31 @@ export default function BatteryPOS() {
                   </thead>
                   <tbody>
                     {lastSaleData.items.map((item, idx) => (
-                      <tr key={idx} className="border-b border-gray-100">
+                      <tr key={idx} className="border-b border-gray-100" data-testid={`receipt-item-${idx}`}>
                         <td className="py-1">
-                          <div className="font-medium">{item.battery.brand}</div>
-                          <div className="text-gray-500 text-[10px]">{item.battery.serialNumber}</div>
+                          <div className="flex items-center gap-1">
+                            {item.productType === 'battery' ? (
+                              <Battery className="w-3 h-3 text-gray-400" />
+                            ) : (
+                              <Plug className="w-3 h-3 text-gray-400" />
+                            )}
+                            <div>
+                              <div className="font-medium">
+                                {item.productType === 'battery' && item.battery 
+                                  ? item.battery.brand 
+                                  : item.adapter 
+                                    ? `${item.adapter.brand}${item.adapter.wattage ? ` ${item.adapter.wattage}W` : ''}`
+                                    : ''
+                                }
+                              </div>
+                              <div className="text-gray-500 text-[10px]">
+                                {item.productType === 'battery' && item.battery 
+                                  ? item.battery.serialNumber 
+                                  : item.adapter?.serialNumber
+                                }
+                              </div>
+                            </div>
+                          </div>
                         </td>
                         <td className="text-center">{item.quantity}</td>
                         <td className="text-end">{formatPrice(item.unitPrice * item.quantity)}</td>
@@ -812,7 +1047,6 @@ export default function BatteryPOS() {
                 </table>
               </div>
 
-              {/* Totals */}
               <div className="space-y-1 text-sm mb-3">
                 <div className="flex justify-between">
                   <span>{isRTL ? 'المجموع:' : 'Subtotal:'}</span>
@@ -826,11 +1060,10 @@ export default function BatteryPOS() {
                 )}
                 <div className="flex justify-between font-bold text-base border-t border-gray-300 pt-2">
                   <span>{isRTL ? 'الإجمالي:' : 'Total:'}</span>
-                  <span>{formatPrice(lastSaleData.total)}</span>
+                  <span data-testid="text-receipt-total">{formatPrice(lastSaleData.total)}</span>
                 </div>
               </div>
 
-              {/* Payment Method */}
               <div className="bg-gray-50 rounded p-2 mb-3 text-xs text-center">
                 <span className="text-gray-600">{isRTL ? 'طريقة الدفع:' : 'Payment:'} </span>
                 <span className="font-semibold">
@@ -840,7 +1073,6 @@ export default function BatteryPOS() {
                 </span>
               </div>
 
-              {/* Warranty Notice */}
               <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-center">
                 <div className="flex items-center justify-center gap-2 mb-1">
                   <Battery className="w-4 h-4 text-amber-600" />
@@ -849,8 +1081,8 @@ export default function BatteryPOS() {
                   </span>
                 </div>
                 <p className="text-xs text-amber-700">
-                  {isRTL ? 'جميع البطاريات تشمل ضمان لمدة شهر واحد من تاريخ الشراء' : 
-                   'All batteries include 1 month warranty from purchase date'}
+                  {isRTL ? 'جميع المنتجات تشمل ضمان لمدة شهر واحد من تاريخ الشراء' : 
+                   'All products include 1 month warranty from purchase date'}
                 </p>
                 <div className="mt-2 pt-2 border-t border-amber-200 text-xs">
                   <div className="flex justify-between text-amber-800">
@@ -868,7 +1100,6 @@ export default function BatteryPOS() {
                 </div>
               </div>
 
-              {/* Footer */}
               <div className="text-center mt-3 pt-3 border-t border-dashed border-gray-300">
                 <p className="text-xs text-gray-500">
                   {isRTL ? 'شكراً لتسوقكم معنا' : 'Thank you for your purchase'}

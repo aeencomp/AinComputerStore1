@@ -34,28 +34,39 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
 -   **Sales Dashboard**: Unified reporting for online and walk-in orders with date range, order type, and payment method filtering, plus summary statistics.
 -   **PC Builder**: Step-by-step component selection with real-time compatibility checks, power consumption, and price summary.
 -   **Market Analysis Feature**: Public and admin views for tracking and updating prices of RAM, SSD, and M.2 components with trend indicators.
--   **Laptop Battery Compatibility System**: Separate authenticated portal (/battery) for managing laptop batteries inventory with:
+-   **Laptop Battery & AC Adapter Compatibility System**: Separate authenticated portal (/battery) for managing laptop batteries and AC adapters inventory with:
     - Separate authentication system (battery_users table, default: battery/battery123)
-    - Two-way search: find batteries by serial number OR find compatible batteries by laptop model
+    - Two-way search: find products by serial number OR find compatible products by laptop model
     - Stock tracking with low-stock alerts (configurable thresholds)
-    - Full CRUD for battery inventory with compatible laptops list, voltage, capacity, pricing
-    - **Battery POS System**: Dedicated point-of-sale for walk-in battery sales with:
-      - Product search and quick add to cart
+    - **Battery Management**: Full CRUD for battery inventory with compatible laptops list, voltage, capacity, cells, three-tier pricing
+    - **AC Adapter Management**: Full CRUD for AC adapters with:
+      - Power specifications: input voltage, output voltage, amperage, wattage
+      - Connector specifications: connector type, tip size, plug type
+      - Compatible laptops list, stock tracking, three-tier pricing
+      - Barcode generation with ADP- prefix
+    - **Unified POS System**: Point-of-sale supporting both batteries and adapters with:
+      - Product type toggle (Batteries/Adapters)
+      - Mixed cart support (batteries + adapters in same sale)
       - Three-tier pricing (purchase, wholesale, selling)
       - Quantity controls with real-time stock validation
       - Percentage discount application
       - Multiple payment methods (Cash, Card, ZainCash)
       - Customer info capture (optional)
       - Receipt generation with sale number
-      - Automatic stock deduction on sale completion
-    - **Battery Sales Reports**: Analytics page with:
+      - Automatic stock deduction for both product types
+    - **Sales Reports**: Analytics page with:
       - Period filters (Today, Last 7 Days, This Month, Custom date range)
-      - Statistics cards (total sales, revenue, average sale value, discounts)
+      - Product type filter (All, Batteries, Adapters)
+      - Separate statistics for battery sales and adapter sales
       - Daily breakdown with revenue per day
       - Payment methods breakdown
-      - Recent sales summary
       - Full sales log table with filtering
+    - **Backup/Restore**: JSON export/import for inventory data
+      - Schema version 1.1 includes both batteries and adapters
+      - Backward compatible with version 1.0 (batteries only)
+      - Merge mode updates existing records by serial number
     - Routes: /battery/login, /battery (dashboard), /battery/manage, /battery/pos, /battery/reports
+    - Dashboard displays stats for both batteries and adapters (types, units, low stock)
 
 # External Dependencies
 

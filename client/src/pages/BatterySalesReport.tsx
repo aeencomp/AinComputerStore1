@@ -46,6 +46,8 @@ import {
   Printer,
   Edit,
   Trash2,
+  Battery,
+  Plug,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -57,7 +59,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { BatterySale, BatterySaleItem } from "@shared/schema";
+import type { BatterySale, BatterySaleItem, AdapterSaleItem } from "@shared/schema";
 
 interface BatteryUserAuth {
   id: string;
@@ -68,9 +70,11 @@ interface BatteryUserAuth {
 
 interface SaleWithItems extends BatterySale {
   items?: BatterySaleItem[];
+  adapterItems?: AdapterSaleItem[];
 }
 
 type ReportPeriod = 'today' | 'week' | 'month' | 'custom';
+type ProductTypeFilter = 'all' | 'batteries' | 'adapters';
 
 export default function BatterySalesReport() {
   const { language } = useLanguage();
@@ -80,6 +84,7 @@ export default function BatterySalesReport() {
   const isRTL = language === 'ar';
   
   const [period, setPeriod] = useState<ReportPeriod>('today');
+  const [productTypeFilter, setProductTypeFilter] = useState<ProductTypeFilter>('all');
   const [editingSale, setEditingSale] = useState<SaleWithItems | null>(null);
   const [deletingSale, setDeletingSale] = useState<SaleWithItems | null>(null);
   const [editForm, setEditForm] = useState({
@@ -174,7 +179,6 @@ export default function BatterySalesReport() {
     const discountAmount = parseFloat(editForm.discount) || 0;
     const subtotal = parseFloat(editingSale.subtotal || '0');
     
-    // Validate discount doesn't exceed subtotal
     if (discountAmount > subtotal) {
       toast({
         title: isRTL ? 'خطأ' : 'Error',
@@ -193,7 +197,6 @@ export default function BatterySalesReport() {
     });
   };
 
-  // Calculate date range based on period
   const dateRange = useMemo(() => {
     const today = new Date();
     today.setHours(23, 59, 59, 999);
@@ -221,32 +224,72 @@ export default function BatterySalesReport() {
     return { start, end: today };
   }, [period, startDate, endDate]);
 
-  // Filter sales by date range
   const filteredSales = useMemo(() => {
-    return salesData.filter(sale => {
+    let sales = salesData.filter(sale => {
       const saleDate = new Date(sale.createdAt);
       return saleDate >= dateRange.start && saleDate <= dateRange.end;
     });
-  }, [salesData, dateRange]);
 
-  // Calculate statistics
+    if (productTypeFilter === 'batteries') {
+      sales = sales.filter(sale => (sale.items?.length || 0) > 0);
+    } else if (productTypeFilter === 'adapters') {
+      sales = sales.filter(sale => (sale.adapterItems?.length || 0) > 0);
+    }
+
+    return sales;
+  }, [salesData, dateRange, productTypeFilter]);
+
   const stats = useMemo(() => {
     const totalSales = filteredSales.length;
     const totalRevenue = filteredSales.reduce((sum, sale) => sum + parseFloat(sale.total || '0'), 0);
     const totalDiscount = filteredSales.reduce((sum, sale) => sum + parseFloat(sale.discount || '0'), 0);
     const avgSaleValue = totalSales > 0 ? totalRevenue / totalSales : 0;
     
-    // Payment method breakdown
     const paymentMethods = filteredSales.reduce((acc, sale) => {
       const method = sale.paymentMethod || 'cash';
       acc[method] = (acc[method] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
+
+    let totalBatteryItemsSold = 0;
+    let batteryRevenue = 0;
+    let totalAdapterItemsSold = 0;
+    let adapterRevenue = 0;
+
+    filteredSales.forEach(sale => {
+      if (sale.items) {
+        sale.items.forEach(item => {
+          totalBatteryItemsSold += item.quantity || 1;
+          batteryRevenue += parseFloat(item.lineTotal || '0');
+        });
+      }
+      if (sale.adapterItems) {
+        sale.adapterItems.forEach(item => {
+          totalAdapterItemsSold += item.quantity || 1;
+          adapterRevenue += parseFloat(item.lineTotal || '0');
+        });
+      }
+    });
+
+    const salesWithBatteries = filteredSales.filter(s => (s.items?.length || 0) > 0).length;
+    const salesWithAdapters = filteredSales.filter(s => (s.adapterItems?.length || 0) > 0).length;
     
-    return { totalSales, totalRevenue, totalDiscount, avgSaleValue, paymentMethods };
+    return { 
+      totalSales, 
+      totalRevenue, 
+      totalDiscount, 
+      avgSaleValue, 
+      paymentMethods,
+      totalBatteryItemsSold,
+      batteryRevenue,
+      totalAdapterItemsSold,
+      adapterRevenue,
+      totalItemsSold: totalBatteryItemsSold + totalAdapterItemsSold,
+      salesWithBatteries,
+      salesWithAdapters,
+    };
   }, [filteredSales]);
 
-  // Daily breakdown for current period
   const dailyBreakdown = useMemo(() => {
     const breakdown: Record<string, { count: number; revenue: number }> = {};
     
@@ -264,7 +307,6 @@ export default function BatterySalesReport() {
       .map(([date, data]) => ({ date, ...data }));
   }, [filteredSales]);
 
-  // Format currency
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('ar-IQ', {
       style: 'decimal',
@@ -273,7 +315,6 @@ export default function BatterySalesReport() {
     }).format(amount) + ' ' + (isRTL ? 'د.ع' : 'IQD');
   };
 
-  // Format date
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US', {
@@ -301,7 +342,6 @@ export default function BatterySalesReport() {
   };
 
   const handlePrintReceipt = (sale: SaleWithItems) => {
-    // Calculate warranty end date (1 month from sale date)
     const saleDate = new Date(sale.createdAt);
     const warrantyEndDate = new Date(saleDate);
     warrantyEndDate.setMonth(warrantyEndDate.getMonth() + 1);
@@ -313,6 +353,13 @@ export default function BatterySalesReport() {
       customerPhone: sale.customerPhone || undefined,
       items: (sale.items || []).map(item => ({
         brand: item.brand || 'Battery',
+        serialNumber: item.serialNumber || '',
+        quantity: item.quantity || 1,
+        unitPrice: parseFloat(item.unitPrice || '0'),
+      })),
+      adapterItems: (sale.adapterItems || []).map(item => ({
+        brand: item.brand || 'Adapter',
+        wattage: item.wattage || 0,
         serialNumber: item.serialNumber || '',
         quantity: item.quantity || 1,
         unitPrice: parseFloat(item.unitPrice || '0'),
@@ -371,7 +418,7 @@ export default function BatterySalesReport() {
           </div>
         </div>
 
-        {/* Period Filter */}
+        {/* Period & Product Type Filter */}
         <Card className="mb-6">
           <CardContent className="pt-4">
             <div className="flex flex-wrap items-end gap-4">
@@ -386,6 +433,20 @@ export default function BatterySalesReport() {
                     <SelectItem value="week">{isRTL ? 'آخر 7 أيام' : 'Last 7 Days'}</SelectItem>
                     <SelectItem value="month">{isRTL ? 'هذا الشهر' : 'This Month'}</SelectItem>
                     <SelectItem value="custom">{isRTL ? 'مخصص' : 'Custom'}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label>{isRTL ? 'نوع المنتج' : 'Product Type'}</Label>
+                <Select value={productTypeFilter} onValueChange={(v) => setProductTypeFilter(v as ProductTypeFilter)}>
+                  <SelectTrigger className="w-[150px]" data-testid="select-product-type">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{isRTL ? 'الكل' : 'All'}</SelectItem>
+                    <SelectItem value="batteries">{isRTL ? 'البطاريات' : 'Batteries'}</SelectItem>
+                    <SelectItem value="adapters">{isRTL ? 'الشواحن' : 'Adapters'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -492,6 +553,106 @@ export default function BatterySalesReport() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Product Type Breakdown Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <Battery className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {isRTL ? 'مبيعات البطاريات' : 'Battery Sales'}
+                  </p>
+                  <p className="text-lg font-bold" data-testid="text-battery-sales-count">
+                    {stats.salesWithBatteries} {isRTL ? 'عملية' : 'sales'}
+                  </p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-battery-items-sold">
+                    {stats.totalBatteryItemsSold} {isRTL ? 'قطعة' : 'items'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-purple-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {isRTL ? 'إيرادات البطاريات' : 'Battery Revenue'}
+                  </p>
+                  <p className="text-lg font-bold text-purple-600" data-testid="text-battery-revenue">
+                    {formatCurrency(stats.batteryRevenue)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Plug className="h-5 w-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {isRTL ? 'مبيعات الشواحن' : 'Adapter Sales'}
+                  </p>
+                  <p className="text-lg font-bold" data-testid="text-adapter-sales-count">
+                    {stats.salesWithAdapters} {isRTL ? 'عملية' : 'sales'}
+                  </p>
+                  <p className="text-sm text-muted-foreground" data-testid="text-adapter-items-sold">
+                    {stats.totalAdapterItemsSold} {isRTL ? 'قطعة' : 'items'}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <DollarSign className="h-5 w-5 text-orange-600" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    {isRTL ? 'إيرادات الشواحن' : 'Adapter Revenue'}
+                  </p>
+                  <p className="text-lg font-bold text-orange-600" data-testid="text-adapter-revenue">
+                    {formatCurrency(stats.adapterRevenue)}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Total Items Sold */}
+        <Card className="mb-6">
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-center gap-6">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  {isRTL ? 'إجمالي القطع المباعة' : 'Total Items Sold'}
+                </p>
+                <p className="text-3xl font-bold" data-testid="text-total-items-sold">
+                  {stats.totalItemsSold}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  ({stats.totalBatteryItemsSold} {isRTL ? 'بطارية' : 'batteries'} + {stats.totalAdapterItemsSold} {isRTL ? 'شاحن' : 'adapters'})
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
 
         <div className="grid md:grid-cols-3 gap-6">
           {/* Daily Breakdown */}
@@ -612,10 +773,11 @@ export default function BatterySalesReport() {
                       <TableHead>{isRTL ? 'رقم الفاتورة' : 'Invoice #'}</TableHead>
                       <TableHead>{isRTL ? 'التاريخ' : 'Date'}</TableHead>
                       <TableHead>{isRTL ? 'الزبون' : 'Customer'}</TableHead>
+                      <TableHead>{isRTL ? 'المنتجات' : 'Products'}</TableHead>
                       <TableHead>{isRTL ? 'طريقة الدفع' : 'Payment'}</TableHead>
                       <TableHead>{isRTL ? 'الخصم' : 'Discount'}</TableHead>
                       <TableHead>{isRTL ? 'الإجمالي' : 'Total'}</TableHead>
-                      <TableHead>{isRTL ? 'طباعة' : 'Print'}</TableHead>
+                      <TableHead>{isRTL ? 'الإجراءات' : 'Actions'}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -634,6 +796,31 @@ export default function BatterySalesReport() {
                         </TableCell>
                         <TableCell>
                           {sale.customerName || (isRTL ? 'زبون متجر' : 'Walk-in')}
+                        </TableCell>
+                        <TableCell>
+                          <div className="space-y-1">
+                            {(sale.items || []).map((item, idx) => (
+                              <div key={`battery-${item.id || idx}`} className="flex items-center gap-1 text-sm" data-testid={`item-battery-${sale.id}-${idx}`}>
+                                <Battery className="h-3 w-3 text-purple-600" />
+                                <span>{item.brand}</span>
+                                {item.serialNumber && (
+                                  <span className="text-xs text-muted-foreground">({item.serialNumber})</span>
+                                )}
+                              </div>
+                            ))}
+                            {(sale.adapterItems || []).map((item, idx) => (
+                              <div key={`adapter-${item.id || idx}`} className="flex items-center gap-1 text-sm" data-testid={`item-adapter-${sale.id}-${idx}`}>
+                                <Plug className="h-3 w-3 text-orange-600" />
+                                <span>{item.brand} {item.wattage}W</span>
+                                {item.serialNumber && (
+                                  <span className="text-xs text-muted-foreground">({item.serialNumber})</span>
+                                )}
+                              </div>
+                            ))}
+                            {(!sale.items || sale.items.length === 0) && (!sale.adapterItems || sale.adapterItems.length === 0) && (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <Badge variant="outline">

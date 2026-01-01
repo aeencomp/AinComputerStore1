@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -141,9 +141,20 @@ export interface IStorage {
   clearAllBatterySales(): Promise<void>;
   getBatterySale(id: string): Promise<BatterySale | undefined>;
   getBatterySaleByNumber(saleNumber: string): Promise<BatterySale | undefined>;
-  createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[]): Promise<BatterySale>;
+  createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[], adapterItems?: InsertAdapterSaleItem[]): Promise<BatterySale>;
   getBatterySaleItems(saleId: string): Promise<BatterySaleItem[]>;
+  getAdapterSaleItems(saleId: string): Promise<AdapterSaleItem[]>;
   generateBatterySaleNumber(): Promise<string>;
+  
+  // AC Adapter methods
+  getAcAdapters(): Promise<AcAdapter[]>;
+  getAcAdapter(id: string): Promise<AcAdapter | undefined>;
+  getAcAdapterBySerial(serialNumber: string): Promise<AcAdapter | undefined>;
+  searchAdaptersByLaptopModel(laptopModel: string): Promise<AcAdapter[]>;
+  getLowStockAdapters(): Promise<AcAdapter[]>;
+  createAcAdapter(adapter: InsertAcAdapter): Promise<AcAdapter>;
+  updateAcAdapter(id: string, updates: Partial<InsertAcAdapter>): Promise<AcAdapter | undefined>;
+  deleteAcAdapter(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {

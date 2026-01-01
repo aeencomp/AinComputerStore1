@@ -661,3 +661,60 @@ export const insertBatterySaleItemSchema = createInsertSchema(batterySaleItems).
 
 export type InsertBatterySaleItem = z.infer<typeof insertBatterySaleItemSchema>;
 export type BatterySaleItem = typeof batterySaleItems.$inferSelect;
+
+// AC Adapters inventory with compatibility tracking
+export const acAdapters = pgTable("ac_adapters", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serialNumber: text("serial_number").notNull().unique(), // Adapter serial/part number
+  partNumber: text("part_number"), // Alternative part numbers
+  barcode: text("barcode"), // Barcode for scanning
+  brand: text("brand").notNull(), // Brand (Dell, HP, Lenovo, Universal, etc.)
+  compatibleLaptops: text("compatible_laptops").array().notNull(), // Array of compatible laptop models
+  inputVoltage: text("input_voltage"), // e.g., "100-240V AC"
+  outputVoltage: decimal("output_voltage", { precision: 5, scale: 2 }), // e.g., 19.5V
+  amperage: decimal("amperage", { precision: 5, scale: 2 }), // e.g., 3.34A
+  wattage: integer("wattage"), // e.g., 65W, 90W, 130W
+  connectorType: text("connector_type"), // e.g., "7.4mm x 5.0mm", "USB-C", "4.5mm x 3.0mm"
+  tipSize: text("tip_size"), // Tip dimensions
+  plugType: text("plug_type"), // e.g., "2-prong", "3-prong", "EU", "UK"
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(2), // Alert threshold
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
+  supplier: text("supplier"),
+  location: text("location"), // Storage location in warehouse
+  notes: text("notes"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertAcAdapterSchema = createInsertSchema(acAdapters).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertAcAdapter = z.infer<typeof insertAcAdapterSchema>;
+export type AcAdapter = typeof acAdapters.$inferSelect;
+
+// AC Adapter Sale Items (to track adapter sales separately)
+export const adapterSaleItems = pgTable("adapter_sale_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull(), // References batterySales (unified sales table)
+  adapterId: varchar("adapter_id").notNull(),
+  serialNumber: text("serial_number").notNull(), // Snapshot of adapter serial
+  brand: text("brand").notNull(), // Snapshot of brand
+  wattage: integer("wattage"), // Snapshot of wattage
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertAdapterSaleItemSchema = createInsertSchema(adapterSaleItems).omit({
+  id: true,
+});
+
+export type InsertAdapterSaleItem = z.infer<typeof insertAdapterSaleItemSchema>;
+export type AdapterSaleItem = typeof adapterSaleItems.$inferSelect;

@@ -40,9 +40,10 @@ import {
   PlusCircle,
   Printer,
   Receipt,
-  BarChart3
+  BarChart3,
+  Plug
 } from "lucide-react";
-import type { LaptopBattery } from "@shared/schema";
+import type { LaptopBattery, AcAdapter } from "@shared/schema";
 import QRCode from "@/components/QRCode";
 
 interface BatteryUserAuth {
@@ -91,6 +92,16 @@ export default function BatteryDashboard() {
 
   const { data: lowStockBatteries = [] } = useQuery<LaptopBattery[]>({
     queryKey: ['/api/battery/batteries/low-stock'],
+    enabled: !!currentUser,
+  });
+
+  const { data: adapters = [] } = useQuery<AcAdapter[]>({
+    queryKey: ['/api/battery/adapters'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lowStockAdapters = [] } = useQuery<AcAdapter[]>({
+    queryKey: ['/api/battery/adapters/low-stock'],
     enabled: !!currentUser,
   });
 
@@ -268,6 +279,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 
   const displayBatteries = searchQuery.trim() ? searchResults : batteries;
   const totalStock = batteries.reduce((sum, b) => sum + (b.stockQuantity || 0), 0);
+  const totalAdapterStock = adapters.reduce((sum, a) => sum + (a.stockQuantity || 0), 0);
 
   const formatNumber = (num: number) => {
     // Remove trailing .00 for whole numbers
@@ -341,39 +353,70 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       </header>
 
       <main className="max-w-7xl mx-auto p-4 md:p-8 space-y-8">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {[
             { 
-              label: language === 'ar' ? 'إجمالي الأنواع' : 'Total Types', 
+              label: language === 'ar' ? 'أنواع البطاريات' : 'Battery Types', 
               value: batteries.length, 
               icon: Battery, 
               color: 'text-primary',
               bg: 'bg-primary/5',
-              clickable: false
+              clickable: false,
+              testId: 'stat-battery-types'
             },
             { 
-              label: language === 'ar' ? 'إجمالي المخزون' : 'Total Units', 
+              label: language === 'ar' ? 'وحدات البطاريات' : 'Battery Units', 
               value: totalStock, 
               icon: Package, 
               color: 'text-blue-600',
               bg: 'bg-blue-50',
-              clickable: false
+              clickable: false,
+              testId: 'stat-battery-units'
             },
             { 
-              label: language === 'ar' ? 'نقص المخزون' : 'Low Stock', 
+              label: language === 'ar' ? 'نقص مخزون البطاريات' : 'Low Stock Batteries', 
               value: lowStockBatteries.length, 
               icon: AlertTriangle, 
               color: lowStockBatteries.length > 0 ? 'text-red-600' : 'text-slate-400',
               bg: lowStockBatteries.length > 0 ? 'bg-red-50' : 'bg-slate-50',
               clickable: lowStockBatteries.length > 0,
-              onClick: () => setLocation("/battery/manage?lowstock=true")
+              onClick: () => setLocation("/battery/manage?lowstock=true"),
+              testId: 'stat-low-stock-batteries'
+            },
+            { 
+              label: language === 'ar' ? 'أنواع الشواحن' : 'Adapter Types', 
+              value: adapters.length, 
+              icon: Plug, 
+              color: 'text-primary',
+              bg: 'bg-primary/5',
+              clickable: false,
+              testId: 'stat-adapter-types'
+            },
+            { 
+              label: language === 'ar' ? 'وحدات الشواحن' : 'Adapter Units', 
+              value: totalAdapterStock, 
+              icon: Plug, 
+              color: 'text-blue-600',
+              bg: 'bg-blue-50',
+              clickable: false,
+              testId: 'stat-adapter-units'
+            },
+            { 
+              label: language === 'ar' ? 'نقص مخزون الشواحن' : 'Low Stock Adapters', 
+              value: lowStockAdapters.length, 
+              icon: AlertTriangle, 
+              color: lowStockAdapters.length > 0 ? 'text-red-600' : 'text-slate-400',
+              bg: lowStockAdapters.length > 0 ? 'bg-red-50' : 'bg-slate-50',
+              clickable: lowStockAdapters.length > 0,
+              onClick: () => setLocation("/battery/manage?tab=adapters&lowstock=true"),
+              testId: 'stat-low-stock-adapters'
             }
           ].map((stat, i) => (
             <Card 
               key={i} 
               className={`border-slate-200 shadow-sm ${stat.clickable ? 'cursor-pointer hover:border-red-300 hover:shadow-md transition-all' : ''}`}
               onClick={stat.clickable ? stat.onClick : undefined}
-              data-testid={stat.clickable ? 'card-low-stock-clickable' : undefined}
+              data-testid={stat.testId}
             >
               <CardContent className="p-6">
                 <div className="flex items-center gap-4">

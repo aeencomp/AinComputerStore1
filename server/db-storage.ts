@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -864,12 +864,12 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
   
-  async createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[]): Promise<BatterySale> {
+  async createBatterySale(sale: InsertBatterySale, items: InsertBatterySaleItem[], adapterItems?: InsertAdapterSaleItem[]): Promise<BatterySale> {
     // Create the sale
     const saleResult = await db.insert(batterySales).values(sale).returning();
     const createdSale = saleResult[0];
     
-    // Create sale items and update stock
+    // Create battery sale items and update stock
     for (const item of items) {
       await db.insert(batterySaleItems).values({
         ...item,
@@ -880,6 +880,21 @@ export class DrizzleStorage implements IStorage {
       await db.update(laptopBatteries)
         .set({ stockQuantity: sql`${laptopBatteries.stockQuantity} - ${item.quantity}` })
         .where(eq(laptopBatteries.id, item.batteryId));
+    }
+    
+    // Create adapter sale items and update stock
+    if (adapterItems && adapterItems.length > 0) {
+      for (const item of adapterItems) {
+        await db.insert(adapterSaleItems).values({
+          ...item,
+          saleId: createdSale.id,
+        });
+        
+        // Decrement stock for each adapter
+        await db.update(acAdapters)
+          .set({ stockQuantity: sql`${acAdapters.stockQuantity} - ${item.quantity}` })
+          .where(eq(acAdapters.id, item.adapterId));
+      }
     }
     
     return createdSale;
@@ -915,5 +930,59 @@ export class DrizzleStorage implements IStorage {
     
     const count = todaySales.length + 1;
     return `BSALE-${dateStr}-${String(count).padStart(3, '0')}`;
+  }
+  
+  async getAdapterSaleItems(saleId: string): Promise<AdapterSaleItem[]> {
+    return await db.select().from(adapterSaleItems).where(eq(adapterSaleItems.saleId, saleId));
+  }
+  
+  // AC Adapter methods
+  async getAcAdapters(): Promise<AcAdapter[]> {
+    return await db.select().from(acAdapters).where(eq(acAdapters.isActive, 1)).orderBy(desc(acAdapters.createdAt));
+  }
+  
+  async getAcAdapter(id: string): Promise<AcAdapter | undefined> {
+    const result = await db.select().from(acAdapters).where(eq(acAdapters.id, id)).limit(1);
+    return result[0];
+  }
+  
+  async getAcAdapterBySerial(serialNumber: string): Promise<AcAdapter | undefined> {
+    const result = await db.select().from(acAdapters).where(eq(acAdapters.serialNumber, serialNumber)).limit(1);
+    return result[0];
+  }
+  
+  async searchAdaptersByLaptopModel(laptopModel: string): Promise<AcAdapter[]> {
+    const allAdapters = await db.select().from(acAdapters).where(eq(acAdapters.isActive, 1));
+    const searchLower = laptopModel.toLowerCase();
+    return allAdapters.filter(adapter => 
+      adapter.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(searchLower))
+    );
+  }
+  
+  async getLowStockAdapters(): Promise<AcAdapter[]> {
+    return await db.select().from(acAdapters).where(
+      and(
+        eq(acAdapters.isActive, 1),
+        sql`${acAdapters.stockQuantity} <= ${acAdapters.minStockLevel}`
+      )
+    );
+  }
+  
+  async createAcAdapter(adapter: InsertAcAdapter): Promise<AcAdapter> {
+    const result = await db.insert(acAdapters).values(adapter).returning();
+    return result[0];
+  }
+  
+  async updateAcAdapter(id: string, updates: Partial<InsertAcAdapter>): Promise<AcAdapter | undefined> {
+    const result = await db.update(acAdapters)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(acAdapters.id, id))
+      .returning();
+    return result[0];
+  }
+  
+  async deleteAcAdapter(id: string): Promise<void> {
+    // Soft delete
+    await db.update(acAdapters).set({ isActive: 0 }).where(eq(acAdapters.id, id));
   }
 }

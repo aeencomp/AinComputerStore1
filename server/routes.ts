@@ -3193,7 +3193,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Battery Backup - Export all batteries as JSON
+  // Battery Backup - Export all batteries and adapters as JSON
   app.get("/api/battery/batteries/backup", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
@@ -3202,12 +3202,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const batteries = await storage.getLaptopBatteries();
+      const adapters = await storage.getAcAdapters();
       
       const backupData = {
-        schemaVersion: "1.0",
+        schemaVersion: "1.1",
         generatedAt: new Date().toISOString(),
-        rowCount: batteries.length,
-        data: batteries.map(b => ({
+        batteryCount: batteries.length,
+        adapterCount: adapters.length,
+        batteries: batteries.map(b => ({
           serialNumber: b.serialNumber,
           partNumber: b.partNumber,
           barcode: b.barcode,
@@ -3226,9 +3228,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: b.notes,
           isActive: b.isActive,
         })),
+        adapters: adapters.map(a => ({
+          serialNumber: a.serialNumber,
+          partNumber: a.partNumber,
+          barcode: a.barcode,
+          brand: a.brand,
+          compatibleLaptops: a.compatibleLaptops,
+          inputVoltage: a.inputVoltage,
+          outputVoltage: a.outputVoltage,
+          amperage: a.amperage,
+          wattage: a.wattage,
+          connectorType: a.connectorType,
+          tipSize: a.tipSize,
+          plugType: a.plugType,
+          stockQuantity: a.stockQuantity,
+          minStockLevel: a.minStockLevel,
+          purchasePrice: a.purchasePrice,
+          sellingPrice: a.sellingPrice,
+          wholesalePrice: a.wholesalePrice,
+          supplier: a.supplier,
+          location: a.location,
+          notes: a.notes,
+          isActive: a.isActive,
+        })),
       };
       
-      const filename = `battery-backup-${new Date().toISOString().split('T')[0]}.json`;
+      const filename = `inventory-backup-${new Date().toISOString().split('T')[0]}.json`;
       res.setHeader('Content-Type', 'application/json');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       return res.json(backupData);
@@ -3238,7 +3263,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Battery Restore - Import batteries from JSON backup
+  // Battery Restore - Import batteries and adapters from JSON backup
   app.post("/api/battery/batteries/restore", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
@@ -3246,37 +3271,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { schemaVersion, data, mode = 'merge' } = req.body;
+      const { schemaVersion, data, batteries, adapters, mode = 'merge' } = req.body;
       
-      if (!schemaVersion || !data || !Array.isArray(data)) {
+      // Support both old format (data array) and new format (batteries/adapters arrays)
+      const batteryData = batteries || data || [];
+      const adapterData = adapters || [];
+      
+      if (!schemaVersion || (!Array.isArray(batteryData) && !Array.isArray(adapterData))) {
         return res.status(400).json({ error: "ملف النسخة الاحتياطية غير صالح" });
       }
       
-      if (schemaVersion !== "1.0") {
+      if (schemaVersion !== "1.0" && schemaVersion !== "1.1") {
         return res.status(400).json({ error: "إصدار النسخة الاحتياطية غير مدعوم" });
       }
       
       const results = {
-        added: 0,
-        updated: 0,
-        skipped: 0,
+        batteriesAdded: 0,
+        batteriesUpdated: 0,
+        batteriesSkipped: 0,
+        adaptersAdded: 0,
+        adaptersUpdated: 0,
+        adaptersSkipped: 0,
         errors: [] as string[],
       };
       
-      for (const item of data) {
+      // Process batteries
+      for (const item of batteryData) {
         try {
           if (!item.serialNumber || !item.brand || !item.compatibleLaptops) {
             results.errors.push(`بيانات ناقصة للبطارية: ${item.serialNumber || 'غير معروف'}`);
-            results.skipped++;
+            results.batteriesSkipped++;
             continue;
           }
           
-          // Check if battery exists
           const existing = await storage.getLaptopBatteryBySerial(item.serialNumber);
           
           if (existing) {
             if (mode === 'merge') {
-              // Update existing battery
               await storage.updateLaptopBattery(existing.id, {
                 partNumber: item.partNumber,
                 barcode: item.barcode,
@@ -3295,12 +3326,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 notes: item.notes,
                 isActive: item.isActive,
               });
-              results.updated++;
+              results.batteriesUpdated++;
             } else {
-              results.skipped++;
+              results.batteriesSkipped++;
             }
           } else {
-            // Create new battery
             await storage.createLaptopBattery({
               serialNumber: item.serialNumber,
               partNumber: item.partNumber,
@@ -3320,17 +3350,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes: item.notes,
               isActive: item.isActive ?? 1,
             });
-            results.added++;
+            results.batteriesAdded++;
           }
         } catch (itemError: any) {
-          results.errors.push(`خطأ في ${item.serialNumber}: ${itemError.message}`);
-          results.skipped++;
+          results.errors.push(`خطأ في البطارية ${item.serialNumber}: ${itemError.message}`);
+          results.batteriesSkipped++;
         }
       }
       
+      // Process adapters
+      for (const item of adapterData) {
+        try {
+          if (!item.serialNumber || !item.brand || !item.compatibleLaptops) {
+            results.errors.push(`بيانات ناقصة للشاحن: ${item.serialNumber || 'غير معروف'}`);
+            results.adaptersSkipped++;
+            continue;
+          }
+          
+          const existing = await storage.getAcAdapterBySerial(item.serialNumber);
+          
+          if (existing) {
+            if (mode === 'merge') {
+              await storage.updateAcAdapter(existing.id, {
+                partNumber: item.partNumber,
+                barcode: item.barcode,
+                brand: item.brand,
+                compatibleLaptops: item.compatibleLaptops,
+                inputVoltage: item.inputVoltage,
+                outputVoltage: item.outputVoltage,
+                amperage: item.amperage,
+                wattage: item.wattage,
+                connectorType: item.connectorType,
+                tipSize: item.tipSize,
+                plugType: item.plugType,
+                stockQuantity: item.stockQuantity,
+                minStockLevel: item.minStockLevel,
+                purchasePrice: item.purchasePrice,
+                sellingPrice: item.sellingPrice,
+                wholesalePrice: item.wholesalePrice,
+                supplier: item.supplier,
+                location: item.location,
+                notes: item.notes,
+                isActive: item.isActive,
+              });
+              results.adaptersUpdated++;
+            } else {
+              results.adaptersSkipped++;
+            }
+          } else {
+            await storage.createAcAdapter({
+              serialNumber: item.serialNumber,
+              partNumber: item.partNumber,
+              barcode: item.barcode || `ADP-${item.serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`,
+              brand: item.brand,
+              compatibleLaptops: item.compatibleLaptops,
+              inputVoltage: item.inputVoltage,
+              outputVoltage: item.outputVoltage,
+              amperage: item.amperage,
+              wattage: item.wattage,
+              connectorType: item.connectorType,
+              tipSize: item.tipSize,
+              plugType: item.plugType,
+              stockQuantity: item.stockQuantity || 0,
+              minStockLevel: item.minStockLevel || 2,
+              purchasePrice: item.purchasePrice,
+              sellingPrice: item.sellingPrice,
+              wholesalePrice: item.wholesalePrice,
+              supplier: item.supplier,
+              location: item.location,
+              notes: item.notes,
+              isActive: item.isActive ?? 1,
+            });
+            results.adaptersAdded++;
+          }
+        } catch (itemError: any) {
+          results.errors.push(`خطأ في الشاحن ${item.serialNumber}: ${itemError.message}`);
+          results.adaptersSkipped++;
+        }
+      }
+      
+      const totalAdded = results.batteriesAdded + results.adaptersAdded;
+      const totalUpdated = results.batteriesUpdated + results.adaptersUpdated;
+      const totalSkipped = results.batteriesSkipped + results.adaptersSkipped;
+      
       return res.json({
         success: true,
-        message: `تمت الاستعادة: ${results.added} جديد، ${results.updated} محدث، ${results.skipped} تخطي`,
+        message: `تمت الاستعادة: ${totalAdded} جديد، ${totalUpdated} محدث، ${totalSkipped} تخطي`,
+        added: totalAdded,
+        updated: totalUpdated,
+        skipped: totalSkipped,
         ...results,
       });
     } catch (error) {
@@ -3498,6 +3606,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  // AC Adapter Routes
+  app.get("/api/battery/adapters", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const adapters = await storage.getAcAdapters();
+      return res.json(adapters);
+    } catch (error) {
+      console.error("Error getting adapters:", error);
+      return res.status(500).json({ error: "خطأ في جلب الشواحن" });
+    }
+  });
+  
+  app.get("/api/battery/adapters/low-stock", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const adapters = await storage.getLowStockAdapters();
+      return res.json(adapters);
+    } catch (error) {
+      console.error("Error getting low stock adapters:", error);
+      return res.status(500).json({ error: "خطأ في جلب الشواحن منخفضة المخزون" });
+    }
+  });
+  
+  app.get("/api/battery/adapters/search", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { q, type } = req.query;
+      if (!q || typeof q !== 'string') {
+        return res.status(400).json({ error: "يرجى إدخال كلمة البحث" });
+      }
+      
+      let results;
+      if (type === 'serial') {
+        const adapter = await storage.getAcAdapterBySerial(q);
+        results = adapter ? [adapter] : [];
+      } else {
+        results = await storage.searchAdaptersByLaptopModel(q);
+      }
+      
+      return res.json(results);
+    } catch (error) {
+      console.error("Error searching adapters:", error);
+      return res.status(500).json({ error: "خطأ في البحث" });
+    }
+  });
+  
+  app.get("/api/battery/adapters/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const adapter = await storage.getAcAdapter(req.params.id);
+      if (!adapter) {
+        return res.status(404).json({ error: "الشاحن غير موجود" });
+      }
+      return res.json(adapter);
+    } catch (error) {
+      console.error("Error getting adapter:", error);
+      return res.status(500).json({ error: "خطأ في جلب الشاحن" });
+    }
+  });
+  
+  app.post("/api/battery/adapters", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const { serialNumber, brand, compatibleLaptops, ...rest } = req.body;
+      
+      if (!serialNumber || !brand || !compatibleLaptops || !Array.isArray(compatibleLaptops)) {
+        return res.status(400).json({ error: "الرقم التسلسلي والعلامة التجارية والأجهزة المتوافقة مطلوبة" });
+      }
+      
+      // Check if serial already exists
+      const existing = await storage.getAcAdapterBySerial(serialNumber);
+      if (existing) {
+        return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+      }
+      
+      // Generate barcode from serial
+      const barcode = `ADP-${serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`;
+      
+      const adapter = await storage.createAcAdapter({
+        serialNumber,
+        brand,
+        compatibleLaptops,
+        barcode,
+        ...rest
+      });
+      
+      return res.status(201).json(adapter);
+    } catch (error) {
+      console.error("Error creating adapter:", error);
+      return res.status(500).json({ error: "خطأ في إضافة الشاحن" });
+    }
+  });
+  
+  app.put("/api/battery/adapters/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      const updateData = { ...req.body };
+      
+      // Auto-regenerate barcode when serial number changes
+      if (updateData.serialNumber) {
+        updateData.barcode = `ADP-${updateData.serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`;
+      }
+      
+      const adapter = await storage.updateAcAdapter(req.params.id, updateData);
+      if (!adapter) {
+        return res.status(404).json({ error: "الشاحن غير موجود" });
+      }
+      return res.json(adapter);
+    } catch (error) {
+      console.error("Error updating adapter:", error);
+      return res.status(500).json({ error: "خطأ في تحديث الشاحن" });
+    }
+  });
+  
+  app.delete("/api/battery/adapters/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      await storage.deleteAcAdapter(req.params.id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting adapter:", error);
+      return res.status(500).json({ error: "خطأ في حذف الشاحن" });
+    }
+  });
+  
   // Battery users management (admin only)
   app.get("/api/battery/users", async (req, res) => {
     try {
@@ -3566,11 +3827,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const sales = await storage.getBatterySales();
-      // Include items for each sale
+      // Include items for each sale (both batteries and adapters)
       const salesWithItems = await Promise.all(
         sales.map(async (sale) => {
           const items = await storage.getBatterySaleItems(sale.id);
-          return { ...sale, items };
+          const adapterItems = await storage.getAdapterSaleItems(sale.id);
+          return { ...sale, items, adapterItems };
         })
       );
       return res.json(salesWithItems);
@@ -3593,7 +3855,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const items = await storage.getBatterySaleItems(sale.id);
-      return res.json({ ...sale, items });
+      const adapterItems = await storage.getAdapterSaleItems(sale.id);
+      return res.json({ ...sale, items, adapterItems });
     } catch (error) {
       console.error("Error getting battery sale:", error);
       return res.status(500).json({ error: "خطأ في جلب عملية البيع" });
@@ -3695,22 +3958,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { customerName, customerPhone, items, subtotal, discount, total, paymentMethod, notes } = req.body;
+      const { customerName, customerPhone, items, adapterItems, subtotal, discount, total, paymentMethod, notes } = req.body;
       
-      if (!items || items.length === 0) {
-        return res.status(400).json({ error: "يجب إضافة بطاريات للطلب" });
+      // Must have at least one item (battery or adapter)
+      const hasItems = (items && items.length > 0) || (adapterItems && adapterItems.length > 0);
+      if (!hasItems) {
+        return res.status(400).json({ error: "يجب إضافة منتجات للطلب" });
       }
       
-      // Validate stock for each item
-      for (const item of items) {
-        const battery = await storage.getLaptopBattery(item.batteryId);
-        if (!battery) {
-          return res.status(400).json({ error: `البطارية غير موجودة: ${item.batteryId}` });
+      // Validate stock for battery items
+      if (items && items.length > 0) {
+        for (const item of items) {
+          const battery = await storage.getLaptopBattery(item.batteryId);
+          if (!battery) {
+            return res.status(400).json({ error: `البطارية غير موجودة: ${item.batteryId}` });
+          }
+          if (battery.stockQuantity < item.quantity) {
+            return res.status(400).json({ 
+              error: `المخزون غير كافي للبطارية ${battery.serialNumber}. المتاح: ${battery.stockQuantity}` 
+            });
+          }
         }
-        if (battery.stockQuantity < item.quantity) {
-          return res.status(400).json({ 
-            error: `المخزون غير كافي للبطارية ${battery.serialNumber}. المتاح: ${battery.stockQuantity}` 
-          });
+      }
+      
+      // Validate stock for adapter items
+      if (adapterItems && adapterItems.length > 0) {
+        for (const item of adapterItems) {
+          const adapter = await storage.getAcAdapter(item.adapterId);
+          if (!adapter) {
+            return res.status(400).json({ error: `الشاحن غير موجود: ${item.adapterId}` });
+          }
+          if (adapter.stockQuantity < item.quantity) {
+            return res.status(400).json({ 
+              error: `المخزون غير كافي للشاحن ${adapter.serialNumber}. المتاح: ${adapter.stockQuantity}` 
+            });
+          }
         }
       }
       
@@ -3734,19 +4016,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Build sale items with battery info
       const saleItems = [];
-      for (const item of items) {
-        const battery = await storage.getLaptopBattery(item.batteryId);
-        saleItems.push({
-          batteryId: item.batteryId,
-          serialNumber: battery?.serialNumber || 'N/A',
-          brand: battery?.brand || 'Unknown',
-          quantity: item.quantity,
-          unitPrice: item.unitPrice.toString(),
-          lineTotal: (item.unitPrice * item.quantity).toString(),
-        });
+      if (items && items.length > 0) {
+        for (const item of items) {
+          const battery = await storage.getLaptopBattery(item.batteryId);
+          saleItems.push({
+            batteryId: item.batteryId,
+            serialNumber: battery?.serialNumber || 'N/A',
+            brand: battery?.brand || 'Unknown',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toString(),
+            lineTotal: (item.unitPrice * item.quantity).toString(),
+          });
+        }
       }
       
-      const sale = await storage.createBatterySale(saleData, saleItems);
+      // Build adapter sale items
+      const adapterSaleItems = [];
+      if (adapterItems && adapterItems.length > 0) {
+        for (const item of adapterItems) {
+          const adapter = await storage.getAcAdapter(item.adapterId);
+          adapterSaleItems.push({
+            adapterId: item.adapterId,
+            serialNumber: adapter?.serialNumber || 'N/A',
+            brand: adapter?.brand || 'Unknown',
+            wattage: adapter?.wattage || null,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toString(),
+            lineTotal: (item.unitPrice * item.quantity).toString(),
+          });
+        }
+      }
+      
+      const sale = await storage.createBatterySale(saleData, saleItems, adapterSaleItems);
       
       return res.json({
         success: true,
