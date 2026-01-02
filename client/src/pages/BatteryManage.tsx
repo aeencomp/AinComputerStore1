@@ -467,10 +467,8 @@ export default function BatteryManage() {
   const handleAdapterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Auto-generate serial number if not editing (ADP-XXXXXX format)
-    const serialNumber = editingAdapter 
-      ? adapterFormData.serialNumber 
-      : `ADP-${Date.now().toString(36).toUpperCase()}${Math.random().toString(36).substring(2, 5).toUpperCase()}`;
+    // Use brand name as the identifier
+    const serialNumber = adapterFormData.brand;
 
     const data = {
       serialNumber,
