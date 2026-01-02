@@ -466,15 +466,6 @@ export default function BatteryManage() {
 
   const handleAdapterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (adapterFormData.compatibleLaptops.length === 0) {
-      toast({ 
-        title: language === 'ar' ? 'خطأ' : 'Error', 
-        description: language === 'ar' ? 'يجب إضافة موديل لابتوب واحد على الأقل' : 'Add at least one laptop model',
-        variant: 'destructive' 
-      });
-      return;
-    }
 
     // Auto-generate serial number if not editing (ADP-XXXXXX format)
     const serialNumber = editingAdapter 
@@ -485,12 +476,12 @@ export default function BatteryManage() {
       serialNumber,
       partNumber: null,
       brand: adapterFormData.brand,
-      compatibleLaptops: adapterFormData.compatibleLaptops,
+      compatibleLaptops: [],
       inputVoltage: adapterFormData.inputVoltage || null,
       outputVoltage: adapterFormData.outputVoltage ? parseFloat(adapterFormData.outputVoltage) : null,
       amperage: adapterFormData.amperage ? parseFloat(adapterFormData.amperage) : null,
       wattage: adapterFormData.wattage ? parseInt(adapterFormData.wattage) : null,
-      connectorType: adapterFormData.connectorType || null,
+      connectorType: null,
       tipSize: adapterFormData.tipSize || null,
       plugType: null,
       stockQuantity: parseInt(adapterFormData.stockQuantity) || 0,
@@ -1199,38 +1190,6 @@ export default function BatteryManage() {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label>{language === 'ar' ? 'الأجهزة المتوافقة *' : 'Compatible Laptops *'}</Label>
-                      <div className="flex gap-2">
-                        <Input
-                          value={adapterFormData.newLaptop}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, newLaptop: e.target.value })}
-                          placeholder={language === 'ar' ? 'مثال: Dell Latitude E6420' : 'e.g., Dell Latitude E6420'}
-                          onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addAdapterLaptopModel())}
-                          data-testid="input-adapter-new-laptop"
-                        />
-                        <Button type="button" onClick={addAdapterLaptopModel} data-testid="button-add-adapter-laptop">
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {adapterFormData.compatibleLaptops.map((laptop, index) => (
-                          <Badge key={index} variant="secondary" className="text-sm py-1 gap-1">
-                            <Laptop className="h-3 w-3" />
-                            {laptop}
-                            <button 
-                              type="button" 
-                              onClick={() => removeAdapterLaptopModel(index)}
-                              className="ms-1 hover:text-destructive"
-                              data-testid={`button-remove-adapter-laptop-${index}`}
-                            >
-                              <X className="h-3 w-3" />
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>{language === 'ar' ? 'فولتية الدخل' : 'Input Voltage'}</Label>
@@ -1278,25 +1237,14 @@ export default function BatteryManage() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>{language === 'ar' ? 'نوع الموصل' : 'Connector Type'}</Label>
-                        <Input
-                          value={adapterFormData.connectorType}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, connectorType: e.target.value })}
-                          placeholder="7.4mm x 5.0mm"
-                          data-testid="input-adapter-connector-type"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>{language === 'ar' ? 'حجم الرأس' : 'Tip Size'}</Label>
-                        <Input
-                          value={adapterFormData.tipSize}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, tipSize: e.target.value })}
-                          placeholder="4.5mm x 3.0mm"
-                          data-testid="input-adapter-tip-size"
-                        />
-                      </div>
+                    <div className="space-y-2">
+                      <Label>{language === 'ar' ? 'حجم الرأس' : 'Tip Size'}</Label>
+                      <Input
+                        value={adapterFormData.tipSize}
+                        onChange={(e) => setAdapterFormData({ ...adapterFormData, tipSize: e.target.value })}
+                        placeholder="4.5mm x 3.0mm"
+                        data-testid="input-adapter-tip-size"
+                      />
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
