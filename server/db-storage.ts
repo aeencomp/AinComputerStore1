@@ -955,6 +955,9 @@ export class DrizzleStorage implements IStorage {
     const allAdapters = await db.select().from(acAdapters).where(eq(acAdapters.isActive, 1));
     const searchLower = laptopModel.toLowerCase();
     return allAdapters.filter(adapter => 
+      adapter.brand.toLowerCase().includes(searchLower) ||
+      adapter.serialNumber.toLowerCase().includes(searchLower) ||
+      adapter.wattage?.toString().includes(searchLower) ||
       adapter.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(searchLower))
     );
   }
