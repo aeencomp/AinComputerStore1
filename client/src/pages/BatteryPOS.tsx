@@ -627,7 +627,6 @@ export default function BatteryPOS() {
                                 {adapter.brand}
                                 {adapter.wattage && <span className="text-primary ms-1">{adapter.wattage}W</span>}
                               </p>
-                              <p className="text-xs text-muted-foreground truncate">{adapter.serialNumber}</p>
                             </div>
                             <Badge variant={adapter.stockQuantity <= (adapter.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">
                               {adapter.stockQuantity}

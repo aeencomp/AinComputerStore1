@@ -1104,9 +1104,8 @@ export default function BatteryManage() {
                               data-testid={`adapter-item-${adapter.id}`}
                             >
                               <div>
-                                <p className="font-mono font-bold">{adapter.serialNumber}</p>
-                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                  <span>{adapter.brand}</span>
+                                <div className="flex items-center gap-2">
+                                  <p className="font-bold">{adapter.brand}</p>
                                   {adapter.wattage && (
                                     <Badge variant="outline" className="text-xs">
                                       {adapter.wattage}W
