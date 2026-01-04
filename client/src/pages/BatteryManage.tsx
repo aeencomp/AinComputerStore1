@@ -691,12 +691,13 @@ export default function BatteryManage() {
                       <div className="flex justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin" />
                       </div>
-                    ) : batteries.length === 0 ? (
+                    ) : batteries.length === 0 && adapters.length === 0 ? (
                       <p className="text-center text-muted-foreground py-8">
-                        {language === 'ar' ? 'لا توجد بطاريات مضافة' : 'No batteries added'}
+                        {language === 'ar' ? 'لا توجد منتجات مضافة' : 'No products added'}
                       </p>
                     ) : (() => {
                       let filteredBatteries = batteries;
+                      let filteredAdaptersInSearch: typeof adapters = [];
                       
                       if (showLowStockOnly) {
                         filteredBatteries = filteredBatteries.filter(b => 
@@ -712,9 +713,16 @@ export default function BatteryManage() {
                           b.partNumber?.toLowerCase().includes(query) ||
                           b.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(query))
                         );
+                        // Also search adapters
+                        filteredAdaptersInSearch = adapters.filter(a => 
+                          a.brand.toLowerCase().includes(query) ||
+                          a.serialNumber.toLowerCase().includes(query) ||
+                          a.wattage?.toString().includes(query) ||
+                          a.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(query))
+                        );
                       }
                       
-                      if (filteredBatteries.length === 0) {
+                      if (filteredBatteries.length === 0 && filteredAdaptersInSearch.length === 0) {
                         return (
                           <p className="text-center text-muted-foreground py-8">
                             {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
@@ -724,6 +732,73 @@ export default function BatteryManage() {
                       
                       return (
                         <div className="space-y-3">
+                          {/* Show matching adapters first when searching */}
+                          {filteredAdaptersInSearch.length > 0 && (
+                            <>
+                              <p className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                                <Plug className="h-4 w-4" />
+                                {language === 'ar' ? 'الشواحن' : 'Adapters'} ({filteredAdaptersInSearch.length})
+                              </p>
+                              {filteredAdaptersInSearch.map((adapter) => (
+                                <div 
+                                  key={`adapter-${adapter.id}`}
+                                  className="flex items-center justify-between p-3 border rounded-lg hover-elevate border-primary/20 bg-primary/5"
+                                  data-testid={`search-adapter-item-${adapter.id}`}
+                                >
+                                  <div>
+                                    <div className="flex items-center gap-2">
+                                      <Plug className="h-4 w-4 text-primary" />
+                                      <p className="font-bold">{adapter.brand}</p>
+                                      {adapter.wattage && (
+                                        <Badge variant="outline" className="text-xs">
+                                          {adapter.wattage}W
+                                        </Badge>
+                                      )}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {adapter.compatibleLaptops.slice(0, 3).map((laptop, idx) => (
+                                        <Badge key={idx} variant="secondary" className="text-xs">
+                                          {laptop}
+                                        </Badge>
+                                      ))}
+                                      {adapter.compatibleLaptops.length > 3 && (
+                                        <Badge variant="outline" className="text-xs">
+                                          +{adapter.compatibleLaptops.length - 3}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-end me-4">
+                                      <p className={`font-bold ${(adapter.stockQuantity || 0) <= (adapter.minStockLevel || 2) ? 'text-red-600' : ''}`}>
+                                        {adapter.stockQuantity || 0}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {language === 'ar' ? 'مخزون' : 'stock'}
+                                      </p>
+                                    </div>
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => {
+                                        setActiveTab("adapters");
+                                        editAdapter(adapter);
+                                      }}
+                                      data-testid={`button-edit-search-adapter-${adapter.id}`}
+                                    >
+                                      {language === 'ar' ? 'تعديل' : 'Edit'}
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                              {filteredBatteries.length > 0 && (
+                                <p className="text-sm font-medium text-muted-foreground flex items-center gap-2 mt-4">
+                                  <Battery className="h-4 w-4" />
+                                  {language === 'ar' ? 'البطاريات' : 'Batteries'} ({filteredBatteries.length})
+                                </p>
+                              )}
+                            </>
+                          )}
                           {filteredBatteries.map((battery) => (
                             <div 
                               key={battery.id}
