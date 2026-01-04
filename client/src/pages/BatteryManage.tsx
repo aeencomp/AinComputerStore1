@@ -28,6 +28,7 @@ import {
   Upload,
   Database,
   Plug,
+  Printer,
 } from "lucide-react";
 import {
   AlertDialog,
