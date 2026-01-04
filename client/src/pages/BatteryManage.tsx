@@ -527,6 +527,46 @@ export default function BatteryManage() {
     setShowAdapterForm(true);
   };
 
+  const printAdapterBarcode = async (adapter: AcAdapter, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const qrValue = adapter.brand;
+    const price = adapter.sellingPrice || '';
+    const wattage = adapter.wattage ? `${adapter.wattage}W` : '';
+    
+    const { toDataURL } = await import('qrcode');
+    const qrDataURL = await toDataURL(qrValue, { width: 70, margin: 0 });
+    
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>Print Label</title>
+<style>
+@page{size:50mm 25mm;margin:0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
+.info{display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.title{font-size:8pt;font-weight:900;letter-spacing:0.5px}
+.wattage{font-size:7pt;font-weight:700;margin-top:1mm;letter-spacing:0.3px}
+.price{font-size:10pt;font-weight:900;margin-top:1mm}
+.qr{display:block}
+</style>
+</head>
+<body>
+<img class="qr" src="${qrDataURL}" width="60" height="60" />
+<div class="info">
+<div class="title">${adapter.brand}</div>
+<div class="wattage">${wattage}</div>
+<div class="price">${price}</div>
+</div>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
+</body>
+</html>`);
+      printWindow.document.close();
+    }
+  };
+
   if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -1210,6 +1250,15 @@ export default function BatteryManage() {
                                     {language === 'ar' ? 'مخزون' : 'stock'}
                                   </p>
                                 </div>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={(e) => printAdapterBarcode(adapter, e)}
+                                  data-testid={`button-print-adapter-${adapter.id}`}
+                                  title={language === 'ar' ? 'طباعة QR' : 'Print QR'}
+                                >
+                                  <Printer className="h-4 w-4" />
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
