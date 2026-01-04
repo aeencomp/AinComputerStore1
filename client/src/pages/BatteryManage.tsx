@@ -530,7 +530,8 @@ export default function BatteryManage() {
   const printAdapterBarcode = async (adapter: AcAdapter, e: React.MouseEvent) => {
     e.stopPropagation();
     const qrValue = adapter.brand;
-    const price = adapter.sellingPrice || '';
+    const rawPrice = adapter.sellingPrice ? parseFloat(adapter.sellingPrice) : 0;
+    const price = rawPrice ? Math.floor(rawPrice).toString() : '';
     const wattage = adapter.wattage ? `${adapter.wattage}W` : '';
     
     const { toDataURL } = await import('qrcode');
