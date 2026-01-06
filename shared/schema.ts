@@ -657,6 +657,7 @@ export const batterySaleItems = pgTable("battery_sale_items", {
 
 export const insertBatterySaleItemSchema = createInsertSchema(batterySaleItems).omit({
   id: true,
+  saleId: true,
 });
 
 export type InsertBatterySaleItem = z.infer<typeof insertBatterySaleItemSchema>;
@@ -714,6 +715,7 @@ export const adapterSaleItems = pgTable("adapter_sale_items", {
 
 export const insertAdapterSaleItemSchema = createInsertSchema(adapterSaleItems).omit({
   id: true,
+  saleId: true,
 });
 
 export type InsertAdapterSaleItem = z.infer<typeof insertAdapterSaleItemSchema>;
