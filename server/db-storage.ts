@@ -922,14 +922,25 @@ export class DrizzleStorage implements IStorage {
   async generateBatterySaleNumber(): Promise<string> {
     const date = new Date();
     const dateStr = date.toISOString().slice(0, 10).replace(/-/g, '');
+    const prefix = `BSALE-${dateStr}-`;
     
-    // Get count of sales for today
-    const todayStart = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-    const todaySales = await db.select().from(batterySales)
-      .where(sql`${batterySales.createdAt} >= ${todayStart}`);
+    // Find the highest existing sale number for today
+    const existingSales = await db.select({ saleNumber: batterySales.saleNumber })
+      .from(batterySales)
+      .where(sql`${batterySales.saleNumber} LIKE ${prefix + '%'}`)
+      .orderBy(desc(batterySales.saleNumber))
+      .limit(1);
     
-    const count = todaySales.length + 1;
-    return `BSALE-${dateStr}-${String(count).padStart(3, '0')}`;
+    let nextNumber = 1;
+    if (existingSales.length > 0) {
+      const lastNumber = existingSales[0].saleNumber;
+      const numPart = lastNumber.split('-').pop();
+      if (numPart) {
+        nextNumber = parseInt(numPart, 10) + 1;
+      }
+    }
+    
+    return `${prefix}${String(nextNumber).padStart(3, '0')}`;
   }
   
   async getAdapterSaleItems(saleId: string): Promise<AdapterSaleItem[]> {
