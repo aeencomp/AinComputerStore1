@@ -336,20 +336,54 @@ export default function AdminProducts() {
                   <SelectTrigger data-testid="select-category">
                     <SelectValue />
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="laptops">{t('categories.laptops')}</SelectItem>
-                    <SelectItem value="desktops">{t('categories.desktops')}</SelectItem>
-                    <SelectItem value="monitors">{t('categories.monitors')}</SelectItem>
-                    <SelectItem value="accessories">{t('categories.accessories')}</SelectItem>
-                    <SelectItem value="ram">{language === 'ar' ? 'ذاكرة RAM' : 'RAM Memory'}</SelectItem>
-                    <SelectItem value="ssd">{language === 'ar' ? 'أقراص SSD' : 'SSD Drives'}</SelectItem>
-                    <SelectItem value="hdd">{language === 'ar' ? 'أقراص HDD' : 'HDD Drives'}</SelectItem>
-                    <SelectItem value="processors">{language === 'ar' ? 'المعالجات' : 'Processors'}</SelectItem>
-                    <SelectItem value="motherboards">{language === 'ar' ? 'اللوحات الأم' : 'Motherboards'}</SelectItem>
-                    <SelectItem value="gpu">{language === 'ar' ? 'كروت الشاشة' : 'Graphics Cards'}</SelectItem>
-                    <SelectItem value="psu">{language === 'ar' ? 'مزودات الطاقة' : 'Power Supplies'}</SelectItem>
-                    <SelectItem value="cases">{language === 'ar' ? 'صناديق الكمبيوتر' : 'PC Cases'}</SelectItem>
-                    <SelectItem value="cooling">{language === 'ar' ? 'أنظمة التبريد' : 'Cooling Systems'}</SelectItem>
+                  <SelectContent className="max-h-80">
+                    <SelectItem value="laptops" className="font-semibold">{t('categories.laptops')}</SelectItem>
+                    <SelectItem value="gaming-laptops">{language === 'ar' ? '↳ لابتوب ألعاب' : '↳ Gaming Laptops'}</SelectItem>
+                    <SelectItem value="business-laptops">{language === 'ar' ? '↳ لابتوب أعمال' : '↳ Business Laptops'}</SelectItem>
+                    <SelectItem value="student-laptops">{language === 'ar' ? '↳ لابتوب طلاب' : '↳ Student Laptops'}</SelectItem>
+                    <SelectItem value="ultrabooks">{language === 'ar' ? '↳ ألترابوك' : '↳ Ultrabooks'}</SelectItem>
+                    <SelectItem value="workstation-laptops">{language === 'ar' ? '↳ محطات عمل محمولة' : '↳ Workstation Laptops'}</SelectItem>
+                    
+                    <SelectItem value="desktops" className="font-semibold">{t('categories.desktops')}</SelectItem>
+                    <SelectItem value="gaming-pcs">{language === 'ar' ? '↳ أجهزة ألعاب' : '↳ Gaming PCs'}</SelectItem>
+                    <SelectItem value="office-pcs">{language === 'ar' ? '↳ أجهزة مكتبية' : '↳ Office PCs'}</SelectItem>
+                    <SelectItem value="workstations">{language === 'ar' ? '↳ محطات عمل' : '↳ Workstations'}</SelectItem>
+                    <SelectItem value="all-in-one">{language === 'ar' ? '↳ الكل في واحد' : '↳ All-in-One PCs'}</SelectItem>
+                    <SelectItem value="mini-pcs">{language === 'ar' ? '↳ أجهزة صغيرة' : '↳ Mini PCs'}</SelectItem>
+                    
+                    <SelectItem value="monitors" className="font-semibold">{t('categories.monitors')}</SelectItem>
+                    <SelectItem value="gaming-monitors">{language === 'ar' ? '↳ شاشات ألعاب' : '↳ Gaming Monitors'}</SelectItem>
+                    <SelectItem value="office-monitors">{language === 'ar' ? '↳ شاشات مكتبية' : '↳ Office Monitors'}</SelectItem>
+                    <SelectItem value="curved-monitors">{language === 'ar' ? '↳ شاشات منحنية' : '↳ Curved Monitors'}</SelectItem>
+                    <SelectItem value="4k-monitors">{language === 'ar' ? '↳ شاشات 4K' : '↳ 4K/UHD Monitors'}</SelectItem>
+                    <SelectItem value="ultrawide-monitors">{language === 'ar' ? '↳ شاشات عريضة' : '↳ Ultrawide Monitors'}</SelectItem>
+                    
+                    <SelectItem value="accessories" className="font-semibold">{t('categories.accessories')}</SelectItem>
+                    <SelectItem value="keyboards">{language === 'ar' ? '↳ لوحات المفاتيح' : '↳ Keyboards'}</SelectItem>
+                    <SelectItem value="mice">{language === 'ar' ? '↳ الماوسات' : '↳ Mice'}</SelectItem>
+                    <SelectItem value="headphones">{language === 'ar' ? '↳ سماعات' : '↳ Headphones'}</SelectItem>
+                    <SelectItem value="webcams">{language === 'ar' ? '↳ كاميرات ويب' : '↳ Webcams'}</SelectItem>
+                    <SelectItem value="cables">{language === 'ar' ? '↳ كابلات وموزعات' : '↳ Cables & Hubs'}</SelectItem>
+                    <SelectItem value="bags">{language === 'ar' ? '↳ حقائب لابتوب' : '↳ Laptop Bags'}</SelectItem>
+                    <SelectItem value="chargers">{language === 'ar' ? '↳ شواحن ومحولات' : '↳ Chargers & Adapters'}</SelectItem>
+                    
+                    <SelectItem value="pc-components" className="font-semibold">{language === 'ar' ? 'قطع الكمبيوتر' : 'PC Components'}</SelectItem>
+                    <SelectItem value="ram">{language === 'ar' ? '↳ ذاكرة RAM' : '↳ RAM Memory'}</SelectItem>
+                    <SelectItem value="ssd">{language === 'ar' ? '↳ أقراص SSD' : '↳ SSD Drives'}</SelectItem>
+                    <SelectItem value="hdd">{language === 'ar' ? '↳ أقراص HDD' : '↳ HDD Drives'}</SelectItem>
+                    <SelectItem value="processors">{language === 'ar' ? '↳ المعالجات' : '↳ Processors'}</SelectItem>
+                    <SelectItem value="motherboards">{language === 'ar' ? '↳ اللوحات الأم' : '↳ Motherboards'}</SelectItem>
+                    <SelectItem value="gpu">{language === 'ar' ? '↳ كروت الشاشة' : '↳ Graphics Cards'}</SelectItem>
+                    <SelectItem value="psu">{language === 'ar' ? '↳ مزودات الطاقة' : '↳ Power Supplies'}</SelectItem>
+                    <SelectItem value="cases">{language === 'ar' ? '↳ صناديق الكمبيوتر' : '↳ PC Cases'}</SelectItem>
+                    <SelectItem value="cooling">{language === 'ar' ? '↳ أنظمة التبريد' : '↳ Cooling Systems'}</SelectItem>
+                    
+                    <SelectItem value="programs" className="font-semibold">{language === 'ar' ? 'البرامج' : 'Software'}</SelectItem>
+                    <SelectItem value="operating-systems">{language === 'ar' ? '↳ أنظمة التشغيل' : '↳ Operating Systems'}</SelectItem>
+                    <SelectItem value="office-software">{language === 'ar' ? '↳ برامج المكتب' : '↳ Office Software'}</SelectItem>
+                    <SelectItem value="antivirus">{language === 'ar' ? '↳ مضادات الفيروسات' : '↳ Antivirus'}</SelectItem>
+                    <SelectItem value="design-software">{language === 'ar' ? '↳ برامج التصميم' : '↳ Design Software'}</SelectItem>
+                    <SelectItem value="gaming-software">{language === 'ar' ? '↳ برامج الألعاب' : '↳ Gaming Software'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -233,46 +233,226 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               {t('header.home')}
             </Button>
           </Link>
-          <Link href="/?category=laptops">
-            <Button 
-              variant="ghost" 
-              className="gap-2 px-4 py-2 rounded-full hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 transition-colors font-bold"
-              data-testid="link-computers"
-            >
-              <Laptop className="h-4 w-4" />
-              {t('category.laptops')}
-            </Button>
-          </Link>
-          <Link href="/?category=accessories">
-            <Button 
-              variant="ghost" 
-              className="gap-2 px-4 py-2 rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 transition-colors font-bold"
-              data-testid="link-accessories"
-            >
-              <Keyboard className="h-4 w-4" />
-              {t('category.accessories')}
-            </Button>
-          </Link>
-          <Link href="/?category=monitors">
-            <Button 
-              variant="ghost" 
-              className="gap-2 px-4 py-2 rounded-full hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 transition-colors font-bold"
-              data-testid="link-monitors"
-            >
-              <Monitor className="h-4 w-4" />
-              {t('category.monitors')}
-            </Button>
-          </Link>
-          <Link href="/?category=desktops">
-            <Button 
-              variant="ghost" 
-              className="gap-2 px-4 py-2 rounded-full hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-colors font-bold"
-              data-testid="link-desktops"
-            >
-              <Computer className="h-4 w-4" />
-              {t('category.desktops')}
-            </Button>
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 transition-colors font-bold"
+                data-testid="link-laptops"
+              >
+                <Laptop className="h-4 w-4" />
+                {t('category.laptops')}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <Link href="/?category=laptops">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <Laptop className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع اللابتوبات' : 'All Laptops'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <Link href="/?category=gaming-laptops">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Gamepad2 className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'لابتوب ألعاب' : 'Gaming Laptops'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=business-laptops">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'لابتوب أعمال' : 'Business Laptops'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=student-laptops">
+                <DropdownMenuItem className="cursor-pointer">
+                  <GraduationCap className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'لابتوب طلاب' : 'Student Laptops'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=ultrabooks">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Zap className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'ألترابوك' : 'Ultrabooks'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=workstation-laptops">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Wrench className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'محطات عمل محمولة' : 'Workstation Laptops'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 transition-colors font-bold"
+                data-testid="link-accessories"
+              >
+                <Keyboard className="h-4 w-4" />
+                {t('category.accessories')}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <Link href="/?category=accessories">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <Keyboard className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع الإكسسوارات' : 'All Accessories'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <Link href="/?category=keyboards">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Keyboard className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'لوحات المفاتيح' : 'Keyboards'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=mice">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Mouse className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'الماوسات' : 'Mice'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=headphones">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Headphones className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'سماعات' : 'Headphones'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=webcams">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Camera className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'كاميرات ويب' : 'Webcams'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=cables">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Cable className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'كابلات وموزعات' : 'Cables & Hubs'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=bags">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Backpack className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'حقائب لابتوب' : 'Laptop Bags'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=chargers">
+                <DropdownMenuItem className="cursor-pointer">
+                  <BatteryCharging className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'شواحن ومحولات' : 'Chargers & Adapters'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 transition-colors font-bold"
+                data-testid="link-monitors"
+              >
+                <Monitor className="h-4 w-4" />
+                {t('category.monitors')}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <Link href="/?category=monitors">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <Monitor className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع الشاشات' : 'All Monitors'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <Link href="/?category=gaming-monitors">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Gamepad2 className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'شاشات ألعاب' : 'Gaming Monitors'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=office-monitors">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'شاشات مكتبية' : 'Office Monitors'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=curved-monitors">
+                <DropdownMenuItem className="cursor-pointer">
+                  <MonitorPlay className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'شاشات منحنية' : 'Curved Monitors'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=4k-monitors">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Tv className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'شاشات 4K' : '4K/UHD Monitors'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=ultrawide-monitors">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Maximize className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'شاشات عريضة' : 'Ultrawide Monitors'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 transition-colors font-bold"
+                data-testid="link-desktops"
+              >
+                <Computer className="h-4 w-4" />
+                {t('category.desktops')}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <Link href="/?category=desktops">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <Computer className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع الأجهزة المكتبية' : 'All Desktops'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <Link href="/?category=gaming-pcs">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Gamepad2 className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'أجهزة ألعاب' : 'Gaming PCs'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=office-pcs">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'أجهزة مكتبية' : 'Office PCs'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=workstations">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Wrench className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'محطات عمل' : 'Workstations'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=all-in-one">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Square className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'الكل في واحد' : 'All-in-One PCs'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=mini-pcs">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Box className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'أجهزة صغيرة' : 'Mini PCs'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -344,16 +524,58 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               </Link>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link href="/?category=programs">
-            <Button 
-              variant="ghost" 
-              className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
-              data-testid="link-programs"
-            >
-              <AppWindow className="h-4 w-4" />
-              {t('category.programs')}
-            </Button>
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
+                data-testid="link-programs"
+              >
+                <AppWindow className="h-4 w-4" />
+                {t('category.programs')}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <Link href="/?category=programs">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <AppWindow className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع البرامج' : 'All Software'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <Link href="/?category=operating-systems">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Computer className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'أنظمة التشغيل' : 'Operating Systems'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=office-software">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Briefcase className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'برامج المكتب' : 'Office Software'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=antivirus">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Shield className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'مضادات الفيروسات' : 'Antivirus'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=design-software">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Palette className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'برامج التصميم' : 'Design Software'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=gaming-software">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Play className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'برامج الألعاب' : 'Gaming Software'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Link href="/pc-builder">
             <Button 
               variant="ghost" 
@@ -388,46 +610,226 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 {t('header.home')}
               </Button>
             </Link>
-            <Link href="/?category=laptops" onClick={() => setMobileMenuOpen(false)}>
-              <Button 
-                variant="ghost" 
-                className="justify-start gap-3 w-full rounded-lg hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 font-bold" 
-                data-testid="link-computers-mobile"
-              >
-                <Laptop className="h-4 w-4" />
-                {t('category.laptops')}
-              </Button>
-            </Link>
-            <Link href="/?category=accessories" onClick={() => setMobileMenuOpen(false)}>
-              <Button 
-                variant="ghost" 
-                className="justify-start gap-3 w-full rounded-lg hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 font-bold" 
-                data-testid="link-accessories-mobile"
-              >
-                <Keyboard className="h-4 w-4" />
-                {t('category.accessories')}
-              </Button>
-            </Link>
-            <Link href="/?category=monitors" onClick={() => setMobileMenuOpen(false)}>
-              <Button 
-                variant="ghost" 
-                className="justify-start gap-3 w-full rounded-lg hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 font-bold" 
-                data-testid="link-monitors-mobile"
-              >
-                <Monitor className="h-4 w-4" />
-                {t('category.monitors')}
-              </Button>
-            </Link>
-            <Link href="/?category=desktops" onClick={() => setMobileMenuOpen(false)}>
-              <Button 
-                variant="ghost" 
-                className="justify-start gap-3 w-full rounded-lg hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 font-bold" 
-                data-testid="link-desktops-mobile"
-              >
-                <Computer className="h-4 w-4" />
-                {t('category.desktops')}
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-purple-100 hover:text-purple-700 dark:hover:bg-purple-900/30 dark:hover:text-purple-400 font-bold"
+                  data-testid="link-laptops-mobile"
+                >
+                  <Laptop className="h-4 w-4" />
+                  {t('category.laptops')}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=laptops" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <Laptop className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع اللابتوبات' : 'All Laptops'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <Link href="/?category=gaming-laptops" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Gamepad2 className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'لابتوب ألعاب' : 'Gaming Laptops'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=business-laptops" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'لابتوب أعمال' : 'Business Laptops'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=student-laptops" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <GraduationCap className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'لابتوب طلاب' : 'Student Laptops'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=ultrabooks" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Zap className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'ألترابوك' : 'Ultrabooks'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=workstation-laptops" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Wrench className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'محطات عمل محمولة' : 'Workstation Laptops'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-amber-100 hover:text-amber-700 dark:hover:bg-amber-900/30 dark:hover:text-amber-400 font-bold"
+                  data-testid="link-accessories-mobile"
+                >
+                  <Keyboard className="h-4 w-4" />
+                  {t('category.accessories')}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=accessories" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <Keyboard className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع الإكسسوارات' : 'All Accessories'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <Link href="/?category=keyboards" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Keyboard className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'لوحات المفاتيح' : 'Keyboards'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=mice" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Mouse className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'الماوسات' : 'Mice'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=headphones" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Headphones className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'سماعات' : 'Headphones'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=webcams" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Camera className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'كاميرات ويب' : 'Webcams'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=cables" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Cable className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'كابلات وموزعات' : 'Cables & Hubs'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=bags" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Backpack className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'حقائب لابتوب' : 'Laptop Bags'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=chargers" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <BatteryCharging className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'شواحن ومحولات' : 'Chargers & Adapters'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-teal-100 hover:text-teal-700 dark:hover:bg-teal-900/30 dark:hover:text-teal-400 font-bold"
+                  data-testid="link-monitors-mobile"
+                >
+                  <Monitor className="h-4 w-4" />
+                  {t('category.monitors')}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=monitors" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع الشاشات' : 'All Monitors'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <Link href="/?category=gaming-monitors" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Gamepad2 className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'شاشات ألعاب' : 'Gaming Monitors'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=office-monitors" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'شاشات مكتبية' : 'Office Monitors'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=curved-monitors" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <MonitorPlay className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'شاشات منحنية' : 'Curved Monitors'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=4k-monitors" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Tv className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'شاشات 4K' : '4K/UHD Monitors'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=ultrawide-monitors" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Maximize className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'شاشات عريضة' : 'Ultrawide Monitors'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-rose-100 hover:text-rose-700 dark:hover:bg-rose-900/30 dark:hover:text-rose-400 font-bold"
+                  data-testid="link-desktops-mobile"
+                >
+                  <Computer className="h-4 w-4" />
+                  {t('category.desktops')}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=desktops" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <Computer className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع الأجهزة المكتبية' : 'All Desktops'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <Link href="/?category=gaming-pcs" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Gamepad2 className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'أجهزة ألعاب' : 'Gaming PCs'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=office-pcs" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'أجهزة مكتبية' : 'Office PCs'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=workstations" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Wrench className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'محطات عمل' : 'Workstations'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=all-in-one" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Square className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'الكل في واحد' : 'All-in-One PCs'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=mini-pcs" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Box className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'أجهزة صغيرة' : 'Mini PCs'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
@@ -497,16 +899,58 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 </Link>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="/?category=programs" onClick={() => setMobileMenuOpen(false)}>
-              <Button 
-                variant="ghost" 
-                className="justify-start gap-3 w-full rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold" 
-                data-testid="link-programs-mobile"
-              >
-                <AppWindow className="h-4 w-4" />
-                {t('category.programs')}
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold"
+                  data-testid="link-programs-mobile"
+                >
+                  <AppWindow className="h-4 w-4" />
+                  {t('category.programs')}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=programs" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <AppWindow className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع البرامج' : 'All Software'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <Link href="/?category=operating-systems" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Computer className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'أنظمة التشغيل' : 'Operating Systems'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=office-software" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Briefcase className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'برامج المكتب' : 'Office Software'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=antivirus" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Shield className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'مضادات الفيروسات' : 'Antivirus'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=design-software" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Palette className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'برامج التصميم' : 'Design Software'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=gaming-software" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Play className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'برامج الألعاب' : 'Gaming Software'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link href="/pc-builder" onClick={() => setMobileMenuOpen(false)}>
               <Button 
                 variant="ghost" 
