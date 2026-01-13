@@ -1,4 +1,5 @@
 import { type Server } from "node:http";
+import path from "node:path";
 
 import express, {
   type Express,
@@ -10,6 +11,8 @@ import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
 
 import { registerRoutes } from "./routes";
+
+const uploadDir = path.join(process.cwd(), "uploads");
 
 const PgStore = connectPgSimple(session);
 
@@ -66,6 +69,9 @@ app.use(express.json({
   }
 }));
 app.use(express.urlencoded({ extended: false }));
+
+// Serve uploaded images
+app.use('/uploads', express.static(uploadDir));
 
 app.use((req, res, next) => {
   const start = Date.now();
