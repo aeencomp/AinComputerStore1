@@ -15,6 +15,7 @@ import Papa from "papaparse";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -55,6 +56,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaultTechnician();
   await storage.initializeDefaultAdmin();
   await storage.initializeDefaultSalesAdmin();
+
+  // Register object storage routes for persistent file uploads
+  registerObjectStorageRoutes(app);
 
   // Serve uploaded images with no-cache headers to ensure fresh images
   app.use("/uploads", (req, res, next) => {

@@ -41,21 +41,37 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
     setUploadError(null);
 
     try {
-      const formData = new FormData();
-      formData.append('image', file);
-
-      const response = await fetch('/api/upload/image', {
+      // Step 1: Get presigned URL from backend
+      const urlResponse = await fetch('/api/uploads/request-url', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: file.name,
+          size: file.size,
+          contentType: file.type,
+        }),
       });
 
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || 'Upload failed');
+      if (!urlResponse.ok) {
+        const errorData = await urlResponse.json();
+        throw new Error(errorData.error || 'Failed to get upload URL');
+      }
+
+      const { uploadURL, objectPath } = await urlResponse.json();
+
+      // Step 2: Upload file directly to presigned URL
+      const uploadResponse = await fetch(uploadURL, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload file');
       }
       
-      onChange(data.url);
+      // Use the object path for displaying the image
+      onChange(objectPath);
       setActiveTab("url");
     } catch (error: any) {
       const errorMessage = error?.message || '';
