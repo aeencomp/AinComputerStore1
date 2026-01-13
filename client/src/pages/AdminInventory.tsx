@@ -33,6 +33,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCategoryName } from "@/lib/categoryNames";
 import { 
   Loader2, 
   Package, 
@@ -448,7 +449,7 @@ export default function AdminInventory() {
                                     <p className="font-medium">
                                       {language === 'ar' ? product.nameAr : product.nameEn}
                                     </p>
-                                    <p className="text-sm text-muted-foreground">{product.category}</p>
+                                    <p className="text-sm text-muted-foreground">{getCategoryName(product.category, language)}</p>
                                   </div>
                                 </div>
                               </TableCell>

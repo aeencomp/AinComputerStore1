@@ -11,6 +11,7 @@ import {
   Loader2,
 } from "lucide-react";
 import type { Product } from "@shared/schema";
+import { getCategoryName } from "@/lib/categoryNames";
 
 interface SalesUser {
   id: string;
@@ -211,7 +212,7 @@ export default function SalesInventory({ user }: SalesInventoryProps) {
                           </div>
                         </td>
                         <td className="p-3 text-muted-foreground">{product.sku || '-'}</td>
-                        <td className="p-3">{product.category}</td>
+                        <td className="p-3">{getCategoryName(product.category, language)}</td>
                         <td className="p-3 text-center font-bold">{formatNumber(stock)}</td>
                         <td className="p-3 text-center text-muted-foreground">{threshold}</td>
                         <td className="p-3">

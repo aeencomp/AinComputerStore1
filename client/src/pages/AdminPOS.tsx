@@ -25,6 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { getCategoryName } from "@/lib/categoryNames";
 import { 
   Loader2, 
   Search,
@@ -713,7 +714,7 @@ export default function AdminPOS() {
                               ) : null}
                               {item.product.category ? (
                                 <div className="text-xs text-muted-foreground print:text-gray-600">
-                                  {language === 'ar' ? 'الفئة:' : 'Cat:'} {item.product.category}
+                                  {language === 'ar' ? 'الفئة:' : 'Cat:'} {getCategoryName(item.product.category, language)}
                                 </div>
                               ) : null}
                             </td>

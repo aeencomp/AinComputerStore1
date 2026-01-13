@@ -43,6 +43,7 @@ import {
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { AdminNav } from "@/components/AdminNav";
 import { ImageUpload } from "@/components/ImageUpload";
+import { getCategoryName } from "@/lib/categoryNames";
 import type { Product, InsertProduct } from "@shared/schema";
 
 interface AdminUser {
@@ -199,7 +200,7 @@ export default function AdminProducts() {
                   <TableCell className="font-medium">
                     {language === 'ar' ? product.nameAr : product.nameEn}
                   </TableCell>
-                  <TableCell>{product.category}</TableCell>
+                  <TableCell>{getCategoryName(product.category, language)}</TableCell>
                   <TableCell>{formatPrice(parseFloat(product.price), language)}</TableCell>
                   <TableCell>{product.inStock}</TableCell>
                   <TableCell className="text-end">
