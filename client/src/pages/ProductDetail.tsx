@@ -25,6 +25,8 @@ import keyboardImage from "@assets/generated_images/gaming_keyboard_product_phot
 import mouseImage from "@assets/generated_images/gaming_mouse_product_photo.png";
 import headsetImage from "@assets/generated_images/gaming_headset_product_photo.png";
 
+import _2_096266e1_41b0_4fef_b2db_a9f92c444c5b from "@assets/2_096266e1-41b0-4fef-b2db-a9f92c444c5b.webp";
+
 const imageMap: Record<string, string> = {
   "gaming_laptop_product_photo.png": laptopImage,
   "desktop_pc_tower_photo.png": desktopImage,
@@ -186,7 +188,6 @@ export default function ProductDetail() {
   return (
     <div className="min-h-screen flex flex-col">
       <Header cartItemsCount={cartItemsCount} onCartClick={() => setCartOpen(true)} onSearch={() => {}} />
-
       <CartSidebar
         open={cartOpen}
         onOpenChange={setCartOpen}
@@ -196,7 +197,6 @@ export default function ProductDetail() {
         isLoading={cartLoading}
         isError={cartError}
       />
-
       <main className="flex-1">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8">
           {/* Back Button */}
@@ -211,7 +211,7 @@ export default function ProductDetail() {
               <Card className="overflow-hidden">
                 <div className="aspect-square overflow-hidden bg-muted flex items-center justify-center">
                   <img
-                    src={imageSrc}
+                    src={_2_096266e1_41b0_4fef_b2db_a9f92c444c5b}
                     alt={productName}
                     className="w-full h-full object-cover"
                     data-testid={`img-product-detail-${product.id}`}
@@ -390,7 +390,6 @@ export default function ProductDetail() {
           </section>
         )}
       </main>
-
       <Footer />
     </div>
   );
