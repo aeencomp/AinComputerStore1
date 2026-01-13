@@ -15,7 +15,10 @@ import {
   Package,
   BarChart3,
   ShoppingCart,
-  Warehouse
+  Warehouse,
+  Wrench,
+  ClipboardList,
+  UserCheck
 } from "lucide-react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
@@ -73,6 +76,22 @@ export default function Portals() {
         { nameAr: "التقارير", nameEn: "Reports", icon: BarChart3 },
       ]
     },
+    {
+      id: "technician",
+      nameAr: "بوابة الصيانة",
+      nameEn: "Repair Portal",
+      descriptionAr: "إدارة طلبات الصيانة والإصلاح",
+      descriptionEn: "Manage repair requests and tickets",
+      icon: Wrench,
+      loginPath: "/technician/login",
+      color: "bg-purple-500",
+      features: [
+        { nameAr: "طلبات الصيانة", nameEn: "Repair Tickets", icon: ClipboardList },
+        { nameAr: "إدارة الفنيين", nameEn: "Technician Management", icon: UserCheck },
+        { nameAr: "تتبع الحالة", nameEn: "Status Tracking", icon: Settings },
+        { nameAr: "التقارير", nameEn: "Reports", icon: BarChart3 },
+      ]
+    },
   ];
 
   return (
@@ -98,7 +117,7 @@ export default function Portals() {
           </div>
 
           <Tabs defaultValue="admin" className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-6">
+            <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 mb-6">
               {portals.map((portal) => (
                 <TabsTrigger 
                   key={portal.id} 
@@ -166,7 +185,7 @@ export default function Portals() {
             ))}
           </Tabs>
 
-          <div className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4">
             {portals.map((portal) => (
               <Link key={portal.id} href={portal.loginPath}>
                 <Card className="hover-elevate cursor-pointer h-full" data-testid={`card-${portal.id}`}>
