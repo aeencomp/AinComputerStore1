@@ -341,6 +341,15 @@ export default function AdminProducts() {
                     <SelectItem value="desktops">{t('categories.desktops')}</SelectItem>
                     <SelectItem value="monitors">{t('categories.monitors')}</SelectItem>
                     <SelectItem value="accessories">{t('categories.accessories')}</SelectItem>
+                    <SelectItem value="ram">{language === 'ar' ? 'ذاكرة RAM' : 'RAM Memory'}</SelectItem>
+                    <SelectItem value="ssd">{language === 'ar' ? 'أقراص SSD' : 'SSD Drives'}</SelectItem>
+                    <SelectItem value="hdd">{language === 'ar' ? 'أقراص HDD' : 'HDD Drives'}</SelectItem>
+                    <SelectItem value="processors">{language === 'ar' ? 'المعالجات' : 'Processors'}</SelectItem>
+                    <SelectItem value="motherboards">{language === 'ar' ? 'اللوحات الأم' : 'Motherboards'}</SelectItem>
+                    <SelectItem value="gpu">{language === 'ar' ? 'كروت الشاشة' : 'Graphics Cards'}</SelectItem>
+                    <SelectItem value="psu">{language === 'ar' ? 'مزودات الطاقة' : 'Power Supplies'}</SelectItem>
+                    <SelectItem value="cases">{language === 'ar' ? 'صناديق الكمبيوتر' : 'PC Cases'}</SelectItem>
+                    <SelectItem value="cooling">{language === 'ar' ? 'أنظمة التبريد' : 'Cooling Systems'}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

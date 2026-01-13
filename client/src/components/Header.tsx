@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -273,6 +273,77 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               {t('category.desktops')}
             </Button>
           </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-orange-100 hover:text-orange-700 dark:hover:bg-orange-900/30 dark:hover:text-orange-400 transition-colors font-bold"
+                data-testid="link-pc-components"
+              >
+                <MemoryStick className="h-4 w-4" />
+                {language === 'ar' ? 'قطع الكمبيوتر' : 'PC Components'}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <DropdownMenuLabel>{language === 'ar' ? 'قطع الكمبيوتر' : 'PC Components'}</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <Link href="/?category=ram">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-ram">
+                  <MemoryStick className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'ذاكرة الوصول العشوائي (RAM)' : 'RAM Memory'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=ssd">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-ssd">
+                  <HardDrive className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'أقراص SSD' : 'SSD Drives'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=hdd">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-hdd">
+                  <HardDrive className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'أقراص HDD' : 'HDD Drives'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=processors">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-processors">
+                  <Cpu className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'المعالجات' : 'Processors'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=motherboards">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-motherboards">
+                  <Cpu className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'اللوحات الأم' : 'Motherboards'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=gpu">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-gpu">
+                  <Monitor className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'كروت الشاشة' : 'Graphics Cards'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=psu">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-psu">
+                  <Cpu className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'مزودات الطاقة' : 'Power Supplies'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=cases">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-cases">
+                  <Computer className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'صناديق الكمبيوتر' : 'PC Cases'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=cooling">
+                <DropdownMenuItem className="cursor-pointer" data-testid="link-cooling">
+                  <Cpu className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'أنظمة التبريد' : 'Cooling Systems'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Link href="/?category=programs">
             <Button 
               variant="ghost" 
@@ -357,6 +428,75 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 {t('category.desktops')}
               </Button>
             </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-orange-100 hover:text-orange-700 dark:hover:bg-orange-900/30 dark:hover:text-orange-400 font-bold"
+                  data-testid="link-pc-components-mobile"
+                >
+                  <MemoryStick className="h-4 w-4" />
+                  {language === 'ar' ? 'قطع الكمبيوتر' : 'PC Components'}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=ram" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <MemoryStick className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'ذاكرة RAM' : 'RAM Memory'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=ssd" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <HardDrive className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'أقراص SSD' : 'SSD Drives'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=hdd" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <HardDrive className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'أقراص HDD' : 'HDD Drives'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=processors" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Cpu className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'المعالجات' : 'Processors'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=motherboards" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Cpu className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'اللوحات الأم' : 'Motherboards'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=gpu" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'كروت الشاشة' : 'Graphics Cards'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=psu" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Cpu className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'مزودات الطاقة' : 'Power Supplies'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=cases" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Computer className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'صناديق الكمبيوتر' : 'PC Cases'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=cooling" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Cpu className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'أنظمة التبريد' : 'Cooling Systems'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Link href="/?category=programs" onClick={() => setMobileMenuOpen(false)}>
               <Button 
                 variant="ghost" 
