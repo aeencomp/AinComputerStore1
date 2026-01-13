@@ -1,8 +1,9 @@
+import { useState } from "react";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Product } from "@shared/schema";
-import { ShoppingCart } from "lucide-react";
+import { ShoppingCart, ImageOff } from "lucide-react";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatPrice } from "@/lib/formatters";
@@ -29,6 +30,7 @@ const imageMap: Record<string, string> = {
 
 export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const { language, t } = useLanguage();
+  const [imageError, setImageError] = useState(false);
   
   // Check if image is a URL, uploaded file, or mapped asset
   const getImageSrc = () => {
@@ -56,12 +58,19 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
             </Badge>
           )}
           <div className="aspect-square overflow-hidden bg-muted">
-            <img
-              src={imageSrc}
-              alt={productName}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-              data-testid={`img-product-${product.id}`}
-            />
+            {imageError ? (
+              <div className="w-full h-full flex items-center justify-center bg-muted">
+                <ImageOff className="w-12 h-12 text-muted-foreground" />
+              </div>
+            ) : (
+              <img
+                src={imageSrc}
+                alt={productName}
+                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                onError={() => setImageError(true)}
+                data-testid={`img-product-${product.id}`}
+              />
+            )}
           </div>
         </CardContent>
         <CardContent className="p-4 space-y-2 cursor-pointer">
