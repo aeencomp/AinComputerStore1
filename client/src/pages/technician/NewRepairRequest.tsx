@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { ArrowLeft, ArrowRight, Plus, Printer } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Printer, Receipt } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import type { RepairTicket } from '@shared/schema';
 import { useForm } from 'react-hook-form';
@@ -225,6 +225,246 @@ export default function NewRepairRequest() {
     form.reset();
   };
 
+  const handlePrintCustomerReceipt = () => {
+    if (!createdTicket) return;
+    
+    const priorityText = {
+      urgent: isRTL ? 'عاجل' : 'Urgent',
+      high: isRTL ? 'مرتفع' : 'High',
+      normal: isRTL ? 'عادي' : 'Normal',
+      low: isRTL ? 'منخفض' : 'Low',
+    }[createdTicket.priority] || createdTicket.priority;
+
+    const deviceTypeText = {
+      laptop: isRTL ? 'لابتوب' : 'Laptop',
+      desktop: isRTL ? 'كمبيوتر مكتبي' : 'Desktop',
+      monitor: isRTL ? 'شاشة' : 'Monitor',
+      printer: isRTL ? 'طابعة' : 'Printer',
+      other: isRTL ? 'أخرى' : 'Other',
+    }[createdTicket.deviceType] || createdTicket.deviceType;
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html dir="${isRTL ? 'rtl' : 'ltr'}">
+        <head>
+          <title>${isRTL ? 'إيصال صيانة' : 'Repair Receipt'}</title>
+          <style>
+            @page { 
+              size: 72.1mm 210mm; 
+              margin: 2mm; 
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+            }
+            body { 
+              font-family: Arial, sans-serif; 
+              font-size: 11px; 
+              width: 68mm;
+              padding: 3mm;
+              direction: ${isRTL ? 'rtl' : 'ltr'};
+              line-height: 1.4;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #000;
+              padding-bottom: 8px;
+              margin-bottom: 8px;
+            }
+            .store-name {
+              font-size: 16px;
+              font-weight: bold;
+              margin-bottom: 4px;
+            }
+            .store-info {
+              font-size: 9px;
+              color: #333;
+            }
+            .receipt-title {
+              text-align: center;
+              font-size: 14px;
+              font-weight: bold;
+              margin: 8px 0;
+              padding: 4px;
+              background: #f0f0f0;
+              border-radius: 4px;
+            }
+            .ticket-number {
+              text-align: center;
+              font-size: 18px;
+              font-weight: bold;
+              margin: 8px 0;
+              padding: 6px;
+              border: 2px dashed #000;
+            }
+            .section {
+              margin: 10px 0;
+              padding-bottom: 8px;
+              border-bottom: 1px dashed #ccc;
+            }
+            .section-title {
+              font-weight: bold;
+              font-size: 12px;
+              margin-bottom: 6px;
+              color: #333;
+            }
+            .info-row {
+              display: flex;
+              justify-content: space-between;
+              margin: 4px 0;
+              font-size: 10px;
+            }
+            .info-label {
+              font-weight: bold;
+              color: #555;
+            }
+            .info-value {
+              text-align: ${isRTL ? 'left' : 'right'};
+            }
+            .problem-box {
+              background: #f9f9f9;
+              padding: 8px;
+              border-radius: 4px;
+              margin-top: 6px;
+              font-size: 10px;
+              min-height: 40px;
+            }
+            .terms {
+              margin-top: 12px;
+              padding-top: 8px;
+              border-top: 1px solid #000;
+            }
+            .terms-title {
+              font-weight: bold;
+              font-size: 10px;
+              margin-bottom: 4px;
+            }
+            .terms-list {
+              font-size: 8px;
+              color: #555;
+              padding-${isRTL ? 'right' : 'left'}: 8px;
+            }
+            .terms-list li {
+              margin: 2px 0;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 12px;
+              padding-top: 8px;
+              border-top: 2px solid #000;
+              font-size: 9px;
+            }
+            .track-info {
+              margin-top: 8px;
+              padding: 6px;
+              background: #f0f0f0;
+              border-radius: 4px;
+              text-align: center;
+              font-size: 9px;
+            }
+            .date-time {
+              text-align: center;
+              font-size: 9px;
+              color: #666;
+              margin: 8px 0;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}</div>
+            <div class="store-info">${isRTL ? 'كربلاء - العراق' : 'Karbala - Iraq'}</div>
+            <div class="store-info">07850006977</div>
+          </div>
+          
+          <div class="receipt-title">${isRTL ? 'إيصال استلام جهاز للصيانة' : 'Device Repair Receipt'}</div>
+          
+          <div class="ticket-number">${createdTicket.ticketNumber}</div>
+          
+          <div class="date-time">
+            ${new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')} - ${new Date().toLocaleTimeString(isRTL ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+          </div>
+          
+          <div class="section">
+            <div class="section-title">${isRTL ? 'معلومات العميل' : 'Customer Information'}</div>
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'الاسم:' : 'Name:'}</span>
+              <span class="info-value">${createdTicket.customerName}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'الهاتف:' : 'Phone:'}</span>
+              <span class="info-value" dir="ltr">${createdTicket.customerPhone}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">${isRTL ? 'معلومات الجهاز' : 'Device Information'}</div>
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'النوع:' : 'Type:'}</span>
+              <span class="info-value">${deviceTypeText}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'الماركة:' : 'Brand:'}</span>
+              <span class="info-value">${createdTicket.deviceBrand}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'الموديل:' : 'Model:'}</span>
+              <span class="info-value">${createdTicket.deviceModel}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'الأولوية:' : 'Priority:'}</span>
+              <span class="info-value">${priorityText}</span>
+            </div>
+          </div>
+          
+          <div class="section">
+            <div class="section-title">${isRTL ? 'وصف المشكلة' : 'Problem Description'}</div>
+            <div class="problem-box">
+              ${createdTicket.issueDescriptionAr || createdTicket.issueDescriptionEn}
+            </div>
+          </div>
+          
+          ${createdTicket.costEstimate ? `
+          <div class="section">
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'التكلفة المتوقعة:' : 'Estimated Cost:'}</span>
+              <span class="info-value">${Number(createdTicket.costEstimate).toLocaleString()} ${isRTL ? 'د.ع' : 'IQD'}</span>
+            </div>
+          </div>
+          ` : ''}
+          
+          <div class="terms">
+            <div class="terms-title">${isRTL ? 'الشروط والأحكام:' : 'Terms & Conditions:'}</div>
+            <ul class="terms-list">
+              <li>${isRTL ? 'يرجى الاحتفاظ بهذا الإيصال لاستلام الجهاز' : 'Please keep this receipt to collect your device'}</li>
+              <li>${isRTL ? 'مدة الصيانة تعتمد على نوع العطل وتوفر القطع' : 'Repair time depends on issue type and parts availability'}</li>
+              <li>${isRTL ? 'سيتم التواصل معكم عند الانتهاء' : 'We will contact you when ready'}</li>
+              <li>${isRTL ? 'الأجهزة غير المستلمة خلال 30 يوم لا نتحمل مسؤوليتها' : 'We are not responsible for devices not collected within 30 days'}</li>
+            </ul>
+          </div>
+          
+          <div class="track-info">
+            ${isRTL ? 'لتتبع حالة جهازك، استخدم رقم التذكرة أعلاه' : 'To track your device status, use the ticket number above'}
+          </div>
+          
+          <div class="footer">
+            <div>${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
+          </div>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      setTimeout(() => {
+        printWindow.print();
+        printWindow.close();
+      }, 250);
+    }
+  };
+
   if (isAuthLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -300,10 +540,14 @@ export default function NewRepairRequest() {
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
                 <Button onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-print-label">
                   <Printer className="h-4 w-4" />
                   {barcodeReady ? (isRTL ? 'طباعة البطاقة' : 'Print Label') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
+                </Button>
+                <Button onClick={handlePrintCustomerReceipt} variant="secondary" className="gap-2" data-testid="button-print-receipt">
+                  <Receipt className="h-4 w-4" />
+                  {isRTL ? 'طباعة إيصال العميل' : 'Print Customer Receipt'}
                 </Button>
                 <Button variant="outline" onClick={handleNewRequest} className="gap-2" data-testid="button-new-request">
                   <Plus className="h-4 w-4" />
