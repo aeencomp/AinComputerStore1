@@ -232,7 +232,11 @@ export default function AdminProducts() {
       </div>
 
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto" 
+          dir={language === 'ar' ? 'rtl' : 'ltr'}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle>
               {editingProduct ? t('admin.products.edit') : t('admin.products.addNew')}

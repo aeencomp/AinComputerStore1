@@ -332,7 +332,11 @@ export default function AdminPrograms() {
       </div>
 
       <Dialog open={isAddEditOpen} onOpenChange={setIsAddEditOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+        <DialogContent 
+          className="max-w-2xl max-h-[90vh] overflow-y-auto" 
+          dir={language === 'ar' ? 'rtl' : 'ltr'}
+          onOpenAutoFocus={(e) => e.preventDefault()}
+        >
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <AppWindow className="w-5 h-5 text-cyan-600" />

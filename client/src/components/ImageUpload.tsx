@@ -133,6 +133,7 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
               type="file"
               accept="image/jpeg,image/png,image/gif,image/webp"
               onChange={handleFileChange}
+              onClick={(e) => e.stopPropagation()}
               className="hidden"
               data-testid="input-file-upload"
             />
