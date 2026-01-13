@@ -262,114 +262,130 @@ export default function NewRepairRequest() {
             }
             body { 
               font-family: Arial, sans-serif; 
-              font-size: 11px; 
+              font-size: 13px; 
+              font-weight: 600;
               width: 68mm;
               padding: 3mm;
               direction: ${isRTL ? 'rtl' : 'ltr'};
-              line-height: 1.4;
+              line-height: 1.5;
+              color: #000;
             }
             .header {
               text-align: center;
-              border-bottom: 2px solid #000;
-              padding-bottom: 8px;
-              margin-bottom: 8px;
+              border-bottom: 3px solid #000;
+              padding-bottom: 10px;
+              margin-bottom: 10px;
             }
             .store-name {
-              font-size: 16px;
-              font-weight: bold;
-              margin-bottom: 4px;
+              font-size: 18px;
+              font-weight: 900;
+              margin-bottom: 6px;
+              letter-spacing: 0.5px;
             }
             .store-info {
-              font-size: 9px;
-              color: #333;
+              font-size: 11px;
+              font-weight: 700;
+              color: #000;
             }
             .receipt-title {
               text-align: center;
-              font-size: 14px;
-              font-weight: bold;
-              margin: 8px 0;
-              padding: 4px;
-              background: #f0f0f0;
+              font-size: 16px;
+              font-weight: 900;
+              margin: 10px 0;
+              padding: 6px;
+              background: #e0e0e0;
               border-radius: 4px;
+              border: 1px solid #000;
             }
             .ticket-number {
               text-align: center;
-              font-size: 18px;
-              font-weight: bold;
-              margin: 8px 0;
-              padding: 6px;
-              border: 2px dashed #000;
+              font-size: 22px;
+              font-weight: 900;
+              margin: 10px 0;
+              padding: 8px;
+              border: 3px dashed #000;
+              letter-spacing: 1px;
             }
             .section {
-              margin: 10px 0;
-              padding-bottom: 8px;
-              border-bottom: 1px dashed #ccc;
+              margin: 12px 0;
+              padding-bottom: 10px;
+              border-bottom: 2px dashed #333;
             }
             .section-title {
-              font-weight: bold;
-              font-size: 12px;
-              margin-bottom: 6px;
-              color: #333;
+              font-weight: 900;
+              font-size: 14px;
+              margin-bottom: 8px;
+              color: #000;
+              text-decoration: underline;
             }
             .info-row {
               display: flex;
               justify-content: space-between;
-              margin: 4px 0;
-              font-size: 10px;
+              margin: 6px 0;
+              font-size: 12px;
+              font-weight: 700;
             }
             .info-label {
-              font-weight: bold;
-              color: #555;
+              font-weight: 900;
+              color: #000;
             }
             .info-value {
               text-align: ${isRTL ? 'left' : 'right'};
+              font-weight: 700;
             }
             .problem-box {
-              background: #f9f9f9;
-              padding: 8px;
+              background: #f0f0f0;
+              padding: 10px;
               border-radius: 4px;
-              margin-top: 6px;
-              font-size: 10px;
-              min-height: 40px;
+              margin-top: 8px;
+              font-size: 12px;
+              font-weight: 700;
+              min-height: 50px;
+              border: 1px solid #999;
             }
             .terms {
-              margin-top: 12px;
-              padding-top: 8px;
-              border-top: 1px solid #000;
+              margin-top: 14px;
+              padding-top: 10px;
+              border-top: 2px solid #000;
             }
             .terms-title {
-              font-weight: bold;
-              font-size: 10px;
-              margin-bottom: 4px;
+              font-weight: 900;
+              font-size: 12px;
+              margin-bottom: 6px;
             }
             .terms-list {
-              font-size: 8px;
-              color: #555;
-              padding-${isRTL ? 'right' : 'left'}: 8px;
+              font-size: 10px;
+              font-weight: 600;
+              color: #000;
+              padding-${isRTL ? 'right' : 'left'}: 10px;
             }
             .terms-list li {
-              margin: 2px 0;
+              margin: 4px 0;
             }
             .footer {
               text-align: center;
-              margin-top: 12px;
-              padding-top: 8px;
-              border-top: 2px solid #000;
-              font-size: 9px;
+              margin-top: 14px;
+              padding-top: 10px;
+              border-top: 3px solid #000;
+              font-size: 12px;
+              font-weight: 900;
             }
             .track-info {
-              margin-top: 8px;
-              padding: 6px;
-              background: #f0f0f0;
+              margin-top: 10px;
+              padding: 8px;
+              background: #e0e0e0;
               border-radius: 4px;
               text-align: center;
-              font-size: 9px;
+              font-size: 11px;
+              font-weight: 700;
+              border: 1px solid #666;
             }
             .date-time {
               text-align: center;
-              font-size: 9px;
-              color: #666;
-              margin: 8px 0;
+              font-size: 11px;
+              font-weight: 700;
+              color: #000;
+              margin: 10px 0;
             }
           </style>
         </head>
