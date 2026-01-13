@@ -111,7 +111,7 @@ export function CartSidebar({
                   // Check if image is a URL, uploaded file, or mapped asset
                   const getImageSrc = () => {
                     if (!item.product.image) return laptopImage;
-                    if (item.product.image.startsWith('/uploads/') || item.product.image.startsWith('http')) {
+                    if (item.product.image.startsWith('/uploads/') || item.product.image.startsWith('/objects/') || item.product.image.startsWith('http')) {
                       return item.product.image;
                     }
                     return imageMap[item.product.image] || laptopImage;

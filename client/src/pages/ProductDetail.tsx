@@ -145,7 +145,7 @@ export default function ProductDetail() {
   // Check if image is a URL, uploaded file, or mapped asset
   const getImageSrc = () => {
     if (!product.image) return laptopImage;
-    if (product.image.startsWith('/uploads/') || product.image.startsWith('http')) {
+    if (product.image.startsWith('/uploads/') || product.image.startsWith('/objects/') || product.image.startsWith('http')) {
       return product.image;
     }
     return imageMap[product.image] || laptopImage;
@@ -356,7 +356,7 @@ export default function ProductDetail() {
               {relatedProducts.map((relatedProduct) => {
                 const getRelatedImageSrc = () => {
                   if (!relatedProduct.image) return laptopImage;
-                  if (relatedProduct.image.startsWith('/uploads/') || relatedProduct.image.startsWith('http')) {
+                  if (relatedProduct.image.startsWith('/uploads/') || relatedProduct.image.startsWith('/objects/') || relatedProduct.image.startsWith('http')) {
                     return relatedProduct.image;
                   }
                   return imageMap[relatedProduct.image] || laptopImage;

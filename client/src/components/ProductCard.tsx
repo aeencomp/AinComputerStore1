@@ -35,7 +35,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   // Check if image is a URL, uploaded file, or mapped asset
   const getImageSrc = () => {
     if (!product.image) return laptopImage;
-    if (product.image.startsWith('/uploads/') || product.image.startsWith('http')) {
+    if (product.image.startsWith('/uploads/') || product.image.startsWith('/objects/') || product.image.startsWith('http')) {
       return product.image;
     }
     return imageMap[product.image] || laptopImage;

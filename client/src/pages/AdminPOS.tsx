@@ -304,7 +304,7 @@ export default function AdminPOS() {
                       const productName = language === 'ar' ? product.nameAr : product.nameEn;
                       const stockQty = (product as any).stockQuantity || 0;
                       const isOutOfStock = stockQty === 0;
-                      const imageSrc = product.image?.startsWith('/uploads/') || product.image?.startsWith('http') 
+                      const imageSrc = product.image?.startsWith('/uploads/') || product.image?.startsWith('/objects/') || product.image?.startsWith('http') 
                         ? product.image 
                         : `/placeholder.png`;
                       
