@@ -143,64 +143,64 @@ export default function NewRepairRequest() {
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
               @page { 
-                size: 80mm 60mm; 
-                margin: 2mm; 
+                size: 80mm 40mm; 
+                margin: 1mm; 
               }
               body { 
                 font-family: Arial, sans-serif; 
-                font-size: 10px; 
+                font-size: 8px; 
                 margin: 0; 
-                padding: 4px;
+                padding: 2px;
                 direction: ${isRTL ? 'rtl' : 'ltr'};
               }
               .label-container {
                 border: 1px solid #000;
-                padding: 4px;
-                max-width: 76mm;
+                padding: 2px;
+                max-width: 78mm;
               }
               .ticket-number {
-                font-size: 14px;
+                font-size: 11px;
                 font-weight: bold;
                 text-align: center;
-                margin-bottom: 4px;
+                margin-bottom: 2px;
               }
               .barcode-container {
                 text-align: center;
-                margin: 4px 0;
+                margin: 2px 0;
               }
               .barcode-container svg {
                 max-width: 100%;
-                height: 35px;
+                height: 22px;
               }
               .info-row {
                 display: flex;
                 justify-content: space-between;
-                margin: 2px 0;
-                font-size: 9px;
+                margin: 1px 0;
+                font-size: 7px;
               }
               .info-label {
                 font-weight: bold;
               }
               .problem-section {
-                margin-top: 4px;
-                padding-top: 4px;
+                margin-top: 2px;
+                padding-top: 2px;
                 border-top: 1px dashed #000;
               }
               .problem-title {
                 font-weight: bold;
-                font-size: 9px;
+                font-size: 7px;
               }
               .problem-text {
-                font-size: 8px;
-                margin-top: 2px;
-                max-height: 30px;
+                font-size: 6px;
+                margin-top: 1px;
+                max-height: 16px;
                 overflow: hidden;
               }
               .store-name {
                 text-align: center;
-                font-size: 11px;
+                font-size: 9px;
                 font-weight: bold;
-                margin-bottom: 2px;
+                margin-bottom: 1px;
               }
             </style>
           </head>
