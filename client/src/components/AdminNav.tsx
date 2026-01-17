@@ -80,7 +80,7 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
   };
 
   const allNavItems = [
-    { href: "/admin/dashboard", icon: LayoutDashboard, labelAr: "لوحة التحكم", labelEn: "Dashboard", permission: "orders" },
+    { href: "/admin/dashboard", icon: LayoutDashboard, labelAr: "لوحة التحكم", labelEn: "Dashboard", permission: "orders", hideForEditor: true },
     { href: "/admin/pos", icon: ShoppingCart, labelAr: "نقطة البيع", labelEn: "POS", permission: "pos" },
     { href: "/admin/sales", icon: BarChart3, labelAr: "المبيعات", labelEn: "Sales", permission: "reports" },
     { href: "/admin/products", icon: Package, labelAr: "المنتجات", labelEn: "Products", permission: "products" },
@@ -94,8 +94,14 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
     { href: "/admin/settings", icon: Settings, labelAr: "الإعدادات", labelEn: "Settings", permission: "settings" },
   ];
 
-  // Filter nav items based on permissions
-  const navItems = allNavItems.filter(item => hasPermission(item.permission));
+  // Filter nav items based on permissions and role
+  const navItems = allNavItems.filter(item => {
+    // Hide items marked as hideForEditor for editor users
+    if (item.hideForEditor && currentAdmin?.role === 'editor') {
+      return false;
+    }
+    return hasPermission(item.permission);
+  });
 
   const externalSections = [
     { href: "/battery", icon: Battery, labelAr: "البطاريات", labelEn: "Battery", color: "text-green-600" },
