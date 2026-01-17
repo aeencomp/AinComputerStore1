@@ -43,6 +43,7 @@ import {
 import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
 import { AdminNav } from "@/components/AdminNav";
 import { ImageUpload } from "@/components/ImageUpload";
+import { MultiImageUpload } from "@/components/MultiImageUpload";
 import { getCategoryName } from "@/lib/categoryNames";
 import type { Product, InsertProduct } from "@shared/schema";
 
@@ -59,7 +60,7 @@ export default function AdminProducts() {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
 
-  const [formData, setFormData] = useState<InsertProduct>({
+  const [formData, setFormData] = useState<InsertProduct & { images?: string[] }>({
     nameAr: "",
     nameEn: "",
     descriptionAr: "",
@@ -68,6 +69,7 @@ export default function AdminProducts() {
     oldPrice: null,
     category: "laptops",
     image: "",
+    images: [],
     specs: [],
     badge: null,
     inStock: 1,
@@ -119,6 +121,7 @@ export default function AdminProducts() {
       oldPrice: null,
       category: "laptops",
       image: "",
+      images: [],
       specs: [],
       badge: null,
       inStock: 1,
@@ -133,6 +136,10 @@ export default function AdminProducts() {
 
   const handleEdit = (product: Product) => {
     setEditingProduct(product);
+    const existingImages = (product as any).images || [];
+    const allImages = product.image && !existingImages.includes(product.image) 
+      ? [product.image, ...existingImages] 
+      : existingImages.length > 0 ? existingImages : (product.image ? [product.image] : []);
     setFormData({
       nameAr: product.nameAr,
       nameEn: product.nameEn,
@@ -142,6 +149,7 @@ export default function AdminProducts() {
       oldPrice: product.oldPrice,
       category: product.category,
       image: product.image,
+      images: allImages,
       specs: product.specs || [],
       badge: product.badge,
       inStock: product.inStock,
@@ -152,10 +160,16 @@ export default function AdminProducts() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    const submitData = {
+      ...formData,
+      image: formData.images && formData.images.length > 0 ? formData.images[0] : formData.image,
+      images: formData.images || [],
+    };
+    
     if (editingProduct) {
-      updateMutation.mutate({ id: editingProduct.id, data: formData });
+      updateMutation.mutate({ id: editingProduct.id, data: submitData });
     } else {
-      createMutation.mutate(formData);
+      createMutation.mutate(submitData);
     }
   };
 
@@ -399,12 +413,11 @@ export default function AdminProducts() {
               </div>
             </div>
 
-            <ImageUpload
-              value={formData.image}
-              onChange={(url) => setFormData({ ...formData, image: url })}
-              label={t('admin.products.image')}
-              placeholder={t('admin.products.imagePlaceholder')}
-              required
+            <MultiImageUpload
+              values={formData.images || []}
+              onChange={(urls) => setFormData({ ...formData, images: urls, image: urls[0] || "" })}
+              label={language === 'ar' ? 'صور المنتج (الصورة الأولى هي الرئيسية)' : 'Product Images (first image is main)'}
+              maxImages={10}
             />
 
             <div>
