@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse, Battery, Printer } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse, Battery, Printer, LayoutDashboard } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AdminNav } from "@/components/AdminNav";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
@@ -101,7 +101,7 @@ export default function AdminDashboard() {
   const { t, language } = useLanguage();
   const [selectedOrders, setSelectedOrders] = useState<{ [key: string]: string }>({});
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState("orders");
+  const [activeTab, setActiveTab] = useState("welcome");
   
   // Admin user management state
   const [showAddAdmin, setShowAddAdmin] = useState(false);
@@ -503,19 +503,80 @@ export default function AdminDashboard() {
       <main className="max-w-7xl mx-auto px-4 py-8">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-6">
-            <TabsTrigger value="orders" data-testid="tab-orders">
-              <Package className="w-4 h-4 me-2" />
-              الطلبات
+            {/* Welcome tab for all users */}
+            <TabsTrigger value="welcome" data-testid="tab-welcome">
+              <LayoutDashboard className="w-4 h-4 me-2" />
+              الرئيسية
             </TabsTrigger>
-            <TabsTrigger value="battery-sales" data-testid="tab-battery-sales">
-              <Battery className="w-4 h-4 me-2" />
-              مبيعات البطاريات
-            </TabsTrigger>
-            <TabsTrigger value="admins" data-testid="tab-admins">
-              <ShieldCheck className="w-4 h-4 me-2" />
-              المديرين
-            </TabsTrigger>
+            {/* Hide Orders tab for editor users */}
+            {currentAdmin?.role !== 'editor' && (
+              <TabsTrigger value="orders" data-testid="tab-orders">
+                <Package className="w-4 h-4 me-2" />
+                الطلبات
+              </TabsTrigger>
+            )}
+            {/* Hide Battery Sales tab for editor users */}
+            {currentAdmin?.role !== 'editor' && (
+              <TabsTrigger value="battery-sales" data-testid="tab-battery-sales">
+                <Battery className="w-4 h-4 me-2" />
+                مبيعات البطاريات
+              </TabsTrigger>
+            )}
+            {/* Hide Admins tab for editor users */}
+            {currentAdmin?.role !== 'editor' && (
+              <TabsTrigger value="admins" data-testid="tab-admins">
+                <ShieldCheck className="w-4 h-4 me-2" />
+                المديرين
+              </TabsTrigger>
+            )}
           </TabsList>
+
+          <TabsContent value="welcome">
+            <div className="mb-8">
+              <h2 className="text-3xl font-bold mb-2">مرحباً {currentAdmin?.name}</h2>
+              <p className="text-muted-foreground">
+                لوحة التحكم الإدارية - العين لتجارة الحاسبات
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-3 gap-4">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    إجمالي الطلبات
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{orders.length}</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Battery className="w-5 h-5" />
+                    مبيعات البطاريات
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{batterySales.length}</p>
+                </CardContent>
+              </Card>
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    المديرين
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-3xl font-bold">{adminUsers.length}</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
           <TabsContent value="orders">
             <div className="mb-8">
