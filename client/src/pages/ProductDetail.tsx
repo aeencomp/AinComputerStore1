@@ -15,7 +15,7 @@ import { formatPrice } from "@/lib/formatters";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useMutation, useQuery as useAuthQuery } from "@tanstack/react-query";
 import type { Product, User, CartItem } from "@shared/schema";
-import { ShoppingCart, ArrowLeft, Check } from "lucide-react";
+import { ShoppingCart, ArrowLeft, Check, ChevronLeft, ChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { ProductReviews } from "@/components/ProductReviews";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
@@ -46,6 +46,7 @@ export default function ProductDetail() {
   const { cartOpen, setCartOpen } = useCart();
   const { toast } = useToast();
   const [quantity, setQuantity] = useState(1);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
 
   const productId = location.split("/product/")[1];
 
@@ -142,15 +143,41 @@ export default function ProductDetail() {
   const productName = language === 'ar' ? product.nameAr : product.nameEn;
   const productDescription = language === 'ar' ? product.descriptionAr : product.descriptionEn;
   
-  // Check if image is a URL, uploaded file, or mapped asset
-  const getImageSrc = () => {
-    if (!product.image) return laptopImage;
-    if (product.image.startsWith('/uploads/') || product.image.startsWith('/objects/') || product.image.startsWith('http')) {
-      return product.image;
+  // Resolve image path - maps asset keys to actual URLs
+  const resolveImagePath = (img: string): string => {
+    if (!img) return laptopImage;
+    if (img.startsWith('/uploads/') || img.startsWith('/objects/') || img.startsWith('http')) {
+      return img;
     }
-    return imageMap[product.image] || laptopImage;
+    return imageMap[img] || laptopImage;
   };
-  const imageSrc = getImageSrc();
+  
+  // Get all product images
+  const getProductImages = (): string[] => {
+    const images: string[] = [];
+    const productImagesArray = (product as any).images || [];
+    
+    // Add images from the images array (resolve each one)
+    if (productImagesArray.length > 0) {
+      productImagesArray.forEach((img: string) => {
+        if (img) images.push(resolveImagePath(img));
+      });
+    }
+    
+    // If no images in array, use the main image
+    if (images.length === 0 && product.image) {
+      images.push(resolveImagePath(product.image));
+    }
+    
+    // Fallback to default
+    if (images.length === 0) {
+      images.push(laptopImage);
+    }
+    
+    return images;
+  };
+  const productImages = getProductImages();
+  const currentImage = productImages[selectedImageIndex] || productImages[0];
   const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleUpdateQuantity = async (id: string, quantity: number) => {
@@ -206,18 +233,66 @@ export default function ProductDetail() {
           </Button>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {/* Product Image */}
-            <div data-testid={`product-detail-image-${product.id}`}>
-              <Card className="overflow-hidden">
+            {/* Product Image Gallery */}
+            <div data-testid={`product-detail-image-${product.id}`} className="space-y-4">
+              <Card className="overflow-hidden relative">
                 <div className="aspect-square overflow-hidden bg-muted flex items-center justify-center">
                   <img
-                    src={_2_096266e1_41b0_4fef_b2db_a9f92c444c5b}
+                    src={currentImage}
                     alt={productName}
                     className="w-full h-full object-cover"
                     data-testid={`img-product-detail-${product.id}`}
                   />
                 </div>
+                {/* Navigation arrows for multiple images */}
+                {productImages.length > 1 && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute left-2 top-1/2 -translate-y-1/2 opacity-80 hover:opacity-100"
+                      onClick={() => setSelectedImageIndex(prev => prev > 0 ? prev - 1 : productImages.length - 1)}
+                      data-testid="button-prev-image"
+                    >
+                      {language === 'ar' ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 opacity-80 hover:opacity-100"
+                      onClick={() => setSelectedImageIndex(prev => prev < productImages.length - 1 ? prev + 1 : 0)}
+                      data-testid="button-next-image"
+                    >
+                      {language === 'ar' ? <ChevronLeft className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
+                    </Button>
+                    <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-black/50 text-white px-2 py-1 rounded text-sm">
+                      {selectedImageIndex + 1} / {productImages.length}
+                    </div>
+                  </>
+                )}
               </Card>
+              
+              {/* Thumbnail images */}
+              {productImages.length > 1 && (
+                <div className="flex gap-2 overflow-x-auto pb-2">
+                  {productImages.map((img, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setSelectedImageIndex(index)}
+                      className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                        index === selectedImageIndex ? 'border-primary' : 'border-transparent hover:border-muted-foreground'
+                      }`}
+                      data-testid={`button-thumbnail-${index}`}
+                    >
+                      <img
+                        src={img}
+                        alt={`${productName} ${index + 1}`}
+                        className="w-full h-full object-cover"
+                      />
+                    </button>
+                  ))}
+                </div>
+              )}
               {product.badge && (
                 <div className="mt-4">
                   <Badge 
