@@ -115,6 +115,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
       }
       
+      // Check if user is active
+      if (admin.isActive === 0) {
+        return res.status(403).json({ error: "هذا الحساب غير مفعّل" });
+      }
+      
       // Set admin session
       (req.session as any).adminId = admin.id;
       (req.session as any).adminUsername = admin.username;
@@ -157,11 +162,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "المستخدم غير موجود" });
       }
       
+      // Check if user is still active
+      if (admin.isActive === 0) {
+        delete (req.session as any).adminId;
+        delete (req.session as any).adminUsername;
+        return res.status(403).json({ error: "هذا الحساب غير مفعّل" });
+      }
+      
       return res.json({ 
         id: admin.id, 
         username: admin.username, 
         name: admin.name, 
-        role: admin.role 
+        role: admin.role,
+        canOrders: admin.canOrders,
+        canProducts: admin.canProducts,
+        canCategories: admin.canCategories,
+        canSettings: admin.canSettings,
+        canUsers: admin.canUsers,
+        canReports: admin.canReports,
+        canPOS: admin.canPOS,
+        canInventory: admin.canInventory,
+        canCustomers: admin.canCustomers,
+        canDiscounts: admin.canDiscounts,
+        isActive: admin.isActive,
       });
     } catch (error) {
       console.error("Admin auth check error:", error);
@@ -177,6 +200,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
+      // Check if caller has permission to manage users
+      const caller = await storage.getAdminUser(adminId);
+      if (!caller || (caller.role !== 'admin' && caller.canUsers !== 1)) {
+        return res.status(403).json({ error: "ليس لديك صلاحية إدارة المستخدمين" });
+      }
+      
       const admins = await storage.getAdminUsers();
       // Don't send passwords
       const sanitizedAdmins = admins.map(a => ({
@@ -185,6 +214,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: a.name,
         role: a.role,
         createdAt: a.createdAt,
+        canOrders: a.canOrders,
+        canProducts: a.canProducts,
+        canCategories: a.canCategories,
+        canSettings: a.canSettings,
+        canUsers: a.canUsers,
+        canReports: a.canReports,
+        canPOS: a.canPOS,
+        canInventory: a.canInventory,
+        canCustomers: a.canCustomers,
+        canDiscounts: a.canDiscounts,
+        isActive: a.isActive,
       }));
       
       return res.json(sanitizedAdmins);
@@ -199,6 +239,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!adminId) {
         return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      // Check if caller has permission to manage users
+      const caller = await storage.getAdminUser(adminId);
+      if (!caller || (caller.role !== 'admin' && caller.canUsers !== 1)) {
+        return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
       }
       
       const validatedData = insertAdminUserSchema.parse(req.body);
@@ -217,6 +263,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: admin.name, 
         role: admin.role,
         createdAt: admin.createdAt,
+        canOrders: admin.canOrders,
+        canProducts: admin.canProducts,
+        canCategories: admin.canCategories,
+        canSettings: admin.canSettings,
+        canUsers: admin.canUsers,
+        canReports: admin.canReports,
+        canPOS: admin.canPOS,
+        canInventory: admin.canInventory,
+        canCustomers: admin.canCustomers,
+        canDiscounts: admin.canDiscounts,
+        isActive: admin.isActive,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -232,6 +289,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!adminId) {
         return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      // Check if caller has permission to manage users
+      const caller = await storage.getAdminUser(adminId);
+      if (!caller || (caller.role !== 'admin' && caller.canUsers !== 1)) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل المستخدمين" });
       }
       
       const { id } = req.params;
@@ -256,6 +319,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         name: admin.name, 
         role: admin.role,
         createdAt: admin.createdAt,
+        canOrders: admin.canOrders,
+        canProducts: admin.canProducts,
+        canCategories: admin.canCategories,
+        canSettings: admin.canSettings,
+        canUsers: admin.canUsers,
+        canReports: admin.canReports,
+        canPOS: admin.canPOS,
+        canInventory: admin.canInventory,
+        canCustomers: admin.canCustomers,
+        canDiscounts: admin.canDiscounts,
+        isActive: admin.isActive,
       });
     } catch (error) {
       console.error("Error updating admin user:", error);
@@ -268,6 +342,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!adminId) {
         return res.status(401).json({ error: "غير مصرح" });
+      }
+      
+      // Check if caller has permission to manage users
+      const caller = await storage.getAdminUser(adminId);
+      if (!caller || (caller.role !== 'admin' && caller.canUsers !== 1)) {
+        return res.status(403).json({ error: "ليس لديك صلاحية حذف المستخدمين" });
       }
       
       const { id } = req.params;

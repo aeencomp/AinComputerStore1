@@ -8,6 +8,7 @@ import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -59,6 +60,17 @@ interface AdminUser {
   name: string;
   role: string;
   createdAt: string;
+  canOrders?: number;
+  canProducts?: number;
+  canCategories?: number;
+  canSettings?: number;
+  canUsers?: number;
+  canReports?: number;
+  canPOS?: number;
+  canInventory?: number;
+  canCustomers?: number;
+  canDiscounts?: number;
+  isActive?: number;
 }
 
 interface BatterySaleItem {
@@ -96,8 +108,18 @@ export default function AdminDashboard() {
   const [showEditAdmin, setShowEditAdmin] = useState<AdminUser | null>(null);
   const [showChangePassword, setShowChangePassword] = useState(false);
   const [deleteAdminId, setDeleteAdminId] = useState<string | null>(null);
-  const [newAdminForm, setNewAdminForm] = useState({ username: '', password: '', name: '', role: 'admin' });
-  const [editAdminForm, setEditAdminForm] = useState({ username: '', name: '', role: '' });
+  const [newAdminForm, setNewAdminForm] = useState({ 
+    username: '', password: '', name: '', role: 'admin',
+    canOrders: 1, canProducts: 1, canCategories: 1, canSettings: 0,
+    canUsers: 0, canReports: 0, canPOS: 1, canInventory: 0,
+    canCustomers: 0, canDiscounts: 0
+  });
+  const [editAdminForm, setEditAdminForm] = useState({ 
+    username: '', name: '', role: '', password: '',
+    canOrders: 1, canProducts: 1, canCategories: 1, canSettings: 0,
+    canUsers: 0, canReports: 0, canPOS: 1, canInventory: 0,
+    canCustomers: 0, canDiscounts: 0
+  });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -198,7 +220,12 @@ export default function AdminDashboard() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/admin/users'] });
       setShowAddAdmin(false);
-      setNewAdminForm({ username: '', password: '', name: '', role: 'admin' });
+      setNewAdminForm({ 
+        username: '', password: '', name: '', role: 'admin',
+        canOrders: 1, canProducts: 1, canCategories: 1, canSettings: 0,
+        canUsers: 0, canReports: 0, canPOS: 1, canInventory: 0,
+        canCustomers: 0, canDiscounts: 0
+      });
       toast({
         title: "تم إنشاء المستخدم",
         description: "تم إنشاء المستخدم الإداري بنجاح",
@@ -344,7 +371,22 @@ export default function AdminDashboard() {
   };
 
   const openEditAdmin = (admin: AdminUser) => {
-    setEditAdminForm({ username: admin.username, name: admin.name, role: admin.role });
+    setEditAdminForm({ 
+      username: admin.username, 
+      name: admin.name, 
+      role: admin.role,
+      password: '',
+      canOrders: admin.canOrders ?? 1,
+      canProducts: admin.canProducts ?? 1,
+      canCategories: admin.canCategories ?? 1,
+      canSettings: admin.canSettings ?? 0,
+      canUsers: admin.canUsers ?? 0,
+      canReports: admin.canReports ?? 0,
+      canPOS: admin.canPOS ?? 1,
+      canInventory: admin.canInventory ?? 0,
+      canCustomers: admin.canCustomers ?? 0,
+      canDiscounts: admin.canDiscounts ?? 0
+    });
     setShowEditAdmin(admin);
   };
 
@@ -358,7 +400,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <AdminNav currentAdmin={currentAdmin} />
+      <AdminNav currentAdmin={currentAdmin ?? null} />
       
       {/* Sub-header with page title and notifications */}
       <div className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -839,7 +881,7 @@ export default function AdminDashboard() {
 
       {/* Add Admin Dialog */}
       <Dialog open={showAddAdmin} onOpenChange={setShowAddAdmin}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>إضافة مدير جديد</DialogTitle>
             <DialogDescription>
@@ -879,17 +921,117 @@ export default function AdminDashboard() {
               <Label>الدور</Label>
               <Select
                 value={newAdminForm.role}
-                onValueChange={(value) => setNewAdminForm(prev => ({ ...prev, role: value }))}
+                onValueChange={(value) => {
+                  if (value === 'admin') {
+                    setNewAdminForm(prev => ({ 
+                      ...prev, role: value,
+                      canOrders: 1, canProducts: 1, canCategories: 1, canSettings: 1,
+                      canUsers: 1, canReports: 1, canPOS: 1, canInventory: 1,
+                      canCustomers: 1, canDiscounts: 1
+                    }));
+                  } else {
+                    setNewAdminForm(prev => ({ ...prev, role: value }));
+                  }
+                }}
               >
                 <SelectTrigger data-testid="select-new-admin-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">مدير</SelectItem>
+                  <SelectItem value="admin">مدير (صلاحيات كاملة)</SelectItem>
+                  <SelectItem value="manager">مشرف</SelectItem>
                   <SelectItem value="editor">محرر</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {newAdminForm.role !== 'admin' && (
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-base font-semibold">الصلاحيات</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canOrders"
+                      checked={newAdminForm.canOrders === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canOrders: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canOrders" className="text-sm cursor-pointer">الطلبات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canProducts"
+                      checked={newAdminForm.canProducts === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canProducts: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canProducts" className="text-sm cursor-pointer">المنتجات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canCategories"
+                      checked={newAdminForm.canCategories === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canCategories: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canCategories" className="text-sm cursor-pointer">الفئات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canPOS"
+                      checked={newAdminForm.canPOS === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canPOS: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canPOS" className="text-sm cursor-pointer">نقطة البيع</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canInventory"
+                      checked={newAdminForm.canInventory === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canInventory: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canInventory" className="text-sm cursor-pointer">المخزون</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canReports"
+                      checked={newAdminForm.canReports === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canReports: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canReports" className="text-sm cursor-pointer">التقارير</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canCustomers"
+                      checked={newAdminForm.canCustomers === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canCustomers: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canCustomers" className="text-sm cursor-pointer">العملاء</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canDiscounts"
+                      checked={newAdminForm.canDiscounts === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canDiscounts: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canDiscounts" className="text-sm cursor-pointer">الخصومات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canSettings"
+                      checked={newAdminForm.canSettings === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canSettings: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canSettings" className="text-sm cursor-pointer">الإعدادات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="new-canUsers"
+                      checked={newAdminForm.canUsers === 1}
+                      onCheckedChange={(checked) => setNewAdminForm(prev => ({ ...prev, canUsers: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="new-canUsers" className="text-sm cursor-pointer">المستخدمين</Label>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowAddAdmin(false)}>
@@ -915,7 +1057,7 @@ export default function AdminDashboard() {
 
       {/* Edit Admin Dialog */}
       <Dialog open={!!showEditAdmin} onOpenChange={(open) => !open && setShowEditAdmin(null)}>
-        <DialogContent>
+        <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>تعديل المستخدم</DialogTitle>
             <DialogDescription>
@@ -942,20 +1084,130 @@ export default function AdminDashboard() {
               />
             </div>
             <div className="space-y-2">
+              <Label>كلمة المرور الجديدة (اتركه فارغاً للإبقاء)</Label>
+              <Input
+                type="password"
+                value={editAdminForm.password}
+                onChange={(e) => setEditAdminForm(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="كلمة المرور الجديدة"
+                data-testid="input-edit-admin-password"
+              />
+            </div>
+            <div className="space-y-2">
               <Label>الدور</Label>
               <Select
                 value={editAdminForm.role}
-                onValueChange={(value) => setEditAdminForm(prev => ({ ...prev, role: value }))}
+                onValueChange={(value) => {
+                  if (value === 'admin') {
+                    setEditAdminForm(prev => ({ 
+                      ...prev, role: value,
+                      canOrders: 1, canProducts: 1, canCategories: 1, canSettings: 1,
+                      canUsers: 1, canReports: 1, canPOS: 1, canInventory: 1,
+                      canCustomers: 1, canDiscounts: 1
+                    }));
+                  } else {
+                    setEditAdminForm(prev => ({ ...prev, role: value }));
+                  }
+                }}
               >
                 <SelectTrigger data-testid="select-edit-admin-role">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="admin">مدير</SelectItem>
+                  <SelectItem value="admin">مدير (صلاحيات كاملة)</SelectItem>
+                  <SelectItem value="manager">مشرف</SelectItem>
                   <SelectItem value="editor">محرر</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+
+            {editAdminForm.role !== 'admin' && (
+              <div className="space-y-3 pt-2 border-t">
+                <Label className="text-base font-semibold">الصلاحيات</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canOrders"
+                      checked={editAdminForm.canOrders === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canOrders: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canOrders" className="text-sm cursor-pointer">الطلبات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canProducts"
+                      checked={editAdminForm.canProducts === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canProducts: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canProducts" className="text-sm cursor-pointer">المنتجات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canCategories"
+                      checked={editAdminForm.canCategories === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canCategories: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canCategories" className="text-sm cursor-pointer">الفئات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canPOS"
+                      checked={editAdminForm.canPOS === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canPOS: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canPOS" className="text-sm cursor-pointer">نقطة البيع</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canInventory"
+                      checked={editAdminForm.canInventory === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canInventory: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canInventory" className="text-sm cursor-pointer">المخزون</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canReports"
+                      checked={editAdminForm.canReports === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canReports: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canReports" className="text-sm cursor-pointer">التقارير</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canCustomers"
+                      checked={editAdminForm.canCustomers === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canCustomers: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canCustomers" className="text-sm cursor-pointer">العملاء</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canDiscounts"
+                      checked={editAdminForm.canDiscounts === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canDiscounts: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canDiscounts" className="text-sm cursor-pointer">الخصومات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canSettings"
+                      checked={editAdminForm.canSettings === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canSettings: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canSettings" className="text-sm cursor-pointer">الإعدادات</Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox 
+                      id="edit-canUsers"
+                      checked={editAdminForm.canUsers === 1}
+                      onCheckedChange={(checked) => setEditAdminForm(prev => ({ ...prev, canUsers: checked ? 1 : 0 }))}
+                    />
+                    <Label htmlFor="edit-canUsers" className="text-sm cursor-pointer">المستخدمين</Label>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowEditAdmin(null)}>

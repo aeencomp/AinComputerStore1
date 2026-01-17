@@ -25,7 +25,19 @@ export const adminUsers = pgTable("admin_users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
-  role: text("role").notNull().default("admin"),
+  role: text("role").notNull().default("admin"), // admin, manager, editor
+  // Permissions (1 = allowed, 0 = not allowed)
+  canOrders: integer("can_orders").notNull().default(1), // View/manage orders
+  canProducts: integer("can_products").notNull().default(1), // Manage products
+  canCategories: integer("can_categories").notNull().default(1), // Manage categories
+  canSettings: integer("can_settings").notNull().default(0), // Access settings (admin only)
+  canUsers: integer("can_users").notNull().default(0), // Manage admin users (admin only)
+  canReports: integer("can_reports").notNull().default(0), // View sales reports
+  canPOS: integer("can_pos").notNull().default(1), // Access POS system
+  canInventory: integer("can_inventory").notNull().default(0), // Manage inventory
+  canCustomers: integer("can_customers").notNull().default(0), // View customer data
+  canDiscounts: integer("can_discounts").notNull().default(0), // Manage discount codes
+  isActive: integer("is_active").notNull().default(1), // Account status
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
