@@ -68,6 +68,7 @@ interface SaleData {
   items: CartItem[];
   subtotal: number;
   discount: number;
+  discountType: 'percentage' | 'iqd';
   discountAmount: number;
   total: number;
   paymentMethod: string;
@@ -97,6 +98,7 @@ export default function BatteryPOS() {
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
+  const [discountType, setDiscountType] = useState<'percentage' | 'iqd'>('percentage');
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<string>("cash");
@@ -157,7 +159,9 @@ export default function BatteryPOS() {
       const warrantyEndDate = new Date(saleDate);
       warrantyEndDate.setMonth(warrantyEndDate.getMonth() + 1);
       
-      const discountAmount = subtotal * (discount / 100);
+      const calculatedDiscountAmount = discountType === 'percentage' 
+        ? subtotal * (discount / 100) 
+        : Math.min(discount, subtotal);
       setLastSaleData({
         saleNumber: data.saleNumber,
         saleDate,
@@ -166,8 +170,9 @@ export default function BatteryPOS() {
         items: [...cart],
         subtotal,
         discount,
-        discountAmount,
-        total: subtotal - discountAmount,
+        discountType,
+        discountAmount: calculatedDiscountAmount,
+        total: subtotal - calculatedDiscountAmount,
         paymentMethod,
         warrantyEndDate,
       });
@@ -338,7 +343,9 @@ export default function BatteryPOS() {
   };
 
   const subtotal = cart.reduce((sum, item) => sum + (item.unitPrice * item.quantity), 0);
-  const discountAmount = (subtotal * discount) / 100;
+  const discountAmount = discountType === 'percentage' 
+    ? (subtotal * discount) / 100 
+    : Math.min(discount, subtotal);
   const total = subtotal - discountAmount;
 
   const handleCheckout = () => {
@@ -748,18 +755,52 @@ export default function BatteryPOS() {
 
                 {cart.length > 0 && (
                   <div className="border-t p-3 space-y-3">
-                    <div className="flex items-center gap-2">
-                      <Percent className="w-4 h-4 text-muted-foreground" />
-                      <Input
-                        type="number"
-                        min="0"
-                        max="100"
-                        placeholder={isRTL ? "خصم %" : "Discount %"}
-                        value={discount || ''}
-                        onChange={(e) => setDiscount(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
-                        className="h-8"
-                        data-testid="input-discount"
-                      />
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant={discountType === 'percentage' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => { setDiscountType('percentage'); setDiscount(0); }}
+                          className="flex-1"
+                          data-testid="button-discount-percentage"
+                        >
+                          <Percent className="w-3 h-3 mr-1" />
+                          {isRTL ? 'نسبة %' : '%'}
+                        </Button>
+                        <Button
+                          variant={discountType === 'iqd' ? 'default' : 'outline'}
+                          size="sm"
+                          onClick={() => { setDiscountType('iqd'); setDiscount(0); }}
+                          className="flex-1"
+                          data-testid="button-discount-iqd"
+                        >
+                          {isRTL ? 'د.ع' : 'IQD'}
+                        </Button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {discountType === 'percentage' ? (
+                          <Percent className="w-4 h-4 text-muted-foreground" />
+                        ) : null}
+                        <Input
+                          type="number"
+                          min="0"
+                          max={discountType === 'percentage' ? 100 : subtotal}
+                          placeholder={discountType === 'percentage' 
+                            ? (isRTL ? "خصم %" : "Discount %") 
+                            : (isRTL ? "مبلغ الخصم" : "Discount Amount")}
+                          value={discount || ''}
+                          onChange={(e) => {
+                            const value = parseFloat(e.target.value) || 0;
+                            if (discountType === 'percentage') {
+                              setDiscount(Math.min(100, Math.max(0, value)));
+                            } else {
+                              setDiscount(Math.max(0, value));
+                            }
+                          }}
+                          className="h-8"
+                          data-testid="input-discount"
+                        />
+                      </div>
                     </div>
 
                     <div className="space-y-1 text-sm">
@@ -769,7 +810,10 @@ export default function BatteryPOS() {
                       </div>
                       {discount > 0 && (
                         <div className="flex justify-between text-green-600">
-                          <span>{isRTL ? 'الخصم' : 'Discount'} ({discount}%)</span>
+                          <span>
+                            {isRTL ? 'الخصم' : 'Discount'} 
+                            {discountType === 'percentage' ? ` (${discount}%)` : ''}
+                          </span>
                           <span data-testid="text-discount-amount">-{formatPrice(discountAmount)}</span>
                         </div>
                       )}
@@ -897,7 +941,10 @@ export default function BatteryPOS() {
               </div>
               {discount > 0 && (
                 <div className="flex justify-between text-sm text-green-600">
-                  <span>{isRTL ? 'الخصم' : 'Discount'} ({discount}%)</span>
+                  <span>
+                    {isRTL ? 'الخصم' : 'Discount'}
+                    {discountType === 'percentage' ? ` (${discount}%)` : ''}
+                  </span>
                   <span>-{formatPrice(discountAmount)}</span>
                 </div>
               )}
@@ -1053,7 +1100,10 @@ export default function BatteryPOS() {
                 </div>
                 {lastSaleData.discount > 0 && (
                   <div className="flex justify-between text-green-600">
-                    <span>{isRTL ? 'الخصم' : 'Discount'} ({lastSaleData.discount}%):</span>
+                    <span>
+                      {isRTL ? 'الخصم' : 'Discount'}
+                      {lastSaleData.discountType === 'percentage' ? ` (${lastSaleData.discount}%)` : ''}:
+                    </span>
                     <span>-{formatPrice(lastSaleData.discountAmount)}</span>
                   </div>
                 )}
