@@ -85,6 +85,7 @@ export const products = pgTable("products", {
   oldPrice: decimal("old_price", { precision: 10, scale: 2 }),
   category: text("category").notNull(),
   image: text("image").notNull(),
+  images: text("images").array().default([]),
   specs: text("specs").array(),
   badge: text("badge"),
   inStock: integer("in_stock").notNull().default(1),
