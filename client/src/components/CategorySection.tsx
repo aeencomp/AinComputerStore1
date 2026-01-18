@@ -59,29 +59,31 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
             <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-5 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
           {categories.map((category) => (
-              <Card
+              <div
                 key={category.id}
-                className="overflow-hidden group cursor-pointer border-0 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
+                className="animated-border-wrapper group cursor-pointer"
                 onClick={() => onCategoryClick?.(category.id)}
                 data-testid={`card-category-${category.id}`}
               >
-                <CardContent className="p-0">
-                  <div className="aspect-square overflow-hidden bg-muted">
-                    <img
-                      src={category.image}
-                      alt={language === 'ar' ? category.nameAr : category.nameEn}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="p-4 text-center bg-card">
-                    <h3 className="font-bold text-lg md:text-xl" data-testid={`text-category-${category.id}`}>
-                      {language === 'ar' ? category.nameAr : category.nameEn}
-                    </h3>
-                  </div>
-                </CardContent>
-              </Card>
+                <Card className="overflow-hidden border-0 shadow-md h-full">
+                  <CardContent className="p-0">
+                    <div className="aspect-square overflow-hidden bg-muted shimmer-effect">
+                      <img
+                        src={category.image}
+                        alt={language === 'ar' ? category.nameAr : category.nameEn}
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                    <div className="p-4 text-center bg-card">
+                      <h3 className="font-bold text-lg md:text-xl group-hover:text-primary transition-colors duration-300" data-testid={`text-category-${category.id}`}>
+                        {language === 'ar' ? category.nameAr : category.nameEn}
+                      </h3>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             ))}
         </div>
       </div>

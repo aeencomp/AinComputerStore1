@@ -383,6 +383,93 @@
   transform-origin: center center;
 }
 
+/* Animated gradient border */
+@keyframes border-rotate {
+  0% {
+    --gradient-angle: 0deg;
+  }
+  100% {
+    --gradient-angle: 360deg;
+  }
+}
+
+@property --gradient-angle {
+  syntax: "<angle>";
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.animated-border-wrapper {
+  position: relative;
+  padding: 3px;
+  border-radius: calc(var(--radius) + 3px);
+  background: hsl(var(--border));
+  transition: all 0.4s ease;
+}
+
+.animated-border-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--gradient-angle),
+    hsl(var(--primary)),
+    hsl(280 65% 60%),
+    hsl(340 82% 52%),
+    hsl(43 96% 56%),
+    hsl(173 80% 40%),
+    hsl(var(--primary))
+  );
+  animation: border-rotate 3s linear infinite;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 0;
+}
+
+.animated-border-wrapper:hover::before {
+  opacity: 1;
+}
+
+.animated-border-wrapper > * {
+  position: relative;
+  z-index: 1;
+  border-radius: var(--radius);
+}
+
+/* Shimmer animation for image overlays */
+@keyframes shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-effect::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.2),
+    transparent
+  );
+  transform: translateX(-100%);
+  transition: none;
+}
+
+.shimmer-effect:hover::after {
+  animation: shimmer 0.8s ease-in-out;
+}
+
 /* Print styles for Battery POS Receipt */
 @media print {
   /* Reset everything */
