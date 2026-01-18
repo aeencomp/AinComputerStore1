@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SlideshowSlide, type InsertSlideshowSlide } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -155,6 +155,14 @@ export interface IStorage {
   createAcAdapter(adapter: InsertAcAdapter): Promise<AcAdapter>;
   updateAcAdapter(id: string, updates: Partial<InsertAcAdapter>): Promise<AcAdapter | undefined>;
   deleteAcAdapter(id: string): Promise<void>;
+  
+  // Slideshow slide methods
+  getSlideshowSlides(): Promise<SlideshowSlide[]>;
+  getActiveSlideshowSlides(): Promise<SlideshowSlide[]>;
+  getSlideshowSlide(id: string): Promise<SlideshowSlide | undefined>;
+  createSlideshowSlide(slide: InsertSlideshowSlide): Promise<SlideshowSlide>;
+  updateSlideshowSlide(id: string, updates: Partial<InsertSlideshowSlide>): Promise<SlideshowSlide | undefined>;
+  deleteSlideshowSlide(id: string): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -828,6 +836,31 @@ export class MemStorage implements IStorage {
     const date = new Date();
     const dateStr = date.toISOString().slice(0,10).replace(/-/g, '');
     return `BSALE-${dateStr}-001`;
+  }
+  
+  // Slideshow slide stubs
+  async getSlideshowSlides(): Promise<SlideshowSlide[]> {
+    return [];
+  }
+  
+  async getActiveSlideshowSlides(): Promise<SlideshowSlide[]> {
+    return [];
+  }
+  
+  async getSlideshowSlide(id: string): Promise<SlideshowSlide | undefined> {
+    return undefined;
+  }
+  
+  async createSlideshowSlide(slide: InsertSlideshowSlide): Promise<SlideshowSlide> {
+    throw new Error("MemStorage does not support slideshow slides");
+  }
+  
+  async updateSlideshowSlide(id: string, updates: Partial<InsertSlideshowSlide>): Promise<SlideshowSlide | undefined> {
+    return undefined;
+  }
+  
+  async deleteSlideshowSlide(id: string): Promise<void> {
+    // Not implemented
   }
 }
 

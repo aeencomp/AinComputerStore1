@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema, insertSlideshowSlideSchema } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte } from "drizzle-orm";
 import { z } from "zod";
@@ -1154,6 +1154,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error resetting dismiss count:", error);
       return res.status(500).json({ error: "Failed to reset dismiss count" });
+    }
+  });
+
+  // Slideshow Slides Routes (public - get active slides)
+  app.get("/api/slideshow-slides", async (req, res) => {
+    try {
+      const slides = await storage.getActiveSlideshowSlides();
+      return res.json(slides);
+    } catch (error) {
+      console.error("Error fetching slideshow slides:", error);
+      return res.status(500).json({ error: "Failed to fetch slideshow slides" });
+    }
+  });
+
+  // Admin routes for slideshow management
+  app.get("/api/admin/slideshow-slides", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const slides = await storage.getSlideshowSlides();
+      return res.json(slides);
+    } catch (error) {
+      console.error("Error fetching admin slideshow slides:", error);
+      return res.status(500).json({ error: "Failed to fetch slideshow slides" });
+    }
+  });
+
+  app.post("/api/admin/slideshow-slides", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const validatedData = insertSlideshowSlideSchema.parse(req.body);
+      const slide = await storage.createSlideshowSlide(validatedData);
+      return res.json(slide);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating slideshow slide:", error);
+      return res.status(500).json({ error: "Failed to create slideshow slide" });
+    }
+  });
+
+  app.put("/api/admin/slideshow-slides/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      const validatedData = insertSlideshowSlideSchema.partial().parse(req.body);
+      const slide = await storage.updateSlideshowSlide(req.params.id, validatedData);
+      if (!slide) {
+        return res.status(404).json({ error: "Slide not found" });
+      }
+      return res.json(slide);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error updating slideshow slide:", error);
+      return res.status(500).json({ error: "Failed to update slideshow slide" });
+    }
+  });
+
+  app.delete("/api/admin/slideshow-slides/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
+      await storage.deleteSlideshowSlide(req.params.id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting slideshow slide:", error);
+      return res.status(500).json({ error: "Failed to delete slideshow slide" });
     }
   });
 
