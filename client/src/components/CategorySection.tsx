@@ -1,9 +1,9 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/LanguageContext";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
-import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
+import desktopImage from "@assets/generated_images/gaming_desktop_pc_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
-import accessoriesImage from "@assets/generated_images/gaming_keyboard_product_photo.png";
+import accessoriesImage from "@assets/generated_images/gaming_accessories_collection_photo.png";
 
 const categories = [
   {
