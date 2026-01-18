@@ -317,15 +317,15 @@ export default function ProductDetail() {
                 </p>
               </div>
 
-              {/* Price Section */}
+              {/* Price Section - Prices stored in thousands (e.g., 340 = 340,000 IQD) */}
               <div className="space-y-2">
                 <div className="flex items-baseline gap-3">
                   <span className="text-4xl font-bold text-primary" data-testid={`text-price-detail-${product.id}`}>
-                    {formatPrice(product.price, language)} {t('common.currency')}
+                    {formatPrice(parseFloat(product.price) * 1000, language)} {t('common.currency')}
                   </span>
                   {product.oldPrice && (
                     <span className="text-lg text-muted-foreground line-through" data-testid={`text-old-price-detail-${product.id}`}>
-                      {formatPrice(product.oldPrice, language)} {t('common.currency')}
+                      {formatPrice(parseFloat(product.oldPrice) * 1000, language)} {t('common.currency')}
                     </span>
                   )}
                 </div>

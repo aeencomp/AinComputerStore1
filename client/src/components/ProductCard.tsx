@@ -92,14 +92,15 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
         </CardContent>
       </Link>
       <CardFooter className="p-4 pt-0 flex flex-col gap-3">
+        {/* Product prices are stored in thousands (e.g., 340 = 340,000 IQD) */}
         <div className="w-full flex items-baseline gap-2">
           {product.oldPrice && (
             <span className="text-sm text-muted-foreground line-through" data-testid={`text-old-price-${product.id}`}>
-              {formatPrice(product.oldPrice, language)} {t('common.currency')}
+              {formatPrice(parseFloat(product.oldPrice) * 1000, language)} {t('common.currency')}
             </span>
           )}
           <span className="text-2xl font-bold text-primary" data-testid={`text-price-${product.id}`}>
-            {formatPrice(product.price, language)} {t('common.currency')}
+            {formatPrice(parseFloat(product.price) * 1000, language)} {t('common.currency')}
           </span>
         </div>
         <Button

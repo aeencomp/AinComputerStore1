@@ -55,8 +55,10 @@ export function CartSidebar({
 }: CartSidebarProps) {
   const [, setLocation] = useLocation();
   const { language, t } = useLanguage();
+  // Product prices are stored in thousands (e.g., 340 = 340,000 IQD)
+  // Multiply by 1000 to get full IQD value
   const subtotal = items.reduce(
-    (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+    (sum, item) => sum + parseFloat(item.product.price) * 1000 * item.quantity,
     0
   );
 
@@ -176,7 +178,7 @@ export function CartSidebar({
                           </Button>
                         </div>
                         <span className="font-bold text-primary" data-testid={`text-cart-price-${item.product.id}`}>
-                          {formatPrice(parseFloat(item.product.price) * item.quantity, language)} {t('common.currency')}
+                          {formatPrice(parseFloat(item.product.price) * 1000 * item.quantity, language)} {t('common.currency')}
                         </span>
                       </div>
                     </div>

@@ -118,8 +118,10 @@ export default function Checkout() {
   const createOrderMutation = useMutation({
     mutationFn: async (data: CheckoutFormValues) => {
       try {
+        // Product prices are stored in thousands (e.g., 340 = 340,000 IQD)
+        // Multiply by 1000 to get full IQD value for calculation with shipping (which is in full IQD)
         const subtotal = cartItems.reduce(
-          (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+          (sum, item) => sum + parseFloat(item.product.price) * 1000 * item.quantity,
           0
         );
         
@@ -275,8 +277,10 @@ export default function Checkout() {
     },
   });
 
+  // Product prices are stored in thousands (e.g., 340 = 340,000 IQD)
+  // Multiply by 1000 to get full IQD value for calculation with shipping (which is in full IQD)
   const subtotal = cartItems.reduce(
-    (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+    (sum, item) => sum + parseFloat(item.product.price) * 1000 * item.quantity,
     0
   );
 
@@ -329,8 +333,9 @@ export default function Checkout() {
   useEffect(() => {
     if (appliedDiscount && cartItems.length > 0) {
       // Recalculate subtotal from current cart
+      // Product prices are stored in thousands (e.g., 340 = 340,000 IQD)
       const newSubtotal = cartItems.reduce(
-        (sum, item) => sum + parseFloat(item.product.price) * item.quantity,
+        (sum, item) => sum + parseFloat(item.product.price) * 1000 * item.quantity,
         0
       );
       const newShipping = enableFreeShipping && newSubtotal >= freeShippingThreshold ? 0 : shippingCost;
@@ -583,7 +588,7 @@ export default function Checkout() {
                       <span>x{item.quantity}</span>
                     </div>
                     <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>{parseFloat(item.product.price).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
+                      <span>{(parseFloat(item.product.price) * 1000).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
                     </div>
                   </div>
                 ))}
