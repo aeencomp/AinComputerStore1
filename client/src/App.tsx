@@ -27,7 +27,6 @@ import AdminPOS from "@/pages/AdminPOS";
 import AdminSales from "@/pages/AdminSales";
 import AdminReviews from "@/pages/AdminReviews";
 import AdminDiscountCodes from "@/pages/AdminDiscountCodes";
-import AdminSlideshow from "@/pages/AdminSlideshow";
 import SalesLogin from "@/pages/SalesLogin";
 import SalesPortal from "@/pages/SalesPortal";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
@@ -75,7 +74,6 @@ function Router() {
       <Route path="/admin/sales" component={AdminSales}/>
       <Route path="/admin/reviews" component={AdminReviews}/>
       <Route path="/admin/discount-codes" component={AdminDiscountCodes}/>
-      <Route path="/admin/slideshow" component={AdminSlideshow}/>
       <Route path="/sales/login" component={SalesLogin}/>
       <Route path="/sales" component={SalesPortal}/>
       <Route path="/sales/:rest*" component={SalesPortal}/>

@@ -325,34 +325,6 @@
 }
 
 /* Marquee animations for announcement bar */
-@keyframes ken-burns {
-  0% {
-    transform: scale(1) translate(0, 0);
-  }
-  100% {
-    transform: scale(1.1) translate(-2%, -1%);
-  }
-}
-
-@keyframes slide-up {
-  0% {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-ken-burns {
-  animation: ken-burns 8s ease-out forwards;
-}
-
-.animate-slide-up {
-  animation: slide-up 0.8s ease-out forwards;
-}
-
 @keyframes marquee-rtl {
   0% {
     transform: translateX(0%);

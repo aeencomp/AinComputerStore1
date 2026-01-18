@@ -733,27 +733,3 @@ export const insertAdapterSaleItemSchema = createInsertSchema(adapterSaleItems).
 
 export type InsertAdapterSaleItem = z.infer<typeof insertAdapterSaleItemSchema>;
 export type AdapterSaleItem = typeof adapterSaleItems.$inferSelect;
-
-// Slideshow slides for homepage banner
-export const slideshowSlides = pgTable("slideshow_slides", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  image: text("image").notNull(), // Image URL
-  titleAr: text("title_ar").notNull(),
-  titleEn: text("title_en").notNull(),
-  subtitleAr: text("subtitle_ar"),
-  subtitleEn: text("subtitle_en"),
-  ctaTextAr: text("cta_text_ar"),
-  ctaTextEn: text("cta_text_en"),
-  ctaLink: text("cta_link"),
-  sortOrder: integer("sort_order").notNull().default(0),
-  isActive: integer("is_active").notNull().default(1),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-});
-
-export const insertSlideshowSlideSchema = createInsertSchema(slideshowSlides).omit({
-  id: true,
-  createdAt: true,
-});
-
-export type InsertSlideshowSlide = z.infer<typeof insertSlideshowSlideSchema>;
-export type SlideshowSlide = typeof slideshowSlides.$inferSelect;

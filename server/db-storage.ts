@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SlideshowSlide, type InsertSlideshowSlide, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, slideshowSlides } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -998,38 +998,5 @@ export class DrizzleStorage implements IStorage {
   async deleteAcAdapter(id: string): Promise<void> {
     // Soft delete
     await db.update(acAdapters).set({ isActive: 0 }).where(eq(acAdapters.id, id));
-  }
-  
-  // Slideshow slide methods
-  async getSlideshowSlides(): Promise<SlideshowSlide[]> {
-    return await db.select().from(slideshowSlides).orderBy(slideshowSlides.sortOrder);
-  }
-  
-  async getActiveSlideshowSlides(): Promise<SlideshowSlide[]> {
-    return await db.select().from(slideshowSlides)
-      .where(eq(slideshowSlides.isActive, 1))
-      .orderBy(slideshowSlides.sortOrder);
-  }
-  
-  async getSlideshowSlide(id: string): Promise<SlideshowSlide | undefined> {
-    const result = await db.select().from(slideshowSlides).where(eq(slideshowSlides.id, id)).limit(1);
-    return result[0];
-  }
-  
-  async createSlideshowSlide(slide: InsertSlideshowSlide): Promise<SlideshowSlide> {
-    const result = await db.insert(slideshowSlides).values(slide).returning();
-    return result[0];
-  }
-  
-  async updateSlideshowSlide(id: string, updates: Partial<InsertSlideshowSlide>): Promise<SlideshowSlide | undefined> {
-    const result = await db.update(slideshowSlides)
-      .set(updates)
-      .where(eq(slideshowSlides.id, id))
-      .returning();
-    return result[0];
-  }
-  
-  async deleteSlideshowSlide(id: string): Promise<void> {
-    await db.delete(slideshowSlides).where(eq(slideshowSlides.id, id));
   }
 }
