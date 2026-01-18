@@ -15,7 +15,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { Link, useLocation, useSearch } from "wouter";
-import { Wrench, Search, Package, Send, PackageX } from "lucide-react";
+import { Wrench, Search, Package, Send, PackageX, X } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -265,61 +265,89 @@ export default function Home() {
           </section>
         )}
 
-        <section className="py-12 md:py-16" data-testid="section-products">
+        <section className="py-12 md:py-20" data-testid="section-products">
           <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-            <div className="flex items-center justify-between mb-8">
-              <h2 className="text-3xl md:text-4xl font-bold" data-testid="text-products-title">
-                {searchQuery 
-                  ? t('home.searchResultsFor', { query: searchQuery })
-                  : selectedCategory 
-                    ? t(`category.${selectedCategory}`)
-                    : t('home.featured.title')}
-              </h2>
+            {/* Section Header - Enhanced */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary/10 border border-primary/20 flex items-center justify-center shadow-lg shadow-primary/10">
+                  <Package className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <h2 className="text-2xl md:text-3xl font-bold text-foreground" data-testid="text-products-title">
+                    {searchQuery 
+                      ? t('home.searchResultsFor', { query: searchQuery })
+                      : selectedCategory 
+                        ? t(`category.${selectedCategory}`)
+                        : t('home.featured.title')}
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {searchQuery || selectedCategory 
+                      ? `${filteredProducts.length} ${language === 'ar' ? 'منتج' : 'products'}`
+                      : language === 'ar' ? 'اكتشف أحدث المنتجات والعروض' : 'Discover the latest products and offers'}
+                  </p>
+                </div>
+              </div>
               {(searchQuery || selectedCategory) && (
                 <Button 
                   variant="outline" 
+                  size="lg"
+                  className="gap-2 border-2 hover:border-primary hover:text-primary"
                   onClick={() => { setSearchQuery(""); setSelectedCategory(""); }}
                   data-testid="button-clear-filter"
                 >
+                  <X className="h-4 w-4" />
                   {t('home.showAll')}
                 </Button>
               )}
             </div>
 
             {isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="space-y-4">
-                    <Skeleton className="aspect-square w-full" />
-                    <Skeleton className="h-4 w-3/4" />
+                  <div key={i} className="space-y-4 bg-card rounded-2xl p-4 border border-border/50">
+                    <Skeleton className="aspect-square w-full rounded-xl" />
+                    <Skeleton className="h-5 w-3/4" />
                     <Skeleton className="h-4 w-1/2" />
-                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-11 w-full rounded-xl" />
                   </div>
                 ))}
               </div>
             ) : productsError ? (
-              <div className="text-center py-12">
-                <p className="text-lg text-destructive" data-testid="text-error-products">
+              <div className="text-center py-16">
+                <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-destructive/10 flex items-center justify-center">
+                  <PackageX className="h-10 w-10 text-destructive" />
+                </div>
+                <p className="text-xl font-semibold text-destructive mb-2" data-testid="text-error-products">
                   {t('home.loadError')}
                 </p>
+                <p className="text-muted-foreground">{language === 'ar' ? 'يرجى المحاولة مرة أخرى' : 'Please try again'}</p>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="py-12">
+              <div className="py-16">
                 <div className="text-center mb-8">
-                  <PackageX className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
-                  <p className="text-xl text-muted-foreground mb-2" data-testid="text-no-products">
+                  <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted/50 border-2 border-dashed border-muted-foreground/20 flex items-center justify-center">
+                    <PackageX className="h-12 w-12 text-muted-foreground/40" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground mb-2" data-testid="text-no-products">
                     {searchQuery ? t('home.noSearchResults') : t('home.noProducts')}
+                  </p>
+                  <p className="text-muted-foreground mb-6">
+                    {searchQuery 
+                      ? (language === 'ar' ? `لم نجد نتائج لـ "${searchQuery}"` : `No results found for "${searchQuery}"`)
+                      : (language === 'ar' ? 'لا توجد منتجات حالياً' : 'No products available')}
                   </p>
                   {searchQuery && !showRequestForm && (
                     <Button 
+                      size="lg"
                       onClick={() => {
                         setRequestForm(prev => ({ ...prev, productName: searchQuery }));
                         setShowRequestForm(true);
                       }}
-                      className="mt-4"
+                      className="gap-2"
                       data-testid="button-request-product"
                     >
-                      <Send className="h-4 w-4 me-2" />
+                      <Send className="h-4 w-4" />
                       {t('home.requestProduct')}
                     </Button>
                   )}
@@ -410,7 +438,7 @@ export default function Home() {
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
                 {(searchQuery || selectedCategory ? filteredProducts : filteredProducts.slice(0, featuredProductsCount)).map((product) => (
                   <ProductCard
                     key={product.id}
