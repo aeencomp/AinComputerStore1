@@ -16,7 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { CartItem, StoreSettings, User } from "@shared/schema";
-import { Banknote, Smartphone, CreditCard, Loader2, Tag, X, Check } from "lucide-react";
+import { Banknote, Smartphone, CreditCard, Loader2, Tag, X, Check, Languages } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import type { DiscountCode } from "@shared/schema";
 
@@ -61,7 +61,7 @@ type CheckoutFormValues = z.infer<typeof checkoutSchema>;
 export default function Checkout() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
-  const { language, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
 
   // Check authentication
   const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
@@ -401,7 +401,19 @@ export default function Checkout() {
   return (
     <div className="min-h-screen bg-background">
       <main className="max-w-6xl mx-auto px-4 md:px-6 lg:px-8 py-8">
-        <h1 className="text-4xl font-bold mb-8" data-testid="text-checkout-title">{t('checkout.title')}</h1>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-4xl font-bold" data-testid="text-checkout-title">{t('checkout.title')}</h1>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+            className="gap-1"
+            data-testid="button-language-switch"
+          >
+            <Languages className="h-4 w-4" />
+            {language === 'ar' ? 'EN' : 'عربي'}
+          </Button>
+        </div>
 
         <div className="grid md:grid-cols-3 gap-8">
           <div className="md:col-span-2">

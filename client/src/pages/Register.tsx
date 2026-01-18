@@ -7,11 +7,12 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Languages } from "lucide-react";
 
 export default function Register() {
   const [, navigate] = useLocation();
   const { toast } = useToast();
-  const { language, t } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
@@ -45,6 +46,18 @@ export default function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
+      <div className="absolute top-4 end-4">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+          className="gap-1"
+          data-testid="button-language-switch"
+        >
+          <Languages className="h-4 w-4" />
+          {language === 'ar' ? 'EN' : 'عربي'}
+        </Button>
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-2">
           <CardTitle className="text-2xl font-bold text-center">{t('register.title')}</CardTitle>
