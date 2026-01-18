@@ -212,7 +212,7 @@ export default function Home() {
   const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col overflow-x-hidden">
       <AnnouncementBar />
       <Header
         cartItemsCount={cartItemsCount}

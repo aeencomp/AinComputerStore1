@@ -103,7 +103,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
           </span>
         </div>
         <Button
-          className="w-full gap-2"
+          className="w-full gap-2 min-h-[44px]"
           onClick={() => onAddToCart(product)}
           disabled={!product.inStock}
           data-testid={`button-add-to-cart-${product.id}`}

@@ -224,7 +224,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           </div>
         </div>
 
-        <nav className="hidden md:flex items-center justify-center gap-1 py-3 mt-6 border-t bg-muted/30">
+        <nav className="hidden md:flex items-center justify-center flex-wrap gap-1 py-3 border-t bg-muted/30 overflow-x-auto">
           <Link href="/">
             <Button 
               variant="ghost" 
