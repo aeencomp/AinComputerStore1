@@ -8,15 +8,13 @@ type Language = 'ar' | 'en';
  * Formats a price according to the specified language locale
  * @param price - The price to format (number or string)
  * @param language - The language locale ('ar' for Arabic, 'en' for English)
- * @returns Formatted price string with proper numeral system
+ * @returns Formatted price string with Western numerals (always English numbers)
  */
 export function formatPrice(price: string | number, language: Language): string {
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
   
-  // Use Arabic-Indic numerals for Arabic, Western numerals for English
-  const locale = language === 'ar' ? 'ar-IQ' : 'en-IQ';
-  
-  return numPrice.toLocaleString(locale, {
+  // Always use Western numerals (English) for prices, regardless of language
+  return numPrice.toLocaleString('en-US', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2
   });

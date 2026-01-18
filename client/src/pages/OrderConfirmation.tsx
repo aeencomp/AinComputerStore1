@@ -111,7 +111,8 @@ export default function OrderConfirmation() {
 
   const formatPrice = (price: string | number) => {
     const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-    return numPrice.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 });
+    // Always use English numerals for prices
+    return numPrice.toLocaleString('en-US', { minimumFractionDigits: 0 });
   };
 
   const formatDate = (dateString: string) => {

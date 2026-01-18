@@ -588,7 +588,7 @@ export default function Checkout() {
                       <span>x{item.quantity}</span>
                     </div>
                     <div className="flex justify-between text-sm text-muted-foreground">
-                      <span>{(parseFloat(item.product.price) * 1000).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
+                      <span>{(parseFloat(item.product.price) * 1000).toLocaleString('en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
                     </div>
                   </div>
                 ))}
@@ -608,7 +608,7 @@ export default function Checkout() {
                           {appliedDiscount.code.code}
                         </span>
                         <span className="text-sm text-green-600">
-                          (-{appliedDiscount.discountAmount.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')} {t('common.currency')})
+                          (-{appliedDiscount.discountAmount.toLocaleString('en-US')} {t('common.currency')})
                         </span>
                       </div>
                       <Button
@@ -657,12 +657,12 @@ export default function Checkout() {
                 <Separator />
                 <div className="flex justify-between">
                   <span>{t('checkout.subtotal')}</span>
-                  <span data-testid="text-subtotal">{subtotal.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
+                  <span data-testid="text-subtotal">{subtotal.toLocaleString('en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
                 </div>
                 {appliedDiscount && (
                   <div className="flex justify-between text-green-600">
                     <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
-                    <span data-testid="text-discount">-{discountAmount.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
+                    <span data-testid="text-discount">-{discountAmount.toLocaleString('en-US', { minimumFractionDigits: 0 })} {t('common.currency')}</span>
                   </div>
                 )}
                 <div className="flex justify-between">
@@ -670,20 +670,20 @@ export default function Checkout() {
                   <span data-testid="text-shipping" className={enableFreeShipping && subtotal >= freeShippingThreshold ? "text-green-600 font-medium" : ""}>
                     {enableFreeShipping && subtotal >= freeShippingThreshold 
                       ? t('checkout.freeShipping')
-                      : `${shippingCost.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} ${t('common.currency')}`
+                      : `${shippingCost.toLocaleString('en-US', { minimumFractionDigits: 0 })} ${t('common.currency')}`
                     }
                   </span>
                 </div>
                 {enableFreeShipping && subtotal < freeShippingThreshold && (
                   <div className="text-sm text-muted-foreground bg-muted p-2 rounded">
-                    {t('checkout.freeShippingThreshold', { amount: freeShippingThreshold.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 }) })}
+                    {t('checkout.freeShippingThreshold', { amount: freeShippingThreshold.toLocaleString('en-US', { minimumFractionDigits: 0 }) })}
                   </div>
                 )}
                 <Separator />
                 <div className="flex justify-between text-lg font-bold">
                   <span>{t('cart.total')}</span>
                   <span data-testid="text-order-total">
-                    {total.toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US', { minimumFractionDigits: 0 })} {t('common.currency')}
+                    {total.toLocaleString('en-US', { minimumFractionDigits: 0 })} {t('common.currency')}
                   </span>
                 </div>
               </CardContent>

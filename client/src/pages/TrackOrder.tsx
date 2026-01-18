@@ -119,10 +119,8 @@ export default function TrackOrder() {
 
   const formatPrice = (price: string | number) => {
     const numPrice = typeof price === 'string' ? parseFloat(price) : price;
-    if (language === 'ar') {
-      return `${numPrice.toLocaleString('ar-IQ')} د.ع`;
-    }
-    return `${numPrice.toLocaleString('en-IQ')} IQD`;
+    // Always use English numerals for prices
+    return `${numPrice.toLocaleString('en-US')} ${language === 'ar' ? 'د.ع' : 'IQD'}`;
   };
 
   return (
