@@ -60,24 +60,26 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
           </div>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
-          {categories.map((category) => (
+          {categories.map((category, index) => (
               <div
                 key={category.id}
-                className="animated-border-wrapper group cursor-pointer"
+                className={`animated-border-wrapper group cursor-pointer ${index % 2 === 0 ? 'float-animation' : 'float-animation-delayed'}`}
                 onClick={() => onCategoryClick?.(category.id)}
                 data-testid={`card-category-${category.id}`}
               >
-                <Card className="overflow-hidden border-0 shadow-md h-full">
+                <Card className="overflow-hidden border-0 shadow-md h-full pulse-glow">
                   <CardContent className="p-0">
-                    <div className="aspect-square overflow-hidden bg-muted shimmer-effect">
+                    <div className="aspect-square overflow-hidden bg-gradient-to-br from-muted to-muted/50 shimmer-effect">
                       <img
                         src={category.image}
                         alt={language === 'ar' ? category.nameAr : category.nameEn}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                        className="w-full h-full object-cover ken-burns-effect group-hover:scale-110 group-hover:brightness-110 transition-all duration-700"
                       />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                     </div>
-                    <div className="p-4 text-center bg-card">
-                      <h3 className="font-bold text-lg md:text-xl group-hover:text-primary transition-colors duration-300" data-testid={`text-category-${category.id}`}>
+                    <div className="p-4 text-center bg-card relative overflow-hidden">
+                      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      <h3 className="font-bold text-lg md:text-xl group-hover:text-primary transition-colors duration-300 relative z-10" data-testid={`text-category-${category.id}`}>
                         {language === 'ar' ? category.nameAr : category.nameEn}
                       </h3>
                     </div>
