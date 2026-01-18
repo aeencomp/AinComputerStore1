@@ -107,50 +107,131 @@ export function Footer() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-12 md:py-16">
         {/* Main Footer Content */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12">
-          {/* Store Info & Contact - Larger Column */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 lg:gap-16">
+          
+          {/* Store Info Column */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Logo and Store Name */}
-            <div className="flex items-center gap-3">
-              <img 
-                src={logoUrl} 
-                alt={storeName} 
-                className="w-14 h-14 rounded-xl object-cover border-2 border-primary/20"
-              />
+            {/* Logo and Store Name - Enhanced */}
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                <img 
+                  src={logoUrl} 
+                  alt={storeName} 
+                  className="w-16 h-16 rounded-2xl object-cover border-2 border-primary/30 shadow-lg shadow-primary/10"
+                />
+                <div className="absolute -bottom-1 -end-1 w-5 h-5 bg-green-500 rounded-full border-2 border-background flex items-center justify-center">
+                  <span className="text-[8px] text-white font-bold">✓</span>
+                </div>
+              </div>
               <div>
-                <h3 className="font-bold text-xl" data-testid="text-footer-store-name">{storeName}</h3>
-                <p className="text-xs text-muted-foreground">{isRTL ? 'متجر الإلكترونيات الموثوق' : 'Trusted Electronics Store'}</p>
+                <h3 className="font-bold text-xl text-foreground" data-testid="text-footer-store-name">{storeName}</h3>
+                <p className="text-sm text-primary font-medium">{isRTL ? 'متجر الإلكترونيات الموثوق' : 'Trusted Electronics Store'}</p>
               </div>
             </div>
             
-            <p className="text-sm text-muted-foreground leading-relaxed">
+            {/* Description */}
+            <p className="text-sm text-muted-foreground leading-relaxed border-s-2 border-primary/30 ps-4">
               {aboutText || description}
             </p>
 
-            {/* Contact Info with Icons */}
-            <div className="space-y-3">
+            {/* Social Media Icons - Redesigned */}
+            {(settings?.twitterUrl || settings?.instagramUrl || settings?.facebookUrl || settings?.whatsappNumber) && (
+              <div className="pt-2">
+                <p className="text-sm font-semibold mb-4 text-foreground">{t('footer.followUs')}</p>
+                <div className="flex gap-3">
+                  {settings?.whatsappNumber && (() => {
+                    const formatIraqiPhone = (phone: string) => {
+                      const digits = phone.replace(/\D/g, '');
+                      if (digits.startsWith('964')) return digits;
+                      if (digits.startsWith('0')) return '964' + digits.slice(1);
+                      return '964' + digits;
+                    };
+                    return (
+                      <a 
+                        href={`https://wa.me/${formatIraqiPhone(settings.whatsappNumber)}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="w-11 h-11 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-600 hover:bg-green-500 hover:text-white hover:border-green-500 hover:scale-110 transition-all duration-300"
+                        data-testid="button-social-whatsapp"
+                      >
+                        <SiWhatsapp className="h-5 w-5" />
+                      </a>
+                    );
+                  })()}
+                  {settings?.facebookUrl && (
+                    <a 
+                      href={settings.facebookUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-11 h-11 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 hover:scale-110 transition-all duration-300"
+                      data-testid="button-social-facebook"
+                    >
+                      <Facebook className="h-5 w-5" />
+                    </a>
+                  )}
+                  {settings?.instagramUrl && (
+                    <a 
+                      href={settings.instagramUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-11 h-11 rounded-xl bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-600 hover:bg-gradient-to-br hover:from-purple-600 hover:to-pink-500 hover:text-white hover:border-pink-500 hover:scale-110 transition-all duration-300"
+                      data-testid="button-social-instagram"
+                    >
+                      <Instagram className="h-5 w-5" />
+                    </a>
+                  )}
+                  {settings?.twitterUrl && (
+                    <a 
+                      href={settings.twitterUrl} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="w-11 h-11 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500 hover:bg-sky-500 hover:text-white hover:border-sky-500 hover:scale-110 transition-all duration-300"
+                      data-testid="button-social-twitter"
+                    >
+                      <Twitter className="h-5 w-5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Contact Info Column - Separate & Organized */}
+          <div className="lg:col-span-3">
+            <h3 className="font-bold text-base mb-5 relative inline-block text-foreground">
+              {isRTL ? 'تواصل معنا' : 'Contact Us'}
+              <span className="absolute -bottom-1.5 start-0 w-10 h-1 bg-primary rounded-full"></span>
+            </h3>
+            
+            <div className="space-y-4">
               <a 
                 href={`mailto:${email}`}
-                className="flex items-center gap-3 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+                className="flex items-center gap-3 text-sm text-muted-foreground hover:text-primary transition-colors group"
                 data-testid="link-footer-email"
               >
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                  <Mail className="h-4 w-4" />
+                <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors">
+                  <Mail className="h-4 w-4 group-hover:text-primary" />
                 </div>
-                <span>{email}</span>
+                <div>
+                  <p className="text-xs text-muted-foreground/70">{isRTL ? 'البريد الإلكتروني' : 'Email'}</p>
+                  <span className="font-medium text-foreground">{email}</span>
+                </div>
               </a>
               
               <a 
                 href={`tel:${phone}`}
-                className="flex items-center gap-3 text-sm text-muted-foreground hover:text-foreground transition-colors group"
+                className="flex items-center gap-3 text-sm text-muted-foreground hover:text-primary transition-colors group"
                 data-testid="link-footer-phone"
               >
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center group-hover:bg-primary/10 transition-colors">
-                  <Phone className="h-4 w-4" />
+                <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center group-hover:border-primary/50 group-hover:bg-primary/5 transition-colors">
+                  <Phone className="h-4 w-4 group-hover:text-primary" />
                 </div>
-                <span dir="ltr">{phone}</span>
+                <div>
+                  <p className="text-xs text-muted-foreground/70">{isRTL ? 'الهاتف' : 'Phone'}</p>
+                  <span dir="ltr" className="font-medium text-foreground">{phone}</span>
+                </div>
               </a>
 
               {settings?.whatsappNumber && (() => {
@@ -168,101 +249,46 @@ export function Footer() {
                     className="flex items-center gap-3 text-sm text-muted-foreground hover:text-green-600 transition-colors group"
                     data-testid="link-footer-whatsapp"
                   >
-                    <div className="w-9 h-9 rounded-lg bg-green-500/10 flex items-center justify-center group-hover:bg-green-500/20 transition-colors">
+                    <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 flex items-center justify-center group-hover:border-green-500/50 transition-colors">
                       <SiWhatsapp className="h-4 w-4 text-green-600" />
                     </div>
-                    <span>{t('footer.whatsapp')}</span>
+                    <div>
+                      <p className="text-xs text-muted-foreground/70">{isRTL ? 'واتساب' : 'WhatsApp'}</p>
+                      <span className="font-medium text-green-600">{t('footer.whatsapp')}</span>
+                    </div>
                   </a>
                 );
               })()}
 
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                <div className="w-9 h-9 rounded-lg bg-muted flex items-center justify-center">
+                <div className="w-10 h-10 rounded-xl bg-card border border-border/50 flex items-center justify-center">
                   <Clock className="h-4 w-4" />
                 </div>
-                <span>{hours}</span>
-              </div>
-            </div>
-
-            {/* Social Media Icons */}
-            {(settings?.twitterUrl || settings?.instagramUrl || settings?.facebookUrl || settings?.whatsappNumber) && (
-              <div className="pt-2">
-                <p className="text-sm font-medium mb-3">{t('footer.followUs')}</p>
-                <div className="flex gap-2">
-                  {settings?.whatsappNumber && (() => {
-                    const formatIraqiPhone = (phone: string) => {
-                      const digits = phone.replace(/\D/g, '');
-                      if (digits.startsWith('964')) return digits;
-                      if (digits.startsWith('0')) return '964' + digits.slice(1);
-                      return '964' + digits;
-                    };
-                    return (
-                      <a 
-                        href={`https://wa.me/${formatIraqiPhone(settings.whatsappNumber)}`} 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 hover:bg-green-500 hover:text-white transition-all duration-300"
-                        data-testid="button-social-whatsapp"
-                      >
-                        <SiWhatsapp className="h-5 w-5" />
-                      </a>
-                    );
-                  })()}
-                  {settings?.facebookUrl && (
-                    <a 
-                      href={settings.facebookUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-all duration-300"
-                      data-testid="button-social-facebook"
-                    >
-                      <Facebook className="h-5 w-5" />
-                    </a>
-                  )}
-                  {settings?.instagramUrl && (
-                    <a 
-                      href={settings.instagramUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="w-10 h-10 rounded-full bg-pink-500/10 flex items-center justify-center text-pink-600 hover:bg-gradient-to-br hover:from-purple-600 hover:to-pink-500 hover:text-white transition-all duration-300"
-                      data-testid="button-social-instagram"
-                    >
-                      <Instagram className="h-5 w-5" />
-                    </a>
-                  )}
-                  {settings?.twitterUrl && (
-                    <a 
-                      href={settings.twitterUrl} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="w-10 h-10 rounded-full bg-sky-500/10 flex items-center justify-center text-sky-500 hover:bg-sky-500 hover:text-white transition-all duration-300"
-                      data-testid="button-social-twitter"
-                    >
-                      <Twitter className="h-5 w-5" />
-                    </a>
-                  )}
+                <div>
+                  <p className="text-xs text-muted-foreground/70">{isRTL ? 'ساعات العمل' : 'Working Hours'}</p>
+                  <span className="font-medium text-foreground">{hours}</span>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {/* Dynamic Footer Link Groups */}
-          <div className="lg:col-span-5">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <div className="space-y-6">
               {(() => {
                 const footerLinks = settings?.footerLinks;
                 if (!footerLinks || !Array.isArray(footerLinks)) return null;
                 
-                return (footerLinks as FooterLinkGroup[]).map((group, groupIndex) => {
+                return (footerLinks as FooterLinkGroup[]).slice(0, 2).map((group, groupIndex) => {
                   if (!group || !group.id || !Array.isArray(group.links)) return null;
                   
                   return (
                     <div key={group.id} className="space-y-4">
-                      <h3 className="font-bold text-base relative inline-block" data-testid={`text-footer-links-${groupIndex}`}>
+                      <h3 className="font-bold text-base relative inline-block text-foreground" data-testid={`text-footer-links-${groupIndex}`}>
                         {language === 'ar' ? group.titleAr : group.titleEn}
-                        <span className="absolute -bottom-1 start-0 w-8 h-0.5 bg-primary rounded-full"></span>
+                        <span className="absolute -bottom-1.5 start-0 w-10 h-1 bg-primary rounded-full"></span>
                       </h3>
-                      <ul className="space-y-2.5">
+                      <ul className="space-y-3">
                         {group.links.map((link, linkIndex) => {
                           if (!link || !link.id) return null;
                           const label = language === 'ar' ? link.labelAr : link.labelEn;
@@ -274,10 +300,10 @@ export function Footer() {
                                   href={link.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                                  className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary hover:translate-x-1 rtl:hover:-translate-x-1 transition-all"
                                   data-testid={`link-footer-${groupIndex}-${linkIndex}`}
                                 >
-                                  <ChevronIcon className="h-3 w-3 opacity-50" />
+                                  <ChevronIcon className="h-3 w-3 text-primary/50" />
                                   {label}
                                   <ExternalLink className="h-3 w-3 opacity-50" />
                                 </a>
@@ -289,10 +315,10 @@ export function Footer() {
                             <li key={link.id}>
                               <Link 
                                 href={link.url}
-                                className="flex items-center gap-1.5 text-sm text-muted-foreground hover:text-primary transition-colors"
+                                className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary hover:translate-x-1 rtl:hover:-translate-x-1 transition-all"
                                 data-testid={`link-footer-${groupIndex}-${linkIndex}`}
                               >
-                                <ChevronIcon className="h-3 w-3 opacity-50" />
+                                <ChevronIcon className="h-3 w-3 text-primary/50" />
                                 {label}
                               </Link>
                             </li>
@@ -308,38 +334,45 @@ export function Footer() {
 
           {/* Newsletter & Map Column */}
           <div className="lg:col-span-3 space-y-6">
-            {/* Newsletter */}
-            <div className="bg-card rounded-xl p-5 border border-border/50">
-              <h3 className="font-bold text-base mb-2" data-testid="text-footer-newsletter">
-                {t('footer.newsletter')}
-              </h3>
+            {/* Newsletter - Enhanced */}
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-2xl p-6 border border-primary/20">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                  <Send className="h-5 w-5 text-primary" />
+                </div>
+                <h3 className="font-bold text-base text-foreground" data-testid="text-footer-newsletter">
+                  {t('footer.newsletter')}
+                </h3>
+              </div>
               <p className="text-sm text-muted-foreground mb-4">
                 {t('footer.newsletterDesc')}
               </p>
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Input 
                   placeholder={t('footer.newsletterPlaceholder')} 
-                  className="bg-background" 
+                  className="bg-background/80 border-primary/20 focus:border-primary" 
                   data-testid="input-newsletter" 
                 />
-                <Button className="w-full gap-2" data-testid="button-newsletter-subscribe">
+                <Button className="w-full gap-2 min-h-[44px]" data-testid="button-newsletter-subscribe">
                   <Send className="h-4 w-4" />
                   {t('footer.subscribe')}
                 </Button>
               </div>
             </div>
 
-            {/* Store Location Map */}
-            <div className="rounded-xl border border-border/50 bg-card">
-              <div className="flex items-center gap-2 p-3 border-b border-border/50">
-                <MapPin className="h-4 w-4 text-primary" />
-                <span className="font-medium text-sm">{t('footer.location')}</span>
+            {/* Store Location Map - Enhanced */}
+            <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+              <div className="flex items-center gap-3 p-4 border-b border-border/50 bg-muted/30">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <MapPin className="h-4 w-4 text-primary" />
+                </div>
+                <span className="font-semibold text-sm text-foreground">{t('footer.location')}</span>
               </div>
-              <div style={{ height: '160px', width: '100%' }}>
+              <div style={{ height: '140px', width: '100%' }}>
                 <MapContainer 
                   center={[32.60524733098948, 44.02350055860585] as [number, number]} 
                   zoom={15} 
-                  style={{ height: '160px', width: '100%' }} 
+                  style={{ height: '140px', width: '100%' }} 
                   data-testid="map-store-location"
                   zoomControl={false}
                   attributionControl={false}
@@ -359,7 +392,7 @@ export function Footer() {
                   </Marker>
                 </MapContainer>
               </div>
-              <div className="p-3 border-t border-border/50">
+              <div className="p-3 border-t border-border/50 bg-muted/20">
                 <p className="text-xs text-muted-foreground text-center">{address}</p>
               </div>
             </div>
