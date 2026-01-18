@@ -58,19 +58,6 @@ export default function AdminSlideshow() {
     enabled: !!currentAdmin,
   });
 
-  if (adminLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-muted-foreground">{language === "ar" ? "جاري التحميل..." : "Loading..."}</div>
-      </div>
-    );
-  }
-
-  if (!currentAdmin) {
-    setLocation("/admin/login");
-    return null;
-  }
-
   const createMutation = useMutation({
     mutationFn: async (data: SlideFormData) => {
       return await apiRequest("POST", "/api/admin/slideshow-slides", data);
@@ -117,6 +104,19 @@ export default function AdminSlideshow() {
       toast({ title: language === "ar" ? "حدث خطأ" : "Error occurred", variant: "destructive" });
     },
   });
+
+  if (adminLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-muted-foreground">{language === "ar" ? "جاري التحميل..." : "Loading..."}</div>
+      </div>
+    );
+  }
+
+  if (!currentAdmin) {
+    setLocation("/admin/login");
+    return null;
+  }
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
