@@ -64,14 +64,14 @@ export function ModernFeaturedProducts({ onAddToCart }: ModernFeaturedProductsPr
   }
 
   return (
-    <section className="py-16 bg-slate-50 dark:bg-slate-800/50">
+    <section className="py-16 bg-slate-50 dark:bg-slate-800/50" dir={isRTL ? 'rtl' : 'ltr'} data-testid="section-featured">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8">
-          <div className="text-center md:text-start">
+        <div className={`flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-8 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
+          <div className={`text-center ${isRTL ? 'md:text-end' : 'md:text-start'}`}>
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-2">
               {isRTL ? 'العروض المميزة' : 'Featured Offers'}
             </h2>
-            <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-4">
+            <div className={`flex flex-wrap justify-center gap-4 mt-4 ${isRTL ? 'md:justify-end' : 'md:justify-start'}`}>
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -90,7 +90,7 @@ export function ModernFeaturedProducts({ onAddToCart }: ModernFeaturedProductsPr
           </div>
           
           <Link href="/?category=offers">
-            <Button variant="outline" className="gap-2 rounded-full">
+            <Button variant="outline" className="gap-2 rounded-full" data-testid="button-browse-more">
               {isRTL ? 'تصفح المزيد' : 'Browse for More'}
               {isRTL ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
             </Button>
@@ -115,7 +115,7 @@ export function ModernFeaturedProducts({ onAddToCart }: ModernFeaturedProductsPr
                     {product.badge}
                   </Badge>
                 )}
-                <Link href={`/product/${product.id}`}>
+                <Link href={`/product/${product.id}`} data-testid={`link-product-image-${product.id}`}>
                   <img 
                     src={getProductImage(product)}
                     alt={isRTL ? product.nameAr : product.nameEn}
@@ -125,8 +125,8 @@ export function ModernFeaturedProducts({ onAddToCart }: ModernFeaturedProductsPr
               </div>
               
               <div className="p-4">
-                <Link href={`/product/${product.id}`}>
-                  <h3 className="font-semibold text-slate-900 dark:text-white mb-2 line-clamp-2 hover:text-blue-600 transition-colors">
+                <Link href={`/product/${product.id}`} data-testid={`link-product-title-${product.id}`}>
+                  <h3 className="font-semibold text-slate-900 dark:text-white mb-2 line-clamp-2 transition-colors">
                     {isRTL ? product.nameAr : product.nameEn}
                   </h3>
                 </Link>
@@ -153,7 +153,7 @@ export function ModernFeaturedProducts({ onAddToCart }: ModernFeaturedProductsPr
                 
                 <Button 
                   size="sm"
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white rounded-full gap-2"
+                  className="w-full bg-blue-600 text-white rounded-full gap-2"
                   onClick={() => onAddToCart(product.id)}
                   data-testid={`button-add-cart-${product.id}`}
                 >

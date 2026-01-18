@@ -37,7 +37,7 @@ export function TrustBadges() {
   const isRTL = language === 'ar';
 
   return (
-    <section className="py-12 bg-gradient-to-r from-blue-50 via-white to-blue-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800">
+    <section className="py-12 bg-gradient-to-r from-blue-50 via-white to-blue-50 dark:from-slate-800 dark:via-slate-900 dark:to-slate-800" dir={isRTL ? 'rtl' : 'ltr'} data-testid="section-trust-badges">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <h2 className="text-2xl md:text-3xl font-bold text-center text-slate-900 dark:text-white mb-10">
           {isRTL ? 'لماذا تتسوق معنا؟' : 'Why Shop With Us?'}

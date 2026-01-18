@@ -10,7 +10,7 @@ export function ModernHero() {
   const isRTL = language === 'ar';
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 dark:from-slate-900 dark:via-blue-950/30 dark:to-slate-900">
+    <section className="relative overflow-hidden bg-gradient-to-br from-slate-50 via-blue-50/30 to-slate-100 dark:from-slate-900 dark:via-blue-950/30 dark:to-slate-900" dir={isRTL ? 'rtl' : 'ltr'} data-testid="section-hero">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-20 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-0 left-1/4 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl" />
@@ -52,7 +52,7 @@ export function ModernHero() {
               <Link href="/?category=laptops">
                 <Button 
                   size="lg" 
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg rounded-full gap-2"
+                  className="bg-blue-600 text-white px-8 py-6 text-lg rounded-full gap-2"
                   data-testid="button-shop-now"
                 >
                   {isRTL ? 'تسوق الآن' : 'Shop Now'}

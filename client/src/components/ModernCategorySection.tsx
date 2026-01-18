@@ -64,7 +64,7 @@ export function ModernCategorySection() {
   const ChevronIcon = isRTL ? ChevronLeft : ChevronRight;
 
   return (
-    <section className="py-16 bg-white dark:bg-slate-900">
+    <section className="py-16 bg-white dark:bg-slate-900" dir={isRTL ? 'rtl' : 'ltr'} data-testid="section-categories">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="text-center mb-12">
           <h2 className="text-3xl md:text-4xl font-bold text-slate-900 dark:text-white mb-3">
@@ -104,7 +104,8 @@ export function ModernCategorySection() {
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className="w-fit bg-white/10 border-white/30 text-white hover:bg-white hover:text-slate-900 backdrop-blur-sm gap-1"
+                    className="w-fit bg-white/10 border-white/30 text-white backdrop-blur-sm gap-1"
+                    data-testid={`button-view-${cat.id}`}
                   >
                     {isRTL ? 'عرض المنتجات' : 'View Products'}
                     <ChevronIcon className="w-4 h-4" />

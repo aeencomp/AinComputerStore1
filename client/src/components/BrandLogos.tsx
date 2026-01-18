@@ -15,7 +15,7 @@ export function BrandLogos() {
   const isRTL = language === 'ar';
 
   return (
-    <section className="py-8 border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+    <section className="py-8 border-y border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900" dir={isRTL ? 'rtl' : 'ltr'} data-testid="section-brand-logos">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
         <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12">
           {brands.map((brand, index) => (

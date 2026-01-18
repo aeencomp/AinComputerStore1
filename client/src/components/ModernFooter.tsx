@@ -40,9 +40,9 @@ export function ModernFooter() {
   ];
 
   return (
-    <footer className="bg-slate-900 text-white" data-testid="footer">
+    <footer className="bg-slate-900 text-white" dir={isRTL ? 'rtl' : 'ltr'} data-testid="footer">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12">
+        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 lg:gap-12 ${isRTL ? 'text-right' : 'text-left'}`}>
           <div className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full bg-blue-600 overflow-hidden flex-shrink-0">
@@ -59,16 +59,16 @@ export function ModernFooter() {
               }
             </p>
             <div className="flex gap-2">
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-blue-600 transition-colors">
+              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover-elevate" data-testid="link-facebook">
                 <Facebook className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-slate-700 transition-colors">
+              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover-elevate" data-testid="link-twitter">
                 <SiX className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-pink-600 transition-colors">
+              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover-elevate" data-testid="link-instagram">
                 <Instagram className="w-5 h-5" />
               </a>
-              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-green-600 transition-colors">
+              <a href="#" className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover-elevate" data-testid="link-whatsapp">
                 <SiWhatsapp className="w-5 h-5" />
               </a>
             </div>
@@ -80,7 +80,7 @@ export function ModernFooter() {
               {quickLinks.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href}>
-                    <span className="text-slate-400 hover:text-white transition-colors text-sm cursor-pointer">
+                    <span className="text-slate-400 text-sm cursor-pointer hover-elevate" data-testid={`footer-link-${link.labelEn.toLowerCase().replace(/\s+/g, '-')}`}>
                       {isRTL ? link.labelAr : link.labelEn}
                     </span>
                   </Link>
@@ -95,7 +95,7 @@ export function ModernFooter() {
               {customerService.map((link) => (
                 <li key={link.href}>
                   <Link href={link.href}>
-                    <span className="text-slate-400 hover:text-white transition-colors text-sm cursor-pointer">
+                    <span className="text-slate-400 text-sm cursor-pointer hover-elevate" data-testid={`footer-link-${link.labelEn.toLowerCase().replace(/\s+/g, '-')}`}>
                       {isRTL ? link.labelAr : link.labelEn}
                     </span>
                   </Link>
@@ -132,18 +132,18 @@ export function ModernFooter() {
 
       <div className="border-t border-slate-800">
         <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6">
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400">
-            <p>
+          <div className={`flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-400 ${isRTL ? 'md:flex-row-reverse' : ''}`}>
+            <p data-testid="text-copyright">
               © 2025 {storeName}. {isRTL ? 'جميع الحقوق محفوظة.' : 'All rights reserved.'}
             </p>
             <div className="flex items-center gap-4">
               <Link href="/privacy">
-                <span className="hover:text-white transition-colors cursor-pointer">
+                <span className="cursor-pointer hover-elevate" data-testid="link-privacy">
                   {isRTL ? 'سياسة الخصوصية' : 'Privacy Policy'}
                 </span>
               </Link>
               <Link href="/terms">
-                <span className="hover:text-white transition-colors cursor-pointer">
+                <span className="cursor-pointer hover-elevate" data-testid="link-terms">
                   {isRTL ? 'الشروط والأحكام' : 'Terms & Conditions'}
                 </span>
               </Link>

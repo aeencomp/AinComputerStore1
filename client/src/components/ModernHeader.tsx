@@ -82,9 +82,9 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
   };
 
   return (
-    <header className="sticky top-0 z-50 bg-slate-900 text-white shadow-lg">
+    <header className="sticky top-0 z-50 bg-slate-900 text-white shadow-lg" dir={isRTL ? 'rtl' : 'ltr'}>
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div className={`flex items-center justify-between h-16 gap-4 ${isRTL ? 'flex-row-reverse' : ''}`}>
           <Link href="/" className="flex items-center gap-3" data-testid="link-logo-home">
             <div className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center overflow-hidden">
               {logoUrl ? (
@@ -98,12 +98,12 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
             </span>
           </Link>
 
-          <nav className="hidden lg:flex items-center gap-1">
-            {navLinks.map((link) => (
+          <nav className={`hidden lg:flex items-center gap-1 ${isRTL ? 'flex-row-reverse' : ''}`}>
+            {(isRTL ? [...navLinks].reverse() : navLinks).map((link) => (
               <Link key={link.href} href={link.href}>
                 <Button 
                   variant="ghost" 
-                  className="text-white/80 hover:text-white hover:bg-white/10"
+                  className="text-white/80"
                   data-testid={`nav-link-${link.labelEn.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   {isRTL ? link.labelAr : link.labelEn}
@@ -112,16 +112,16 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
             ))}
           </nav>
 
-          <div className="flex items-center gap-2">
+          <div className={`flex items-center gap-2 ${isRTL ? 'flex-row-reverse' : ''}`}>
             <form onSubmit={handleSearch} className="hidden md:flex items-center">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 ${isRTL ? 'right-3' : 'left-3'}`} />
                 <Input
                   type="search"
                   placeholder={isRTL ? 'البحث...' : 'Search...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-48 lg:w-64 pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:bg-white/20"
+                  className={`w-48 lg:w-64 bg-white/10 border-white/20 text-white placeholder:text-white/50 focus:bg-white/20 ${isRTL ? 'pr-10' : 'pl-10'}`}
                   data-testid="input-search"
                 />
               </div>
@@ -129,15 +129,15 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10">
+                <Button variant="ghost" size="icon" className="text-white/80" data-testid="button-language">
                   <Globe className="w-5 h-5" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setLanguage('ar')}>
+                <DropdownMenuItem onClick={() => setLanguage('ar')} data-testid="menu-item-arabic">
                   العربية
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setLanguage('en')}>
+                <DropdownMenuItem onClick={() => setLanguage('en')} data-testid="menu-item-english">
                   English
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -146,22 +146,22 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
             {currentUser ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10">
+                  <Button variant="ghost" size="icon" className="text-white/80" data-testid="button-user-menu">
                     <User className="w-5 h-5" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => navigate('/orders')}>
+                  <DropdownMenuItem onClick={() => navigate('/orders')} data-testid="menu-item-orders">
                     {isRTL ? 'طلباتي' : 'My Orders'}
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => logoutMutation.mutate()}>
+                  <DropdownMenuItem onClick={() => logoutMutation.mutate()} data-testid="menu-item-logout">
                     {isRTL ? 'تسجيل الخروج' : 'Logout'}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
               <Link href="/login">
-                <Button variant="ghost" size="icon" className="text-white/80 hover:text-white hover:bg-white/10">
+                <Button variant="ghost" size="icon" className="text-white/80" data-testid="button-login">
                   <User className="w-5 h-5" />
                 </Button>
               </Link>
@@ -171,12 +171,12 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
               variant="ghost" 
               size="icon" 
               onClick={onCartClick}
-              className="relative text-white/80 hover:text-white hover:bg-white/10"
+              className="relative text-white/80"
               data-testid="button-cart"
             >
               <ShoppingCart className="w-5 h-5" />
               {cartItemsCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center bg-blue-500 text-white text-xs">
+                <Badge className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center bg-blue-500 text-white text-xs no-default-hover-elevate no-default-active-elevate">
                   {cartItemsCount}
                 </Badge>
               )}
@@ -185,7 +185,7 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
             <Button 
               variant="ghost" 
               size="icon" 
-              className="lg:hidden text-white/80 hover:text-white hover:bg-white/10"
+              className="lg:hidden text-white/80"
               onClick={() => setMobileMenuOpen(true)}
               data-testid="button-mobile-menu"
             >
@@ -203,13 +203,14 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
           <div className="mt-6 space-y-2">
             <form onSubmit={handleSearch} className="mb-4">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className={`absolute top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 ${isRTL ? 'right-3' : 'left-3'}`} />
                 <Input
                   type="search"
                   placeholder={isRTL ? 'البحث...' : 'Search...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-white/50"
+                  className={`bg-white/10 border-white/20 text-white placeholder:text-white/50 ${isRTL ? 'pr-10' : 'pl-10'}`}
+                  data-testid="input-mobile-search"
                 />
               </div>
             </form>
@@ -217,8 +218,9 @@ export function ModernHeader({ cartItemsCount, onCartClick, onSearch, searchValu
               <Link key={link.href} href={link.href}>
                 <Button 
                   variant="ghost" 
-                  className="w-full justify-start text-white/80 hover:text-white hover:bg-white/10"
+                  className={`w-full text-white/80 ${isRTL ? 'justify-end' : 'justify-start'}`}
                   onClick={() => setMobileMenuOpen(false)}
+                  data-testid={`mobile-nav-${link.labelEn.toLowerCase().replace(/\s+/g, '-')}`}
                 >
                   {isRTL ? link.labelAr : link.labelEn}
                 </Button>

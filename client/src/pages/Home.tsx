@@ -8,7 +8,7 @@ import { BrandLogos } from "@/components/BrandLogos";
 import { ModernFooter } from "@/components/ModernFooter";
 import { ProductCard } from "@/components/ProductCard";
 import { CartSidebar } from "@/components/CartSidebar";
-import { Product, CartItem, StoreSettings, User } from "@shared/schema";
+import { Product, CartItem, StoreSettings } from "@shared/schema";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -50,10 +50,6 @@ export default function Home() {
 
   const { data: products = [], isLoading, isError: productsError } = useQuery<Product[]>({
     queryKey: [queryKey],
-  });
-
-  const { data: currentUser } = useQuery<User | null>({
-    queryKey: ['/api/auth/me'],
   });
 
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({
