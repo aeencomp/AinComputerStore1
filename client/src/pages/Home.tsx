@@ -226,16 +226,17 @@ export default function Home() {
         {!searchQuery && !selectedCategory && showCategories && <CategorySection onCategoryClick={handleCategorySelect} />}
 
         {!searchQuery && !selectedCategory && (
-          <section className="py-12 md:py-16 bg-muted/30" data-testid="section-repair-service">
+          <section className="py-12 md:py-16" data-testid="section-repair-service">
             <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-              <div className="flex flex-col md:flex-row items-center gap-6 md:gap-10">
-                <div className="flex-shrink-0">
-                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+              <div className="relative flex flex-col md:flex-row items-center gap-6 md:gap-10 p-6 md:p-8 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-card/80 to-primary/10 shadow-xl shadow-primary/10 overflow-hidden">
+                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50 pointer-events-none" />
+                <div className="flex-shrink-0 relative z-10">
+                  <div className="w-20 h-20 md:w-24 md:h-24 rounded-full bg-primary/20 border-2 border-primary/30 flex items-center justify-center animate-pulse shadow-lg shadow-primary/20">
                     <Wrench className="w-10 h-10 md:w-12 md:h-12 text-primary animate-wrench" />
                   </div>
                 </div>
-                <div className="flex-1 text-center md:text-start">
-                  <h2 className="text-3xl md:text-4xl font-extrabold mb-2" data-testid="text-repair-title">
+                <div className="flex-1 text-center md:text-start relative z-10">
+                  <h2 className="text-3xl md:text-4xl font-extrabold mb-2 text-foreground" data-testid="text-repair-title">
                     {t('home.repair.title')}
                   </h2>
                   <p className="text-xl text-primary font-bold mb-2" data-testid="text-repair-subtitle">
@@ -245,7 +246,7 @@ export default function Home() {
                     {t('home.repair.description')}
                   </p>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex flex-col sm:flex-row gap-4 relative z-10">
                   <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25 font-semibold px-6" data-testid="link-request-repair">
                     <Link href="/repair-request">
                       <Wrench className="w-5 h-5" />
