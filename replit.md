@@ -20,7 +20,7 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
 -   **Authentication**: Session-based authentication for customers and administrators, using bcrypt for password hashing and PostgreSQL for session storage.
 -   **Real-time Notifications**: WebSocket-based system for new order notifications to the admin dashboard.
 -   **Email Notifications**: Automated, Arabic-formatted order confirmation emails via Gmail SMTP.
--   **Internationalization (i18n)**: `LanguageContext` for UI text translation, supporting Arabic and English with dynamic RTL/LTR adjustment.
+-   **Internationalization (i18n)**: `LanguageContext` for UI text translation, supporting Arabic and English with dynamic RTL/LTR adjustment. Language switcher button available on all pages including admin portal (via AdminNav), battery portal (dashboard, manage, POS, reports), and sales portal.
 -   **Image Upload**: Admin functionality to upload product images directly to the server.
 -   **PWA**: Installable on mobile, offline support via service worker, push notifications, and custom app icons.
 -   **Android App**: Packaged as a native Android APK using Capacitor.

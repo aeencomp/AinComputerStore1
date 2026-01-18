@@ -29,6 +29,7 @@ import {
   Database,
   Plug,
   Printer,
+  Languages
 } from "lucide-react";
 import {
   AlertDialog,
@@ -43,7 +44,7 @@ import {
 import type { LaptopBattery, AcAdapter } from "@shared/schema";
 
 export default function BatteryManage() {
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [, setLocation] = useLocation();
   const searchParams = useSearch();
   const { toast } = useToast();
@@ -612,22 +613,34 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   return (
     <div className="min-h-screen bg-muted/30" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <header className="bg-green-600 text-white p-4">
-        <div className="max-w-4xl mx-auto flex items-center gap-4">
+        <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setLocation("/battery")}
+              className="text-white hover:bg-green-700"
+              data-testid="button-back-dashboard"
+            >
+              <BackIcon className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-3">
+              <Battery className="h-6 w-6" />
+              <h1 className="text-xl font-bold">
+                {language === 'ar' ? 'إدارة المنتجات' : 'Manage Products'}
+              </h1>
+            </div>
+          </div>
           <Button
             variant="ghost"
-            size="icon"
-            onClick={() => setLocation("/battery")}
-            className="text-white hover:bg-green-700"
-            data-testid="button-back-dashboard"
+            size="sm"
+            onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+            className="text-white hover:bg-green-700 gap-1"
+            data-testid="button-language-switch"
           >
-            <BackIcon className="h-5 w-5" />
+            <Languages className="h-4 w-4" />
+            {language === 'ar' ? 'EN' : 'عربي'}
           </Button>
-          <div className="flex items-center gap-3">
-            <Battery className="h-6 w-6" />
-            <h1 className="text-xl font-bold">
-              {language === 'ar' ? 'إدارة المنتجات' : 'Manage Products'}
-            </h1>
-          </div>
         </div>
       </header>
 

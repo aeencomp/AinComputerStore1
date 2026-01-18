@@ -46,7 +46,8 @@ import {
   FileText,
   Package,
   ChevronLeft,
-  Plug
+  Plug,
+  Languages
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { LaptopBattery, AcAdapter } from "@shared/schema";
@@ -88,7 +89,7 @@ function formatPrice(price: string | number): string {
 }
 
 export default function BatteryPOS() {
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const isRTL = language === 'ar';
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
@@ -504,6 +505,16 @@ export default function BatteryPOS() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+              className="gap-1"
+              data-testid="button-language-switch"
+            >
+              <Languages className="w-4 h-4" />
+              {language === 'ar' ? 'EN' : 'عربي'}
+            </Button>
             <Badge variant="outline" className="gap-1">
               <User className="w-3 h-3" />
               {currentUser.name}

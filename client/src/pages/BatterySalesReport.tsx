@@ -48,6 +48,7 @@ import {
   Trash2,
   Battery,
   Plug,
+  Languages,
 } from "lucide-react";
 import {
   AlertDialog,
@@ -77,7 +78,7 @@ type ReportPeriod = 'today' | 'week' | 'month' | 'custom';
 type ProductTypeFilter = 'all' | 'batteries' | 'adapters';
 
 export default function BatterySalesReport() {
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -412,6 +413,16 @@ export default function BatterySalesReport() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+              className="gap-1"
+              data-testid="button-language-switch"
+            >
+              <Languages className="h-4 w-4" />
+              {language === 'ar' ? 'EN' : 'عربي'}
+            </Button>
             <Badge variant="secondary" className="text-sm">
               {currentUser.name}
             </Badge>

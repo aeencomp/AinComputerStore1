@@ -17,7 +17,8 @@ import {
   Store,
   ExternalLink,
   Tag,
-  MessageSquare
+  MessageSquare,
+  Languages
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -45,7 +46,7 @@ interface AdminNavProps {
 
 export function AdminNav({ currentAdmin }: AdminNavProps) {
   const [location, setLocation] = useLocation();
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -163,6 +164,16 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
                 {currentAdmin.name}
               </span>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+              data-testid="button-language-switch"
+              className="gap-1"
+            >
+              <Languages className="w-4 h-4" />
+              <span className="hidden sm:inline">{language === 'ar' ? 'EN' : 'عربي'}</span>
+            </Button>
             <Button
               variant="ghost"
               size="sm"

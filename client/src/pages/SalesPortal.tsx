@@ -19,7 +19,8 @@ import {
   Store,
   Settings,
   Bell,
-  ChevronDown
+  ChevronDown,
+  Languages
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -50,7 +51,7 @@ interface SalesUser {
 }
 
 export default function SalesPortal() {
-  const { language } = useLanguage();
+  const { language, setLanguage } = useLanguage();
   const [location, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -203,6 +204,18 @@ export default function SalesPortal() {
 
             {/* User Menu & Actions */}
             <div className="flex items-center gap-2">
+              {/* Language Switcher */}
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+                className="gap-1"
+                data-testid="button-language-switch"
+              >
+                <Languages className="h-4 w-4" />
+                <span className="hidden sm:inline">{language === 'ar' ? 'EN' : 'عربي'}</span>
+              </Button>
+              
               {/* Notifications */}
               <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
                 <Bell className="h-5 w-5" />
