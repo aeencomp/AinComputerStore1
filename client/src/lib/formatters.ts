@@ -13,10 +13,10 @@ type Language = 'ar' | 'en';
 export function formatPrice(price: string | number, language: Language): string {
   const numPrice = typeof price === 'string' ? parseFloat(price) : price;
   
-  // Always use Western numerals (English) for prices, regardless of language
+  // Always use Western numerals (English) for prices, no decimal places
   return numPrice.toLocaleString('en-US', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
   });
 }
 
