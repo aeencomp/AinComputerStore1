@@ -1157,6 +1157,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Product Request API - for unavailable products
+  app.post("/api/product-requests", async (req, res) => {
+    try {
+      const requestSchema = z.object({
+        productName: z.string().min(2, "اسم المنتج مطلوب"),
+        customerName: z.string().min(2, "الاسم مطلوب"),
+        customerPhone: z.string().min(10, "رقم الهاتف مطلوب"),
+        customerEmail: z.string().email().optional().or(z.literal("")),
+        notes: z.string().optional(),
+      });
+
+      const validatedData = requestSchema.parse(req.body);
+      
+      await db.execute(
+        `INSERT INTO product_requests (id, product_name, customer_name, customer_phone, customer_email, notes, status, created_at) 
+         VALUES (gen_random_uuid(), '${validatedData.productName.replace(/'/g, "''")}', '${validatedData.customerName.replace(/'/g, "''")}', '${validatedData.customerPhone.replace(/'/g, "''")}', ${validatedData.customerEmail ? `'${validatedData.customerEmail.replace(/'/g, "''")}'` : 'NULL'}, ${validatedData.notes ? `'${validatedData.notes.replace(/'/g, "''")}'` : 'NULL'}, 'pending', NOW())`
+      );
+      
+      return res.status(201).json({ success: true, message: "تم إرسال طلبك بنجاح" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("Error creating product request:", error);
+      return res.status(500).json({ error: "حدث خطأ أثناء إرسال الطلب" });
+    }
+  });
+
   app.post("/api/auth/register", async (req, res) => {
     try {
       const registerSchema = insertUserSchema.extend({

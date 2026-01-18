@@ -109,20 +109,22 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
             </span>
           </Link>
 
-          <form onSubmit={handleSearch} className="flex-1 max-w-md hidden md:flex gap-1.5">
-            <Input
-              type="search"
-              placeholder={t('header.searchPlaceholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="flex-1 h-9 px-3 rounded-lg border border-border bg-muted/30 focus:border-muted-foreground/40 focus:bg-background transition-all placeholder:text-muted-foreground/50 text-sm"
-              data-testid="input-search"
-            />
+          <form onSubmit={handleSearch} className="flex-1 max-w-lg hidden md:flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/70" />
+              <Input
+                type="search"
+                placeholder={t('header.searchPlaceholder')}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 ps-10 pe-4 rounded-xl bg-card/80 border-2 border-primary/20 focus:border-primary focus:bg-card shadow-inner placeholder:text-muted-foreground/60"
+                data-testid="input-search"
+              />
+            </div>
             <Button
               type="submit"
-              size="sm"
-              variant="ghost"
-              className="h-9 px-3 rounded-lg"
+              size="default"
+              className="rounded-xl px-5"
               data-testid="button-search"
             >
               <Search className="h-4 w-4" />

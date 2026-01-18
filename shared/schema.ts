@@ -733,3 +733,24 @@ export const insertAdapterSaleItemSchema = createInsertSchema(adapterSaleItems).
 
 export type InsertAdapterSaleItem = z.infer<typeof insertAdapterSaleItemSchema>;
 export type AdapterSaleItem = typeof adapterSaleItems.$inferSelect;
+
+// Product Requests - for customers requesting unavailable products
+export const productRequests = pgTable("product_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  productName: text("product_name").notNull(),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  customerEmail: text("customer_email"),
+  notes: text("notes"),
+  status: text("status").notNull().default("pending"), // pending, contacted, fulfilled, cancelled
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertProductRequestSchema = createInsertSchema(productRequests).omit({
+  id: true,
+  createdAt: true,
+  status: true,
+});
+
+export type InsertProductRequest = z.infer<typeof insertProductRequestSchema>;
+export type ProductRequest = typeof productRequests.$inferSelect;

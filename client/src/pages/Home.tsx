@@ -15,7 +15,10 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { Link, useLocation, useSearch } from "wouter";
-import { Wrench, Search, Package } from "lucide-react";
+import { Wrench, Search, Package, Send, PackageX } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -67,6 +70,15 @@ export default function Home() {
   const showFeaturedProducts = storeSettings?.showFeaturedProducts !== 0;
   const featuredProductsCount = storeSettings?.featuredProductsCount || 8;
 
+  const [showRequestForm, setShowRequestForm] = useState(false);
+  const [requestForm, setRequestForm] = useState({
+    productName: '',
+    customerName: '',
+    customerPhone: '',
+    customerEmail: '',
+    notes: '',
+  });
+
   const addToCartMutation = useMutation({
     mutationFn: async (productId: string) => {
       return await apiRequest('POST', '/api/cart', {
@@ -76,6 +88,31 @@ export default function Home() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+    },
+  });
+
+  const productRequestMutation = useMutation({
+    mutationFn: async (data: typeof requestForm) => {
+      return await apiRequest('POST', '/api/product-requests', data);
+    },
+    onSuccess: () => {
+      toast({
+        title: t('home.requestProduct.success'),
+      });
+      setShowRequestForm(false);
+      setRequestForm({
+        productName: searchQuery,
+        customerName: '',
+        customerPhone: '',
+        customerEmail: '',
+        notes: '',
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('home.requestProduct.error'),
+        variant: 'destructive',
+      });
     },
   });
 
@@ -266,10 +303,110 @@ export default function Home() {
                 </p>
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-12">
-                <p className="text-lg text-muted-foreground" data-testid="text-no-products">
-                  {searchQuery ? t('home.noSearchResults') : t('home.noProducts')}
-                </p>
+              <div className="py-12">
+                <div className="text-center mb-8">
+                  <PackageX className="h-16 w-16 mx-auto text-muted-foreground/50 mb-4" />
+                  <p className="text-xl text-muted-foreground mb-2" data-testid="text-no-products">
+                    {searchQuery ? t('home.noSearchResults') : t('home.noProducts')}
+                  </p>
+                  {searchQuery && !showRequestForm && (
+                    <Button 
+                      onClick={() => {
+                        setRequestForm(prev => ({ ...prev, productName: searchQuery }));
+                        setShowRequestForm(true);
+                      }}
+                      className="mt-4"
+                      data-testid="button-request-product"
+                    >
+                      <Send className="h-4 w-4 me-2" />
+                      {t('home.requestProduct')}
+                    </Button>
+                  )}
+                </div>
+
+                {showRequestForm && (
+                  <Card className="max-w-lg mx-auto border-primary/30" data-testid="card-product-request">
+                    <CardHeader className="text-center">
+                      <CardTitle className="text-primary">{t('home.requestProduct.title')}</CardTitle>
+                      <CardDescription>{t('home.requestProduct.desc')}</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          productRequestMutation.mutate(requestForm);
+                        }}
+                        className="space-y-4"
+                      >
+                        <div>
+                          <Input
+                            placeholder={t('home.requestProduct.productName')}
+                            value={requestForm.productName}
+                            onChange={(e) => setRequestForm(prev => ({ ...prev, productName: e.target.value }))}
+                            required
+                            data-testid="input-request-product-name"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            placeholder={t('home.requestProduct.customerName')}
+                            value={requestForm.customerName}
+                            onChange={(e) => setRequestForm(prev => ({ ...prev, customerName: e.target.value }))}
+                            required
+                            data-testid="input-request-customer-name"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            type="tel"
+                            placeholder={t('home.requestProduct.customerPhone')}
+                            value={requestForm.customerPhone}
+                            onChange={(e) => setRequestForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                            required
+                            data-testid="input-request-phone"
+                          />
+                        </div>
+                        <div>
+                          <Input
+                            type="email"
+                            placeholder={t('home.requestProduct.customerEmail')}
+                            value={requestForm.customerEmail}
+                            onChange={(e) => setRequestForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                            data-testid="input-request-email"
+                          />
+                        </div>
+                        <div>
+                          <Textarea
+                            placeholder={t('home.requestProduct.notes')}
+                            value={requestForm.notes}
+                            onChange={(e) => setRequestForm(prev => ({ ...prev, notes: e.target.value }))}
+                            rows={3}
+                            data-testid="textarea-request-notes"
+                          />
+                        </div>
+                        <div className="flex gap-3">
+                          <Button 
+                            type="submit" 
+                            className="flex-1"
+                            disabled={productRequestMutation.isPending}
+                            data-testid="button-submit-request"
+                          >
+                            <Send className="h-4 w-4 me-2" />
+                            {productRequestMutation.isPending ? '...' : t('home.requestProduct.submit')}
+                          </Button>
+                          <Button 
+                            type="button" 
+                            variant="outline"
+                            onClick={() => setShowRequestForm(false)}
+                            data-testid="button-cancel-request"
+                          >
+                            {t('common.cancel')}
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 md:gap-6">
