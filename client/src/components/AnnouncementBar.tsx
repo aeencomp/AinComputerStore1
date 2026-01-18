@@ -31,36 +31,39 @@ export function AnnouncementBar() {
     return null;
   }
 
-  const bgColor = settings.announcementBgColor || '#3B82F6';
   const scrollDirection = settings.announcementScrollDirection || 'rtl';
 
   return (
     <div 
-      className="relative py-2 text-sm font-medium text-white overflow-hidden"
-      style={{ backgroundColor: bgColor }}
+      className="relative overflow-hidden announcement-bar-animated"
       data-testid="announcement-bar"
     >
-      <div className={`flex whitespace-nowrap ${scrollDirection === 'rtl' ? 'animate-marquee-rtl' : 'animate-marquee-ltr'}`}>
-        <div className="flex shrink-0">
-          <span className="mx-8" data-testid="text-announcement">{text}</span>
-          <span className="mx-8">{text}</span>
-          <span className="mx-8">{text}</span>
-          <span className="mx-8">{text}</span>
-        </div>
-        <div className="flex shrink-0">
-          <span className="mx-8">{text}</span>
-          <span className="mx-8">{text}</span>
-          <span className="mx-8">{text}</span>
-          <span className="mx-8">{text}</span>
+      <div className="absolute inset-0 bg-gradient-to-r from-black via-red-900 to-black" />
+      <div className="absolute inset-0 announcement-shimmer" />
+      <div className="relative py-2.5 text-sm font-semibold text-white tracking-wide">
+        <div className={`flex whitespace-nowrap ${scrollDirection === 'rtl' ? 'animate-marquee-rtl' : 'animate-marquee-ltr'}`}>
+          <div className="flex shrink-0">
+            <span className="mx-8 drop-shadow-lg" data-testid="text-announcement">{text}</span>
+            <span className="mx-8 drop-shadow-lg">{text}</span>
+            <span className="mx-8 drop-shadow-lg">{text}</span>
+            <span className="mx-8 drop-shadow-lg">{text}</span>
+          </div>
+          <div className="flex shrink-0">
+            <span className="mx-8 drop-shadow-lg">{text}</span>
+            <span className="mx-8 drop-shadow-lg">{text}</span>
+            <span className="mx-8 drop-shadow-lg">{text}</span>
+            <span className="mx-8 drop-shadow-lg">{text}</span>
+          </div>
         </div>
       </div>
+      <div className="absolute bottom-0 left-0 right-0 h-[2px] animated-gradient-border" />
       <button
         onClick={handleDismiss}
-        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-white/20 rounded transition-colors z-10 bg-black/20"
+        className="absolute right-3 top-1/2 -translate-y-1/2 p-1.5 hover:bg-white/20 rounded-full transition-all z-10 bg-black/30 backdrop-blur-sm border border-white/10"
         aria-label="Dismiss announcement"
         data-testid="button-dismiss-announcement"
       >
-        <X className="h-4 w-4" />
+        <X className="h-3.5 w-3.5" />
       </button>
     </div>
   );

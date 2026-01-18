@@ -471,6 +471,59 @@
   animation: shimmer 0.8s ease-in-out;
 }
 
+/* Announcement Bar Styles */
+.announcement-bar-animated {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a0000 25%, #0a0a0a 50%, #1a0000 75%, #0a0a0a 100%);
+  border-top: 1px solid rgba(220, 38, 38, 0.3);
+  border-bottom: 1px solid rgba(220, 38, 38, 0.3);
+}
+
+.announcement-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(220, 38, 38, 0.1) 25%,
+    rgba(220, 38, 38, 0.2) 50%,
+    rgba(220, 38, 38, 0.1) 75%,
+    transparent 100%
+  );
+  animation: announcement-shimmer 4s ease-in-out infinite;
+}
+
+@keyframes announcement-shimmer {
+  0%, 100% {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  50% {
+    transform: translateX(100%);
+    opacity: 1;
+  }
+}
+
+.animated-gradient-border {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    hsl(0 85% 50%) 20%,
+    hsl(0 0% 5%) 40%,
+    hsl(0 85% 60%) 60%,
+    hsl(0 0% 5%) 80%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: gradient-slide 3s linear infinite;
+}
+
+@keyframes gradient-slide {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 /* Floating animation for images */
 @keyframes float {
   0%, 100% {
