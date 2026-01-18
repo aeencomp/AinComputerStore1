@@ -7,9 +7,11 @@ export default {
     direction: 'rtl',
     extend: {
       borderRadius: {
-        lg: ".5625rem", /* 9px */
-        md: ".375rem", /* 6px */
-        sm: ".1875rem", /* 3px */
+        lg: "0.875rem", /* 14px - more modern rounded */
+        md: "0.625rem", /* 10px */
+        sm: "0.375rem", /* 6px */
+        xl: "1.25rem", /* 20px - for large cards */
+        "2xl": "1.5rem", /* 24px - for hero sections */
       },
       colors: {
         // Flat / base colors (regular buttons)
