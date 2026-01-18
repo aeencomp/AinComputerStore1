@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { AnnouncementBar } from "@/components/AnnouncementBar";
 import { HeroSection } from "@/components/HeroSection";
+import { HeroSlideshow } from "@/components/HeroSlideshow";
 import { CategorySection } from "@/components/CategorySection";
 import { ProductCard } from "@/components/ProductCard";
 import { CartSidebar } from "@/components/CartSidebar";
@@ -186,6 +187,8 @@ export default function Home() {
       />
 
       <main className="flex-1">
+        {!searchQuery && !selectedCategory && <HeroSlideshow />}
+        
         {!searchQuery && !selectedCategory && showCategories && <CategorySection onCategoryClick={handleCategorySelect} />}
 
         {!searchQuery && !selectedCategory && (
