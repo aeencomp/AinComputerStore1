@@ -2,113 +2,93 @@
 
 ## Important: This APK Connects to Your Online Store
 
-This Android app is configured to load your **live published website**. 
-The app will NOT work offline - it requires internet connection to access your store.
+This Android app loads your **live published website** (https://aeen-iq.com).
+The app requires an internet connection to work.
 
-**Before building, you MUST:**
-1. Publish your website on Replit first
-2. Update `capacitor.config.ts` with your published URL
+## Quick Build Steps (5 minutes)
 
-## Prerequisites
+### Prerequisites
+1. **Android Studio** - Download from https://developer.android.com/studio
+2. **Java JDK 17+** - Usually included with Android Studio
 
-1. **Android Studio** (Download from https://developer.android.com/studio)
-2. **Java JDK 17+**
-3. **Node.js 18+**
-4. **Your published website URL** (e.g., https://your-app.replit.app)
+### Step 1: Download This Project
+1. Click the three dots menu (⋮) in Replit
+2. Select "Download as zip"
+3. Extract the zip file on your computer
 
-## Step-by-Step Build Guide
-
-### Step 1: Update Your Website URL
-
-The URL is already configured in `capacitor.config.ts`:
-```typescript
-const LIVE_WEBSITE_URL = 'https://aeen-iq.com';
+### Step 2: Open Terminal in Project Folder
+```bash
+cd path/to/extracted/project
 ```
 
-### Step 2: Build the Web App
+### Step 3: Install Dependencies & Build
 ```bash
+npm install
 npm run build
 ```
 
-### Step 3: Initialize Capacitor Android
+### Step 4: Add Android Platform
 ```bash
 npx cap add android
-```
-
-### Step 4: Copy Web Assets to Android
-```bash
-npx cap copy android
-```
-
-### Step 5: Sync Capacitor Plugins
-```bash
 npx cap sync android
 ```
 
-### Step 6: Open in Android Studio
+### Step 5: Open in Android Studio
 ```bash
 npx cap open android
 ```
 
-### Step 7: Build APK in Android Studio
-
-1. Wait for Gradle sync to complete
+### Step 6: Build APK
+1. Wait for Gradle sync to complete (may take a few minutes first time)
 2. Go to **Build > Build Bundle(s) / APK(s) > Build APK(s)**
-3. The APK will be generated at:
-   `android/app/build/outputs/apk/debug/app-debug.apk`
+3. Wait for build to complete
+4. Click "locate" in the notification to find your APK
 
-## For Release APK (Google Play):
+The APK will be at: `android/app/build/outputs/apk/debug/app-debug.apk`
 
-1. Generate a signing key:
+## App Details
+
+| Setting | Value |
+|---------|-------|
+| Package ID | `com.alain.computers` |
+| App Name | العين لتجارة الحاسبات |
+| Min Android | 5.1 (API 22) |
+| Target Android | 14 (API 34) |
+| Theme | Black (#0f0f0f) with Red accent |
+
+## For Google Play Store (Release APK)
+
+### Generate Signing Key
 ```bash
 keytool -genkey -v -keystore alain-release-key.jks -keyalg RSA -keysize 2048 -validity 10000 -alias alain
 ```
 
-2. In Android Studio:
-   - Go to **Build > Generate Signed Bundle/APK**
-   - Select **APK**
-   - Choose your keystore and enter credentials
-   - Select **release** build variant
-   - Build
+### Build Signed APK
+1. In Android Studio: **Build > Generate Signed Bundle/APK**
+2. Select **APK**
+3. Choose your keystore file and enter credentials
+4. Select **release** build variant
+5. Click **Create**
 
-## App Configuration
+## Customizing App Icon
 
-- **Package ID**: `com.alain.computers`
-- **App Name**: العين لتجارة الحاسبات
-- **Min SDK**: 22 (Android 5.1)
-- **Target SDK**: 34 (Android 14)
-
-## Customizing Icons
-
-Replace the following files in `android/app/src/main/res/`:
-- `mipmap-mdpi/ic_launcher.png` (48x48)
-- `mipmap-hdpi/ic_launcher.png` (72x72)
-- `mipmap-xhdpi/ic_launcher.png` (96x96)
-- `mipmap-xxhdpi/ic_launcher.png` (144x144)
-- `mipmap-xxxhdpi/ic_launcher.png` (192x192)
-
-## Splash Screen
-
-The splash screen is configured in `capacitor.config.ts` with:
-- Background color: #0891b2 (cyan)
-- White spinner during loading
-
-## Server URL for Development
-
-To test against your development server:
-1. Set `CAPACITOR_SERVER_URL` environment variable to your Replit URL
-2. Run `npx cap copy android`
+Replace these files in `android/app/src/main/res/`:
+- `mipmap-mdpi/ic_launcher.png` (48x48 px)
+- `mipmap-hdpi/ic_launcher.png` (72x72 px)
+- `mipmap-xhdpi/ic_launcher.png` (96x96 px)
+- `mipmap-xxhdpi/ic_launcher.png` (144x144 px)
+- `mipmap-xxxhdpi/ic_launcher.png` (192x192 px)
 
 ## Troubleshooting
 
-### Gradle Sync Failed
-- Ensure Java JDK 17+ is installed
-- Check Android Studio SDK Manager for required SDK versions
+### "Gradle sync failed"
+- Make sure Java JDK 17+ is installed
+- In Android Studio: File > Settings > Build > Gradle > Gradle JDK > Select JDK 17
 
-### White Screen on App Launch
-- Check that `dist/public` folder exists after build
-- Verify `webDir` in `capacitor.config.ts` matches your build output
+### "White screen on launch"
+- Make sure you ran `npm run build` before `npx cap sync android`
+- Check that `dist/public` folder exists
 
-### Network Requests Failing
-- `cleartext: true` is enabled for development
-- For production, ensure your server uses HTTPS
+### "App crashes immediately"
+- Check internet connection - the app needs internet to load the website
+- Make sure https://aeen-iq.com is accessible
