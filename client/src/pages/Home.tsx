@@ -144,17 +144,12 @@ export default function Home() {
     : products;
 
   const handleCategorySelect = (category: string) => {
-    if (category && category !== 'all') {
+    if (category === 'all') {
+      setLocation('/products');
+    } else if (category) {
       setLocation(`/?category=${category}`);
     } else {
       setLocation('/');
-      // Scroll to products section when "All Products" is clicked
-      setTimeout(() => {
-        const productsSection = document.querySelector('[data-testid="section-products"]');
-        if (productsSection) {
-          productsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }
-      }, 100);
     }
     setSearchQuery("");
   };

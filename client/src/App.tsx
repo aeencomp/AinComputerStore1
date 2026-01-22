@@ -8,6 +8,7 @@ import { CartProvider } from "@/contexts/CartContext";
 import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import { WhatsAppButton } from "@/components/WhatsAppButton";
 import Home from "@/pages/Home";
+import AllProducts from "@/pages/AllProducts";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import ProductDetail from "@/pages/ProductDetail";
@@ -55,6 +56,7 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={Home}/>
+      <Route path="/products" component={AllProducts}/>
       <Route path="/login" component={Login}/>
       <Route path="/register" component={Register}/>
       <Route path="/product/:id" component={ProductDetail}/>
