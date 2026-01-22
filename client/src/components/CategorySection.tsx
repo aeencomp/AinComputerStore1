@@ -4,8 +4,15 @@ import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.pn
 import desktopImage from "@assets/generated_images/gaming_desktop_pc_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
 import accessoriesImage from "@assets/generated_images/gaming_accessories_collection_photo.png";
+import allProductsImage from "@assets/generated_images/gaming_setup_hero_banner.png";
 
 const categories = [
+  {
+    id: 'all',
+    nameAr: 'جميع المنتجات',
+    nameEn: 'All Products',
+    image: allProductsImage,
+  },
   {
     id: 'laptops',
     nameAr: 'أجهزة لابتوب',
@@ -59,7 +66,7 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
             <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
           {categories.map((category, index) => (
               <div
                 key={category.id}

@@ -144,7 +144,7 @@ export default function Home() {
     : products;
 
   const handleCategorySelect = (category: string) => {
-    if (category) {
+    if (category && category !== 'all') {
       setLocation(`/?category=${category}`);
     } else {
       setLocation('/');
