@@ -22,7 +22,8 @@ import {
   Activity,
   Ban,
   ShieldCheck,
-  ShieldX
+  ShieldX,
+  Trash2
 } from "lucide-react";
 
 interface AnalyticsData {
@@ -131,6 +132,19 @@ export default function AdminAnalytics() {
   const isIpBlocked = (ipAddress: string): boolean => {
     return blockedIps?.some(b => b.ipAddress === ipAddress && b.isActive === 1) || false;
   };
+
+  const clearVisitorsMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest('DELETE', '/api/admin/analytics/clear-visitors');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/analytics'] });
+      toast({
+        title: language === 'ar' ? 'تم المسح' : 'Cleared',
+        description: language === 'ar' ? 'تم مسح جميع بيانات الزوار' : 'All visitor data has been cleared',
+      });
+    },
+  });
 
   const formatDuration = (seconds: number): string => {
     if (seconds < 60) return `${seconds}${language === 'ar' ? ' ثانية' : 's'}`;
@@ -415,9 +429,30 @@ export default function AdminAnalytics() {
 
               <Card>
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">
-                    {language === 'ar' ? 'الجلسات الأخيرة' : 'Recent Sessions'}
-                  </CardTitle>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base">
+                      {language === 'ar' ? 'الجلسات الأخيرة' : 'Recent Sessions'}
+                    </CardTitle>
+                    {analytics.recentSessions.length > 0 && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-red-600 border-red-600"
+                        onClick={() => {
+                          if (confirm(language === 'ar' 
+                            ? 'هل أنت متأكد من مسح جميع بيانات الزوار؟' 
+                            : 'Are you sure you want to clear all visitor data?')) {
+                            clearVisitorsMutation.mutate();
+                          }
+                        }}
+                        disabled={clearVisitorsMutation.isPending}
+                        data-testid="button-clear-visitors"
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        {language === 'ar' ? 'مسح الكل' : 'Clear All'}
+                      </Button>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   <ScrollArea className="h-[300px]">

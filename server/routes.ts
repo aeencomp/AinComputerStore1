@@ -4950,5 +4950,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Clear all visitor sessions (admin only)
+  app.delete("/api/admin/analytics/clear-visitors", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      // Delete all page views first (foreign key dependency)
+      await db.delete(pageViews);
+      
+      // Delete all visitor sessions
+      await db.delete(visitorSessions);
+      
+      return res.json({ success: true, message: "All visitor data cleared" });
+    } catch (error) {
+      console.error("Error clearing visitors:", error);
+      return res.status(500).json({ error: "Failed to clear visitor data" });
+    }
+  });
+
   return httpServer;
 }
