@@ -125,17 +125,17 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
                     </a>
                     
                     <a href={`tel:${phoneNumber}`}>
-                      <Button variant="outline" className="w-full gap-2 hover:bg-gray-50">
-                        <Phone className="h-4 w-4" />
-                        <span dir="ltr">{phoneNumber}</span>
+                      <Button variant="outline" className="w-full gap-2 hover:bg-gray-50 text-gray-800 border-gray-300">
+                        <Phone className="h-4 w-4 text-gray-600" />
+                        <span dir="ltr" className="text-gray-800">{phoneNumber}</span>
                       </Button>
                     </a>
                     
                     {email && (
                       <a href={`mailto:${email}?subject=${encodeURIComponent(language === 'ar' ? `طلب إلغاء حظر - Ray ID: ${rayId}` : `Unblock Request - Ray ID: ${rayId}`)}`}>
-                        <Button variant="outline" className="w-full gap-2 hover:bg-gray-50">
-                          <Mail className="h-4 w-4" />
-                          {language === 'ar' ? 'البريد الإلكتروني' : 'Email'}
+                        <Button variant="outline" className="w-full gap-2 hover:bg-gray-50 text-gray-800 border-gray-300">
+                          <Mail className="h-4 w-4 text-gray-600" />
+                          <span className="text-gray-800">{language === 'ar' ? 'البريد الإلكتروني' : 'Email'}</span>
                         </Button>
                       </a>
                     )}
