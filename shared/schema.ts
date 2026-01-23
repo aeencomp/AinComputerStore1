@@ -754,3 +754,52 @@ export const insertProductRequestSchema = createInsertSchema(productRequests).om
 
 export type InsertProductRequest = z.infer<typeof insertProductRequestSchema>;
 export type ProductRequest = typeof productRequests.$inferSelect;
+
+// Visitor Sessions - for tracking website analytics
+export const visitorSessions = pgTable("visitor_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: text("session_id").notNull(), // Unique session identifier
+  ipAddress: text("ip_address"),
+  country: text("country"),
+  countryCode: text("country_code"),
+  city: text("city"),
+  userAgent: text("user_agent"),
+  device: text("device"), // desktop, mobile, tablet
+  browser: text("browser"),
+  os: text("os"),
+  referrer: text("referrer"),
+  landingPage: text("landing_page"),
+  pagesViewed: integer("pages_viewed").notNull().default(1),
+  startTime: timestamp("start_time").defaultNow().notNull(),
+  lastActivity: timestamp("last_activity").defaultNow().notNull(),
+  endTime: timestamp("end_time"),
+  duration: integer("duration").default(0), // Duration in seconds
+  isActive: integer("is_active").notNull().default(1),
+});
+
+export const insertVisitorSessionSchema = createInsertSchema(visitorSessions).omit({
+  id: true,
+  startTime: true,
+  lastActivity: true,
+});
+
+export type InsertVisitorSession = z.infer<typeof insertVisitorSessionSchema>;
+export type VisitorSession = typeof visitorSessions.$inferSelect;
+
+// Page Views - for tracking individual page visits
+export const pageViews = pgTable("page_views", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  sessionId: text("session_id").notNull(),
+  pagePath: text("page_path").notNull(),
+  pageTitle: text("page_title"),
+  timestamp: timestamp("timestamp").defaultNow().notNull(),
+  timeOnPage: integer("time_on_page").default(0), // Time in seconds
+});
+
+export const insertPageViewSchema = createInsertSchema(pageViews).omit({
+  id: true,
+  timestamp: true,
+});
+
+export type InsertPageView = z.infer<typeof insertPageViewSchema>;
+export type PageView = typeof pageViews.$inferSelect;
