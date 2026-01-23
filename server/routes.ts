@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte } from "drizzle-orm";
+import { eq, desc, and, gte, sql, count, between } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
@@ -4512,6 +4512,316 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error validating discount code:", error);
       return res.status(500).json({ error: "Failed to validate discount code" });
+    }
+  });
+
+  // ============ VISITOR ANALYTICS ROUTES ============
+  
+  // Start a new visitor session (public)
+  app.post("/api/analytics/session", async (req, res) => {
+    try {
+      const { sessionId, landingPage, referrer, userAgent } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID required" });
+      }
+      
+      // Parse user agent for device/browser info
+      const ua = userAgent || req.headers['user-agent'] || '';
+      let device = 'desktop';
+      if (/mobile/i.test(ua)) device = 'mobile';
+      else if (/tablet|ipad/i.test(ua)) device = 'tablet';
+      
+      let browser = 'unknown';
+      if (/chrome/i.test(ua) && !/edg/i.test(ua)) browser = 'Chrome';
+      else if (/firefox/i.test(ua)) browser = 'Firefox';
+      else if (/safari/i.test(ua) && !/chrome/i.test(ua)) browser = 'Safari';
+      else if (/edg/i.test(ua)) browser = 'Edge';
+      else if (/opera|opr/i.test(ua)) browser = 'Opera';
+      
+      let os = 'unknown';
+      if (/windows/i.test(ua)) os = 'Windows';
+      else if (/mac/i.test(ua)) os = 'macOS';
+      else if (/linux/i.test(ua)) os = 'Linux';
+      else if (/android/i.test(ua)) os = 'Android';
+      else if (/iphone|ipad/i.test(ua)) os = 'iOS';
+      
+      // Get IP address
+      const ipAddress = req.headers['x-forwarded-for']?.toString().split(',')[0] || 
+                        req.socket.remoteAddress || 'unknown';
+      
+      // Try to get country from IP using free API
+      let country = 'Unknown';
+      let countryCode = 'XX';
+      let city = '';
+      
+      try {
+        if (ipAddress && ipAddress !== 'unknown' && !ipAddress.startsWith('127.') && !ipAddress.startsWith('::1')) {
+          const geoResponse = await fetch(`http://ip-api.com/json/${ipAddress}?fields=status,country,countryCode,city`);
+          const geoData = await geoResponse.json();
+          if (geoData.status === 'success') {
+            country = geoData.country || 'Unknown';
+            countryCode = geoData.countryCode || 'XX';
+            city = geoData.city || '';
+          }
+        }
+      } catch (geoError) {
+        // Silently fail, use defaults
+      }
+      
+      // Check if session already exists
+      const existing = await db.select().from(visitorSessions)
+        .where(eq(visitorSessions.sessionId, sessionId)).limit(1);
+      
+      if (existing.length > 0) {
+        // Update last activity
+        await db.update(visitorSessions)
+          .set({ 
+            lastActivity: new Date(),
+            pagesViewed: sql`${visitorSessions.pagesViewed} + 1`
+          })
+          .where(eq(visitorSessions.sessionId, sessionId));
+        return res.json({ success: true, existing: true });
+      }
+      
+      // Create new session
+      await db.insert(visitorSessions).values({
+        sessionId,
+        ipAddress,
+        country,
+        countryCode,
+        city,
+        userAgent: ua,
+        device,
+        browser,
+        os,
+        referrer: referrer || '',
+        landingPage: landingPage || '/',
+        pagesViewed: 1,
+        isActive: 1,
+      });
+      
+      return res.json({ success: true, country, countryCode });
+    } catch (error) {
+      console.error("Error creating visitor session:", error);
+      return res.status(500).json({ error: "Failed to track session" });
+    }
+  });
+  
+  // Update session activity (heartbeat)
+  app.post("/api/analytics/heartbeat", async (req, res) => {
+    try {
+      const { sessionId, duration } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID required" });
+      }
+      
+      await db.update(visitorSessions)
+        .set({ 
+          lastActivity: new Date(),
+          duration: duration || 0,
+        })
+        .where(eq(visitorSessions.sessionId, sessionId));
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating heartbeat:", error);
+      return res.status(500).json({ error: "Failed to update heartbeat" });
+    }
+  });
+  
+  // End session
+  app.post("/api/analytics/end-session", async (req, res) => {
+    try {
+      const { sessionId, duration } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ error: "Session ID required" });
+      }
+      
+      await db.update(visitorSessions)
+        .set({ 
+          endTime: new Date(),
+          duration: duration || 0,
+          isActive: 0,
+        })
+        .where(eq(visitorSessions.sessionId, sessionId));
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error ending session:", error);
+      return res.status(500).json({ error: "Failed to end session" });
+    }
+  });
+  
+  // Record page view
+  app.post("/api/analytics/pageview", async (req, res) => {
+    try {
+      const { sessionId, pagePath, pageTitle, timeOnPage } = req.body;
+      
+      if (!sessionId || !pagePath) {
+        return res.status(400).json({ error: "Session ID and page path required" });
+      }
+      
+      await db.insert(pageViews).values({
+        sessionId,
+        pagePath,
+        pageTitle: pageTitle || '',
+        timeOnPage: timeOnPage || 0,
+      });
+      
+      // Update session page count
+      await db.update(visitorSessions)
+        .set({ 
+          lastActivity: new Date(),
+          pagesViewed: sql`${visitorSessions.pagesViewed} + 1`
+        })
+        .where(eq(visitorSessions.sessionId, sessionId));
+      
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error recording page view:", error);
+      return res.status(500).json({ error: "Failed to record page view" });
+    }
+  });
+  
+  // Get analytics data (admin only)
+  app.get("/api/admin/analytics", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const { period = '7d' } = req.query;
+      
+      // Calculate date range
+      let startDate = new Date();
+      switch(period) {
+        case '24h':
+          startDate.setHours(startDate.getHours() - 24);
+          break;
+        case '7d':
+          startDate.setDate(startDate.getDate() - 7);
+          break;
+        case '30d':
+          startDate.setDate(startDate.getDate() - 30);
+          break;
+        case '90d':
+          startDate.setDate(startDate.getDate() - 90);
+          break;
+        default:
+          startDate.setDate(startDate.getDate() - 7);
+      }
+      
+      // Get sessions in date range
+      const sessions = await db.select().from(visitorSessions)
+        .where(gte(visitorSessions.startTime, startDate))
+        .orderBy(desc(visitorSessions.startTime));
+      
+      // Calculate statistics
+      const totalVisitors = sessions.length;
+      const activeNow = sessions.filter(s => s.isActive === 1).length;
+      
+      // Average duration
+      const completedSessions = sessions.filter(s => s.duration && s.duration > 0);
+      const avgDuration = completedSessions.length > 0 
+        ? Math.round(completedSessions.reduce((sum, s) => sum + (s.duration || 0), 0) / completedSessions.length)
+        : 0;
+      
+      // Average pages per session
+      const avgPages = totalVisitors > 0 
+        ? Math.round(sessions.reduce((sum, s) => sum + s.pagesViewed, 0) / totalVisitors * 10) / 10
+        : 0;
+      
+      // Country breakdown
+      const countryStats: Record<string, number> = {};
+      sessions.forEach(s => {
+        const country = s.country || 'Unknown';
+        countryStats[country] = (countryStats[country] || 0) + 1;
+      });
+      const countries = Object.entries(countryStats)
+        .map(([country, count]) => ({ country, count, percentage: Math.round(count / totalVisitors * 100) }))
+        .sort((a, b) => b.count - a.count);
+      
+      // Device breakdown
+      const deviceStats: Record<string, number> = {};
+      sessions.forEach(s => {
+        const device = s.device || 'unknown';
+        deviceStats[device] = (deviceStats[device] || 0) + 1;
+      });
+      const devices = Object.entries(deviceStats)
+        .map(([device, count]) => ({ device, count, percentage: Math.round(count / totalVisitors * 100) }))
+        .sort((a, b) => b.count - a.count);
+      
+      // Browser breakdown
+      const browserStats: Record<string, number> = {};
+      sessions.forEach(s => {
+        const browser = s.browser || 'unknown';
+        browserStats[browser] = (browserStats[browser] || 0) + 1;
+      });
+      const browsers = Object.entries(browserStats)
+        .map(([browser, count]) => ({ browser, count, percentage: Math.round(count / totalVisitors * 100) }))
+        .sort((a, b) => b.count - a.count);
+      
+      // Daily visitors
+      const dailyStats: Record<string, number> = {};
+      sessions.forEach(s => {
+        const date = new Date(s.startTime).toISOString().split('T')[0];
+        dailyStats[date] = (dailyStats[date] || 0) + 1;
+      });
+      const dailyVisitors = Object.entries(dailyStats)
+        .map(([date, count]) => ({ date, count }))
+        .sort((a, b) => a.date.localeCompare(b.date));
+      
+      // Recent sessions (last 20)
+      const recentSessions = sessions.slice(0, 20).map(s => ({
+        id: s.id,
+        country: s.country,
+        countryCode: s.countryCode,
+        city: s.city,
+        device: s.device,
+        browser: s.browser,
+        os: s.os,
+        pagesViewed: s.pagesViewed,
+        duration: s.duration,
+        startTime: s.startTime,
+        isActive: s.isActive,
+        landingPage: s.landingPage,
+      }));
+      
+      // Get top pages
+      const allPageViews = await db.select().from(pageViews)
+        .where(gte(pageViews.timestamp, startDate));
+      
+      const pageStats: Record<string, number> = {};
+      allPageViews.forEach(pv => {
+        pageStats[pv.pagePath] = (pageStats[pv.pagePath] || 0) + 1;
+      });
+      const topPages = Object.entries(pageStats)
+        .map(([page, views]) => ({ page, views }))
+        .sort((a, b) => b.views - a.views)
+        .slice(0, 10);
+      
+      return res.json({
+        summary: {
+          totalVisitors,
+          activeNow,
+          avgDuration,
+          avgPages,
+          totalPageViews: allPageViews.length,
+        },
+        countries,
+        devices,
+        browsers,
+        dailyVisitors,
+        topPages,
+        recentSessions,
+      });
+    } catch (error) {
+      console.error("Error getting analytics:", error);
+      return res.status(500).json({ error: "Failed to get analytics" });
     }
   });
 

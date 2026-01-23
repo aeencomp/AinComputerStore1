@@ -18,7 +18,8 @@ import {
   ExternalLink,
   Tag,
   MessageSquare,
-  Languages
+  Languages,
+  Activity
 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -92,6 +93,7 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
     { href: "/admin/programs", icon: GraduationCap, labelAr: "البرامج", labelEn: "Programs", permission: "products" },
     { href: "/admin/discount-codes", icon: Tag, labelAr: "أكواد الخصم", labelEn: "Discount Codes", permission: "discounts" },
     { href: "/admin/reviews", icon: MessageSquare, labelAr: "التقييمات", labelEn: "Reviews", permission: "products" },
+    { href: "/admin/analytics", icon: Activity, labelAr: "تحليلات الزوار", labelEn: "Analytics", permission: "reports" },
     { href: "/admin/settings", icon: Settings, labelAr: "الإعدادات", labelEn: "Settings", permission: "settings" },
   ];
 
