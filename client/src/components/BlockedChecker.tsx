@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useQuery } from '@tanstack/react-query';
-import { ShieldX, Phone, MessageCircle, Mail } from 'lucide-react';
+import { Shield, Phone, MessageCircle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface StoreSettings {
@@ -15,6 +15,7 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
   const [isBlocked, setIsBlocked] = useState(false);
   const [reason, setReason] = useState<string>('');
   const [checked, setChecked] = useState(false);
+  const [rayId] = useState(() => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
 
   const { data: storeSettings } = useQuery<StoreSettings>({
     queryKey: ['/api/store-settings'],
@@ -51,64 +52,104 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
 
     return (
       <div 
-        className="min-h-screen bg-background flex items-center justify-center p-4"
+        className="min-h-screen bg-[#1a1a2e] flex flex-col"
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        <div className="text-center max-w-md">
-          <div className="flex justify-center mb-6">
-            <div className="h-20 w-20 rounded-full bg-red-500/10 flex items-center justify-center">
-              <ShieldX className="h-10 w-10 text-red-500" />
-            </div>
+        {/* Cloudflare-style header */}
+        <div className="bg-[#f38020] py-3 px-4">
+          <div className="max-w-4xl mx-auto flex items-center gap-2">
+            <Shield className="h-6 w-6 text-white" />
+            <span className="text-white font-semibold text-lg">Security Check</span>
           </div>
-          <h1 className="text-2xl font-bold text-red-500 mb-4">
-            {language === 'ar' ? 'تم حظر الوصول' : 'Access Blocked'}
-          </h1>
-          <p className="text-muted-foreground mb-4">
-            {language === 'ar' 
-              ? 'عذراً، تم حظر الوصول من عنوان IP الخاص بك إلى هذا الموقع.'
-              : 'Sorry, your IP address has been blocked from accessing this site.'}
-          </p>
-          {reason && reason !== 'Access denied' && (
-            <p className="text-sm text-muted-foreground mb-4">
-              {language === 'ar' ? 'السبب: ' : 'Reason: '}{reason}
-            </p>
-          )}
-          
-          <div className="border-t pt-6 mt-6">
-            <p className="text-sm text-muted-foreground mb-4">
-              {language === 'ar' 
-                ? 'إذا كنت تعتقد أن هذا خطأ، يرجى التواصل معنا:'
-                : 'If you believe this is an error, please contact us:'}
-            </p>
-            
-            <div className="flex flex-col gap-3">
-              <a 
-                href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(language === 'ar' ? 'مرحباً، أعتقد أن حظر IP الخاص بي كان خطأ. الرجاء المساعدة.' : 'Hello, I believe my IP was blocked by mistake. Please help.')}`}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <Button variant="outline" className="w-full gap-2 text-green-600 border-green-600">
-                  <MessageCircle className="h-4 w-4" />
-                  {language === 'ar' ? 'تواصل عبر واتساب' : 'Contact via WhatsApp'}
-                </Button>
-              </a>
-              
-              <a href={`tel:${phoneNumber}`}>
-                <Button variant="outline" className="w-full gap-2">
-                  <Phone className="h-4 w-4" />
-                  {language === 'ar' ? 'اتصل بنا' : 'Call Us'}
-                  <span className="font-mono text-sm" dir="ltr">{phoneNumber}</span>
-                </Button>
-              </a>
-              
-              {email && (
-                <a href={`mailto:${email}?subject=${encodeURIComponent(language === 'ar' ? 'طلب إلغاء حظر IP' : 'IP Unblock Request')}`}>
-                  <Button variant="outline" className="w-full gap-2">
-                    <Mail className="h-4 w-4" />
-                    {language === 'ar' ? 'راسلنا عبر البريد' : 'Email Us'}
-                  </Button>
-                </a>
-              )}
+        </div>
+
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="max-w-xl w-full">
+            {/* Main error box */}
+            <div className="bg-white rounded-lg shadow-2xl overflow-hidden">
+              {/* Error header */}
+              <div className="bg-[#c41e3a] px-6 py-4">
+                <h1 className="text-white text-xl font-bold flex items-center gap-2">
+                  <Shield className="h-6 w-6" />
+                  {language === 'ar' ? 'تم حظر الوصول' : 'Access Denied'}
+                </h1>
+                <p className="text-white/90 text-sm mt-1">
+                  Error 1020
+                </p>
+              </div>
+
+              {/* Error content */}
+              <div className="p-6">
+                <div className="mb-6">
+                  <h2 className="text-gray-800 font-semibold text-lg mb-2">
+                    {language === 'ar' ? 'ماذا حدث؟' : 'What happened?'}
+                  </h2>
+                  <p className="text-gray-600">
+                    {language === 'ar' 
+                      ? 'تم حظر هذا الطلب بواسطة قواعد الأمان. عنوان IP الخاص بك قد تم وضعه في القائمة السوداء بسبب نشاط مشبوه.'
+                      : 'This request was blocked by the security rules. Your IP address has been blacklisted due to suspicious activity.'}
+                  </p>
+                </div>
+
+                <div className="bg-gray-100 rounded-lg p-4 mb-6">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500">{language === 'ar' ? 'معرف الحدث:' : 'Ray ID:'}</span>
+                      <p className="font-mono text-gray-800">{rayId}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-500">{language === 'ar' ? 'الوقت:' : 'Time:'}</span>
+                      <p className="font-mono text-gray-800">{new Date().toISOString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Contact section */}
+                <div className="border-t pt-6">
+                  <h3 className="text-gray-800 font-semibold mb-3">
+                    {language === 'ar' 
+                      ? 'هل تعتقد أن هذا خطأ؟ تواصل معنا:'
+                      : 'Think this is a mistake? Contact us:'}
+                  </h3>
+                  
+                  <div className="flex flex-col gap-2">
+                    <a 
+                      href={`https://wa.me/${whatsappNumber.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(language === 'ar' ? `مرحباً، تم حظر IP الخاص بي بالخطأ. Ray ID: ${rayId}` : `Hello, my IP was blocked by mistake. Ray ID: ${rayId}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <Button variant="outline" className="w-full gap-2 text-green-600 border-green-600 hover:bg-green-50">
+                        <MessageCircle className="h-4 w-4" />
+                        {language === 'ar' ? 'واتساب' : 'WhatsApp'}
+                      </Button>
+                    </a>
+                    
+                    <a href={`tel:${phoneNumber}`}>
+                      <Button variant="outline" className="w-full gap-2 hover:bg-gray-50">
+                        <Phone className="h-4 w-4" />
+                        <span dir="ltr">{phoneNumber}</span>
+                      </Button>
+                    </a>
+                    
+                    {email && (
+                      <a href={`mailto:${email}?subject=${encodeURIComponent(language === 'ar' ? `طلب إلغاء حظر - Ray ID: ${rayId}` : `Unblock Request - Ray ID: ${rayId}`)}`}>
+                        <Button variant="outline" className="w-full gap-2 hover:bg-gray-50">
+                          <Mail className="h-4 w-4" />
+                          {language === 'ar' ? 'البريد الإلكتروني' : 'Email'}
+                        </Button>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="text-center mt-6">
+              <p className="text-gray-400 text-sm">
+                {language === 'ar' ? 'الأداء والأمان بواسطة' : 'Performance & security by'}{' '}
+                <span className="text-[#f38020] font-semibold">Cloudflare</span>
+              </p>
             </div>
           </div>
         </div>
