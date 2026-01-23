@@ -803,3 +803,22 @@ export const insertPageViewSchema = createInsertSchema(pageViews).omit({
 
 export type InsertPageView = z.infer<typeof insertPageViewSchema>;
 export type PageView = typeof pageViews.$inferSelect;
+
+// Blocked IPs - for blocking visitors from accessing the site
+export const blockedIps = pgTable("blocked_ips", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  ipAddress: text("ip_address").notNull().unique(),
+  reason: text("reason"),
+  blockedBy: varchar("blocked_by"), // Admin user ID who blocked
+  blockedAt: timestamp("blocked_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at"), // Optional expiration (null = permanent)
+  isActive: integer("is_active").notNull().default(1),
+});
+
+export const insertBlockedIpSchema = createInsertSchema(blockedIps).omit({
+  id: true,
+  blockedAt: true,
+});
+
+export type InsertBlockedIp = z.infer<typeof insertBlockedIpSchema>;
+export type BlockedIp = typeof blockedIps.$inferSelect;

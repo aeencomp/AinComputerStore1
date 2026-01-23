@@ -30,6 +30,7 @@ import AdminReviews from "@/pages/AdminReviews";
 import AdminDiscountCodes from "@/pages/AdminDiscountCodes";
 import AdminAnalytics from "@/pages/AdminAnalytics";
 import { VisitorTracker } from "@/components/VisitorTracker";
+import { BlockedChecker } from "@/components/BlockedChecker";
 import SalesLogin from "@/pages/SalesLogin";
 import SalesPortal from "@/pages/SalesPortal";
 import TechnicianLogin from "@/pages/technician/TechnicianLogin";
@@ -116,9 +117,11 @@ function App() {
           <TooltipProvider>
             <Toaster />
             <VisitorTracker />
-            <Router />
-            <PWAInstallPrompt />
-            <WhatsAppButton />
+            <BlockedChecker>
+              <Router />
+              <PWAInstallPrompt />
+              <WhatsAppButton />
+            </BlockedChecker>
           </TooltipProvider>
         </CartProvider>
       </LanguageProvider>

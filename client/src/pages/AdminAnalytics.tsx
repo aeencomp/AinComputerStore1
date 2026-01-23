@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -7,6 +7,8 @@ import { Separator } from "@/components/ui/separator";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AdminNav } from "@/components/AdminNav";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { 
   Users, 
   Globe, 
@@ -17,7 +19,10 @@ import {
   TrendingUp,
   Eye,
   FileText,
-  Activity
+  Activity,
+  Ban,
+  ShieldCheck,
+  ShieldX
 } from "lucide-react";
 
 interface AnalyticsData {
@@ -67,8 +72,17 @@ interface AdminUser {
   canDiscounts?: number;
 }
 
+interface BlockedIp {
+  id: string;
+  ipAddress: string;
+  reason: string | null;
+  blockedAt: string;
+  isActive: number;
+}
+
 export default function AdminAnalytics() {
-  const { t, language, isRTL } = useLanguage();
+  const { language, isRTL } = useLanguage();
+  const { toast } = useToast();
   const [period, setPeriod] = useState<string>('7d');
 
   const { data: currentAdmin } = useQuery<AdminUser>({
@@ -83,6 +97,40 @@ export default function AdminAnalytics() {
       return response.json();
     },
   });
+
+  const { data: blockedIps } = useQuery<BlockedIp[]>({
+    queryKey: ['/api/admin/blocked-ips'],
+  });
+
+  const blockIpMutation = useMutation({
+    mutationFn: async (ipAddress: string) => {
+      return apiRequest('POST', '/api/admin/blocked-ips', { ipAddress, reason: 'Blocked from analytics' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/blocked-ips'] });
+      toast({
+        title: language === 'ar' ? 'تم الحظر' : 'IP Blocked',
+        description: language === 'ar' ? 'تم حظر عنوان IP بنجاح' : 'IP address has been blocked',
+      });
+    },
+  });
+
+  const unblockIpMutation = useMutation({
+    mutationFn: async (ipAddress: string) => {
+      return apiRequest('DELETE', `/api/admin/blocked-ips/${encodeURIComponent(ipAddress)}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/blocked-ips'] });
+      toast({
+        title: language === 'ar' ? 'تم إلغاء الحظر' : 'IP Unblocked',
+        description: language === 'ar' ? 'تم إلغاء حظر عنوان IP' : 'IP address has been unblocked',
+      });
+    },
+  });
+
+  const isIpBlocked = (ipAddress: string): boolean => {
+    return blockedIps?.some(b => b.ipAddress === ipAddress && b.isActive === 1) || false;
+  };
 
   const formatDuration = (seconds: number): string => {
     if (seconds < 60) return `${seconds}${language === 'ar' ? ' ثانية' : 's'}`;
@@ -398,16 +446,43 @@ export default function AdminAnalytics() {
                               </p>
                             </div>
                           </div>
-                          <div className="text-right">
-                            <p className="text-sm">
-                              {session.pagesViewed} {language === 'ar' ? 'صفحات' : 'pages'}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatDuration(session.duration || 0)}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {formatTime(session.startTime)}
-                            </p>
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-sm">
+                                {session.pagesViewed} {language === 'ar' ? 'صفحات' : 'pages'}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatDuration(session.duration || 0)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatTime(session.startTime)}
+                              </p>
+                            </div>
+                            {session.ipAddress && (
+                              isIpBlocked(session.ipAddress) ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-green-600 border-green-600"
+                                  onClick={() => unblockIpMutation.mutate(session.ipAddress)}
+                                  disabled={unblockIpMutation.isPending}
+                                  data-testid={`button-unblock-${session.id}`}
+                                >
+                                  <ShieldCheck className="h-4 w-4" />
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-red-600 border-red-600"
+                                  onClick={() => blockIpMutation.mutate(session.ipAddress)}
+                                  disabled={blockIpMutation.isPending}
+                                  data-testid={`button-block-${session.id}`}
+                                >
+                                  <Ban className="h-4 w-4" />
+                                </Button>
+                              )
+                            )}
                           </div>
                         </div>
                       ))}
@@ -420,6 +495,51 @@ export default function AdminAnalytics() {
                   </ScrollArea>
                 </CardContent>
               </Card>
+
+              {blockedIps && blockedIps.filter(b => b.isActive === 1).length > 0 && (
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <ShieldX className="h-4 w-4 text-red-500" />
+                      {language === 'ar' ? 'عناوين IP المحظورة' : 'Blocked IPs'}
+                      <Badge variant="destructive" className="text-xs">
+                        {blockedIps.filter(b => b.isActive === 1).length}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <ScrollArea className="h-[200px]">
+                      <div className="space-y-2">
+                        {blockedIps.filter(b => b.isActive === 1).map((blocked) => (
+                          <div key={blocked.id} className="flex items-center justify-between p-2 rounded bg-red-500/10">
+                            <div>
+                              <p className="text-sm font-mono">{blocked.ipAddress}</p>
+                              {blocked.reason && (
+                                <p className="text-xs text-muted-foreground">{blocked.reason}</p>
+                              )}
+                              <p className="text-xs text-muted-foreground">
+                                {language === 'ar' ? 'تم الحظر: ' : 'Blocked: '}
+                                {new Date(blocked.blockedAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="text-green-600 border-green-600"
+                              onClick={() => unblockIpMutation.mutate(blocked.ipAddress)}
+                              disabled={unblockIpMutation.isPending}
+                              data-testid={`button-unblock-list-${blocked.id}`}
+                            >
+                              <ShieldCheck className="h-4 w-4 mr-1" />
+                              {language === 'ar' ? 'إلغاء الحظر' : 'Unblock'}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              )}
             </>
           ) : (
             <Card>

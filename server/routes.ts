@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, sql, count, between } from "drizzle-orm";
+import { eq, desc, and, gte, sql, count, between, isNull, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
@@ -4823,6 +4823,130 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error getting analytics:", error);
       return res.status(500).json({ error: "Failed to get analytics" });
+    }
+  });
+
+  // ============ BLOCKED IPs ROUTES ============
+  
+  // Check if IP is blocked (public - used by middleware)
+  app.get("/api/check-blocked", async (req, res) => {
+    try {
+      const ipAddress = req.headers['x-forwarded-for']?.toString().split(',')[0] || 
+                        req.socket.remoteAddress || '';
+      
+      if (!ipAddress) {
+        return res.json({ blocked: false });
+      }
+      
+      const now = new Date();
+      const blockedEntry = await db.select().from(blockedIps)
+        .where(and(
+          eq(blockedIps.ipAddress, ipAddress),
+          eq(blockedIps.isActive, 1),
+          or(
+            isNull(blockedIps.expiresAt),
+            gte(blockedIps.expiresAt, now)
+          )
+        ))
+        .limit(1);
+      
+      if (blockedEntry.length > 0) {
+        return res.status(403).json({ 
+          blocked: true, 
+          reason: blockedEntry[0].reason || 'Access denied'
+        });
+      }
+      
+      return res.json({ blocked: false });
+    } catch (error) {
+      console.error("Error checking blocked IP:", error);
+      return res.json({ blocked: false });
+    }
+  });
+  
+  // Get all blocked IPs (admin only)
+  app.get("/api/admin/blocked-ips", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const blocked = await db.select().from(blockedIps)
+        .orderBy(desc(blockedIps.blockedAt));
+      return res.json(blocked);
+    } catch (error) {
+      console.error("Error getting blocked IPs:", error);
+      return res.status(500).json({ error: "Failed to get blocked IPs" });
+    }
+  });
+  
+  // Block an IP (admin only)
+  app.post("/api/admin/blocked-ips", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const { ipAddress, reason, expiresAt } = req.body;
+      
+      if (!ipAddress) {
+        return res.status(400).json({ error: "IP address required" });
+      }
+      
+      // Check if already blocked
+      const existing = await db.select().from(blockedIps)
+        .where(eq(blockedIps.ipAddress, ipAddress))
+        .limit(1);
+      
+      if (existing.length > 0) {
+        // Update existing entry
+        await db.update(blockedIps)
+          .set({ 
+            isActive: 1,
+            reason: reason || null,
+            expiresAt: expiresAt ? new Date(expiresAt) : null,
+            blockedBy: adminId,
+            blockedAt: new Date(),
+          })
+          .where(eq(blockedIps.ipAddress, ipAddress));
+        return res.json({ success: true, message: "IP block updated" });
+      }
+      
+      // Create new entry
+      await db.insert(blockedIps).values({
+        ipAddress,
+        reason: reason || null,
+        blockedBy: adminId,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
+      });
+      
+      return res.json({ success: true, message: "IP blocked" });
+    } catch (error) {
+      console.error("Error blocking IP:", error);
+      return res.status(500).json({ error: "Failed to block IP" });
+    }
+  });
+  
+  // Unblock an IP (admin only)
+  app.delete("/api/admin/blocked-ips/:ipAddress", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    
+    try {
+      const { ipAddress } = req.params;
+      
+      await db.update(blockedIps)
+        .set({ isActive: 0 })
+        .where(eq(blockedIps.ipAddress, decodeURIComponent(ipAddress)));
+      
+      return res.json({ success: true, message: "IP unblocked" });
+    } catch (error) {
+      console.error("Error unblocking IP:", error);
+      return res.status(500).json({ error: "Failed to unblock IP" });
     }
   });
 
