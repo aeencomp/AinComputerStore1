@@ -35,6 +35,7 @@ interface AnalyticsData {
   topPages: { page: string; views: number }[];
   recentSessions: {
     id: string;
+    ipAddress: string;
     country: string;
     countryCode: string;
     city: string;
@@ -389,6 +390,9 @@ export default function AdminAnalytics() {
                                   </Badge>
                                 )}
                               </div>
+                              <p className="text-xs text-muted-foreground font-mono">
+                                IP: {session.ipAddress}
+                              </p>
                               <p className="text-xs text-muted-foreground">
                                 {session.browser} • {session.os}
                               </p>

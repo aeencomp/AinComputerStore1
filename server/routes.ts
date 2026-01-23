@@ -4778,6 +4778,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Recent sessions (last 20)
       const recentSessions = sessions.slice(0, 20).map(s => ({
         id: s.id,
+        ipAddress: s.ipAddress,
         country: s.country,
         countryCode: s.countryCode,
         city: s.city,
