@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack, Printer } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -347,6 +347,52 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 <DropdownMenuItem className="cursor-pointer">
                   <BatteryCharging className="h-4 w-4 mr-2" />
                   {language === 'ar' ? 'شواحن ومحولات' : 'Chargers & Adapters'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=miscellaneous">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Package className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'منوعات' : 'Miscellaneous'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-orange-100 hover:text-orange-700 dark:hover:bg-orange-900/30 dark:hover:text-orange-400 transition-colors font-bold"
+                data-testid="link-printers"
+              >
+                <Printer className="h-4 w-4" />
+                {language === 'ar' ? 'الطابعات' : 'Printers'}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-48">
+              <Link href="/?category=printers">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <Printer className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع الطابعات' : 'All Printers'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <Link href="/?category=laser-printers">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Printer className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'طابعات ليزر' : 'Laser Printers'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=inkjet-printers">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Printer className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'طابعات حبر' : 'Inkjet Printers'}
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=printer-accessories">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Package className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'ملحقات الطابعات' : 'Printer Accessories'}
                 </DropdownMenuItem>
               </Link>
             </DropdownMenuContent>
@@ -724,6 +770,52 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                   <DropdownMenuItem className="cursor-pointer">
                     <BatteryCharging className="h-4 w-4 mr-2" />
                     {language === 'ar' ? 'شواحن ومحولات' : 'Chargers & Adapters'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=miscellaneous" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Package className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'منوعات' : 'Miscellaneous'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-orange-100 hover:text-orange-700 dark:hover:bg-orange-900/30 dark:hover:text-orange-400 font-bold"
+                  data-testid="link-printers-mobile"
+                >
+                  <Printer className="h-4 w-4" />
+                  {language === 'ar' ? 'الطابعات' : 'Printers'}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=printers" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <Printer className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع الطابعات' : 'All Printers'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <Link href="/?category=laser-printers" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Printer className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'طابعات ليزر' : 'Laser Printers'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=inkjet-printers" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Printer className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'طابعات حبر' : 'Inkjet Printers'}
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=printer-accessories" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Package className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'ملحقات الطابعات' : 'Printer Accessories'}
                   </DropdownMenuItem>
                 </Link>
               </DropdownMenuContent>
