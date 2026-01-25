@@ -32,6 +32,13 @@ export const categoryNames: Record<string, { ar: string; en: string }> = {
   'cables': { ar: 'كابلات وموزعات', en: 'Cables & Hubs' },
   'bags': { ar: 'حقائب لابتوب', en: 'Laptop Bags' },
   'chargers': { ar: 'شواحن ومحولات', en: 'Chargers & Adapters' },
+  'miscellaneous': { ar: 'منوعات', en: 'Miscellaneous' },
+  
+  // Printers
+  'printers': { ar: 'الطابعات', en: 'Printers' },
+  'laser-printers': { ar: 'طابعات ليزر', en: 'Laser Printers' },
+  'inkjet-printers': { ar: 'طابعات حبر', en: 'Inkjet Printers' },
+  'printer-accessories': { ar: 'ملحقات الطابعات', en: 'Printer Accessories' },
   
   // PC Components
   'pc-components': { ar: 'قطع الكمبيوتر', en: 'PC Components' },

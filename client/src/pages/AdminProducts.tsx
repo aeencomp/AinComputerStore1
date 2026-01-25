@@ -407,6 +407,12 @@ export default function AdminProducts() {
                     <SelectItem value="cables">{language === 'ar' ? '↳ كابلات وموزعات' : '↳ Cables & Hubs'}</SelectItem>
                     <SelectItem value="bags">{language === 'ar' ? '↳ حقائب لابتوب' : '↳ Laptop Bags'}</SelectItem>
                     <SelectItem value="chargers">{language === 'ar' ? '↳ شواحن ومحولات' : '↳ Chargers & Adapters'}</SelectItem>
+                    <SelectItem value="miscellaneous">{language === 'ar' ? '↳ منوعات' : '↳ Miscellaneous'}</SelectItem>
+                    
+                    <SelectItem value="printers" className="font-semibold">{language === 'ar' ? 'الطابعات' : 'Printers'}</SelectItem>
+                    <SelectItem value="laser-printers">{language === 'ar' ? '↳ طابعات ليزر' : '↳ Laser Printers'}</SelectItem>
+                    <SelectItem value="inkjet-printers">{language === 'ar' ? '↳ طابعات حبر' : '↳ Inkjet Printers'}</SelectItem>
+                    <SelectItem value="printer-accessories">{language === 'ar' ? '↳ ملحقات الطابعات' : '↳ Printer Accessories'}</SelectItem>
                     
                     <SelectItem value="pc-components" className="font-semibold">{language === 'ar' ? 'قطع الكمبيوتر' : 'PC Components'}</SelectItem>
                     <SelectItem value="ram">{language === 'ar' ? '↳ ذاكرة RAM' : '↳ RAM Memory'}</SelectItem>
