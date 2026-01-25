@@ -40,7 +40,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Pencil, Trash2, Loader2 } from "lucide-react";
+import { Plus, Pencil, Trash2, Loader2, Search } from "lucide-react";
 import { AdminNav } from "@/components/AdminNav";
 import { ImageUpload } from "@/components/ImageUpload";
 import { MultiImageUpload } from "@/components/MultiImageUpload";
@@ -59,6 +59,7 @@ export default function AdminProducts() {
   const [isAddEditOpen, setIsAddEditOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const [formData, setFormData] = useState<InsertProduct & { images?: string[] }>({
     nameAr: "",
@@ -197,6 +198,19 @@ export default function AdminProducts() {
           </Button>
         </div>
 
+        <div className="mb-4">
+          <div className="relative max-w-md">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder={language === 'ar' ? 'البحث في المنتجات...' : 'Search products...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="ps-10"
+              data-testid="input-search-products"
+            />
+          </div>
+        </div>
+
         <Card>
           <Table>
             <TableHeader>
@@ -209,7 +223,19 @@ export default function AdminProducts() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => (
+              {products
+                .filter((product) => {
+                  if (!searchQuery.trim()) return true;
+                  const query = searchQuery.toLowerCase();
+                  return (
+                    product.nameAr.toLowerCase().includes(query) ||
+                    product.nameEn.toLowerCase().includes(query) ||
+                    product.category.toLowerCase().includes(query) ||
+                    (product.descriptionAr && product.descriptionAr.toLowerCase().includes(query)) ||
+                    (product.descriptionEn && product.descriptionEn.toLowerCase().includes(query))
+                  );
+                })
+                .map((product) => (
                 <TableRow key={product.id} data-testid={`row-product-${product.id}`}>
                   <TableCell className="font-medium">
                     {language === 'ar' ? product.nameAr : product.nameEn}
