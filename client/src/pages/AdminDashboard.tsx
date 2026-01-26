@@ -144,6 +144,13 @@ export default function AdminDashboard() {
     enabled: !!currentAdmin,
   });
 
+  const { data: products = [] } = useQuery<{ id: string; nameAr: string; nameEn: string }[]>({
+    queryKey: ['/api/products'],
+    enabled: !!currentAdmin,
+  });
+
+  const productMap = new Map(products.map(p => [p.id, p]));
+
   const { data: adminUsers = [], isLoading: adminUsersLoading } = useQuery<AdminUser[]>({
     queryKey: ['/api/admin/users'],
     enabled: !!currentAdmin,
@@ -643,10 +650,14 @@ export default function AdminDashboard() {
                           {order.items.map((itemStr: string, idx: number) => {
                             try {
                               const item = JSON.parse(itemStr);
+                              const product = productMap.get(item.productId);
+                              const displayName = language === 'ar' 
+                                ? (item.nameAr || product?.nameAr || item.productId) 
+                                : (item.nameEn || product?.nameEn || item.productId);
                               return (
                                 <div key={idx} className="flex justify-between items-center text-sm border-b border-border/50 pb-2 last:border-0 last:pb-0">
                                   <span className="font-medium">
-                                    {language === 'ar' ? (item.nameAr || item.productId) : (item.nameEn || item.productId)}
+                                    {displayName}
                                   </span>
                                   <div className="flex gap-4 text-muted-foreground">
                                     <span>{language === 'ar' ? 'الكمية:' : 'Qty:'} {item.quantity}</span>
