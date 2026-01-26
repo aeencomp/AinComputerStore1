@@ -132,6 +132,8 @@ export default function Checkout() {
         
         const items = cartItems.map(item => JSON.stringify({
           productId: item.product.id,
+          nameAr: item.product.nameAr,
+          nameEn: item.product.nameEn,
           quantity: item.quantity,
           price: item.product.price,
         }));

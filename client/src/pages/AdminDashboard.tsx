@@ -637,6 +637,30 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
+                      <div className="mt-4">
+                        <p className="text-sm text-muted-foreground mb-2">{language === 'ar' ? 'المنتجات المطلوبة:' : 'Ordered Products:'}</p>
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-2">
+                          {order.items.map((itemStr: string, idx: number) => {
+                            try {
+                              const item = JSON.parse(itemStr);
+                              return (
+                                <div key={idx} className="flex justify-between items-center text-sm border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                                  <span className="font-medium">
+                                    {language === 'ar' ? (item.nameAr || item.productId) : (item.nameEn || item.productId)}
+                                  </span>
+                                  <div className="flex gap-4 text-muted-foreground">
+                                    <span>{language === 'ar' ? 'الكمية:' : 'Qty:'} {item.quantity}</span>
+                                    <span>{parseFloat(item.price).toLocaleString('ar-IQ')} {t('common.currency')}</span>
+                                  </div>
+                                </div>
+                              );
+                            } catch {
+                              return <div key={idx} className="text-sm text-muted-foreground">{itemStr}</div>;
+                            }
+                          })}
+                        </div>
+                      </div>
+
                       <Separator />
 
                       <div className="flex flex-wrap gap-2 items-center justify-between">
