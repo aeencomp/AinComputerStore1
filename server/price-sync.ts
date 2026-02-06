@@ -76,49 +76,70 @@ async function fetchAllGlobalIraqProducts(): Promise<ShopifyProduct[]> {
   return allProducts;
 }
 
-function extractModelCodes(name: string): string[] {
-  const codes: string[] = [];
-
-  const modelPatterns = [
-    /[A-Z]{2,}\d{2,}[-\w]*/g,
-    /\b[A-Z]\d{3,}[-\w]*/g,
-    /\b(?:PH|NL|FX|ANV|EP|PV|G6)\d{2,}[-\w]*/gi,
-    /\b\d{2}-[A-Z]{2}\d{4}[A-Z]*/g,
-    /\b[A-Z]{3,}\d+[A-Z]*[-]\w+/g,
+function extractFullModelCode(name: string): string | null {
+  const patterns = [
+    /\b(FX\d{3}[A-Z]{1,4}[-][A-Z]{2}\d{3}[A-Z]*)\b/i,
+    /\b([A-Z]{2,3}\d{3,4}[A-Z]{0,4}[-][A-Z]{1,3}\d{2,4}[A-Z]*)\b/i,
+    /\b(\d{2}-[A-Z]{2}\d{4}[A-Z]*)\b/i,
+    /\b([A-Z]{2,}\d{3,}[-]\w{3,})\b/i,
   ];
 
-  for (const pattern of modelPatterns) {
-    const matches = name.match(pattern);
-    if (matches) {
-      for (const m of matches) {
-        if (m.length >= 5) {
-          codes.push(m.toLowerCase());
-        }
-      }
+  for (const pattern of patterns) {
+    const match = name.match(pattern);
+    if (match && match[1].length >= 8) {
+      return match[1].toLowerCase();
     }
   }
 
-  return [...new Set(codes)];
+  return null;
+}
+
+function extractShortModelCode(name: string): string | null {
+  const patterns = [
+    /\b(FX\d{3}[A-Z]{1,4})\b/i,
+    /\b([A-Z]{2,3}\d{3,4}[A-Z]{0,4})\b/i,
+    /\b(PH\d{2}-\d{2})\b/i,
+    /\b(G\d{3}[A-Z]{1,3})\b/i,
+    /\b(NL\d{2}[A-Z]{1,3})\b/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = name.match(pattern);
+    if (match && match[1].length >= 5) {
+      return match[1].toLowerCase();
+    }
+  }
+
+  return null;
 }
 
 function matchProducts(
   ourName: string,
   globalProducts: ShopifyProduct[]
 ): ShopifyProduct | null {
-  const ourCodes = extractModelCodes(ourName);
+  const ourFullCode = extractFullModelCode(ourName);
 
-  if (ourCodes.length > 0) {
+  if (ourFullCode) {
     for (const gp of globalProducts) {
-      const gpCodes = extractModelCodes(gp.title);
-      for (const ourCode of ourCodes) {
-        for (const gpCode of gpCodes) {
-          if (ourCode === gpCode || gpCode.includes(ourCode) || ourCode.includes(gpCode)) {
-            if (ourCode.length >= 6 || gpCode.length >= 6) {
-              return gp;
-            }
-          }
-        }
+      const gpFullCode = extractFullModelCode(gp.title);
+      if (gpFullCode && ourFullCode === gpFullCode) {
+        return gp;
       }
+    }
+  }
+
+  const ourShortCode = extractShortModelCode(ourName);
+
+  if (ourShortCode) {
+    const candidates: ShopifyProduct[] = [];
+    for (const gp of globalProducts) {
+      const gpShortCode = extractShortModelCode(gp.title);
+      if (gpShortCode && ourShortCode === gpShortCode) {
+        candidates.push(gp);
+      }
+    }
+    if (candidates.length === 1) {
+      return candidates[0];
     }
   }
 
@@ -141,7 +162,7 @@ function matchProducts(
     const matchCount = ourWords.filter((w) => gpWords.includes(w)).length;
     const matchRatio = matchCount / Math.max(ourWords.length, 1);
 
-    if (matchRatio >= 0.65 && matchCount >= 5 && matchCount > bestScore) {
+    if (matchRatio >= 0.7 && matchCount >= 6 && matchCount > bestScore) {
       bestScore = matchCount;
       bestMatch = gp;
     }
