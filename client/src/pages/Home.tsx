@@ -15,11 +15,26 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { Link, useLocation, useSearch } from "wouter";
-import { Wrench, Search, Package, Send, PackageX, X, ChevronLeft, ChevronRight } from "lucide-react";
+import {
+  Wrench,
+  Search,
+  Package,
+  Send,
+  PackageX,
+  X,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { getCategoryName } from "@/lib/categoryNames";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 
 interface CartItemWithId extends CartItem {
   id: string;
@@ -32,13 +47,13 @@ export default function Home() {
   const { language, t } = useLanguage();
   const [location, setLocation] = useLocation();
   const searchString = useSearch();
-  
+
   const urlParams = new URLSearchParams(searchString);
-  const categoryFromUrl = urlParams.get('category') || "";
-  const searchFromUrl = urlParams.get('search') || "";
-  
+  const categoryFromUrl = urlParams.get("category") || "";
+  const searchFromUrl = urlParams.get("search") || "";
+
   const [selectedCategory, setSelectedCategory] = useState(categoryFromUrl);
-  
+
   useEffect(() => {
     setSelectedCategory(categoryFromUrl);
     if (searchFromUrl) {
@@ -46,24 +61,32 @@ export default function Home() {
     }
   }, [categoryFromUrl, searchFromUrl]);
 
-  const queryKey = selectedCategory 
+  const queryKey = selectedCategory
     ? `/api/products?category=${selectedCategory}`
-    : '/api/products';
+    : "/api/products";
 
-  const { data: products = [], isLoading, isError: productsError } = useQuery<Product[]>({
+  const {
+    data: products = [],
+    isLoading,
+    isError: productsError,
+  } = useQuery<Product[]>({
     queryKey: [queryKey],
   });
 
   const { data: currentUser } = useQuery<User | null>({
-    queryKey: ['/api/auth/me'],
+    queryKey: ["/api/auth/me"],
   });
 
-  const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({
-    queryKey: ['/api/cart'],
+  const {
+    data: cartItems = [],
+    isLoading: cartLoading,
+    isError: cartError,
+  } = useQuery<CartItemWithId[]>({
+    queryKey: ["/api/cart"],
   });
 
   const { data: storeSettings } = useQuery<StoreSettings>({
-    queryKey: ['/api/store-settings'],
+    queryKey: ["/api/store-settings"],
   });
 
   const showHeroBanner = storeSettings?.showHeroBanner !== 0;
@@ -73,84 +96,88 @@ export default function Home() {
 
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [requestForm, setRequestForm] = useState({
-    productName: '',
-    customerName: '',
-    customerPhone: '',
-    customerEmail: '',
-    notes: '',
+    productName: "",
+    customerName: "",
+    customerPhone: "",
+    customerEmail: "",
+    notes: "",
   });
 
   const addToCartMutation = useMutation({
     mutationFn: async (productId: string) => {
-      return await apiRequest('POST', '/api/cart', {
+      return await apiRequest("POST", "/api/cart", {
         productId,
         quantity: 1,
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
     },
   });
 
   const productRequestMutation = useMutation({
     mutationFn: async (data: typeof requestForm) => {
-      return await apiRequest('POST', '/api/product-requests', data);
+      return await apiRequest("POST", "/api/product-requests", data);
     },
     onSuccess: () => {
       toast({
-        title: t('home.requestProduct.success'),
+        title: t("home.requestProduct.success"),
       });
       setShowRequestForm(false);
       setRequestForm({
         productName: searchQuery,
-        customerName: '',
-        customerPhone: '',
-        customerEmail: '',
-        notes: '',
+        customerName: "",
+        customerPhone: "",
+        customerEmail: "",
+        notes: "",
       });
     },
     onError: () => {
       toast({
-        title: t('home.requestProduct.error'),
-        variant: 'destructive',
+        title: t("home.requestProduct.error"),
+        variant: "destructive",
       });
     },
   });
 
   const updateQuantityMutation = useMutation({
     mutationFn: async ({ id, quantity }: { id: string; quantity: number }) => {
-      return await apiRequest('PATCH', `/api/cart/${id}`, { quantity });
+      return await apiRequest("PATCH", `/api/cart/${id}`, { quantity });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
     },
   });
 
   const removeItemMutation = useMutation({
     mutationFn: async (id: string) => {
-      return await apiRequest('DELETE', `/api/cart/${id}`, undefined);
+      return await apiRequest("DELETE", `/api/cart/${id}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
     },
   });
 
   const filteredProducts = searchQuery
     ? products.filter(
         (p) =>
-          (language === 'ar' ? p.nameAr : p.nameEn).toLowerCase().includes(searchQuery.toLowerCase()) ||
-          (language === 'ar' ? p.descriptionAr : p.descriptionEn).toLowerCase().includes(searchQuery.toLowerCase()) ||
-          p.category.includes(searchQuery)
+          (language === "ar" ? p.nameAr : p.nameEn)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          (language === "ar" ? p.descriptionAr : p.descriptionEn)
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase()) ||
+          p.category.includes(searchQuery),
       )
     : products;
 
   const handleCategorySelect = (category: string) => {
-    if (category === 'all') {
-      setLocation('/products');
+    if (category === "all") {
+      setLocation("/products");
     } else if (category) {
       setLocation(`/?category=${category}`);
     } else {
-      setLocation('/');
+      setLocation("/");
     }
     setSearchQuery("");
   };
@@ -160,7 +187,7 @@ export default function Home() {
     if (query) {
       setLocation(`/?search=${encodeURIComponent(query)}`);
     } else {
-      setLocation('/');
+      setLocation("/");
     }
   };
 
@@ -168,13 +195,13 @@ export default function Home() {
     try {
       await addToCartMutation.mutateAsync(product.id);
       toast({
-        title: t('cart.addedToCart'),
-        description: t('cart.addedDescription'),
+        title: t("cart.addedToCart"),
+        description: t("cart.addedDescription"),
       });
     } catch (error: any) {
       toast({
-        title: t('common.error'),
-        description: t('cart.addError'),
+        title: t("common.error"),
+        description: t("cart.addError"),
         variant: "destructive",
       });
     }
@@ -189,8 +216,8 @@ export default function Home() {
       await updateQuantityMutation.mutateAsync({ id, quantity });
     } catch (error) {
       toast({
-        title: t('common.error'),
-        description: t('cart.quantityUpdateError'),
+        title: t("common.error"),
+        description: t("cart.quantityUpdateError"),
         variant: "destructive",
       });
     }
@@ -200,19 +227,22 @@ export default function Home() {
     try {
       await removeItemMutation.mutateAsync(id);
       toast({
-        title: t('cart.removed'),
-        description: t('cart.removedDescription'),
+        title: t("cart.removed"),
+        description: t("cart.removedDescription"),
       });
     } catch (error) {
       toast({
-        title: t('common.error'),
-        description: t('cart.removeError'),
+        title: t("common.error"),
+        description: t("cart.removeError"),
         variant: "destructive",
       });
     }
   };
 
-  const cartItemsCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  const cartItemsCount = cartItems.reduce(
+    (sum, item) => sum + item.quantity,
+    0,
+  );
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden">
@@ -226,10 +256,15 @@ export default function Home() {
       />
 
       <main className="flex-1">
-        {!searchQuery && !selectedCategory && showCategories && <CategorySection onCategoryClick={handleCategorySelect} />}
+        {!searchQuery && !selectedCategory && showCategories && (
+          <CategorySection onCategoryClick={handleCategorySelect} />
+        )}
 
         {!searchQuery && !selectedCategory && (
-          <section className="py-12 md:py-16" data-testid="section-repair-service">
+          <section
+            className="py-12 md:py-16"
+            data-testid="section-repair-service"
+          >
             <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
               <div className="relative flex flex-col md:flex-row items-center gap-6 md:gap-10 p-6 md:p-8 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-card/80 to-primary/10 shadow-xl shadow-primary/10 overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50 pointer-events-none" />
@@ -239,27 +274,46 @@ export default function Home() {
                   </div>
                 </div>
                 <div className="flex-1 text-center md:text-start relative z-10">
-                  <h2 className="text-3xl md:text-4xl font-extrabold mb-2 text-foreground" data-testid="text-repair-title">
-                    {t('home.repair.title')}
+                  <h2
+                    className="text-3xl md:text-4xl font-extrabold mb-2 text-foreground"
+                    data-testid="text-repair-title"
+                  >
+                    {t("home.repair.title")}
                   </h2>
-                  <p className="text-xl text-primary font-bold mb-2" data-testid="text-repair-subtitle">
-                    {t('home.repair.subtitle')}
+                  <p
+                    className="text-xl text-primary font-bold mb-2"
+                    data-testid="text-repair-subtitle"
+                  >
+                    {t("home.repair.subtitle")}
                   </p>
-                  <p className="text-muted-foreground font-medium" data-testid="text-repair-description">
-                    {t('home.repair.description')}
+                  <p
+                    className="text-muted-foreground font-medium"
+                    data-testid="text-repair-description"
+                  >
+                    {t("home.repair.description")}
                   </p>
                 </div>
                 <div className="flex flex-col sm:flex-row gap-4 relative z-10">
-                  <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25 font-semibold px-6" data-testid="link-request-repair">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-lg shadow-blue-500/25 font-semibold px-6"
+                    data-testid="link-request-repair"
+                  >
                     <Link href="/repair-request">
                       <Wrench className="w-5 h-5" />
-                      {t('home.repair.requestBtn')}
+                      {t("home.repair.requestBtn")}
                     </Link>
                   </Button>
-                  <Button asChild size="lg" className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-lg shadow-emerald-500/25 font-semibold px-6" data-testid="link-track-repair">
+                  <Button
+                    asChild
+                    size="lg"
+                    className="gap-2 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white shadow-lg shadow-emerald-500/25 font-semibold px-6"
+                    data-testid="link-track-repair"
+                  >
                     <Link href="/track-repair">
                       <Search className="w-5 h-5" />
-                      {t('home.repair.trackBtn')}
+                      {t("home.repair.trackBtn")}
                     </Link>
                   </Button>
                 </div>
@@ -277,30 +331,38 @@ export default function Home() {
                   <Package className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <h2 className="text-2xl md:text-3xl font-bold text-foreground" data-testid="text-products-title">
-                    {searchQuery 
-                      ? t('home.searchResultsFor', { query: searchQuery })
-                      : selectedCategory 
+                  <h2
+                    className="text-2xl md:text-3xl font-bold text-foreground"
+                    data-testid="text-products-title"
+                  >
+                    {searchQuery
+                      ? t("home.searchResultsFor", { query: searchQuery })
+                      : selectedCategory
                         ? t(`category.${selectedCategory}`)
-                        : t('home.featured.title')}
+                        : t("home.featured.title")}
                   </h2>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {searchQuery || selectedCategory 
-                      ? `${filteredProducts.length} ${language === 'ar' ? 'منتج' : 'products'}`
-                      : language === 'ar' ? 'اكتشف أحدث المنتجات والعروض' : 'Discover the latest products and offers'}
+                    {searchQuery || selectedCategory
+                      ? `${filteredProducts.length} ${language === "ar" ? "منتج" : "products"}`
+                      : language === "ar"
+                        ? "اكتشف أحدث المنتجات والعروض"
+                        : "Discover the latest products and offers"}
                   </p>
                 </div>
               </div>
               {(searchQuery || selectedCategory) && (
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   size="lg"
                   className="gap-2 border-2 hover:border-primary hover:text-primary"
-                  onClick={() => { setSearchQuery(""); setSelectedCategory(""); }}
+                  onClick={() => {
+                    setSearchQuery("");
+                    setSelectedCategory("");
+                  }}
                   data-testid="button-clear-filter"
                 >
                   <X className="h-4 w-4" />
-                  {t('home.showAll')}
+                  {t("home.showAll")}
                 </Button>
               )}
             </div>
@@ -308,7 +370,10 @@ export default function Home() {
             {isLoading ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
                 {[...Array(8)].map((_, i) => (
-                  <div key={i} className="space-y-4 bg-card rounded-2xl p-4 border border-border/50">
+                  <div
+                    key={i}
+                    className="space-y-4 bg-card rounded-2xl p-4 border border-border/50"
+                  >
                     <Skeleton className="aspect-square w-full rounded-xl" />
                     <Skeleton className="h-5 w-3/4" />
                     <Skeleton className="h-4 w-1/2" />
@@ -321,10 +386,17 @@ export default function Home() {
                 <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-destructive/10 flex items-center justify-center">
                   <PackageX className="h-10 w-10 text-destructive" />
                 </div>
-                <p className="text-xl font-semibold text-destructive mb-2" data-testid="text-error-products">
-                  {t('home.loadError')}
+                <p
+                  className="text-xl font-semibold text-destructive mb-2"
+                  data-testid="text-error-products"
+                >
+                  {t("home.loadError")}
                 </p>
-                <p className="text-muted-foreground">{language === 'ar' ? 'يرجى المحاولة مرة أخرى' : 'Please try again'}</p>
+                <p className="text-muted-foreground">
+                  {language === "ar"
+                    ? "يرجى المحاولة مرة أخرى"
+                    : "Please try again"}
+                </p>
               </div>
             ) : filteredProducts.length === 0 ? (
               <div className="py-16">
@@ -332,38 +404,57 @@ export default function Home() {
                   <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-muted/50 border-2 border-dashed border-muted-foreground/20 flex items-center justify-center">
                     <PackageX className="h-12 w-12 text-muted-foreground/40" />
                   </div>
-                  <p className="text-2xl font-bold text-foreground mb-2" data-testid="text-no-products">
-                    {searchQuery ? t('home.noSearchResults') : t('home.noProducts')}
+                  <p
+                    className="text-2xl font-bold text-foreground mb-2"
+                    data-testid="text-no-products"
+                  >
+                    {searchQuery
+                      ? t("home.noSearchResults")
+                      : t("home.noProducts")}
                   </p>
                   <p className="text-muted-foreground mb-6">
-                    {searchQuery 
-                      ? (language === 'ar' ? `لم نجد نتائج لـ "${searchQuery}"` : `No results found for "${searchQuery}"`)
-                      : (language === 'ar' ? 'لا توجد منتجات حالياً' : 'No products available')}
+                    {searchQuery
+                      ? language === "ar"
+                        ? `لم نجد نتائج لـ "${searchQuery}"`
+                        : `No results found for "${searchQuery}"`
+                      : language === "ar"
+                        ? "لا توجد منتجات حالياً"
+                        : "No products available"}
                   </p>
                   {searchQuery && !showRequestForm && (
-                    <Button 
+                    <Button
                       size="lg"
                       onClick={() => {
-                        setRequestForm(prev => ({ ...prev, productName: searchQuery }));
+                        setRequestForm((prev) => ({
+                          ...prev,
+                          productName: searchQuery,
+                        }));
                         setShowRequestForm(true);
                       }}
                       className="gap-2"
                       data-testid="button-request-product"
                     >
                       <Send className="h-4 w-4" />
-                      {t('home.requestProduct')}
+                      {t("home.requestProduct")}
                     </Button>
                   )}
                 </div>
 
                 {showRequestForm && (
-                  <Card className="max-w-lg mx-auto border-primary/30" data-testid="card-product-request">
+                  <Card
+                    className="max-w-lg mx-auto border-primary/30"
+                    data-testid="card-product-request"
+                  >
                     <CardHeader className="text-center">
-                      <CardTitle className="text-primary">{t('home.requestProduct.title')}</CardTitle>
-                      <CardDescription>{t('home.requestProduct.desc')}</CardDescription>
+                      <CardTitle className="text-primary">
+                        {t("home.requestProduct.title")}
+                      </CardTitle>
+                      <CardDescription>
+                        {t("home.requestProduct.desc")}
+                      </CardDescription>
                     </CardHeader>
                     <CardContent>
-                      <form 
+                      <form
                         onSubmit={(e) => {
                           e.preventDefault();
                           productRequestMutation.mutate(requestForm);
@@ -372,18 +463,28 @@ export default function Home() {
                       >
                         <div>
                           <Input
-                            placeholder={t('home.requestProduct.productName')}
+                            placeholder={t("home.requestProduct.productName")}
                             value={requestForm.productName}
-                            onChange={(e) => setRequestForm(prev => ({ ...prev, productName: e.target.value }))}
+                            onChange={(e) =>
+                              setRequestForm((prev) => ({
+                                ...prev,
+                                productName: e.target.value,
+                              }))
+                            }
                             required
                             data-testid="input-request-product-name"
                           />
                         </div>
                         <div>
                           <Input
-                            placeholder={t('home.requestProduct.customerName')}
+                            placeholder={t("home.requestProduct.customerName")}
                             value={requestForm.customerName}
-                            onChange={(e) => setRequestForm(prev => ({ ...prev, customerName: e.target.value }))}
+                            onChange={(e) =>
+                              setRequestForm((prev) => ({
+                                ...prev,
+                                customerName: e.target.value,
+                              }))
+                            }
                             required
                             data-testid="input-request-customer-name"
                           />
@@ -391,9 +492,14 @@ export default function Home() {
                         <div>
                           <Input
                             type="tel"
-                            placeholder={t('home.requestProduct.customerPhone')}
+                            placeholder={t("home.requestProduct.customerPhone")}
                             value={requestForm.customerPhone}
-                            onChange={(e) => setRequestForm(prev => ({ ...prev, customerPhone: e.target.value }))}
+                            onChange={(e) =>
+                              setRequestForm((prev) => ({
+                                ...prev,
+                                customerPhone: e.target.value,
+                              }))
+                            }
                             required
                             data-testid="input-request-phone"
                           />
@@ -401,38 +507,50 @@ export default function Home() {
                         <div>
                           <Input
                             type="email"
-                            placeholder={t('home.requestProduct.customerEmail')}
+                            placeholder={t("home.requestProduct.customerEmail")}
                             value={requestForm.customerEmail}
-                            onChange={(e) => setRequestForm(prev => ({ ...prev, customerEmail: e.target.value }))}
+                            onChange={(e) =>
+                              setRequestForm((prev) => ({
+                                ...prev,
+                                customerEmail: e.target.value,
+                              }))
+                            }
                             data-testid="input-request-email"
                           />
                         </div>
                         <div>
                           <Textarea
-                            placeholder={t('home.requestProduct.notes')}
+                            placeholder={t("home.requestProduct.notes")}
                             value={requestForm.notes}
-                            onChange={(e) => setRequestForm(prev => ({ ...prev, notes: e.target.value }))}
+                            onChange={(e) =>
+                              setRequestForm((prev) => ({
+                                ...prev,
+                                notes: e.target.value,
+                              }))
+                            }
                             rows={3}
                             data-testid="textarea-request-notes"
                           />
                         </div>
                         <div className="flex gap-3">
-                          <Button 
-                            type="submit" 
+                          <Button
+                            type="submit"
                             className="flex-1"
                             disabled={productRequestMutation.isPending}
                             data-testid="button-submit-request"
                           >
                             <Send className="h-4 w-4 me-2" />
-                            {productRequestMutation.isPending ? '...' : t('home.requestProduct.submit')}
+                            {productRequestMutation.isPending
+                              ? "..."
+                              : t("home.requestProduct.submit")}
                           </Button>
-                          <Button 
-                            type="button" 
+                          <Button
+                            type="button"
                             variant="outline"
                             onClick={() => setShowRequestForm(false)}
                             data-testid="button-cancel-request"
                           >
-                            {t('common.cancel')}
+                            {t("common.cancel")}
                           </Button>
                         </div>
                       </form>
@@ -451,56 +569,65 @@ export default function Home() {
                 ))}
               </div>
             ) : (
-              <div className="space-y-12">
+              <div className="space-y-16">
                 {(() => {
-                  const mainCategoryOrder = ['laptops', 'desktops', 'monitors', 'accessories', 'printers', 'pc-components', 'programs'];
+                  const mainCategoryOrder = [
+                    "laptops",
+                    "desktops",
+                    "monitors",
+                    "accessories",
+                    "printers",
+                    "pc-components",
+                    "programs",
+                  ];
                   const getMainCategory = (cat: string) => {
-                    if (['laptops', 'gaming-laptops', 'business-laptops', 'student-laptops', 'ultrabooks', 'workstation-laptops'].includes(cat)) return 'laptops';
-                    if (['desktops', 'gaming-pcs', 'office-pcs', 'workstations', 'all-in-one', 'mini-pcs'].includes(cat)) return 'desktops';
-                    if (['monitors', 'gaming-monitors', 'office-monitors', 'curved-monitors', '4k-monitors', 'ultrawide-monitors'].includes(cat)) return 'monitors';
-                    if (['accessories', 'keyboards', 'mice', 'headphones', 'webcams', 'cables', 'bags', 'chargers', 'miscellaneous'].includes(cat)) return 'accessories';
-                    if (['printers', 'laser-printers', 'inkjet-printers', 'printer-accessories'].includes(cat)) return 'printers';
-                    if (['pc-components', 'ram', 'ssd', 'hdd', 'processors', 'motherboards', 'gpu', 'psu', 'cases', 'cooling'].includes(cat)) return 'pc-components';
-                    if (['programs', 'operating-systems', 'office-software', 'antivirus', 'design-software', 'gaming-software'].includes(cat)) return 'programs';
+                    if (["laptops","gaming-laptops","business-laptops","student-laptops","ultrabooks","workstation-laptops"].includes(cat)) return "laptops";
+                    if (["desktops","gaming-pcs","office-pcs","workstations","all-in-one","mini-pcs"].includes(cat)) return "desktops";
+                    if (["monitors","gaming-monitors","office-monitors","curved-monitors","4k-monitors","ultrawide-monitors"].includes(cat)) return "monitors";
+                    if (["accessories","keyboards","mice","headphones","webcams","cables","bags","chargers","miscellaneous"].includes(cat)) return "accessories";
+                    if (["printers","laser-printers","inkjet-printers","printer-accessories"].includes(cat)) return "printers";
+                    if (["pc-components","ram","ssd","hdd","processors","motherboards","gpu","psu","cases","cooling"].includes(cat)) return "pc-components";
+                    if (["programs","operating-systems","office-software","antivirus","design-software","gaming-software"].includes(cat)) return "programs";
                     return cat;
                   };
-                  const displayProducts = filteredProducts.slice(0, featuredProductsCount);
                   const grouped = new Map<string, Product[]>();
-                  displayProducts.forEach((product) => {
+                  filteredProducts.forEach((product) => {
                     const mainCat = getMainCategory(product.category);
                     if (!grouped.has(mainCat)) grouped.set(mainCat, []);
                     grouped.get(mainCat)!.push(product);
                   });
-                  const sortedEntries = Array.from(grouped.entries()).sort((a, b) => {
-                    const idxA = mainCategoryOrder.indexOf(a[0]);
-                    const idxB = mainCategoryOrder.indexOf(b[0]);
-                    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
-                  });
+                  const sortedEntries = Array.from(grouped.entries()).sort(
+                    (a, b) => {
+                      const idxA = mainCategoryOrder.indexOf(a[0]);
+                      const idxB = mainCategoryOrder.indexOf(b[0]);
+                      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                    },
+                  );
+                  const PREVIEW_COUNT = 5;
                   return sortedEntries.map(([category, categoryProducts]) => (
-                    <div key={category}>
-                      <div className="text-center mb-8">
-                        <h3 className="text-2xl md:text-3xl font-extrabold text-foreground mb-2">
+                    <div key={category} data-testid={`section-category-${category}`}>
+                      <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-2xl md:text-3xl font-extrabold text-foreground">
                           {getCategoryName(category, language)}
                         </h3>
-                        <div className="flex items-center justify-center gap-2 mb-3">
-                          <div className="w-12 h-1 bg-gradient-to-r from-transparent to-primary rounded-full" />
-                          <div className="w-3 h-3 rounded-full bg-primary" />
-                          <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
-                        </div>
-                        <div className="flex items-center justify-center gap-3">
-                          <span className="text-sm text-muted-foreground">
-                            {categoryProducts.length} {language === 'ar' ? 'منتج' : 'products'}
-                          </span>
-                          <Link href={`/?category=${category}`}>
-                            <Button variant="outline" size="sm" className="gap-1 text-primary border-primary/30">
-                              {language === 'ar' ? 'عرض الكل' : 'View All'}
-                              {language === 'ar' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            </Button>
-                          </Link>
-                        </div>
+                        <Link href={`/?category=${category}`}>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="gap-1 text-primary border-primary/30"
+                            data-testid={`button-viewall-${category}`}
+                          >
+                            {language === "ar" ? "عرض الكل" : "View All"}
+                            {language === "ar" ? (
+                              <ChevronLeft className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </Link>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
-                        {categoryProducts.map((product) => (
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
+                        {categoryProducts.slice(0, PREVIEW_COUNT).map((product) => (
                           <ProductCard
                             key={product.id}
                             product={product}
