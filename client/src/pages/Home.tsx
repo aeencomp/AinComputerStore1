@@ -460,7 +460,13 @@ export default function Home() {
                     if (!grouped.has(mainCat)) grouped.set(mainCat, []);
                     grouped.get(mainCat)!.push(product);
                   });
-                  return Array.from(grouped.entries()).map(([category, categoryProducts]) => (
+                  const categoryOrder = ['laptops', 'desktops', 'monitors', 'printers', 'accessories', 'pc-components', 'programs'];
+                  const sortedEntries = Array.from(grouped.entries()).sort(([a], [b]) => {
+                    const idxA = categoryOrder.indexOf(a);
+                    const idxB = categoryOrder.indexOf(b);
+                    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                  });
+                  return sortedEntries.map(([category, categoryProducts]) => (
                     <div key={category}>
                       <div className="flex items-center justify-between mb-5">
                         <div className="flex items-center gap-3">
