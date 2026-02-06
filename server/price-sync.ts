@@ -94,22 +94,42 @@ function extractFullModelCode(name: string): string | null {
   return null;
 }
 
-function extractShortModelCode(name: string): string | null {
-  const patterns = [
-    /\b(FX\d{3}[A-Z]{1,4})\b/i,
-    /\b([A-Z]{2,3}\d{3,4}[A-Z]{0,4})\b/i,
-    /\b(PH\d{2}-\d{2})\b/i,
-    /\b(G\d{3}[A-Z]{1,3})\b/i,
-    /\b(NL\d{2}[A-Z]{1,3})\b/i,
+function extractParenCode(name: string): string | null {
+  const match = name.match(/\(([A-Z0-9]{3,8})\)/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function extractProductLine(name: string): string | null {
+  const match = name.match(/\b(\d{2}[A-Z]{2,4}\d{1,2}[A-Z]?)\b/i);
+  return match ? match[1].toLowerCase() : null;
+}
+
+function extractProductFamily(name: string): string | null {
+  const families = [
+    /\b(Legion\s+(?:Pro\s+)?[57])\b/i,
+    /\b(Legion\s+\d+)\b/i,
+    /\b(ThinkPad\s+[A-Z]\d+)\b/i,
+    /\b(ThinkBook\s+\d+)\b/i,
+    /\b(IdeaPad\s+(?:Flex\s+)?\d+)\b/i,
+    /\b(LOQ\s+\d+)\b/i,
+    /\b(TUF\s+Gaming\s+[A-Z]\d+)\b/i,
+    /\b(ROG\s+Strix\s+[A-Z]\d+)\b/i,
+    /\b(Vivobook\s+\d+)\b/i,
+    /\b(Victus\s+\d+)\b/i,
+    /\b(OmniBook\s+\w+\s*\d*)\b/i,
+    /\b(Nitro\s+(?:V|Lite)?\s*\d*)\b/i,
+    /\b(Predator\s+Helios\s+(?:Neo\s+)?\d+)\b/i,
+    /\b(Cyborg\s+\d+)\b/i,
+    /\b(Thin\s+\d+)\b/i,
+    /\b(MacBook\s+Pro)\b/i,
+    /\b(Surface\s+Pro\s+\d+)\b/i,
+    /\b(Dell\s+Pro\s+\d+)\b/i,
   ];
 
-  for (const pattern of patterns) {
+  for (const pattern of families) {
     const match = name.match(pattern);
-    if (match && match[1].length >= 5) {
-      return match[1].toLowerCase();
-    }
+    if (match) return match[1].toLowerCase().replace(/\s+/g, ' ');
   }
-
   return null;
 }
 
@@ -118,7 +138,6 @@ function matchProducts(
   globalProducts: ShopifyProduct[]
 ): ShopifyProduct | null {
   const ourFullCode = extractFullModelCode(ourName);
-
   if (ourFullCode) {
     for (const gp of globalProducts) {
       const gpFullCode = extractFullModelCode(gp.title);
@@ -128,13 +147,32 @@ function matchProducts(
     }
   }
 
-  const ourShortCode = extractShortModelCode(ourName);
+  const ourParenCode = extractParenCode(ourName);
+  const ourProductLine = extractProductLine(ourName);
+  const ourFamily = extractProductFamily(ourName);
 
-  if (ourShortCode) {
+  if (ourParenCode) {
+    for (const gp of globalProducts) {
+      const gpParenCode = extractParenCode(gp.title);
+      if (gpParenCode && ourParenCode === gpParenCode) {
+        const gpProductLine = extractProductLine(gp.title);
+        if (!ourProductLine || !gpProductLine || ourProductLine === gpProductLine) {
+          return gp;
+        }
+      }
+    }
+  }
+
+  if (ourProductLine && ourFamily) {
     const candidates: ShopifyProduct[] = [];
     for (const gp of globalProducts) {
-      const gpShortCode = extractShortModelCode(gp.title);
-      if (gpShortCode && ourShortCode === gpShortCode) {
+      const gpProductLine = extractProductLine(gp.title);
+      const gpFamily = extractProductFamily(gp.title);
+      if (gpProductLine && gpFamily && ourProductLine === gpProductLine && ourFamily === gpFamily) {
+        const gpParenCode = extractParenCode(gp.title);
+        if (ourParenCode && gpParenCode && ourParenCode !== gpParenCode) {
+          continue;
+        }
         candidates.push(gp);
       }
     }
@@ -153,17 +191,35 @@ function matchProducts(
   const ourNorm = normalize(ourName);
   const ourWords = ourNorm.split(/[\s,]+/).filter((w) => w.length > 2);
 
+  const genericWords = new Set([
+    "intel", "core", "ultra", "ram", "ssd", "nvidia", "rtx", "geforce",
+    "inch", "ips", "oled", "wqxga", "wuxga", "fhd", "black", "gray", "grey",
+    "white", "silver", "eclipse", "mecha", "amd", "ryzen", "graphics",
+    "chip", "lenovo", "asus", "acer", "msi", "dell", "apple", "microsoft",
+    "gaming", "pro", "laptop"
+  ]);
+
   let bestMatch: ShopifyProduct | null = null;
   let bestScore = 0;
 
   for (const gp of globalProducts) {
     const gpNorm = normalize(gp.title);
     const gpWords = gpNorm.split(/[\s,]+/).filter((w) => w.length > 2);
-    const matchCount = ourWords.filter((w) => gpWords.includes(w)).length;
-    const matchRatio = matchCount / Math.max(ourWords.length, 1);
 
-    if (matchRatio >= 0.7 && matchCount >= 6 && matchCount > bestScore) {
-      bestScore = matchCount;
+    const matchingWords = ourWords.filter((w) => gpWords.includes(w));
+    const specificMatches = matchingWords.filter((w) => !genericWords.has(w));
+    const matchRatio = matchingWords.length / Math.max(ourWords.length, 1);
+
+    if (matchRatio >= 0.75 && matchingWords.length >= 8 && specificMatches.length >= 3 && matchingWords.length > bestScore) {
+      const gpFamily = extractProductFamily(gp.title);
+      if (ourFamily && gpFamily && ourFamily !== gpFamily) {
+        continue;
+      }
+      const gpParenCode = extractParenCode(gp.title);
+      if (ourParenCode && gpParenCode && ourParenCode !== gpParenCode) {
+        continue;
+      }
+      bestScore = matchingWords.length;
       bestMatch = gp;
     }
   }
