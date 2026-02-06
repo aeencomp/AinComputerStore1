@@ -61,6 +61,53 @@ export const categoryNames: Record<string, { ar: string; en: string }> = {
   'gaming-software': { ar: 'برامج الألعاب', en: 'Gaming Software' },
 };
 
+export const parentCategoryMap: Record<string, string> = {
+  'gaming-laptops': 'laptops',
+  'business-laptops': 'laptops',
+  'student-laptops': 'laptops',
+  'ultrabooks': 'laptops',
+  'workstation-laptops': 'laptops',
+  'gaming-pcs': 'desktops',
+  'office-pcs': 'desktops',
+  'workstations': 'desktops',
+  'all-in-one': 'desktops',
+  'mini-pcs': 'desktops',
+  'gaming-monitors': 'monitors',
+  'office-monitors': 'monitors',
+  'curved-monitors': 'monitors',
+  '4k-monitors': 'monitors',
+  'ultrawide-monitors': 'monitors',
+  'keyboards': 'accessories',
+  'mice': 'accessories',
+  'headphones': 'accessories',
+  'webcams': 'accessories',
+  'cables': 'accessories',
+  'bags': 'accessories',
+  'chargers': 'accessories',
+  'miscellaneous': 'accessories',
+  'laser-printers': 'printers',
+  'inkjet-printers': 'printers',
+  'printer-accessories': 'printers',
+  'ram': 'pc-components',
+  'ssd': 'pc-components',
+  'hdd': 'pc-components',
+  'processors': 'pc-components',
+  'motherboards': 'pc-components',
+  'gpu': 'pc-components',
+  'psu': 'pc-components',
+  'cases': 'pc-components',
+  'cooling': 'pc-components',
+  'operating-systems': 'programs',
+  'office-software': 'programs',
+  'antivirus': 'programs',
+  'design-software': 'programs',
+  'gaming-software': 'programs',
+};
+
+export function getParentCategory(slug: string): string {
+  return parentCategoryMap[slug] || slug;
+}
+
 export function getCategoryName(slug: string, language: 'ar' | 'en'): string {
   const category = categoryNames[slug];
   if (category) {

@@ -16,7 +16,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { Link, useLocation, useSearch } from "wouter";
 import { Wrench, Search, Package, Send, PackageX, X, ChevronLeft, ChevronRight } from "lucide-react";
-import { getCategoryName } from "@/lib/categoryNames";
+import { getCategoryName, getParentCategory } from "@/lib/categoryNames";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -456,9 +456,9 @@ export default function Home() {
                   const displayProducts = filteredProducts.slice(0, featuredProductsCount);
                   const grouped = new Map<string, Product[]>();
                   displayProducts.forEach((product) => {
-                    const cat = product.category;
-                    if (!grouped.has(cat)) grouped.set(cat, []);
-                    grouped.get(cat)!.push(product);
+                    const mainCat = getParentCategory(product.category);
+                    if (!grouped.has(mainCat)) grouped.set(mainCat, []);
+                    grouped.get(mainCat)!.push(product);
                   });
                   return Array.from(grouped.entries()).map(([category, categoryProducts]) => (
                     <div key={category}>
