@@ -15,7 +15,8 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { Link, useLocation, useSearch } from "wouter";
-import { Wrench, Search, Package, Send, PackageX, X } from "lucide-react";
+import { Wrench, Search, Package, Send, PackageX, X, ChevronLeft, ChevronRight } from "lucide-react";
+import { getCategoryName } from "@/lib/categoryNames";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -439,15 +440,57 @@ export default function Home() {
                   </Card>
                 )}
               </div>
-            ) : (
+            ) : searchQuery || selectedCategory ? (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
-                {(searchQuery || selectedCategory ? filteredProducts : filteredProducts.slice(0, featuredProductsCount)).map((product) => (
+                {filteredProducts.map((product) => (
                   <ProductCard
                     key={product.id}
                     product={product}
                     onAddToCart={handleAddToCart}
                   />
                 ))}
+              </div>
+            ) : (
+              <div className="space-y-12">
+                {(() => {
+                  const displayProducts = filteredProducts.slice(0, featuredProductsCount);
+                  const grouped = new Map<string, Product[]>();
+                  displayProducts.forEach((product) => {
+                    const cat = product.category;
+                    if (!grouped.has(cat)) grouped.set(cat, []);
+                    grouped.get(cat)!.push(product);
+                  });
+                  return Array.from(grouped.entries()).map(([category, categoryProducts]) => (
+                    <div key={category}>
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1.5 h-8 rounded-full bg-primary" />
+                          <h3 className="text-xl md:text-2xl font-bold text-foreground">
+                            {getCategoryName(category, language)}
+                          </h3>
+                          <span className="text-sm text-muted-foreground">
+                            ({categoryProducts.length})
+                          </span>
+                        </div>
+                        <Link href={`/?category=${category}`}>
+                          <Button variant="ghost" size="sm" className="gap-1 text-primary">
+                            {language === 'ar' ? 'عرض الكل' : 'View All'}
+                            {language === 'ar' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </Button>
+                        </Link>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
+                        {categoryProducts.map((product) => (
+                          <ProductCard
+                            key={product.id}
+                            product={product}
+                            onAddToCart={handleAddToCart}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  ));
+                })()}
               </div>
             )}
           </div>
