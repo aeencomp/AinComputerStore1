@@ -462,26 +462,22 @@ export default function Home() {
                   });
                   return Array.from(grouped.entries()).map(([category, categoryProducts]) => (
                     <div key={category}>
-                      <div className="text-center mb-8">
-                        <h3 className="text-2xl md:text-3xl font-extrabold text-foreground mb-2">
-                          {getCategoryName(category, language)}
-                        </h3>
-                        <div className="flex items-center justify-center gap-2 mb-3">
-                          <div className="w-12 h-1 bg-gradient-to-r from-transparent to-primary rounded-full" />
-                          <div className="w-3 h-3 rounded-full bg-primary" />
-                          <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
-                        </div>
-                        <div className="flex items-center justify-center gap-3">
+                      <div className="flex items-center justify-between mb-5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-1.5 h-8 rounded-full bg-primary" />
+                          <h3 className="text-xl md:text-2xl font-bold text-foreground">
+                            {getCategoryName(category, language)}
+                          </h3>
                           <span className="text-sm text-muted-foreground">
-                            {categoryProducts.length} {language === 'ar' ? 'منتج' : 'products'}
+                            ({categoryProducts.length})
                           </span>
-                          <Link href={`/?category=${category}`}>
-                            <Button variant="outline" size="sm" className="gap-1 text-primary border-primary/30">
-                              {language === 'ar' ? 'عرض الكل' : 'View All'}
-                              {language === 'ar' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                            </Button>
-                          </Link>
                         </div>
+                        <Link href={`/?category=${category}`}>
+                          <Button variant="ghost" size="sm" className="gap-1 text-primary">
+                            {language === 'ar' ? 'عرض الكل' : 'View All'}
+                            {language === 'ar' ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                          </Button>
+                        </Link>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
                         {categoryProducts.map((product) => (
