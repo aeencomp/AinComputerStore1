@@ -16,6 +16,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
+import { startPriceSync, syncPrices, getSyncStatus } from "./price-sync";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -4970,6 +4971,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to clear visitor data" });
     }
   });
+
+  app.get("/api/admin/price-sync/status", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    return res.json(getSyncStatus());
+  });
+
+  app.post("/api/admin/price-sync/run", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    try {
+      const result = await syncPrices();
+      return res.json(result);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  startPriceSync();
 
   return httpServer;
 }

@@ -22,6 +22,7 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
 -   **Email Notifications**: Automated, Arabic-formatted order confirmation emails via Gmail SMTP.
 -   **Internationalization (i18n)**: `LanguageContext` for UI text translation, supporting Arabic and English with dynamic RTL/LTR adjustment. Language switcher button available on all pages including admin portal (via AdminNav), battery portal (dashboard, manage, POS, reports), and sales portal.
 -   **Image Upload**: Admin functionality to upload product images directly to the server.
+-   **Price Sync**: Automatic price synchronization with globaliraq.iq every 6 hours. Fetches prices via Shopify products.json API, matches by model codes, applies 5% markup, and updates database. Products tagged with badge 'جديد' are synced. Admin dashboard shows sync status with manual trigger button. Module: `server/price-sync.ts`.
 -   **PWA**: Installable on mobile, offline support via service worker, push notifications, and custom app icons.
 -   **Android App**: Packaged as a native Android APK using Capacitor.
 
