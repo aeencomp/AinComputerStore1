@@ -453,19 +453,20 @@ export default function Home() {
             ) : (
               <div className="space-y-12">
                 {(() => {
-                  const displayProducts = filteredProducts.slice(0, featuredProductsCount);
                   const grouped = new Map<string, Product[]>();
-                  displayProducts.forEach((product) => {
+                  filteredProducts.forEach((product) => {
                     const mainCat = getParentCategory(product.category);
                     if (!grouped.has(mainCat)) grouped.set(mainCat, []);
                     grouped.get(mainCat)!.push(product);
                   });
                   const categoryOrder = ['laptops', 'desktops', 'monitors', 'printers', 'accessories', 'pc-components', 'programs'];
-                  const sortedEntries = Array.from(grouped.entries()).sort(([a], [b]) => {
-                    const idxA = categoryOrder.indexOf(a);
-                    const idxB = categoryOrder.indexOf(b);
-                    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                  const sortedEntries = categoryOrder
+                    .filter(cat => grouped.has(cat))
+                    .map(cat => [cat, grouped.get(cat)!] as [string, Product[]]);
+                  grouped.forEach((products, cat) => {
+                    if (!categoryOrder.includes(cat)) sortedEntries.push([cat, products]);
                   });
+                  const maxPerCategory = 8;
                   return sortedEntries.map(([category, categoryProducts]) => (
                     <div key={category}>
                       <div className="flex items-center justify-between mb-5">
@@ -486,7 +487,7 @@ export default function Home() {
                         </Link>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
-                        {categoryProducts.map((product) => (
+                        {categoryProducts.slice(0, maxPerCategory).map((product) => (
                           <ProductCard
                             key={product.id}
                             product={product}
