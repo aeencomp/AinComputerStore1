@@ -1,5 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { Laptop, Monitor, Keyboard, Computer, Cpu, Printer, AppWindow, Package } from "lucide-react";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/gaming_desktop_pc_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -12,30 +13,56 @@ const categories = [
     nameAr: 'جميع المنتجات',
     nameEn: 'All Products',
     image: allProductsImage,
+    icon: Package,
   },
   {
     id: 'laptops',
     nameAr: 'أجهزة لابتوب',
     nameEn: 'Laptops',
     image: laptopImage,
+    icon: Laptop,
   },
   {
     id: 'desktops',
     nameAr: 'أجهزة مكتبية',
     nameEn: 'Desktops',
     image: desktopImage,
+    icon: Computer,
   },
   {
     id: 'monitors',
     nameAr: 'شاشات',
     nameEn: 'Monitors',
     image: monitorImage,
+    icon: Monitor,
   },
   {
     id: 'accessories',
-    nameAr: 'ملحقات الألعاب',
-    nameEn: 'Gaming Accessories',
+    nameAr: 'ملحقات',
+    nameEn: 'Accessories',
     image: accessoriesImage,
+    icon: Keyboard,
+  },
+  {
+    id: 'printers',
+    nameAr: 'الطابعات',
+    nameEn: 'Printers',
+    image: null,
+    icon: Printer,
+  },
+  {
+    id: 'pc-components',
+    nameAr: 'قطع الكمبيوتر',
+    nameEn: 'PC Components',
+    image: null,
+    icon: Cpu,
+  },
+  {
+    id: 'programs',
+    nameAr: 'البرامج',
+    nameEn: 'Software',
+    image: null,
+    icon: AppWindow,
   },
 ];
 
@@ -66,8 +93,10 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
             <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
-          {categories.map((category, index) => (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 md:gap-6">
+          {categories.map((category, index) => {
+            const Icon = category.icon;
+            return (
               <div
                 key={category.id}
                 className={`animated-border-wrapper group cursor-pointer ${index % 2 === 0 ? 'float-animation' : 'float-animation-delayed'}`}
@@ -76,14 +105,20 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
               >
                 <Card className="overflow-hidden border-0 shadow-md h-full pulse-glow">
                   <CardContent className="p-0">
-                    <div className="aspect-square overflow-hidden bg-gradient-to-br from-muted to-muted/50 shimmer-effect">
-                      <img
-                        src={category.image}
-                        alt={language === 'ar' ? category.nameAr : category.nameEn}
-                        className="w-full h-full object-cover ken-burns-effect group-hover:scale-110 group-hover:brightness-110 transition-all duration-700"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-                    </div>
+                    {category.image ? (
+                      <div className="aspect-square overflow-hidden bg-gradient-to-br from-muted to-muted/50 shimmer-effect">
+                        <img
+                          src={category.image}
+                          alt={language === 'ar' ? category.nameAr : category.nameEn}
+                          className="w-full h-full object-cover ken-burns-effect group-hover:scale-110 group-hover:brightness-110 transition-all duration-700"
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                      </div>
+                    ) : (
+                      <div className="aspect-square overflow-hidden bg-gradient-to-br from-primary/10 via-muted to-primary/5 flex items-center justify-center">
+                        <Icon className="w-16 h-16 text-primary/60 group-hover:text-primary group-hover:scale-110 transition-all duration-500" />
+                      </div>
+                    )}
                     <div className="p-4 text-center bg-card relative overflow-hidden">
                       <div className="absolute inset-0 bg-gradient-to-r from-primary/5 via-primary/10 to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
                       <h3 className="font-bold text-lg md:text-xl group-hover:text-primary transition-colors duration-300 relative z-10" data-testid={`text-category-${category.id}`}>
@@ -93,7 +128,8 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
                   </CardContent>
                 </Card>
               </div>
-            ))}
+            );
+          })}
         </div>
       </div>
     </section>

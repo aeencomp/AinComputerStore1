@@ -453,14 +453,30 @@ export default function Home() {
             ) : (
               <div className="space-y-12">
                 {(() => {
+                  const mainCategoryOrder = ['laptops', 'desktops', 'monitors', 'accessories', 'printers', 'pc-components', 'programs'];
+                  const getMainCategory = (cat: string) => {
+                    if (['laptops', 'gaming-laptops', 'business-laptops', 'student-laptops', 'ultrabooks', 'workstation-laptops'].includes(cat)) return 'laptops';
+                    if (['desktops', 'gaming-pcs', 'office-pcs', 'workstations', 'all-in-one', 'mini-pcs'].includes(cat)) return 'desktops';
+                    if (['monitors', 'gaming-monitors', 'office-monitors', 'curved-monitors', '4k-monitors', 'ultrawide-monitors'].includes(cat)) return 'monitors';
+                    if (['accessories', 'keyboards', 'mice', 'headphones', 'webcams', 'cables', 'bags', 'chargers', 'miscellaneous'].includes(cat)) return 'accessories';
+                    if (['printers', 'laser-printers', 'inkjet-printers', 'printer-accessories'].includes(cat)) return 'printers';
+                    if (['pc-components', 'ram', 'ssd', 'hdd', 'processors', 'motherboards', 'gpu', 'psu', 'cases', 'cooling'].includes(cat)) return 'pc-components';
+                    if (['programs', 'operating-systems', 'office-software', 'antivirus', 'design-software', 'gaming-software'].includes(cat)) return 'programs';
+                    return cat;
+                  };
                   const displayProducts = filteredProducts.slice(0, featuredProductsCount);
                   const grouped = new Map<string, Product[]>();
                   displayProducts.forEach((product) => {
-                    const cat = product.category;
-                    if (!grouped.has(cat)) grouped.set(cat, []);
-                    grouped.get(cat)!.push(product);
+                    const mainCat = getMainCategory(product.category);
+                    if (!grouped.has(mainCat)) grouped.set(mainCat, []);
+                    grouped.get(mainCat)!.push(product);
                   });
-                  return Array.from(grouped.entries()).map(([category, categoryProducts]) => (
+                  const sortedEntries = Array.from(grouped.entries()).sort((a, b) => {
+                    const idxA = mainCategoryOrder.indexOf(a[0]);
+                    const idxB = mainCategoryOrder.indexOf(b[0]);
+                    return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+                  });
+                  return sortedEntries.map(([category, categoryProducts]) => (
                     <div key={category}>
                       <div className="text-center mb-8">
                         <h3 className="text-2xl md:text-3xl font-extrabold text-foreground mb-2">
