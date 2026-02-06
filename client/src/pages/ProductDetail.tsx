@@ -454,7 +454,7 @@ export default function ProductDetail() {
                           {relatedProductName}
                         </h3>
                         <p className="text-primary font-bold" data-testid={`text-related-price-${relatedProduct.id}`}>
-                          {formatPrice(relatedProduct.price, language)} {t('common.currency')}
+                          {formatPrice(parseFloat(relatedProduct.price) * 1000, language)} {t('common.currency')}
                         </p>
                       </div>
                     </Card>
