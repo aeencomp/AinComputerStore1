@@ -986,29 +986,51 @@ export default function SalesPOS({ user }: SalesPOSProps) {
           </DialogHeader>
           <style>{`
             @media print {
+              @page {
+                size: 80mm auto;
+                margin: 2mm;
+              }
+              html, body {
+                height: auto !important;
+                overflow: visible !important;
+              }
               body > *:not([data-radix-portal]) { display: none !important; }
               [data-radix-portal] > *:not([data-state="open"]) { display: none !important; }
+              [data-radix-dialog-overlay] { display: none !important; }
               .print-hide { display: none !important; }
               .print-receipt { 
                 display: block !important; 
                 visibility: visible !important; 
                 position: static !important;
-                width: 100% !important;
-                padding: 10px !important;
+                width: 80mm !important;
+                max-width: 80mm !important;
+                padding: 3mm !important;
                 background: white !important;
                 color: black !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
               }
               .print-receipt * { 
                 visibility: visible !important; 
                 color: black !important;
+                page-break-inside: avoid !important;
+                break-inside: avoid !important;
               }
               [role="dialog"] {
-                position: fixed !important;
-                inset: 0 !important;
-                max-width: none !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 80mm !important;
+                max-width: 80mm !important;
+                height: auto !important;
+                max-height: none !important;
+                overflow: visible !important;
                 border: none !important;
                 box-shadow: none !important;
                 background: white !important;
+                padding: 0 !important;
+                margin: 0 !important;
+                transform: none !important;
               }
             }
           `}</style>

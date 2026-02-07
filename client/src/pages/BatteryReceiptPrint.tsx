@@ -214,7 +214,7 @@ export default function BatteryReceiptPrint() {
       <style>{`
         @media print {
           @page {
-            size: 72.1mm 210mm;
+            size: 72.1mm auto;
             margin: 2mm;
           }
           * {
@@ -227,6 +227,8 @@ export default function BatteryReceiptPrint() {
             margin: 0 !important;
             padding: 0 !important;
             width: 72.1mm !important;
+            height: auto !important;
+            overflow: visible !important;
             font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, sans-serif !important;
           }
           body > * {
@@ -241,6 +243,7 @@ export default function BatteryReceiptPrint() {
           #root .min-h-screen {
             display: block !important;
             min-height: auto !important;
+            height: auto !important;
             background: white !important;
             padding: 0 !important;
           }
@@ -256,12 +259,18 @@ export default function BatteryReceiptPrint() {
             padding: 0 !important;
             box-shadow: none !important;
             background: white !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+            page-break-before: avoid !important;
+            page-break-after: avoid !important;
             font-family: 'Cairo', 'Tajawal', 'IBM Plex Sans Arabic', 'Noto Sans Arabic', system-ui, sans-serif !important;
             -webkit-font-smoothing: antialiased !important;
             text-rendering: optimizeLegibility !important;
           }
           #printable-receipt * {
             visibility: visible !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
           #printable-receipt .bg-black {
             background-color: black !important;

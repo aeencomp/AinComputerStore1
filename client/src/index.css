@@ -613,6 +613,7 @@
     padding: 0 !important;
     width: 100% !important;
     height: auto !important;
+    overflow: visible !important;
   }
   
   /* Hide dialog overlay/backdrop */
@@ -641,6 +642,13 @@
     font-size: 9pt !important;
     border: none !important;
     box-shadow: none !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  #receipt-content * {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
   
   /* Preserve specific background colors */

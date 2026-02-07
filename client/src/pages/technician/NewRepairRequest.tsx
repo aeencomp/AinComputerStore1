@@ -252,19 +252,23 @@ export default function NewRepairRequest() {
           <title>${isRTL ? 'إيصال صيانة' : 'Repair Receipt'}</title>
           <style>
             @page { 
-              size: 72.1mm 210mm; 
+              size: 72.1mm auto; 
               margin: 2mm; 
             }
             * {
               box-sizing: border-box;
               margin: 0;
               padding: 0;
+              page-break-inside: avoid;
+              break-inside: avoid;
             }
             body { 
               font-family: Arial, sans-serif; 
               font-size: 13px; 
               font-weight: 600;
               width: 68mm;
+              height: auto;
+              overflow: visible;
               padding: 3mm;
               direction: ${isRTL ? 'rtl' : 'ltr'};
               line-height: 1.5;

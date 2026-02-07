@@ -618,12 +618,28 @@ export default function OrderConfirmation() {
           animation: confetti 3s ease-in-out forwards;
         }
         @media print {
+          @page {
+            size: A4 portrait;
+            margin: 10mm;
+          }
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+          }
           body {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
           }
           .print\\:hidden {
             display: none !important;
+          }
+          * {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .divide-y > * {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}</style>
