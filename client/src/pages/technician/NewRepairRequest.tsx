@@ -143,8 +143,12 @@ export default function NewRepairRequest() {
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
               @page { 
-                size: 80mm 40mm; 
+                size: 80mm auto; 
                 margin: 1mm; 
+              }
+              html, body {
+                height: auto !important;
+                overflow: visible !important;
               }
               body { 
                 font-family: Arial, sans-serif; 
@@ -153,10 +157,16 @@ export default function NewRepairRequest() {
                 padding: 2px;
                 direction: ${isRTL ? 'rtl' : 'ltr'};
               }
+              * {
+                page-break-inside: avoid;
+                break-inside: avoid;
+              }
               .label-container {
                 border: 1px solid #000;
                 padding: 2px;
                 max-width: 78mm;
+                page-break-inside: avoid;
+                break-inside: avoid;
               }
               .ticket-number {
                 font-size: 11px;
