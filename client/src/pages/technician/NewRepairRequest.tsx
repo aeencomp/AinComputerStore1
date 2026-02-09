@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { ArrowLeft, ArrowRight, Plus, Printer, Receipt } from 'lucide-react';
-import JsBarcode from 'jsbarcode';
+import QRCode from 'qrcode';
 import type { RepairTicket } from '@shared/schema';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,7 +35,7 @@ export default function NewRepairRequest() {
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const [createdTicket, setCreatedTicket] = useState<RepairTicket | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
-  const barcodeRef = useRef<SVGSVGElement>(null);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -48,7 +48,7 @@ export default function NewRepairRequest() {
     }
   }, [authError, isAuthLoading, currentTechnician, navigate]);
 
-  const [barcodeReady, setBarcodeReady] = useState(false);
+  const [qrReady, setQrReady] = useState(false);
 
   const formSchema = z.object({
     customerName: z.string().min(2, isRTL ? 'اسم العميل مطلوب' : 'Customer name is required'),
@@ -78,27 +78,21 @@ export default function NewRepairRequest() {
   });
 
   useEffect(() => {
-    if (createdTicket && barcodeRef.current) {
-      requestAnimationFrame(() => {
-        if (barcodeRef.current) {
-          try {
-            JsBarcode(barcodeRef.current, createdTicket.ticketNumber, {
-              format: 'CODE128',
-              width: 1.5,
-              height: 40,
-              displayValue: true,
-              fontSize: 12,
-              margin: 5,
-              background: '#ffffff',
-            });
-            setBarcodeReady(true);
-          } catch (error) {
-            console.error('Barcode generation error:', error);
-          }
-        }
+    if (createdTicket) {
+      const trackingUrl = `${window.location.origin}/track-repair?ticket=${encodeURIComponent(createdTicket.ticketNumber)}&lang=${language}`;
+      QRCode.toDataURL(trackingUrl, {
+        width: 200,
+        margin: 1,
+        color: { dark: '#000000', light: '#ffffff' },
+        errorCorrectionLevel: 'M',
+      }).then((dataUrl) => {
+        setQrCodeDataUrl(dataUrl);
+        setQrReady(true);
+      }).catch((error) => {
+        console.error('QR code generation error:', error);
       });
     }
-  }, [createdTicket]);
+  }, [createdTicket, language]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -174,13 +168,14 @@ export default function NewRepairRequest() {
                 text-align: center;
                 margin-bottom: 2px;
               }
-              .barcode-container {
+              .qr-container {
                 text-align: center;
                 margin: 2px 0;
               }
-              .barcode-container svg {
-                max-width: 100%;
-                height: 22px;
+              .qr-container img {
+                width: 60px;
+                height: 60px;
+                margin: 0 auto;
               }
               .info-row {
                 display: flex;
@@ -231,7 +226,8 @@ export default function NewRepairRequest() {
 
   const handleNewRequest = () => {
     setCreatedTicket(null);
-    setBarcodeReady(false);
+    setQrReady(false);
+    setQrCodeDataUrl('');
     form.reset();
   };
 
@@ -414,6 +410,11 @@ export default function NewRepairRequest() {
           
           <div class="ticket-number">${createdTicket.ticketNumber}</div>
           
+          <div style="text-align: center; margin: 8px 0;">
+            <img src="${qrCodeDataUrl}" alt="QR Code" style="width: 100px; height: 100px; margin: 0 auto;" />
+            <div style="font-size: 9px; font-weight: 700; margin-top: 4px;">${isRTL ? 'امسح الكود لتتبع حالة الصيانة' : 'Scan to track repair status'}</div>
+          </div>
+          
           <div class="date-time">
             ${new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')} - ${new Date().toLocaleTimeString(isRTL ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
           </div>
@@ -477,7 +478,7 @@ export default function NewRepairRequest() {
           </div>
           
           <div class="track-info">
-            ${isRTL ? 'لتتبع حالة جهازك، استخدم رقم التذكرة أعلاه' : 'To track your device status, use the ticket number above'}
+            ${isRTL ? 'امسح رمز QR أعلاه لتتبع حالة جهازك مباشرة' : 'Scan the QR code above to track your device status directly'}
           </div>
           
           <div class="footer">
@@ -540,8 +541,13 @@ export default function NewRepairRequest() {
                     <div className="ticket-number" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
                       {createdTicket.ticketNumber}
                     </div>
-                    <div className="barcode-container" style={{ textAlign: 'center', marginBottom: '8px' }}>
-                      <svg ref={barcodeRef} />
+                    <div className="qr-container" style={{ textAlign: 'center', marginBottom: '8px' }}>
+                      {qrCodeDataUrl && (
+                        <img src={qrCodeDataUrl} alt="QR Code" style={{ width: '120px', height: '120px', margin: '0 auto' }} data-testid="img-qr-code" />
+                      )}
+                      <div style={{ fontSize: '8px', color: '#666', marginTop: '2px' }}>
+                        {isRTL ? 'امسح للتتبع' : 'Scan to track'}
+                      </div>
                     </div>
                     <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
@@ -571,11 +577,11 @@ export default function NewRepairRequest() {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 justify-center flex-wrap">
-                <Button onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-print-label">
+                <Button onClick={handlePrint} className="gap-2" disabled={!qrReady} data-testid="button-print-label">
                   <Printer className="h-4 w-4" />
-                  {barcodeReady ? (isRTL ? 'طباعة البطاقة' : 'Print Label') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
+                  {qrReady ? (isRTL ? 'طباعة البطاقة' : 'Print Label') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
                 </Button>
-                <Button onClick={handlePrintCustomerReceipt} variant="secondary" className="gap-2" data-testid="button-print-receipt">
+                <Button onClick={handlePrintCustomerReceipt} variant="secondary" className="gap-2" disabled={!qrReady} data-testid="button-print-receipt">
                   <Receipt className="h-4 w-4" />
                   {isRTL ? 'طباعة إيصال العميل' : 'Print Customer Receipt'}
                 </Button>
