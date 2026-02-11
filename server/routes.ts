@@ -2268,6 +2268,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/admin/repair-tickets/:id/archive", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { archived } = req.body;
+      const ticket = await storage.archiveRepairTicket(id, archived !== false);
+      if (!ticket) {
+        return res.status(404).json({ error: "Repair ticket not found" });
+      }
+      return res.json(ticket);
+    } catch (error) {
+      console.error("Error archiving repair ticket:", error);
+      return res.status(500).json({ error: "Failed to archive repair ticket" });
+    }
+  });
+
+  app.post("/api/admin/repair-tickets/archive-delivered", async (req, res) => {
+    try {
+      const count = await storage.archiveDeliveredTickets();
+      return res.json({ success: true, count });
+    } catch (error) {
+      console.error("Error archiving delivered tickets:", error);
+      return res.status(500).json({ error: "Failed to archive delivered tickets" });
+    }
+  });
+
   app.delete("/api/admin/repair-tickets/:id", async (req, res) => {
     try {
       const { id } = req.params;

@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore } from 'lucide-react';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 
@@ -32,6 +32,7 @@ export default function TechnicianDashboard() {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -94,6 +95,32 @@ export default function TechnicianDashboard() {
     },
   });
 
+  const archiveTicketMutation = useMutation({
+    mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
+      return await apiRequest('PATCH', `/api/admin/repair-tickets/${id}/archive`, { archived });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      toast({
+        title: language === 'ar' ? 'تم التحديث' : 'Updated',
+        description: language === 'ar' ? 'تم تحديث حالة الأرشفة' : 'Archive status updated',
+      });
+    },
+  });
+
+  const archiveAllDeliveredMutation = useMutation({
+    mutationFn: async () => {
+      return await apiRequest('POST', '/api/admin/repair-tickets/archive-delivered');
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      toast({
+        title: language === 'ar' ? 'تمت الأرشفة' : 'Archived',
+        description: language === 'ar' ? `تم أرشفة ${data.count} تذكرة مسلمة` : `${data.count} delivered tickets archived`,
+      });
+    },
+  });
+
   const stats = useMemo(() => {
     if (!tickets) return { totalRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0 };
     let totalRevenue = 0;
@@ -144,7 +171,17 @@ export default function TechnicianDashboard() {
   const isAdmin = currentTechnician.isAdmin === 1;
   const canViewRevenue = isAdmin || (currentTechnician.permissions || []).includes('view_revenue');
 
+  const archivedCount = useMemo(() => {
+    return tickets?.filter(t => t.isArchived === 1).length || 0;
+  }, [tickets]);
+
+  const deliveredUnarchived = useMemo(() => {
+    return tickets?.filter(t => t.status === 'delivered' && t.isArchived !== 1).length || 0;
+  }, [tickets]);
+
   const filteredTickets = tickets?.filter((ticket) => {
+    if (!showArchived && ticket.isArchived === 1) return false;
+    if (showArchived && ticket.isArchived !== 1) return false;
     if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
     if (filterPriority !== 'all' && ticket.priority !== filterPriority) return false;
     if (searchQuery) {
@@ -351,6 +388,28 @@ export default function TechnicianDashboard() {
               <SelectItem value="low">{t('repair.priority.low')}</SelectItem>
             </SelectContent>
           </Select>
+
+          <Button
+            variant={showArchived ? 'default' : 'outline'}
+            onClick={() => setShowArchived(!showArchived)}
+            className="toggle-elevate"
+            data-testid="button-toggle-archived"
+          >
+            <Archive className="h-4 w-4 me-2" />
+            {language === 'ar' ? `الأرشيف (${archivedCount})` : `Archive (${archivedCount})`}
+          </Button>
+
+          {!showArchived && deliveredUnarchived > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => archiveAllDeliveredMutation.mutate()}
+              disabled={archiveAllDeliveredMutation.isPending}
+              data-testid="button-archive-all-delivered"
+            >
+              <Archive className="h-4 w-4 me-2" />
+              {language === 'ar' ? `أرشفة المسلمة (${deliveredUnarchived})` : `Archive Delivered (${deliveredUnarchived})`}
+            </Button>
+          )}
         </div>
 
         {isTicketsLoading ? (
@@ -438,8 +497,33 @@ export default function TechnicianDashboard() {
                     </Select>
                   </div>
 
-                  <div className="text-xs text-muted-foreground pt-1">
-                    {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
+                  <div className="flex justify-between items-center pt-1">
+                    <span className="text-xs text-muted-foreground">
+                      {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
+                    </span>
+                    {showArchived ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => { e.stopPropagation(); archiveTicketMutation.mutate({ id: ticket.id, archived: false }); }}
+                        disabled={archiveTicketMutation.isPending}
+                        data-testid={`button-unarchive-${ticket.id}`}
+                      >
+                        <ArchiveRestore className="h-3 w-3 me-1" />
+                        {language === 'ar' ? 'إلغاء الأرشفة' : 'Unarchive'}
+                      </Button>
+                    ) : ticket.status === 'delivered' ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={(e) => { e.stopPropagation(); archiveTicketMutation.mutate({ id: ticket.id, archived: true }); }}
+                        disabled={archiveTicketMutation.isPending}
+                        data-testid={`button-archive-${ticket.id}`}
+                      >
+                        <Archive className="h-3 w-3 me-1" />
+                        {language === 'ar' ? 'أرشفة' : 'Archive'}
+                      </Button>
+                    ) : null}
                   </div>
                 </CardContent>
               </Card>

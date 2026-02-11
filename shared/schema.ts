@@ -357,6 +357,7 @@ export const repairTickets = pgTable("repair_tickets", {
   costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
   finalCost: decimal("final_cost", { precision: 10, scale: 2 }),
   userId: varchar("user_id"), // optional - if customer has account
+  isArchived: integer("is_archived").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

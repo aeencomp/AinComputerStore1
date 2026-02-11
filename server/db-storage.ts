@@ -285,6 +285,22 @@ export class DrizzleStorage implements IStorage {
     return result[0];
   }
 
+  async archiveRepairTicket(id: string, archived: boolean): Promise<RepairTicket | undefined> {
+    const result = await db.update(repairTickets)
+      .set({ isArchived: archived ? 1 : 0, updatedAt: new Date() })
+      .where(eq(repairTickets.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async archiveDeliveredTickets(): Promise<number> {
+    const result = await db.update(repairTickets)
+      .set({ isArchived: 1, updatedAt: new Date() })
+      .where(and(eq(repairTickets.status, 'delivered'), eq(repairTickets.isArchived, 0)))
+      .returning();
+    return result.length;
+  }
+
   async deleteRepairTicket(id: string): Promise<void> {
     await db.delete(repairTickets).where(eq(repairTickets.id, id));
   }
