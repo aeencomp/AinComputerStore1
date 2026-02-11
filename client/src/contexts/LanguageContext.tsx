@@ -647,6 +647,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.status.waiting-parts': 'بانتظار القطع',
     'repair.status.completed': 'مكتمل',
     'repair.status.delivered': 'تم التسليم',
+    'repair.status.rejected': 'تم رفض الصيانة',
     
     'repair.priority.low': 'منخفضة',
     'repair.priority.normal': 'عادية',
@@ -1449,6 +1450,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.status.waiting-parts': 'Waiting for Parts',
     'repair.status.completed': 'Completed',
     'repair.status.delivered': 'Delivered',
+    'repair.status.rejected': 'Repair Rejected',
     
     'repair.priority.low': 'Low',
     'repair.priority.normal': 'Normal',

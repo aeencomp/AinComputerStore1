@@ -161,6 +161,7 @@ export default function TechnicianDashboard() {
       case 'waiting-parts': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400';
       case 'completed': return 'bg-green-500/10 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
+      case 'rejected': return 'bg-red-500/10 text-red-700 dark:text-red-400';
       default: return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
     }
   };
@@ -307,6 +308,7 @@ export default function TechnicianDashboard() {
               <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
               <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
               <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+              <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -399,6 +401,7 @@ export default function TechnicianDashboard() {
                         <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                         <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                         <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+                        <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

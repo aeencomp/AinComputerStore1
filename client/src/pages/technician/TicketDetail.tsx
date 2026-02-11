@@ -415,6 +415,7 @@ export default function TicketDetail() {
                             <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                             <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                             <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+                            <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormMessage />

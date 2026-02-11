@@ -112,7 +112,8 @@ export async function sendTicketUpdatedMessage(
     'in-progress': { ar: 'جاري العمل عليه', en: 'In Progress' },
     'waiting-parts': { ar: 'بانتظار القطع', en: 'Waiting for Parts' },
     'completed': { ar: 'تم الإصلاح', en: 'Completed' },
-    'delivered': { ar: 'تم التسليم', en: 'Delivered' }
+    'delivered': { ar: 'تم التسليم', en: 'Delivered' },
+    'rejected': { ar: 'تم رفض الصيانة', en: 'Repair Rejected' }
   };
 
   const statusText = statusMessages[status] || { ar: status, en: status };
