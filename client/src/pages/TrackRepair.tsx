@@ -183,6 +183,7 @@ export default function TrackRepair() {
       case 'completed': return 'bg-green-500/10 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
       case 'rejected': return 'bg-red-500/10 text-red-700 dark:text-red-400';
+      case 'unrepairable': return 'bg-red-500/10 text-red-700 dark:text-red-400';
       default: return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
     }
   };

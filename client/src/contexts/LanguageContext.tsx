@@ -650,6 +650,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.status.completed': 'مكتمل',
     'repair.status.delivered': 'تم التسليم',
     'repair.status.rejected': 'تم رفض الصيانة',
+    'repair.status.unrepairable': 'لا يصلح',
     
     'repair.priority.low': 'منخفضة',
     'repair.priority.normal': 'عادية',
@@ -1455,6 +1456,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.status.completed': 'Completed',
     'repair.status.delivered': 'Delivered',
     'repair.status.rejected': 'Repair Rejected',
+    'repair.status.unrepairable': 'Unrepairable',
     
     'repair.priority.low': 'Low',
     'repair.priority.normal': 'Normal',
