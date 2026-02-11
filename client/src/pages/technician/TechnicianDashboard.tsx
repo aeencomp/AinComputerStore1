@@ -12,6 +12,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket } from '@shared/schema';
 import { LogOut, Wrench, Search, Users, Settings, Plus } from 'lucide-react';
 import { format } from 'date-fns';
+import TicketDetailDialog from '@/components/TicketDetailDialog';
 
 interface Technician {
   id: string;
@@ -29,6 +30,8 @@ export default function TechnicianDashboard() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -214,34 +217,40 @@ export default function TechnicianDashboard() {
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredTickets.map((ticket) => (
-              <Link key={ticket.id} href={`/technician/tickets/${ticket.id}`}>
-                <Card className="hover-elevate cursor-pointer" data-testid={`card-ticket-${ticket.id}`}>
-                  <CardHeader>
-                    <div className="flex justify-between items-start mb-2">
-                      <CardTitle className="text-lg">{ticket.ticketNumber}</CardTitle>
-                      <Badge className={getPriorityColor(ticket.priority)}>
-                        {t(`repair.priority.${ticket.priority}`)}
-                      </Badge>
-                    </div>
-                    <CardDescription>{ticket.customerName}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{t('repair.ticket.deviceType')}:</span>
-                      <span className="text-sm font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{t('repair.ticket.status')}:</span>
-                      <Badge className={getStatusColor(ticket.status)}>
-                        {t(`repair.status.${ticket.status}`)}
-                      </Badge>
-                    </div>
-                    <div className="text-xs text-muted-foreground pt-2">
-                      {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
-                    </div>
-                  </CardContent>
-                </Card>
-              </Link>
+              <Card
+                key={ticket.id}
+                className="hover-elevate cursor-pointer"
+                role="button"
+                tabIndex={0}
+                onClick={() => { setSelectedTicketId(ticket.id); setDialogOpen(true); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicketId(ticket.id); setDialogOpen(true); } }}
+                data-testid={`card-ticket-${ticket.id}`}
+              >
+                <CardHeader>
+                  <div className="flex justify-between items-start mb-2">
+                    <CardTitle className="text-lg">{ticket.ticketNumber}</CardTitle>
+                    <Badge className={getPriorityColor(ticket.priority)}>
+                      {t(`repair.priority.${ticket.priority}`)}
+                    </Badge>
+                  </div>
+                  <CardDescription>{ticket.customerName}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{t('repair.ticket.deviceType')}:</span>
+                    <span className="text-sm font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{t('repair.ticket.status')}:</span>
+                    <Badge className={getStatusColor(ticket.status)}>
+                      {t(`repair.status.${ticket.status}`)}
+                    </Badge>
+                  </div>
+                  <div className="text-xs text-muted-foreground pt-2">
+                    {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         ) : (
@@ -254,6 +263,12 @@ export default function TechnicianDashboard() {
           </Card>
         )}
       </div>
+
+      <TicketDetailDialog
+        ticketId={selectedTicketId}
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+      />
     </div>
   );
 }
