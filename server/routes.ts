@@ -2157,6 +2157,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/repair-tickets/search/:query", async (req, res) => {
+    try {
+      const query = req.params.query.trim();
+      let ticket;
+
+      ticket = await storage.getRepairTicketByNumber(query);
+
+      if (!ticket) {
+        ticket = await storage.getRepairTicketByNumber(query.toUpperCase());
+      }
+
+      if (!ticket) {
+        ticket = await storage.getRepairTicketByPhone(query);
+      }
+
+      if (!ticket) {
+        return res.status(404).json({ error: "Repair ticket not found" });
+      }
+
+      return res.json(ticket);
+    } catch (error) {
+      console.error("Error searching repair ticket:", error);
+      return res.status(500).json({ error: "Failed to search repair ticket" });
+    }
+  });
+
   app.get("/api/repair-tickets/lookup/:ticketNumber", async (req, res) => {
     try {
       const { ticketNumber } = req.params;

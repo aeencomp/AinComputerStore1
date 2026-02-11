@@ -135,37 +135,26 @@ export default function TrackRepair() {
     });
   };
 
-  const [phoneNumber, setPhoneNumber] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [ticket, setTicket] = useState<RepairTicket | null>(null);
 
-  // Auto-search if ticket parameter is in URL and set language from URL param
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     
-    // Set language to Arabic if lang=ar is in URL (from QR code scan)
     const langParam = params.get('lang');
     if (langParam === 'ar' || langParam === 'en') {
       setLanguage(langParam);
     }
     
     const ticketParam = params.get('ticket');
-    if (ticketParam && !phoneNumber && !ticket) {
-      // Search by ticket number
+    if (ticketParam && !searchQuery && !ticket) {
       searchMutation.mutate(ticketParam);
     }
   }, []);
 
   const searchMutation = useMutation({
     mutationFn: async (query: string) => {
-      // Try ticket number search first (if it starts with AEEN-)
-      if (query.startsWith('AEEN-') || query.startsWith('TKT-') || query.startsWith('REP-')) {
-        const res = await fetch(`/api/repair-tickets/lookup/${encodeURIComponent(query)}`);
-        if (res.ok) {
-          return res.json();
-        }
-      }
-      // Otherwise search by phone
-      const res = await fetch(`/api/repair-tickets/lookup/phone/${encodeURIComponent(query)}`);
+      const res = await fetch(`/api/repair-tickets/search/${encodeURIComponent(query)}`);
       if (!res.ok) {
         throw new Error('Not found');
       }
@@ -181,8 +170,8 @@ export default function TrackRepair() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (phoneNumber.trim()) {
-      searchMutation.mutate(phoneNumber.trim());
+    if (searchQuery.trim()) {
+      searchMutation.mutate(searchQuery.trim());
     }
   };
 
@@ -212,15 +201,18 @@ export default function TrackRepair() {
           <CardContent className="space-y-6">
             <form onSubmit={handleSearch} className="flex gap-2">
               <Input
-                value={phoneNumber}
-                onChange={(e) => setPhoneNumber(e.target.value)}
-                placeholder={t('repair.lookup.phonePlaceholder')}
-                data-testid="input-phone-number"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder={t('repair.lookup.searchPlaceholder')}
+                data-testid="input-search-query"
               />
               <Button type="submit" disabled={searchMutation.isPending} data-testid="button-search-repair">
                 {searchMutation.isPending ? t('repair.lookup.searching') : t('repair.lookup.search')}
               </Button>
             </form>
+            <p className="text-xs text-muted-foreground -mt-4">
+              {t('repair.lookup.searchHint')}
+            </p>
 
             {searchMutation.isError && (
               <div className="text-destructive text-center py-4" data-testid="text-not-found">
