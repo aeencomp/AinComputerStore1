@@ -95,15 +95,17 @@ export default function TechnicianDashboard() {
   });
 
   const stats = useMemo(() => {
-    if (!tickets) return { totalRevenue: 0, completedCount: 0, pendingCount: 0, deliveredCount: 0 };
+    if (!tickets) return { totalRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0 };
     let totalRevenue = 0;
     let completedCount = 0;
+    let completedRevenue = 0;
     let pendingCount = 0;
     let deliveredCount = 0;
     for (const ticket of tickets) {
       if (ticket.status === 'completed') {
         completedCount++;
         const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
+        completedRevenue += cost;
         totalRevenue += cost;
       } else if (ticket.status === 'delivered') {
         deliveredCount++;
@@ -113,7 +115,7 @@ export default function TechnicianDashboard() {
         pendingCount++;
       }
     }
-    return { totalRevenue, completedCount, pendingCount, deliveredCount };
+    return { totalRevenue, completedCount, completedRevenue, pendingCount, deliveredCount };
   }, [tickets]);
 
   const formatPrice = (price: string | null | undefined) => {
@@ -255,8 +257,12 @@ export default function TechnicianDashboard() {
                   <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'}</p>
-                  <p className="text-lg font-bold" data-testid="text-completed-count">{stats.completedCount}</p>
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'} ({stats.completedCount})</p>
+                  <p className="text-lg font-bold" data-testid="text-completed-count">
+                    {language === 'ar'
+                      ? `${stats.completedRevenue.toLocaleString('ar-IQ')} د.ع`
+                      : `${stats.completedRevenue.toLocaleString('en-US')} IQD`}
+                  </p>
                 </div>
               </div>
             </CardContent>
