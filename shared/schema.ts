@@ -401,6 +401,7 @@ export const TECHNICIAN_PERMISSIONS = {
   SET_COSTS: 'set_costs',
   DELETE_TICKETS: 'delete_tickets',
   MANAGE_TECHNICIANS: 'manage_technicians',
+  VIEW_REVENUE: 'view_revenue',
 } as const;
 
 export type TechnicianPermission = typeof TECHNICIAN_PERMISSIONS[keyof typeof TECHNICIAN_PERMISSIONS];

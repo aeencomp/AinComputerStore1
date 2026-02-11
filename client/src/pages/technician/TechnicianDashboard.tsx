@@ -142,6 +142,7 @@ export default function TechnicianDashboard() {
   }
 
   const isAdmin = currentTechnician.isAdmin === 1;
+  const canViewRevenue = isAdmin || (currentTechnician.permissions || []).includes('view_revenue');
 
   const filteredTickets = tickets?.filter((ticket) => {
     if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
@@ -223,50 +224,54 @@ export default function TechnicianDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card
-            className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
-            onClick={() => setFilterStatus('all')}
-            data-testid="card-total-revenue"
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                  <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
+        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
+          {canViewRevenue && (
+            <Card
+              className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setFilterStatus('all')}
+              data-testid="card-total-revenue"
+            >
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                    <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
+                    <p className="text-lg font-bold" data-testid="text-total-revenue">
+                      {language === 'ar'
+                        ? `${stats.totalRevenue.toLocaleString('ar-IQ')} د.ع`
+                        : `${stats.totalRevenue.toLocaleString('en-US')} IQD`}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
-                  <p className="text-lg font-bold" data-testid="text-total-revenue">
-                    {language === 'ar'
-                      ? `${stats.totalRevenue.toLocaleString('ar-IQ')} د.ع`
-                      : `${stats.totalRevenue.toLocaleString('en-US')} IQD`}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
-          <Card
-            className={`cursor-pointer hover-elevate ${filterStatus === 'completed' ? 'ring-2 ring-primary' : ''}`}
-            onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
-            data-testid="card-completed-count"
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+          {canViewRevenue && (
+            <Card
+              className={`cursor-pointer hover-elevate ${filterStatus === 'completed' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
+              data-testid="card-completed-count"
+            >
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'} ({stats.completedCount})</p>
+                    <p className="text-lg font-bold" data-testid="text-completed-count">
+                      {language === 'ar'
+                        ? `${stats.completedRevenue.toLocaleString('ar-IQ')} د.ع`
+                        : `${stats.completedRevenue.toLocaleString('en-US')} IQD`}
+                    </p>
+                  </div>
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'} ({stats.completedCount})</p>
-                  <p className="text-lg font-bold" data-testid="text-completed-count">
-                    {language === 'ar'
-                      ? `${stats.completedRevenue.toLocaleString('ar-IQ')} د.ع`
-                      : `${stats.completedRevenue.toLocaleString('en-US')} IQD`}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           <Card
             className={`cursor-pointer hover-elevate ${filterStatus === 'pending' ? 'ring-2 ring-primary' : ''}`}
@@ -289,7 +294,7 @@ export default function TechnicianDashboard() {
           <Card
             className={`cursor-pointer hover-elevate ${filterStatus === 'delivered' ? 'ring-2 ring-primary' : ''}`}
             onClick={() => setFilterStatus(filterStatus === 'delivered' ? 'all' : 'delivered')}
-            data-testid="card-pending-revenue"
+            data-testid="card-delivered-count"
           >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
@@ -383,7 +388,7 @@ export default function TechnicianDashboard() {
                     <span className="text-sm font-medium" data-testid={`text-model-${ticket.id}`}>{ticket.deviceBrand} {ticket.deviceModel}</span>
                   </div>
 
-                  {formatPrice(ticket.finalCost) && (
+                  {canViewRevenue && formatPrice(ticket.finalCost) && (
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{t('repair.ticket.finalCost')}:</span>
                       <span className="text-sm font-bold text-green-600 dark:text-green-400" data-testid={`text-final-price-${ticket.id}`}>
@@ -391,7 +396,7 @@ export default function TechnicianDashboard() {
                       </span>
                     </div>
                   )}
-                  {formatPrice(ticket.costEstimate) && !formatPrice(ticket.finalCost) && (
+                  {canViewRevenue && formatPrice(ticket.costEstimate) && !formatPrice(ticket.finalCost) && (
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-muted-foreground">{t('repair.ticket.costEstimate')}:</span>
                       <span className="text-sm font-semibold" data-testid={`text-price-${ticket.id}`}>
