@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 
@@ -95,23 +95,25 @@ export default function TechnicianDashboard() {
   });
 
   const stats = useMemo(() => {
-    if (!tickets) return { totalRevenue: 0, completedCount: 0, pendingCount: 0, pendingRevenue: 0 };
+    if (!tickets) return { totalRevenue: 0, completedCount: 0, pendingCount: 0, deliveredCount: 0 };
     let totalRevenue = 0;
     let completedCount = 0;
     let pendingCount = 0;
-    let pendingRevenue = 0;
+    let deliveredCount = 0;
     for (const ticket of tickets) {
-      if (ticket.status === 'completed' || ticket.status === 'delivered') {
+      if (ticket.status === 'completed') {
         completedCount++;
         const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
         totalRevenue += cost;
-      } else {
+      } else if (ticket.status === 'delivered') {
+        deliveredCount++;
+        const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
+        totalRevenue += cost;
+      } else if (ticket.status === 'pending') {
         pendingCount++;
-        const cost = parseFloat(ticket.costEstimate || '0');
-        pendingRevenue += cost;
       }
     }
-    return { totalRevenue, completedCount, pendingCount, pendingRevenue };
+    return { totalRevenue, completedCount, pendingCount, deliveredCount };
   }, [tickets]);
 
   const formatPrice = (price: string | null | undefined) => {
@@ -219,7 +221,11 @@ export default function TechnicianDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <Card data-testid="card-total-revenue">
+          <Card
+            className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setFilterStatus('all')}
+            data-testid="card-total-revenue"
+          >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
@@ -237,47 +243,55 @@ export default function TechnicianDashboard() {
             </CardContent>
           </Card>
 
-          <Card data-testid="card-completed-count">
+          <Card
+            className={`cursor-pointer hover-elevate ${filterStatus === 'completed' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
+            data-testid="card-completed-count"
+          >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
                   <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة / مسلّمة' : 'Completed / Delivered'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'}</p>
                   <p className="text-lg font-bold" data-testid="text-completed-count">{stats.completedCount}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-pending-count">
+          <Card
+            className={`cursor-pointer hover-elevate ${filterStatus === 'pending' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')}
+            data-testid="card-pending-count"
+          >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
                   <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'قيد العمل' : 'In Progress'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'قيد الانتظار' : 'Pending'}</p>
                   <p className="text-lg font-bold" data-testid="text-pending-count">{stats.pendingCount}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card data-testid="card-pending-revenue">
+          <Card
+            className={`cursor-pointer hover-elevate ${filterStatus === 'delivered' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setFilterStatus(filterStatus === 'delivered' ? 'all' : 'delivered')}
+            data-testid="card-pending-revenue"
+          >
             <CardContent className="pt-4 pb-4">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                  <DollarSign className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  <Truck className="h-4 w-4 text-orange-600 dark:text-orange-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إيرادات معلقة' : 'Pending Revenue'}</p>
-                  <p className="text-lg font-bold" data-testid="text-pending-revenue">
-                    {language === 'ar'
-                      ? `${stats.pendingRevenue.toLocaleString('ar-IQ')} د.ع`
-                      : `${stats.pendingRevenue.toLocaleString('en-US')} IQD`}
-                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'تم التسليم' : 'Delivered'}</p>
+                  <p className="text-lg font-bold" data-testid="text-delivered-count">{stats.deliveredCount}</p>
                 </div>
               </div>
             </CardContent>
@@ -361,15 +375,19 @@ export default function TechnicianDashboard() {
                     <span className="text-sm font-medium" data-testid={`text-model-${ticket.id}`}>{ticket.deviceBrand} {ticket.deviceModel}</span>
                   </div>
 
-                  {(formatPrice(ticket.costEstimate) || formatPrice(ticket.finalCost)) && (
+                  {formatPrice(ticket.finalCost) && (
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">
-                        {ticket.finalCost && ticket.finalCost !== '0' && ticket.finalCost !== '0.00'
-                          ? t('repair.ticket.finalCost')
-                          : t('repair.ticket.costEstimate')}:
+                      <span className="text-sm text-muted-foreground">{t('repair.ticket.finalCost')}:</span>
+                      <span className="text-sm font-bold text-green-600 dark:text-green-400" data-testid={`text-final-price-${ticket.id}`}>
+                        {formatPrice(ticket.finalCost)}
                       </span>
+                    </div>
+                  )}
+                  {formatPrice(ticket.costEstimate) && !formatPrice(ticket.finalCost) && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{t('repair.ticket.costEstimate')}:</span>
                       <span className="text-sm font-semibold" data-testid={`text-price-${ticket.id}`}>
-                        {formatPrice(ticket.finalCost) || formatPrice(ticket.costEstimate)}
+                        {formatPrice(ticket.costEstimate)}
                       </span>
                     </div>
                   )}
