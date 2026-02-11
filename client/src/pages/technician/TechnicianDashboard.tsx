@@ -268,6 +268,10 @@ export default function TechnicianDashboard() {
                     <span className="text-sm text-muted-foreground">{t('repair.ticket.deviceType')}:</span>
                     <span className="text-sm font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</span>
                   </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{language === 'ar' ? 'الموديل:' : 'Model:'}</span>
+                    <span className="text-sm font-medium" data-testid={`text-model-${ticket.id}`}>{ticket.deviceBrand} {ticket.deviceModel}</span>
+                  </div>
 
                   {(formatPrice(ticket.costEstimate) || formatPrice(ticket.finalCost)) && (
                     <div className="flex justify-between items-center">
