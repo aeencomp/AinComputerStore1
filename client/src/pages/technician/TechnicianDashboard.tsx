@@ -94,6 +94,26 @@ export default function TechnicianDashboard() {
     },
   });
 
+  const stats = useMemo(() => {
+    if (!tickets) return { totalRevenue: 0, completedCount: 0, pendingCount: 0, pendingRevenue: 0 };
+    let totalRevenue = 0;
+    let completedCount = 0;
+    let pendingCount = 0;
+    let pendingRevenue = 0;
+    for (const ticket of tickets) {
+      if (ticket.status === 'completed' || ticket.status === 'delivered') {
+        completedCount++;
+        const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
+        totalRevenue += cost;
+      } else {
+        pendingCount++;
+        const cost = parseFloat(ticket.costEstimate || '0');
+        pendingRevenue += cost;
+      }
+    }
+    return { totalRevenue, completedCount, pendingCount, pendingRevenue };
+  }, [tickets]);
+
   const formatPrice = (price: string | null | undefined) => {
     if (!price || price === '0' || price === '0.00') return null;
     const num = parseFloat(price);
@@ -118,26 +138,6 @@ export default function TechnicianDashboard() {
   }
 
   const isAdmin = currentTechnician.isAdmin === 1;
-
-  const stats = useMemo(() => {
-    if (!tickets) return { totalRevenue: 0, completedCount: 0, pendingCount: 0, pendingRevenue: 0 };
-    let totalRevenue = 0;
-    let completedCount = 0;
-    let pendingCount = 0;
-    let pendingRevenue = 0;
-    for (const ticket of tickets) {
-      if (ticket.status === 'completed' || ticket.status === 'delivered') {
-        completedCount++;
-        const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
-        totalRevenue += cost;
-      } else {
-        pendingCount++;
-        const cost = parseFloat(ticket.costEstimate || '0');
-        pendingRevenue += cost;
-      }
-    }
-    return { totalRevenue, completedCount, pendingCount, pendingRevenue };
-  }, [tickets]);
 
   const filteredTickets = tickets?.filter((ticket) => {
     if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
