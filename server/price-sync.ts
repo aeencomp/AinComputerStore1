@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import https from "https";
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
-const MARKUP_PERCENTAGE = 0.05;
+const MARKUP_PERCENTAGE = 0;
 const GLOBALIRAQ_API = "https://globaliraq.iq/products.json?limit=250";
 
 interface ShopifyProduct {
