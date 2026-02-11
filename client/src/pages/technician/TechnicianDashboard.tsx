@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 
@@ -72,6 +72,34 @@ export default function TechnicianDashboard() {
 
   const handleLogout = () => {
     logoutMutation.mutate();
+  };
+
+  const statusUpdateMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      return await apiRequest('PATCH', `/api/admin/repair-tickets/${id}`, { status });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      toast({
+        title: t('repair.edit.successTitle'),
+        description: t('repair.edit.successMessage'),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: t('repair.edit.errorMessage'),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const formatPrice = (price: string | null | undefined) => {
+    if (!price || price === '0' || price === '0.00') return null;
+    const num = parseFloat(price);
+    return language === 'ar'
+      ? `${num.toLocaleString('ar-IQ')} د.ع`
+      : `${num.toLocaleString('en-US')} IQD`;
   };
 
   if (isAuthLoading) {
@@ -240,13 +268,52 @@ export default function TechnicianDashboard() {
                     <span className="text-sm text-muted-foreground">{t('repair.ticket.deviceType')}:</span>
                     <span className="text-sm font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">{t('repair.ticket.status')}:</span>
-                    <Badge className={getStatusColor(ticket.status)}>
-                      {t(`repair.status.${ticket.status}`)}
-                    </Badge>
+
+                  {(formatPrice(ticket.costEstimate) || formatPrice(ticket.finalCost)) && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">
+                        {ticket.finalCost && ticket.finalCost !== '0' && ticket.finalCost !== '0.00'
+                          ? t('repair.ticket.finalCost')
+                          : t('repair.ticket.costEstimate')}:
+                      </span>
+                      <span className="text-sm font-semibold" data-testid={`text-price-${ticket.id}`}>
+                        {formatPrice(ticket.finalCost) || formatPrice(ticket.costEstimate)}
+                      </span>
+                    </div>
+                  )}
+
+                  <div
+                    className="pt-2"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Select
+                      value={ticket.status}
+                      onValueChange={(newStatus) => {
+                        statusUpdateMutation.mutate({ id: ticket.id, status: newStatus });
+                      }}
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        data-testid={`select-card-status-${ticket.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Badge className={getStatusColor(ticket.status) + ' text-xs'}>
+                            {t(`repair.status.${ticket.status}`)}
+                          </Badge>
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">{t('repair.status.pending')}</SelectItem>
+                        <SelectItem value="in-progress">{t('repair.status.in-progress')}</SelectItem>
+                        <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
+                        <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
+                        <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="text-xs text-muted-foreground pt-2">
+
+                  <div className="text-xs text-muted-foreground pt-1">
                     {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
                   </div>
                 </CardContent>
