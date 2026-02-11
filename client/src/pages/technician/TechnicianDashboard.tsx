@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote } from 'lucide-react';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 
@@ -119,6 +119,26 @@ export default function TechnicianDashboard() {
 
   const isAdmin = currentTechnician.isAdmin === 1;
 
+  const stats = useMemo(() => {
+    if (!tickets) return { totalRevenue: 0, completedCount: 0, pendingCount: 0, pendingRevenue: 0 };
+    let totalRevenue = 0;
+    let completedCount = 0;
+    let pendingCount = 0;
+    let pendingRevenue = 0;
+    for (const ticket of tickets) {
+      if (ticket.status === 'completed' || ticket.status === 'delivered') {
+        completedCount++;
+        const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
+        totalRevenue += cost;
+      } else {
+        pendingCount++;
+        const cost = parseFloat(ticket.costEstimate || '0');
+        pendingRevenue += cost;
+      }
+    }
+    return { totalRevenue, completedCount, pendingCount, pendingRevenue };
+  }, [tickets]);
+
   const filteredTickets = tickets?.filter((ticket) => {
     if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
     if (filterPriority !== 'all' && ticket.priority !== filterPriority) return false;
@@ -197,6 +217,72 @@ export default function TechnicianDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <Card data-testid="card-total-revenue">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                  <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
+                  <p className="text-lg font-bold" data-testid="text-total-revenue">
+                    {language === 'ar'
+                      ? `${stats.totalRevenue.toLocaleString('ar-IQ')} د.ع`
+                      : `${stats.totalRevenue.toLocaleString('en-US')} IQD`}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-completed-count">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة / مسلّمة' : 'Completed / Delivered'}</p>
+                  <p className="text-lg font-bold" data-testid="text-completed-count">{stats.completedCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-pending-count">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
+                  <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'قيد العمل' : 'In Progress'}</p>
+                  <p className="text-lg font-bold" data-testid="text-pending-count">{stats.pendingCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card data-testid="card-pending-revenue">
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                  <DollarSign className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إيرادات معلقة' : 'Pending Revenue'}</p>
+                  <p className="text-lg font-bold" data-testid="text-pending-revenue">
+                    {language === 'ar'
+                      ? `${stats.pendingRevenue.toLocaleString('ar-IQ')} د.ع`
+                      : `${stats.pendingRevenue.toLocaleString('en-US')} IQD`}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-1 md:max-w-[300px]">
             <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
