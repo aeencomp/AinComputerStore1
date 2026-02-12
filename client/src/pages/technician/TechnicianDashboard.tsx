@@ -145,6 +145,14 @@ export default function TechnicianDashboard() {
     return { totalRevenue, completedCount, completedRevenue, pendingCount, deliveredCount };
   }, [tickets]);
 
+  const archivedCount = useMemo(() => {
+    return tickets?.filter(t => t.isArchived === 1).length || 0;
+  }, [tickets]);
+
+  const deliveredUnarchived = useMemo(() => {
+    return tickets?.filter(t => t.status === 'delivered' && t.isArchived !== 1).length || 0;
+  }, [tickets]);
+
   const formatPrice = (price: string | null | undefined) => {
     if (!price || price === '0' || price === '0.00') return null;
     const num = parseFloat(price);
@@ -170,14 +178,6 @@ export default function TechnicianDashboard() {
 
   const isAdmin = currentTechnician.isAdmin === 1;
   const canViewRevenue = isAdmin || (currentTechnician.permissions || []).includes('view_revenue');
-
-  const archivedCount = useMemo(() => {
-    return tickets?.filter(t => t.isArchived === 1).length || 0;
-  }, [tickets]);
-
-  const deliveredUnarchived = useMemo(() => {
-    return tickets?.filter(t => t.status === 'delivered' && t.isArchived !== 1).length || 0;
-  }, [tickets]);
 
   const filteredTickets = tickets?.filter((ticket) => {
     if (!showArchived && ticket.isArchived === 1) return false;
