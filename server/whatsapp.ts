@@ -11,6 +11,10 @@ interface WhatsAppMessageResult {
 function formatPhoneNumber(phone: string): string {
   let cleaned = phone.replace(/[\s\-\+]/g, '');
   
+  if (cleaned.startsWith('00')) {
+    cleaned = cleaned.substring(2);
+  }
+  
   if (cleaned.startsWith('07')) {
     cleaned = '964' + cleaned.substring(1);
   }
