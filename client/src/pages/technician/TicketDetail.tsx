@@ -158,10 +158,10 @@ export default function TicketDetail() {
           try {
             JsBarcode(barcodeRef.current, ticket.ticketNumber, {
               format: 'CODE128',
-              width: 1.2,
-              height: 30,
+              width: 1.5,
+              height: 35,
               displayValue: false,
-              margin: 2,
+              margin: 1,
               background: '#ffffff',
             });
             setBarcodeReady(true);
@@ -186,11 +186,11 @@ export default function TicketDetail() {
             <style>
               @page { size: 50mm 25mm; margin: 0; }
               * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1mm; }
-              .store-name { font-size: 7pt; font-weight: 900; text-align: center; margin-bottom: 1mm; }
-              .barcode-container { text-align: center; }
-              .barcode-container svg { max-width: 46mm; height: 12mm; }
-              .serial { font-size: 7pt; font-weight: 700; text-align: center; margin-top: 1mm; }
+              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1.5mm 2mm; }
+              .store-name { font-size: 8pt; font-weight: 900; text-align: center; letter-spacing: 0.3px; }
+              .barcode-container { text-align: center; margin: 1mm 0; }
+              .barcode-container svg { max-width: 44mm; height: 10mm; }
+              .serial { font-size: 9pt; font-weight: 800; text-align: center; letter-spacing: 0.5px; }
             </style>
           </head>
           <body>${printContents}</body>
@@ -294,13 +294,13 @@ export default function TicketDetail() {
           <CardContent>
             <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
               <div ref={printRef} data-testid="print-label">
-                <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '9px', marginBottom: '2px' }}>
+                <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', letterSpacing: '0.3px' }}>
                   العين لتجارة الحاسبات
                 </div>
-                <div className="barcode-container" style={{ textAlign: 'center' }}>
+                <div className="barcode-container" style={{ textAlign: 'center', margin: '4px 0' }}>
                   <svg ref={barcodeRef} />
                 </div>
-                <div className="serial" style={{ textAlign: 'center', fontWeight: 700, fontSize: '9px', marginTop: '2px' }}>
+                <div className="serial" style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', letterSpacing: '0.5px' }}>
                   {ticket.ticketNumber}
                 </div>
               </div>
