@@ -100,11 +100,10 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
           try {
             JsBarcode(barcodeRef.current, ticket.ticketNumber, {
               format: 'CODE128',
-              width: 1.5,
-              height: 40,
-              displayValue: true,
-              fontSize: 12,
-              margin: 5,
+              width: 1.2,
+              height: 30,
+              displayValue: false,
+              margin: 2,
               background: '#ffffff',
             });
             setBarcodeReady(true);
@@ -174,22 +173,17 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       if (printWindow) {
         printWindow.document.write(`
           <!DOCTYPE html>
-          <html dir="${isRTL ? 'rtl' : 'ltr'}">
+          <html>
           <head>
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
-              @page { size: 80mm 60mm; margin: 2mm; }
-              body { font-family: Arial, sans-serif; font-size: 10px; margin: 0; padding: 4px; direction: ${isRTL ? 'rtl' : 'ltr'}; }
-              .label-container { border: 1px solid #000; padding: 4px; max-width: 76mm; }
-              .ticket-number { font-size: 14px; font-weight: bold; text-align: center; margin-bottom: 4px; }
-              .barcode-container { text-align: center; margin: 4px 0; }
-              .barcode-container svg { max-width: 100%; height: 35px; }
-              .info-row { display: flex; justify-content: space-between; margin: 2px 0; font-size: 9px; }
-              .info-label { font-weight: bold; }
-              .problem-section { margin-top: 4px; padding-top: 4px; border-top: 1px dashed #000; }
-              .problem-title { font-weight: bold; font-size: 9px; }
-              .problem-text { font-size: 8px; margin-top: 2px; max-height: 30px; overflow: hidden; }
-              .store-name { text-align: center; font-size: 11px; font-weight: bold; margin-bottom: 2px; }
+              @page { size: 50mm 25mm; margin: 0; }
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1mm; }
+              .store-name { font-size: 7pt; font-weight: 900; text-align: center; margin-bottom: 1mm; }
+              .barcode-container { text-align: center; }
+              .barcode-container svg { max-width: 46mm; height: 12mm; }
+              .serial { font-size: 7pt; font-weight: 700; text-align: center; margin-top: 1mm; }
             </style>
           </head>
           <body>${printContents}</body>
@@ -287,39 +281,14 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
               </div>
               <div className="border-2 border-dashed border-muted-foreground/30 rounded-md p-3 bg-white">
                 <div ref={printRef} data-testid="dialog-print-label">
-                  <div style={{ border: '1px solid #000', padding: '8px', maxWidth: '300px', margin: '0 auto' }}>
-                    <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
-                      {isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
-                    </div>
-                    <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
-                      {ticket.ticketNumber}
-                    </div>
-                    <div style={{ textAlign: 'center', marginBottom: '8px' }}>
-                      <svg ref={barcodeRef} />
-                    </div>
-                    <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الاسم:' : 'Name:'}</span>
-                        <span>{ticket.customerName}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الهاتف:' : 'Phone:'}</span>
-                        <span dir="ltr">{ticket.customerPhone}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الجهاز:' : 'Device:'}</span>
-                        <span>{ticket.deviceBrand} {ticket.deviceModel}</span>
-                      </div>
-                      <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #000' }}>
-                        <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{isRTL ? 'المشكلة:' : 'Problem:'}</div>
-                        <div style={{ fontSize: '10px' }}>
-                          {ticket.issueDescriptionAr || ticket.issueDescriptionEn}
-                        </div>
-                      </div>
-                      <div style={{ marginTop: '6px', fontSize: '9px', textAlign: 'center', color: '#666' }}>
-                        {new Date(ticket.createdAt).toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')}
-                      </div>
-                    </div>
+                  <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '9px', marginBottom: '2px' }}>
+                    العين لتجارة الحاسبات
+                  </div>
+                  <div className="barcode-container" style={{ textAlign: 'center' }}>
+                    <svg ref={barcodeRef} />
+                  </div>
+                  <div className="serial" style={{ textAlign: 'center', fontWeight: 700, fontSize: '9px', marginTop: '2px' }}>
+                    {ticket.ticketNumber}
                   </div>
                 </div>
               </div>

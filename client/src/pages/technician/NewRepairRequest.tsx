@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { ArrowLeft, ArrowRight, Plus, Printer, Receipt } from 'lucide-react';
 import QRCode from 'qrcode';
+import JsBarcode from 'jsbarcode';
 import type { RepairTicket } from '@shared/schema';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,6 +36,7 @@ export default function NewRepairRequest() {
   const BackIcon = isRTL ? ArrowRight : ArrowLeft;
   const [createdTicket, setCreatedTicket] = useState<RepairTicket | null>(null);
   const printRef = useRef<HTMLDivElement>(null);
+  const barcodeRef = useRef<SVGSVGElement>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
@@ -87,7 +89,23 @@ export default function NewRepairRequest() {
         errorCorrectionLevel: 'M',
       }).then((dataUrl) => {
         setQrCodeDataUrl(dataUrl);
-        setQrReady(true);
+        requestAnimationFrame(() => {
+          if (barcodeRef.current) {
+            try {
+              JsBarcode(barcodeRef.current, createdTicket.ticketNumber, {
+                format: 'CODE128',
+                width: 1.2,
+                height: 30,
+                displayValue: false,
+                margin: 2,
+                background: '#ffffff',
+              });
+            } catch (error) {
+              console.error('Barcode generation error:', error);
+            }
+          }
+          setQrReady(true);
+        });
       }).catch((error) => {
         console.error('QR code generation error:', error);
       });
@@ -132,86 +150,20 @@ export default function NewRepairRequest() {
       if (printWindow) {
         printWindow.document.write(`
           <!DOCTYPE html>
-          <html dir="${isRTL ? 'rtl' : 'ltr'}">
+          <html>
           <head>
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
-              @page { 
-                size: 80mm auto; 
-                margin: 1mm; 
-              }
-              html, body {
-                height: auto !important;
-                overflow: visible !important;
-              }
-              body { 
-                font-family: Arial, sans-serif; 
-                font-size: 8px; 
-                margin: 0; 
-                padding: 2px;
-                direction: ${isRTL ? 'rtl' : 'ltr'};
-              }
-              * {
-                page-break-inside: avoid;
-                break-inside: avoid;
-              }
-              .label-container {
-                border: 1px solid #000;
-                padding: 2px;
-                max-width: 78mm;
-                page-break-inside: avoid;
-                break-inside: avoid;
-              }
-              .ticket-number {
-                font-size: 11px;
-                font-weight: bold;
-                text-align: center;
-                margin-bottom: 2px;
-              }
-              .qr-container {
-                text-align: center;
-                margin: 2px 0;
-              }
-              .qr-container img {
-                width: 60px;
-                height: 60px;
-                margin: 0 auto;
-              }
-              .info-row {
-                display: flex;
-                justify-content: space-between;
-                margin: 1px 0;
-                font-size: 7px;
-              }
-              .info-label {
-                font-weight: bold;
-              }
-              .problem-section {
-                margin-top: 2px;
-                padding-top: 2px;
-                border-top: 1px dashed #000;
-              }
-              .problem-title {
-                font-weight: bold;
-                font-size: 7px;
-              }
-              .problem-text {
-                font-size: 6px;
-                margin-top: 1px;
-                max-height: 16px;
-                overflow: hidden;
-              }
-              .store-name {
-                text-align: center;
-                font-size: 9px;
-                font-weight: bold;
-                margin-bottom: 1px;
-              }
+              @page { size: 50mm 25mm; margin: 0; }
+              * { margin: 0; padding: 0; box-sizing: border-box; }
+              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1mm; }
+              .store-name { font-size: 7pt; font-weight: 900; text-align: center; margin-bottom: 1mm; }
+              .barcode-container { text-align: center; }
+              .barcode-container svg { max-width: 46mm; height: 12mm; }
+              .serial { font-size: 7pt; font-weight: 700; text-align: center; margin-top: 1mm; }
             </style>
           </head>
-          <body>
-            ${printContents}
-          </body>
+          <body>${printContents}</body>
           </html>
         `);
         printWindow.document.close();
@@ -534,44 +486,14 @@ export default function NewRepairRequest() {
               {/* Printable Label Preview */}
               <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
                 <div ref={printRef} data-testid="print-label">
-                  <div className="label-container" style={{ border: '1px solid #000', padding: '8px', maxWidth: '300px', margin: '0 auto' }}>
-                    <div className="store-name" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', marginBottom: '4px' }}>
-                      {isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
-                    </div>
-                    <div className="ticket-number" style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '16px', marginBottom: '8px' }}>
-                      {createdTicket.ticketNumber}
-                    </div>
-                    <div className="qr-container" style={{ textAlign: 'center', marginBottom: '8px' }}>
-                      {qrCodeDataUrl && (
-                        <img src={qrCodeDataUrl} alt="QR Code" style={{ width: '120px', height: '120px', margin: '0 auto' }} data-testid="img-qr-code" />
-                      )}
-                      <div style={{ fontSize: '8px', color: '#666', marginTop: '2px' }}>
-                        {isRTL ? 'امسح للتتبع' : 'Scan to track'}
-                      </div>
-                    </div>
-                    <div style={{ fontSize: '11px', lineHeight: '1.4' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الاسم:' : 'Name:'}</span>
-                        <span>{createdTicket.customerName}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الهاتف:' : 'Phone:'}</span>
-                        <span dir="ltr">{createdTicket.customerPhone}</span>
-                      </div>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '2px' }}>
-                        <span style={{ fontWeight: 'bold' }}>{isRTL ? 'الجهاز:' : 'Device:'}</span>
-                        <span>{createdTicket.deviceBrand} {createdTicket.deviceModel}</span>
-                      </div>
-                      <div style={{ marginTop: '6px', paddingTop: '6px', borderTop: '1px dashed #000' }}>
-                        <div style={{ fontWeight: 'bold', marginBottom: '2px' }}>{isRTL ? 'المشكلة:' : 'Problem:'}</div>
-                        <div style={{ fontSize: '10px' }}>
-                          {createdTicket.issueDescriptionAr || createdTicket.issueDescriptionEn}
-                        </div>
-                      </div>
-                      <div style={{ marginTop: '6px', fontSize: '9px', textAlign: 'center', color: '#666' }}>
-                        {new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')}
-                      </div>
-                    </div>
+                  <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '9px', marginBottom: '2px' }}>
+                    العين لتجارة الحاسبات
+                  </div>
+                  <div className="barcode-container" style={{ textAlign: 'center' }}>
+                    <svg ref={barcodeRef} />
+                  </div>
+                  <div className="serial" style={{ textAlign: 'center', fontWeight: 700, fontSize: '9px', marginTop: '2px' }}>
+                    {createdTicket.ticketNumber}
                   </div>
                 </div>
               </div>
