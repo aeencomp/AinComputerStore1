@@ -201,14 +201,14 @@ export default function AdminPOS() {
   };
 
   const subtotal = cart.reduce((sum, item) => 
-    sum + (parseFloat(item.product.price) * item.quantity), 0
+    sum + (parseFloat(item.product.price) * 1000 * item.quantity), 0
   );
   
   const discount = parseFloat(paymentInfo.discount) || 0;
   const total = Math.max(0, subtotal - discount);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('ar-IQ').format(price);
+    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(price);
   };
 
   const handleCheckout = () => {
@@ -330,7 +330,7 @@ export default function AdminPOS() {
                             <h3 className="font-medium text-sm line-clamp-2 mb-1">{productName}</h3>
                             <div className="flex items-center justify-between">
                               <span className="text-primary font-bold text-sm">
-                                {formatPrice(parseFloat(product.price))}
+                                {formatPrice(parseFloat(product.price) * 1000)}
                               </span>
                               <Badge variant={isOutOfStock ? "destructive" : "secondary"} className="text-xs">
                                 {isOutOfStock ? (language === 'ar' ? 'نفد' : 'Out') : stockQty}
@@ -381,14 +381,14 @@ export default function AdminPOS() {
                   <div className="space-y-3">
                     {cart.map((item) => {
                       const productName = language === 'ar' ? item.product.nameAr : item.product.nameEn;
-                      const itemTotal = parseFloat(item.product.price) * item.quantity;
+                      const itemTotal = parseFloat(item.product.price) * 1000 * item.quantity;
                       
                       return (
                         <div key={item.product.id} className="flex items-center gap-3 p-2 bg-muted/50 rounded-lg" data-testid={`cart-item-${item.product.id}`}>
                           <div className="flex-1 min-w-0">
                             <p className="font-medium text-sm truncate">{productName}</p>
                             <p className="text-sm text-muted-foreground">
-                              {formatPrice(parseFloat(item.product.price))} × {item.quantity}
+                              {formatPrice(parseFloat(item.product.price) * 1000)} × {item.quantity}
                             </p>
                           </div>
                           <div className="flex items-center gap-1">
@@ -721,7 +721,7 @@ export default function AdminPOS() {
                     </thead>
                     <tbody>
                       {completedOrder.items.map((item, idx) => {
-                        const unitPrice = parseFloat(item.product.price);
+                        const unitPrice = parseFloat(item.product.price) * 1000;
                         const lineTotal = unitPrice * item.quantity;
                         return (
                           <tr key={idx} className="border-b">
