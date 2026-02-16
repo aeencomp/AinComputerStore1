@@ -501,6 +501,16 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               </Link>
             </DropdownMenuContent>
           </DropdownMenu>
+          <Link href="/?category=all-in-one">
+            <Button 
+              variant="ghost" 
+              className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
+              data-testid="link-all-in-one"
+            >
+              <Monitor className="h-4 w-4" />
+              {language === 'ar' ? 'الكل في واحد' : 'All-in-One'}
+            </Button>
+          </Link>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -924,6 +934,16 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 </Link>
               </DropdownMenuContent>
             </DropdownMenu>
+            <Link href="/?category=all-in-one" onClick={() => setMobileMenuOpen(false)}>
+              <Button 
+                variant="ghost" 
+                className="justify-start gap-3 w-full rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold"
+                data-testid="link-all-in-one-mobile"
+              >
+                <Monitor className="h-4 w-4" />
+                {language === 'ar' ? 'الكل في واحد' : 'All-in-One'}
+              </Button>
+            </Link>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
