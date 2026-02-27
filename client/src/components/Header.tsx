@@ -1,4 +1,4 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack, Printer, Tag } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack, Printer } from "lucide-react";
 import { SiLenovo, SiDell, SiHp, SiAsus, SiAcer, SiMsi, SiApple, SiSamsung, SiHuawei, SiFujitsu, SiLg, SiToshiba } from "react-icons/si";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
@@ -286,28 +286,10 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                   {language === 'ar' ? 'محطات عمل محمولة' : 'Workstation Laptops'}
                 </DropdownMenuItem>
               </Link>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button 
-                variant="ghost" 
-                className="gap-2 px-4 py-2 rounded-full hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/30 dark:hover:text-green-400 transition-colors font-bold"
-                data-testid="link-laptop-brands"
-              >
-                <Tag className="h-4 w-4" />
-                {language === 'ar' ? 'ماركات اللابتوب' : 'Laptop Brands'}
-                <ChevronDown className="h-3 w-3" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" className="w-52">
-              <Link href="/?category=laptops">
-                <DropdownMenuItem className="cursor-pointer font-semibold">
-                  <Laptop className="h-4 w-4 mr-2" />
-                  {language === 'ar' ? 'جميع الماركات' : 'All Brands'}
-                </DropdownMenuItem>
-              </Link>
               <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground px-2">
+                {language === 'ar' ? 'حسب الماركة' : 'By Brand'}
+              </DropdownMenuLabel>
               <Link href="/?category=brand-lenovo">
                 <DropdownMenuItem className="cursor-pointer">
                   <SiLenovo className="h-4 w-4 mr-2" />
@@ -813,28 +795,10 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                     {language === 'ar' ? 'محطات عمل محمولة' : 'Workstation Laptops'}
                   </DropdownMenuItem>
                 </Link>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  className="justify-start gap-3 w-full rounded-lg hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/30 dark:hover:text-green-400 font-bold"
-                  data-testid="link-laptop-brands-mobile"
-                >
-                  <Tag className="h-4 w-4" />
-                  {language === 'ar' ? 'ماركات اللابتوب' : 'Laptop Brands'}
-                  <ChevronDown className="h-3 w-3 ms-auto" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <Link href="/?category=laptops" onClick={() => setMobileMenuOpen(false)}>
-                  <DropdownMenuItem className="cursor-pointer font-semibold">
-                    <Laptop className="h-4 w-4 mr-2" />
-                    {language === 'ar' ? 'جميع الماركات' : 'All Brands'}
-                  </DropdownMenuItem>
-                </Link>
                 <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground px-2">
+                  {language === 'ar' ? 'حسب الماركة' : 'By Brand'}
+                </DropdownMenuLabel>
                 <Link href="/?category=brand-lenovo" onClick={() => setMobileMenuOpen(false)}>
                   <DropdownMenuItem className="cursor-pointer">
                     <SiLenovo className="h-4 w-4 mr-2" />
