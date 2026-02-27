@@ -16,7 +16,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
-import { startPriceSync, syncPrices, getSyncStatus } from "./price-sync";
+import { startPriceSync, syncPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -5045,6 +5045,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   startPriceSync();
+
+  app.get("/api/admin/desktop-sync/status", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) return res.status(401).json({ error: "Unauthorized" });
+    return res.json(getDesktopSyncStatus());
+  });
+
+  app.post("/api/admin/desktop-sync/run", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const result = await syncDesktopPrices();
+      return res.json(result);
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
+  startDesktopPriceSync();
 
   return httpServer;
 }

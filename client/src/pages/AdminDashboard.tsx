@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse, Battery, Printer, LayoutDashboard, RefreshCw } from "lucide-react";
+import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse, Battery, Printer, LayoutDashboard, RefreshCw, Monitor } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AdminNav } from "@/components/AdminNav";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
@@ -208,6 +208,121 @@ function PriceSyncCard() {
             {status.errors.map((err, i) => (
               <p key={i}>{err}</p>
             ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function DesktopSyncCard() {
+  const { toast } = useToast();
+
+  const syncStatusQuery = useQuery<{
+    lastSync: string | null;
+    nextSync: string | null;
+    updatedCount: number;
+    totalMatched: number;
+    errors: string[];
+    status: string;
+  }>({
+    queryKey: ["/api/admin/desktop-sync/status"],
+    refetchInterval: 30000,
+  });
+
+  const syncMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/desktop-sync/run");
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/desktop-sync/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      toast({
+        title: "تم مزامنة الأسعار",
+        description: `تم تحديث ${data.updatedCount} منتج من أصل ${data.totalMatched} منتج متطابق`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "فشلت المزامنة",
+        description: "حدث خطأ أثناء مزامنة أسعار الأجهزة المكتبية",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const status = syncStatusQuery.data;
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return "—";
+    return new Date(dateStr).toLocaleString("ar-IQ", {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit",
+    });
+  };
+
+  return (
+    <Card className="mt-4" data-testid="card-desktop-sync">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 flex-wrap">
+        <div>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Monitor className="w-5 h-5" />
+            مزامنة أسعار الأجهزة المكتبية والكل في واحد
+          </CardTitle>
+          <CardDescription>
+            مزامنة تلقائية كل 6 ساعات لأجهزة الديسك توب، الألعاب، العمل، والكل في واحد
+          </CardDescription>
+        </div>
+        <Button
+          onClick={() => syncMutation.mutate()}
+          disabled={syncMutation.isPending || status?.status === "running"}
+          data-testid="button-sync-desktop-prices"
+        >
+          {syncMutation.isPending || status?.status === "running" ? (
+            <>
+              <Loader2 className="w-4 h-4 animate-spin" />
+              جاري المزامنة...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="w-4 h-4" />
+              مزامنة الآن
+            </>
+          )}
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">الحالة</p>
+            <p className="font-medium">
+              <Badge variant={
+                status?.status === "success" ? "default" :
+                status?.status === "running" ? "secondary" :
+                status?.status === "error" ? "destructive" : "outline"
+              }>
+                {status?.status === "success" ? "ناجح" :
+                 status?.status === "running" ? "قيد التشغيل" :
+                 status?.status === "error" ? "خطأ" : "في الانتظار"}
+              </Badge>
+            </p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">آخر مزامنة</p>
+            <p className="font-medium">{formatDate(status?.lastSync ?? null)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">المزامنة القادمة</p>
+            <p className="font-medium">{formatDate(status?.nextSync ?? null)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">المنتجات المحدثة</p>
+            <p className="font-medium">{status?.updatedCount ?? 0} / {status?.totalMatched ?? 0}</p>
+          </div>
+        </div>
+        {status?.errors && status.errors.length > 0 && (
+          <div className="mt-3 p-2 bg-destructive/10 rounded text-sm text-destructive">
+            {status.errors.map((err, i) => <p key={i}>{err}</p>)}
           </div>
         )}
       </CardContent>
@@ -708,6 +823,7 @@ export default function AdminDashboard() {
                 </div>
 
                 <PriceSyncCard />
+                <DesktopSyncCard />
               </>
             )}
           </TabsContent>

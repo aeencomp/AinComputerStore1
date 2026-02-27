@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { products } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, or, inArray } from "drizzle-orm";
 import https from "https";
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
@@ -365,4 +365,213 @@ export function stopPriceSync() {
     initialTimeout = null;
   }
   schedulerStarted = false;
+}
+
+// ─── Desktop & All-in-One Sync ───────────────────────────────────────────────
+
+const DESKTOP_CATEGORIES = [
+  "all-in-one",
+  "desktops",
+  "gaming-pcs",
+  "office-pcs",
+  "workstations",
+  "mini-pcs",
+];
+
+let desktopSyncLog: SyncLog = {
+  lastSync: null,
+  nextSync: null,
+  updatedCount: 0,
+  totalMatched: 0,
+  errors: [],
+  status: "idle",
+};
+
+let isDesktopRunning = false;
+let desktopSyncInterval: NodeJS.Timeout | null = null;
+let desktopInitialTimeout: NodeJS.Timeout | null = null;
+let desktopSchedulerStarted = false;
+
+function extractDesktopModelCode(name: string): string | null {
+  // AIO HP model e.g. "24-CR0323NH", "27-CR0156NH"
+  const hpAio = name.match(/\b(\d{2}-[A-Z]{2}\d{4}[A-Z0-9]*)\b/i);
+  if (hpAio) return hpAio[1].toLowerCase();
+
+  // Lenovo IdeaCentre paren code e.g. "(LAAX)", "(MCAK)", "(0WGR)"
+  const parenCode = extractParenCode(name);
+  if (parenCode) return parenCode;
+
+  // General model code fallback
+  return extractFullModelCode(name);
+}
+
+function matchDesktopProducts(
+  ourName: string,
+  globalProducts: ShopifyProduct[]
+): ShopifyProduct | null {
+  const ourCode = extractDesktopModelCode(ourName);
+
+  if (ourCode) {
+    for (const gp of globalProducts) {
+      const gpCode = extractDesktopModelCode(gp.title);
+      if (gpCode && ourCode === gpCode) {
+        return gp;
+      }
+    }
+  }
+
+  // Fallback: word-overlap matching (same as laptop sync but with desktop-adjusted thresholds)
+  const normalize = (s: string) =>
+    s.toLowerCase()
+      .replace(/[–—]/g, "-")
+      .replace(/all[\s-]?in[\s-]?one/gi, "aio")
+      .replace(/[^\w\s\-\.]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+
+  const ourNorm = normalize(ourName);
+  const ourWords = ourNorm.split(/[\s,]+/).filter((w) => w.length > 2);
+
+  const genericWords = new Set([
+    "intel", "core", "ultra", "ram", "ssd", "nvidia", "rtx",
+    "lenovo", "asus", "acer", "msi", "dell", "hp", "all", "one",
+    "ideacentre", "thinkcentre", "desktop", "office", "gaming",
+  ]);
+
+  let bestMatch: ShopifyProduct | null = null;
+  let bestScore = 0;
+
+  for (const gp of globalProducts) {
+    const gpNorm = normalize(gp.title);
+    const gpWords = gpNorm.split(/[\s,]+/).filter((w) => w.length > 2);
+
+    const matchingWords = ourWords.filter((w) => gpWords.includes(w));
+    const specificMatches = matchingWords.filter((w) => !genericWords.has(w));
+    const matchRatio = matchingWords.length / Math.max(ourWords.length, 1);
+
+    if (matchRatio >= 0.7 && matchingWords.length >= 6 && specificMatches.length >= 2 && matchingWords.length > bestScore) {
+      bestScore = matchingWords.length;
+      bestMatch = gp;
+    }
+  }
+
+  return bestMatch;
+}
+
+export async function syncDesktopPrices(): Promise<SyncLog> {
+  if (isDesktopRunning) return desktopSyncLog;
+
+  isDesktopRunning = true;
+  desktopSyncLog = {
+    lastSync: new Date(),
+    nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
+    updatedCount: 0,
+    totalMatched: 0,
+    errors: [],
+    status: "running",
+  };
+
+  try {
+    console.log("[Desktop Sync] Starting price sync for desktops & AIOs...");
+
+    const globalProducts = await fetchAllGlobalIraqProducts();
+    console.log(`[Desktop Sync] Fetched ${globalProducts.length} products from globaliraq.iq`);
+
+    const ourProducts = await db
+      .select()
+      .from(products)
+      .where(inArray(products.category, DESKTOP_CATEGORIES));
+
+    console.log(`[Desktop Sync] Found ${ourProducts.length} desktop/AIO products in our database`);
+
+    let updated = 0;
+    let matched = 0;
+
+    for (const ourProduct of ourProducts) {
+      if (!ourProduct.nameEn) continue;
+      try {
+        const match = matchDesktopProducts(ourProduct.nameEn, globalProducts);
+        if (!match) continue;
+
+        matched++;
+
+        const globalPrice = parseFloat(match.variants[0].price);
+        if (isNaN(globalPrice) || globalPrice <= 0) {
+          desktopSyncLog.errors.push(`Invalid price for ${ourProduct.nameEn}: ${match.variants[0].price}`);
+          continue;
+        }
+
+        const priceInThousands = Math.round((globalPrice / 1000) * 100) / 100;
+
+        const currentPrice = parseFloat(ourProduct.price?.toString() || "0");
+        if (Math.abs(currentPrice - priceInThousands) < 0.01) continue;
+
+        await db
+          .update(products)
+          .set({
+            price: priceInThousands.toString(),
+            oldPrice: currentPrice > priceInThousands ? currentPrice.toString() : null,
+          })
+          .where(eq(products.id, ourProduct.id));
+
+        console.log(`[Desktop Sync] Updated ${ourProduct.nameEn.substring(0, 50)}: ${currentPrice} → ${priceInThousands}`);
+        updated++;
+      } catch (err: any) {
+        desktopSyncLog.errors.push(`Error updating ${ourProduct.nameEn}: ${err.message}`);
+      }
+    }
+
+    desktopSyncLog.updatedCount = updated;
+    desktopSyncLog.totalMatched = matched;
+    desktopSyncLog.status = "success";
+    console.log(`[Desktop Sync] Complete. Matched: ${matched}, Updated: ${updated}, Errors: ${desktopSyncLog.errors.length}`);
+  } catch (err: any) {
+    desktopSyncLog.status = "error";
+    desktopSyncLog.errors.push(`Sync failed: ${err.message}`);
+    console.error("[Desktop Sync] Failed:", err.message);
+  } finally {
+    isDesktopRunning = false;
+  }
+
+  return desktopSyncLog;
+}
+
+export function getDesktopSyncStatus(): SyncLog {
+  return desktopSyncLog;
+}
+
+export function startDesktopPriceSync() {
+  if (desktopSchedulerStarted) return;
+  desktopSchedulerStarted = true;
+
+  console.log("[Desktop Sync] Scheduling desktop/AIO price sync every 6 hours");
+  desktopSyncLog.nextSync = new Date(Date.now() + SYNC_INTERVAL_MS);
+
+  desktopSyncInterval = setInterval(async () => {
+    try {
+      await syncDesktopPrices();
+    } catch (err) {
+      console.error("[Desktop Sync] Scheduled sync error:", err);
+    }
+  }, SYNC_INTERVAL_MS);
+
+  desktopInitialTimeout = setTimeout(async () => {
+    try {
+      await syncDesktopPrices();
+    } catch (err) {
+      console.error("[Desktop Sync] Initial sync error:", err);
+    }
+  }, 60000);
+}
+
+export function stopDesktopPriceSync() {
+  if (desktopSyncInterval) {
+    clearInterval(desktopSyncInterval);
+    desktopSyncInterval = null;
+  }
+  if (desktopInitialTimeout) {
+    clearTimeout(desktopInitialTimeout);
+    desktopInitialTimeout = null;
+  }
+  desktopSchedulerStarted = false;
 }
