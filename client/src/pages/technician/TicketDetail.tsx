@@ -55,7 +55,7 @@ export default function TicketDetail() {
     retry: false,
   });
 
-  const canChangePrice = currentTechnician?.isAdmin === 1;
+  const canChangePrice = currentTechnician?.isAdmin === 1 || (currentTechnician?.isAdmin as any) === true;
 
   useEffect(() => {
     if (authError || (!isAuthLoading && !currentTechnician)) {

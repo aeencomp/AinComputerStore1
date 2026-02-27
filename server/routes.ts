@@ -2221,18 +2221,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Determine if caller can change prices:
       // - Regular admin (adminId in session) → allowed
-      // - Admin technician (technicianIsAdmin === 1) → allowed
-      // - Regular technician (technicianIsAdmin !== 1) → NOT allowed to change prices
+      // - Admin technician (technicianIsAdmin == 1) → allowed
+      // - Regular technician → price fields are silently ignored
       const isRegularAdmin = !!(req.session as any).adminId;
-      const isAdminTechnician = (req.session as any).technicianIsAdmin === 1;
+      const techIsAdmin = (req.session as any).technicianIsAdmin;
+      const isAdminTechnician = techIsAdmin === 1 || techIsAdmin === true || techIsAdmin === "1";
       const canChangePrice = isRegularAdmin || isAdminTechnician;
 
-      // If caller tries to change price without permission, reject
-      if (!canChangePrice && (req.body.costEstimate !== undefined || req.body.finalCost !== undefined)) {
-        return res.status(403).json({ error: "غير مصرح لك بتغيير السعر. هذه الصلاحية للمشرف التقني فقط." });
-      }
-
-      // Build update object with only the fields that are being updated
+      // Build update object — price fields only applied when caller has permission
       const updateData: Record<string, any> = {};
       
       if (req.body.status !== undefined) {
@@ -2247,11 +2243,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.estimatedCompletion !== undefined) {
         updateData.estimatedCompletion = req.body.estimatedCompletion ? new Date(req.body.estimatedCompletion) : null;
       }
-      if (canChangePrice && req.body.costEstimate !== undefined) {
-        updateData.costEstimate = req.body.costEstimate && req.body.costEstimate !== '' ? req.body.costEstimate : null;
-      }
-      if (canChangePrice && req.body.finalCost !== undefined) {
-        updateData.finalCost = req.body.finalCost && req.body.finalCost !== '' ? req.body.finalCost : null;
+      if (canChangePrice) {
+        if (req.body.costEstimate !== undefined) {
+          updateData.costEstimate = req.body.costEstimate && req.body.costEstimate !== '' ? req.body.costEstimate : null;
+        }
+        if (req.body.finalCost !== undefined) {
+          updateData.finalCost = req.body.finalCost && req.body.finalCost !== '' ? req.body.finalCost : null;
+        }
       }
       
       const ticket = await storage.updateRepairTicket(id, updateData);
