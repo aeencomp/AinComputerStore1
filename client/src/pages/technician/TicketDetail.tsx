@@ -383,41 +383,52 @@ export default function TicketDetail() {
                     )}
                   />
 
-                  {canChangePrice ? (
-                    <>
-                      <FormField
-                        control={form.control}
-                        name="costEstimate"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-cost-estimate" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <FormField
-                        control={form.control}
-                        name="finalCost"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>{t('repair.ticket.finalCost')}</FormLabel>
-                            <FormControl>
-                              <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-final-cost" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </>
-                  ) : (
-                    <div className="col-span-2 flex items-center gap-2 p-3 rounded-md bg-muted text-muted-foreground text-sm" data-testid="text-price-restricted">
-                      <Lock className="h-4 w-4 shrink-0" />
-                      <span>{language === 'ar' ? 'تغيير السعر متاح للمشرف التقني فقط' : 'Price changes are restricted to admin technicians only'}</span>
-                    </div>
-                  )}
+                  <FormField
+                    control={form.control}
+                    name="costEstimate"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          {t('repair.ticket.costEstimate')}
+                          {!canChangePrice && <Lock className="h-3 w-3 text-muted-foreground" />}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...field}
+                            disabled={!canChangePrice}
+                            data-testid="input-cost-estimate"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="finalCost"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="flex items-center gap-1">
+                          {t('repair.ticket.finalCost')}
+                          {!canChangePrice && <Lock className="h-3 w-3 text-muted-foreground" />}
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder="0.00"
+                            {...field}
+                            disabled={!canChangePrice}
+                            data-testid="input-final-cost"
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <FormField
