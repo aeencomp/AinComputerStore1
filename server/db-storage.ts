@@ -85,14 +85,13 @@ export class DrizzleStorage implements IStorage {
         like(products.category, 'pcs-%'),
         eq(products.category, 'workstations'),
         eq(products.category, 'mini-pcs'),
-        eq(products.category, 'all-in-one'),
       );
       return await db.select().from(products).where(
         and(or(...nameConditions), desktopCategoryCondition)
       );
     }
 
-    // Handle all-in-one brand filtering: aio-brand-lenovo → all desktop categories + all-in-one
+    // Handle all-in-one brand filtering: aio-brand-lenovo → all-in-one only
     if (category.startsWith('aio-brand-')) {
       const brandKey = category.replace('aio-brand-', '');
       const brandSearchTerms: Record<string, string[]> = {
@@ -105,16 +104,8 @@ export class DrizzleStorage implements IStorage {
         ilike(products.nameEn, `%${term}%`),
         ilike(products.nameAr, `%${term}%`),
       ]);
-      const desktopCategoryCondition = or(
-        eq(products.category, 'desktops'),
-        like(products.category, '%-pcs'),
-        like(products.category, 'pcs-%'),
-        eq(products.category, 'workstations'),
-        eq(products.category, 'mini-pcs'),
-        eq(products.category, 'all-in-one'),
-      );
       return await db.select().from(products).where(
-        and(or(...nameConditions), desktopCategoryCondition)
+        and(or(...nameConditions), eq(products.category, 'all-in-one'))
       );
     }
 
