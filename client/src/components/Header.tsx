@@ -576,18 +576,103 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                   {language === 'ar' ? 'أجهزة صغيرة' : 'Mini PCs'}
                 </DropdownMenuItem>
               </Link>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground px-2">
+                {language === 'ar' ? 'حسب الماركة' : 'By Brand'}
+              </DropdownMenuLabel>
+              <Link href="/?category=desktop-brand-lenovo">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiLenovo className="h-4 w-4 mr-2" />
+                  Lenovo
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=desktop-brand-hp">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiHp className="h-4 w-4 mr-2" />
+                  HP
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=desktop-brand-acer">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiAcer className="h-4 w-4 mr-2" />
+                  Acer
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=desktop-brand-dell">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiDell className="h-4 w-4 mr-2" />
+                  Dell
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=desktop-brand-asus">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiAsus className="h-4 w-4 mr-2" />
+                  Asus
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=desktop-brand-msi">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiMsi className="h-4 w-4 mr-2" />
+                  MSI
+                </DropdownMenuItem>
+              </Link>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Link href="/?category=all-in-one">
-            <Button 
-              variant="ghost" 
-              className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
-              data-testid="link-all-in-one"
-            >
-              <Monitor className="h-4 w-4" />
-              {language === 'ar' ? 'الكل في واحد' : 'All-in-One'}
-            </Button>
-          </Link>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 transition-colors font-bold"
+                data-testid="link-all-in-one"
+              >
+                <Monitor className="h-4 w-4" />
+                {language === 'ar' ? 'الكل في واحد' : 'All-in-One'}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-52">
+              <Link href="/?category=all-in-one">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <Monitor className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع أجهزة الكل في واحد' : 'All AIO PCs'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel className="text-xs text-muted-foreground px-2">
+                {language === 'ar' ? 'حسب الماركة' : 'By Brand'}
+              </DropdownMenuLabel>
+              <Link href="/?category=aio-brand-lenovo">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiLenovo className="h-4 w-4 mr-2" />
+                  Lenovo
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=aio-brand-hp">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiHp className="h-4 w-4 mr-2" />
+                  HP
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=aio-brand-acer">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiAcer className="h-4 w-4 mr-2" />
+                  Acer
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=aio-brand-dell">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiDell className="h-4 w-4 mr-2" />
+                  Dell
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=aio-brand-asus">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiAsus className="h-4 w-4 mr-2" />
+                  Asus
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -1085,18 +1170,103 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                     {language === 'ar' ? 'أجهزة صغيرة' : 'Mini PCs'}
                   </DropdownMenuItem>
                 </Link>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground px-2">
+                  {language === 'ar' ? 'حسب الماركة' : 'By Brand'}
+                </DropdownMenuLabel>
+                <Link href="/?category=desktop-brand-lenovo" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiLenovo className="h-4 w-4 mr-2" />
+                    Lenovo
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=desktop-brand-hp" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiHp className="h-4 w-4 mr-2" />
+                    HP
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=desktop-brand-acer" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiAcer className="h-4 w-4 mr-2" />
+                    Acer
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=desktop-brand-dell" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiDell className="h-4 w-4 mr-2" />
+                    Dell
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=desktop-brand-asus" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiAsus className="h-4 w-4 mr-2" />
+                    Asus
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=desktop-brand-msi" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiMsi className="h-4 w-4 mr-2" />
+                    MSI
+                  </DropdownMenuItem>
+                </Link>
               </DropdownMenuContent>
             </DropdownMenu>
-            <Link href="/?category=all-in-one" onClick={() => setMobileMenuOpen(false)}>
-              <Button 
-                variant="ghost" 
-                className="justify-start gap-3 w-full rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold"
-                data-testid="link-all-in-one-mobile"
-              >
-                <Monitor className="h-4 w-4" />
-                {language === 'ar' ? 'الكل في واحد' : 'All-in-One'}
-              </Button>
-            </Link>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-cyan-100 hover:text-cyan-700 dark:hover:bg-cyan-900/30 dark:hover:text-cyan-400 font-bold"
+                  data-testid="link-all-in-one-mobile"
+                >
+                  <Monitor className="h-4 w-4" />
+                  {language === 'ar' ? 'الكل في واحد' : 'All-in-One'}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=all-in-one" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع أجهزة الكل في واحد' : 'All AIO PCs'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-xs text-muted-foreground px-2">
+                  {language === 'ar' ? 'حسب الماركة' : 'By Brand'}
+                </DropdownMenuLabel>
+                <Link href="/?category=aio-brand-lenovo" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiLenovo className="h-4 w-4 mr-2" />
+                    Lenovo
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=aio-brand-hp" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiHp className="h-4 w-4 mr-2" />
+                    HP
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=aio-brand-acer" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiAcer className="h-4 w-4 mr-2" />
+                    Acer
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=aio-brand-dell" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiDell className="h-4 w-4 mr-2" />
+                    Dell
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=aio-brand-asus" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiAsus className="h-4 w-4 mr-2" />
+                    Asus
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 

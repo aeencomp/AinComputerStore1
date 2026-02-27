@@ -65,6 +65,51 @@ export class DrizzleStorage implements IStorage {
         and(or(...nameConditions), laptopCategoryCondition)
       );
     }
+
+    // Handle desktop brand filtering: desktop-brand-lenovo → desktops + all-in-one
+    if (category.startsWith('desktop-brand-')) {
+      const brandKey = category.replace('desktop-brand-', '');
+      const brandSearchTerms: Record<string, string[]> = {
+        'lenovo': ['lenovo'], 'dell': ['dell', 'deel'], 'hp': ['hp '],
+        'asus': ['asus'], 'acer': ['acer'], 'msi': ['msi'],
+        'apple': ['apple'], 'samsung': ['samsung'], 'huawei': ['huawei'],
+      };
+      const terms = brandSearchTerms[brandKey] || [brandKey];
+      const nameConditions = terms.flatMap(term => [
+        ilike(products.nameEn, `%${term}%`),
+        ilike(products.nameAr, `%${term}%`),
+      ]);
+      const desktopCategoryCondition = or(
+        eq(products.category, 'desktops'),
+        like(products.category, '%-pcs'),
+        like(products.category, 'pcs-%'),
+        eq(products.category, 'workstations'),
+        eq(products.category, 'mini-pcs'),
+        eq(products.category, 'all-in-one'),
+      );
+      return await db.select().from(products).where(
+        and(or(...nameConditions), desktopCategoryCondition)
+      );
+    }
+
+    // Handle all-in-one brand filtering: aio-brand-lenovo → all-in-one only
+    if (category.startsWith('aio-brand-')) {
+      const brandKey = category.replace('aio-brand-', '');
+      const brandSearchTerms: Record<string, string[]> = {
+        'lenovo': ['lenovo'], 'dell': ['dell'], 'hp': ['hp '],
+        'asus': ['asus'], 'acer': ['acer'], 'msi': ['msi'],
+        'apple': ['apple'], 'samsung': ['samsung'],
+      };
+      const terms = brandSearchTerms[brandKey] || [brandKey];
+      const nameConditions = terms.flatMap(term => [
+        ilike(products.nameEn, `%${term}%`),
+        ilike(products.nameAr, `%${term}%`),
+      ]);
+      return await db.select().from(products).where(
+        and(or(...nameConditions), eq(products.category, 'all-in-one'))
+      );
+    }
+
     // Support both exact match and parent category matching
     // e.g., "laptops" matches "gaming-laptops", "student-laptops", "business-laptops"
     return await db.select().from(products).where(

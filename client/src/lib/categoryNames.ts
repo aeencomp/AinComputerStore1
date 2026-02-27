@@ -13,6 +13,21 @@ export const categoryNames: Record<string, { ar: string; en: string }> = {
   'brand-toshiba': { ar: 'لابتوب توشيبا', en: 'Toshiba Laptops' },
   'brand-fujitsu': { ar: 'لابتوب فوجيتسو', en: 'Fujitsu Laptops' },
 
+  // Desktop Brands
+  'desktop-brand-lenovo': { ar: 'أجهزة لينوفو المكتبية', en: 'Lenovo Desktops' },
+  'desktop-brand-dell': { ar: 'أجهزة ديل المكتبية', en: 'Dell Desktops' },
+  'desktop-brand-hp': { ar: 'أجهزة HP المكتبية', en: 'HP Desktops' },
+  'desktop-brand-asus': { ar: 'أجهزة أسوس المكتبية', en: 'Asus Desktops' },
+  'desktop-brand-acer': { ar: 'أجهزة إيسر المكتبية', en: 'Acer Desktops' },
+  'desktop-brand-msi': { ar: 'أجهزة MSI المكتبية', en: 'MSI Desktops' },
+
+  // All-in-One Brands
+  'aio-brand-lenovo': { ar: 'لينوفو الكل في واحد', en: 'Lenovo All-in-One' },
+  'aio-brand-dell': { ar: 'ديل الكل في واحد', en: 'Dell All-in-One' },
+  'aio-brand-hp': { ar: 'HP الكل في واحد', en: 'HP All-in-One' },
+  'aio-brand-asus': { ar: 'أسوس الكل في واحد', en: 'Asus All-in-One' },
+  'aio-brand-acer': { ar: 'إيسر الكل في واحد', en: 'Acer All-in-One' },
+
   // Laptops
   'laptops': { ar: 'لابتوبات', en: 'Laptops' },
   'gaming-laptops': { ar: 'لابتوب ألعاب', en: 'Gaming Laptops' },
