@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket } from '@shared/schema';
-import { Trash2, Printer } from 'lucide-react';
+import { Trash2, Printer, Lock } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -54,6 +54,13 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     queryKey: ['/api/repair-tickets', ticketId],
     enabled: !!ticketId && open,
   });
+
+  const { data: currentTechnician } = useQuery<any>({
+    queryKey: ['/api/technician/auth/me'],
+    retry: false,
+  });
+
+  const canChangePrice = currentTechnician?.isAdmin === 1 || (currentTechnician?.isAdmin as any) === true;
 
   const updateSchema = useMemo(() => z.object({
     status: z.string(),
@@ -369,9 +376,12 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                       name="costEstimate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
+                          <FormLabel className="flex items-center gap-1">
+                            {t('repair.ticket.costEstimate')}
+                            {!canChangePrice && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          </FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="dialog-input-cost-estimate" />
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} disabled={!canChangePrice} data-testid="dialog-input-cost-estimate" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -383,9 +393,12 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                       name="finalCost"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>{t('repair.ticket.finalCost')}</FormLabel>
+                          <FormLabel className="flex items-center gap-1">
+                            {t('repair.ticket.finalCost')}
+                            {!canChangePrice && <Lock className="h-3 w-3 text-muted-foreground" />}
+                          </FormLabel>
                           <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="dialog-input-final-cost" />
+                            <Input type="number" step="0.01" placeholder="0.00" {...field} disabled={!canChangePrice} data-testid="dialog-input-final-cost" />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
