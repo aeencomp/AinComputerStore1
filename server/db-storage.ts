@@ -50,11 +50,20 @@ export class DrizzleStorage implements IStorage {
         'fujitsu': ['fujitsu'],
       };
       const terms = brandSearchTerms[brandKey] || [brandKey];
-      const conditions = terms.flatMap(term => [
+      const nameConditions = terms.flatMap(term => [
         ilike(products.nameEn, `%${term}%`),
         ilike(products.nameAr, `%${term}%`),
       ]);
-      return await db.select().from(products).where(or(...conditions));
+      const laptopCategoryCondition = or(
+        eq(products.category, 'laptops'),
+        like(products.category, '%-laptops'),
+        like(products.category, 'laptops-%'),
+        like(products.category, '%-laptops-%'),
+        eq(products.category, 'ultrabooks'),
+      );
+      return await db.select().from(products).where(
+        and(or(...nameConditions), laptopCategoryCondition)
+      );
     }
     // Support both exact match and parent category matching
     // e.g., "laptops" matches "gaming-laptops", "student-laptops", "business-laptops"
