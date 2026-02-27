@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket } from '@shared/schema';
-import { ArrowLeft, Trash2, Printer } from 'lucide-react';
+import { ArrowLeft, Trash2, Printer, Lock } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -54,6 +54,8 @@ export default function TicketDetail() {
     queryKey: ['/api/technician/auth/me'],
     retry: false,
   });
+
+  const canChangePrice = currentTechnician?.isAdmin === 1;
 
   useEffect(() => {
     if (authError || (!isAuthLoading && !currentTechnician)) {
@@ -381,33 +383,41 @@ export default function TicketDetail() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="costEstimate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-cost-estimate" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="finalCost"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('repair.ticket.finalCost')}</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-final-cost" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {canChangePrice ? (
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="costEstimate"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-cost-estimate" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="finalCost"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('repair.ticket.finalCost')}</FormLabel>
+                            <FormControl>
+                              <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-final-cost" />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </>
+                  ) : (
+                    <div className="col-span-2 flex items-center gap-2 p-3 rounded-md bg-muted text-muted-foreground text-sm" data-testid="text-price-restricted">
+                      <Lock className="h-4 w-4 shrink-0" />
+                      <span>{language === 'ar' ? 'تغيير السعر متاح للمشرف التقني فقط' : 'Price changes are restricted to admin technicians only'}</span>
+                    </div>
+                  )}
                 </div>
 
                 <FormField

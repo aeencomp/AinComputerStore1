@@ -2218,7 +2218,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/admin/repair-tickets/:id", async (req, res) => {
     try {
       const { id } = req.params;
-      
+
+      // Determine if caller can change prices:
+      // - Regular admin (adminId in session) → allowed
+      // - Admin technician (technicianIsAdmin === 1) → allowed
+      // - Regular technician (technicianIsAdmin !== 1) → NOT allowed to change prices
+      const isRegularAdmin = !!(req.session as any).adminId;
+      const isAdminTechnician = (req.session as any).technicianIsAdmin === 1;
+      const canChangePrice = isRegularAdmin || isAdminTechnician;
+
+      // If caller tries to change price without permission, reject
+      if (!canChangePrice && (req.body.costEstimate !== undefined || req.body.finalCost !== undefined)) {
+        return res.status(403).json({ error: "غير مصرح لك بتغيير السعر. هذه الصلاحية للمشرف التقني فقط." });
+      }
+
       // Build update object with only the fields that are being updated
       const updateData: Record<string, any> = {};
       
@@ -2234,10 +2247,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.estimatedCompletion !== undefined) {
         updateData.estimatedCompletion = req.body.estimatedCompletion ? new Date(req.body.estimatedCompletion) : null;
       }
-      if (req.body.costEstimate !== undefined) {
+      if (canChangePrice && req.body.costEstimate !== undefined) {
         updateData.costEstimate = req.body.costEstimate && req.body.costEstimate !== '' ? req.body.costEstimate : null;
       }
-      if (req.body.finalCost !== undefined) {
+      if (canChangePrice && req.body.finalCost !== undefined) {
         updateData.finalCost = req.body.finalCost && req.body.finalCost !== '' ? req.body.finalCost : null;
       }
       
