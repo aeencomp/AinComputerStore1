@@ -33,7 +33,7 @@ export class DrizzleStorage implements IStorage {
       const brandKey = category.replace('brand-', '');
       const brandSearchTerms: Record<string, string[]> = {
         'lenovo': ['lenovo'],
-        'dell': ['dell'],
+        'dell': ['dell', 'deel'],
         'hp': ['hp '],
         'asus': ['asus'],
         'acer': ['acer'],
@@ -47,9 +47,13 @@ export class DrizzleStorage implements IStorage {
         'microsoft': ['microsoft', 'surface'],
         'gigabyte': ['gigabyte'],
         'razer': ['razer'],
+        'fujitsu': ['fujitsu'],
       };
       const terms = brandSearchTerms[brandKey] || [brandKey];
-      const conditions = terms.map(term => ilike(products.name, `%${term}%`));
+      const conditions = terms.flatMap(term => [
+        ilike(products.nameEn, `%${term}%`),
+        ilike(products.nameAr, `%${term}%`),
+      ]);
       return await db.select().from(products).where(or(...conditions));
     }
     // Support both exact match and parent category matching

@@ -11,6 +11,7 @@ export const categoryNames: Record<string, { ar: string; en: string }> = {
   'brand-huawei': { ar: 'هواوي / أونر', en: 'Huawei / Honor' },
   'brand-microsoft': { ar: 'مايكروسوفت سيرفس', en: 'Microsoft Surface' },
   'brand-toshiba': { ar: 'لابتوب توشيبا', en: 'Toshiba Laptops' },
+  'brand-fujitsu': { ar: 'لابتوب فوجيتسو', en: 'Fujitsu Laptops' },
 
   // Laptops
   'laptops': { ar: 'لابتوبات', en: 'Laptops' },

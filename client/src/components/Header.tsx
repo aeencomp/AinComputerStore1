@@ -1,5 +1,5 @@
 import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack, Printer, Tag } from "lucide-react";
-import { SiLenovo, SiDell, SiHp, SiAsus, SiAcer, SiMsi, SiApple, SiSamsung, SiHuawei } from "react-icons/si";
+import { SiLenovo, SiDell, SiHp, SiAsus, SiAcer, SiMsi, SiApple, SiSamsung, SiHuawei, SiFujitsu, SiLg, SiToshiba } from "react-icons/si";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -370,8 +370,14 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
               </Link>
               <Link href="/?category=brand-toshiba">
                 <DropdownMenuItem className="cursor-pointer">
-                  <Laptop className="h-4 w-4 mr-2" />
+                  <SiToshiba className="h-4 w-4 mr-2" />
                   Toshiba
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-fujitsu">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiFujitsu className="h-4 w-4 mr-2" />
+                  Fujitsu
                 </DropdownMenuItem>
               </Link>
             </DropdownMenuContent>
@@ -891,8 +897,14 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 </Link>
                 <Link href="/?category=brand-toshiba" onClick={() => setMobileMenuOpen(false)}>
                   <DropdownMenuItem className="cursor-pointer">
-                    <Laptop className="h-4 w-4 mr-2" />
+                    <SiToshiba className="h-4 w-4 mr-2" />
                     Toshiba
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-fujitsu" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiFujitsu className="h-4 w-4 mr-2" />
+                    Fujitsu
                   </DropdownMenuItem>
                 </Link>
               </DropdownMenuContent>
