@@ -1,6 +1,6 @@
 import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems } from "@shared/schema";
 import { db } from "./db.js";
-import { eq, sql, and, desc, lte, or, like } from "drizzle-orm";
+import { eq, sql, and, desc, lte, or, like, ilike } from "drizzle-orm";
 import type { IStorage } from "./storage";
 import bcrypt from "bcrypt";
 
@@ -28,6 +28,30 @@ export class DrizzleStorage implements IStorage {
   }
 
   async getProductsByCategory(category: string): Promise<Product[]> {
+    // Handle brand filtering: brand-lenovo → search by brand name in product names
+    if (category.startsWith('brand-')) {
+      const brandKey = category.replace('brand-', '');
+      const brandSearchTerms: Record<string, string[]> = {
+        'lenovo': ['lenovo'],
+        'dell': ['dell'],
+        'hp': ['hp '],
+        'asus': ['asus'],
+        'acer': ['acer'],
+        'msi': ['msi'],
+        'apple': ['apple', 'macbook'],
+        'toshiba': ['toshiba'],
+        'samsung': ['samsung'],
+        'huawei': ['huawei', 'honor'],
+        'lg': ['lg '],
+        'sony': ['sony'],
+        'microsoft': ['microsoft', 'surface'],
+        'gigabyte': ['gigabyte'],
+        'razer': ['razer'],
+      };
+      const terms = brandSearchTerms[brandKey] || [brandKey];
+      const conditions = terms.map(term => ilike(products.name, `%${term}%`));
+      return await db.select().from(products).where(or(...conditions));
+    }
     // Support both exact match and parent category matching
     // e.g., "laptops" matches "gaming-laptops", "student-laptops", "business-laptops"
     return await db.select().from(products).where(

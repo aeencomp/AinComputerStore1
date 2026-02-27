@@ -1,4 +1,17 @@
 export const categoryNames: Record<string, { ar: string; en: string }> = {
+  // Laptop Brands
+  'brand-lenovo': { ar: 'لابتوب لينوفو', en: 'Lenovo Laptops' },
+  'brand-dell': { ar: 'لابتوب ديل', en: 'Dell Laptops' },
+  'brand-hp': { ar: 'لابتوب HP', en: 'HP Laptops' },
+  'brand-asus': { ar: 'لابتوب أسوس', en: 'Asus Laptops' },
+  'brand-acer': { ar: 'لابتوب إيسر', en: 'Acer Laptops' },
+  'brand-msi': { ar: 'لابتوب MSI', en: 'MSI Laptops' },
+  'brand-apple': { ar: 'آبل / ماك بوك', en: 'Apple / MacBook' },
+  'brand-samsung': { ar: 'لابتوب سامسونج', en: 'Samsung Laptops' },
+  'brand-huawei': { ar: 'هواوي / أونر', en: 'Huawei / Honor' },
+  'brand-microsoft': { ar: 'مايكروسوفت سيرفس', en: 'Microsoft Surface' },
+  'brand-toshiba': { ar: 'لابتوب توشيبا', en: 'Toshiba Laptops' },
+
   // Laptops
   'laptops': { ar: 'لابتوبات', en: 'Laptops' },
   'gaming-laptops': { ar: 'لابتوب ألعاب', en: 'Gaming Laptops' },

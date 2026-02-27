@@ -1,4 +1,5 @@
-import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack, Printer } from "lucide-react";
+import { ShoppingCart, Search, Menu, Languages, Cpu, LogOut, User as UserIcon, Package, MapPin, Home, Laptop, Monitor, Keyboard, Computer, AppWindow, MemoryStick, HardDrive, ChevronDown, Gamepad2, Briefcase, GraduationCap, Zap, Mouse, Headphones, Camera, Cable, BatteryCharging, Tv, MonitorPlay, Maximize, Square, Box, Wrench, Shield, Palette, Play, Backpack, Printer, Tag } from "lucide-react";
+import { SiLenovo, SiDell, SiHp, SiAsus, SiAcer, SiMsi, SiApple, SiSamsung, SiHuawei } from "react-icons/si";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -283,6 +284,94 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                 <DropdownMenuItem className="cursor-pointer">
                   <Wrench className="h-4 w-4 mr-2" />
                   {language === 'ar' ? 'محطات عمل محمولة' : 'Workstation Laptops'}
+                </DropdownMenuItem>
+              </Link>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                className="gap-2 px-4 py-2 rounded-full hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/30 dark:hover:text-green-400 transition-colors font-bold"
+                data-testid="link-laptop-brands"
+              >
+                <Tag className="h-4 w-4" />
+                {language === 'ar' ? 'ماركات اللابتوب' : 'Laptop Brands'}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="center" className="w-52">
+              <Link href="/?category=laptops">
+                <DropdownMenuItem className="cursor-pointer font-semibold">
+                  <Laptop className="h-4 w-4 mr-2" />
+                  {language === 'ar' ? 'جميع الماركات' : 'All Brands'}
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuSeparator />
+              <Link href="/?category=brand-lenovo">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiLenovo className="h-4 w-4 mr-2" />
+                  Lenovo
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-dell">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiDell className="h-4 w-4 mr-2" />
+                  Dell
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-hp">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiHp className="h-4 w-4 mr-2" />
+                  HP
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-asus">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiAsus className="h-4 w-4 mr-2" />
+                  Asus
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-acer">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiAcer className="h-4 w-4 mr-2" />
+                  Acer
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-msi">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiMsi className="h-4 w-4 mr-2" />
+                  MSI
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-apple">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiApple className="h-4 w-4 mr-2" />
+                  Apple / MacBook
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-samsung">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiSamsung className="h-4 w-4 mr-2" />
+                  Samsung
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-huawei">
+                <DropdownMenuItem className="cursor-pointer">
+                  <SiHuawei className="h-4 w-4 mr-2" />
+                  Huawei / Honor
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-microsoft">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Monitor className="h-4 w-4 mr-2" />
+                  Microsoft Surface
+                </DropdownMenuItem>
+              </Link>
+              <Link href="/?category=brand-toshiba">
+                <DropdownMenuItem className="cursor-pointer">
+                  <Laptop className="h-4 w-4 mr-2" />
+                  Toshiba
                 </DropdownMenuItem>
               </Link>
             </DropdownMenuContent>
@@ -716,6 +805,94 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
                   <DropdownMenuItem className="cursor-pointer">
                     <Wrench className="h-4 w-4 mr-2" />
                     {language === 'ar' ? 'محطات عمل محمولة' : 'Workstation Laptops'}
+                  </DropdownMenuItem>
+                </Link>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button 
+                  variant="ghost" 
+                  className="justify-start gap-3 w-full rounded-lg hover:bg-green-100 hover:text-green-700 dark:hover:bg-green-900/30 dark:hover:text-green-400 font-bold"
+                  data-testid="link-laptop-brands-mobile"
+                >
+                  <Tag className="h-4 w-4" />
+                  {language === 'ar' ? 'ماركات اللابتوب' : 'Laptop Brands'}
+                  <ChevronDown className="h-3 w-3 ms-auto" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-56">
+                <Link href="/?category=laptops" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer font-semibold">
+                    <Laptop className="h-4 w-4 mr-2" />
+                    {language === 'ar' ? 'جميع الماركات' : 'All Brands'}
+                  </DropdownMenuItem>
+                </Link>
+                <DropdownMenuSeparator />
+                <Link href="/?category=brand-lenovo" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiLenovo className="h-4 w-4 mr-2" />
+                    Lenovo
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-dell" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiDell className="h-4 w-4 mr-2" />
+                    Dell
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-hp" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiHp className="h-4 w-4 mr-2" />
+                    HP
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-asus" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiAsus className="h-4 w-4 mr-2" />
+                    Asus
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-acer" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiAcer className="h-4 w-4 mr-2" />
+                    Acer
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-msi" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiMsi className="h-4 w-4 mr-2" />
+                    MSI
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-apple" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiApple className="h-4 w-4 mr-2" />
+                    Apple / MacBook
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-samsung" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiSamsung className="h-4 w-4 mr-2" />
+                    Samsung
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-huawei" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <SiHuawei className="h-4 w-4 mr-2" />
+                    Huawei / Honor
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-microsoft" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Monitor className="h-4 w-4 mr-2" />
+                    Microsoft Surface
+                  </DropdownMenuItem>
+                </Link>
+                <Link href="/?category=brand-toshiba" onClick={() => setMobileMenuOpen(false)}>
+                  <DropdownMenuItem className="cursor-pointer">
+                    <Laptop className="h-4 w-4 mr-2" />
+                    Toshiba
                   </DropdownMenuItem>
                 </Link>
               </DropdownMenuContent>
