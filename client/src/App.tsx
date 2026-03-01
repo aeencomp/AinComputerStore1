@@ -29,6 +29,11 @@ import AdminSales from "@/pages/AdminSales";
 import AdminReviews from "@/pages/AdminReviews";
 import AdminDiscountCodes from "@/pages/AdminDiscountCodes";
 import AdminAnalytics from "@/pages/AdminAnalytics";
+import PlatformAdmin from "@/pages/admin/PlatformAdmin";
+import ShopLogin from "@/pages/shop/ShopLogin";
+import ShopDashboard from "@/pages/shop/ShopDashboard";
+import ShopNewRepair from "@/pages/shop/ShopNewRepair";
+import ShopCustomerProfile from "@/pages/shop/ShopCustomerProfile";
 import { VisitorTracker } from "@/components/VisitorTracker";
 import { BlockedChecker } from "@/components/BlockedChecker";
 import SalesLogin from "@/pages/SalesLogin";
@@ -81,6 +86,7 @@ function Router() {
       <Route path="/admin/reviews" component={AdminReviews}/>
       <Route path="/admin/discount-codes" component={AdminDiscountCodes}/>
       <Route path="/admin/analytics" component={AdminAnalytics}/>
+      <Route path="/admin/platform" component={PlatformAdmin}/>
       <Route path="/sales/login" component={SalesLogin}/>
       <Route path="/sales" component={SalesPortal}/>
       <Route path="/sales/:rest*" component={SalesPortal}/>
@@ -106,6 +112,11 @@ function Router() {
       <Route path="/battery/pos/print" component={BatteryReceiptPrint}/>
       <Route path="/battery/reports" component={BatterySalesReport}/>
       <Route path="/portals" component={Portals}/>
+      <Route path="/shop/login" component={ShopLogin}/>
+      <Route path="/shop/new-request" component={ShopNewRepair}/>
+      <Route path="/shop/customer/:customerId" component={ShopCustomerProfile}/>
+      <Route path="/shop/dashboard" component={ShopDashboard}/>
+      <Route path="/shop" component={ShopDashboard}/>
       <Route component={NotFound} />
     </Switch>
   );

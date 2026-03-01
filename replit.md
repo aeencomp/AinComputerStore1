@@ -68,6 +68,18 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
       - Merge mode updates existing records by serial number
     - Routes: /battery/login, /battery (dashboard), /battery/manage, /battery/pos, /battery/reports
     - Dashboard displays stats for both batteries and adapters (types, units, low stock)
+-   **SaaS Repair Shop Platform**: Multi-tenant platform allowing external repair shops to subscribe and use an isolated version of the repair management system.
+    - **Platform Admin** (`/admin/platform`): Platform owner manages all shops — create shops, set subscription status (trial/active/expired/suspended), set expiry dates, view ticket counts. Manual payment workflow (platform owner marks shop active after receiving payment).
+    - **Shop Login** (`/shop/login`): Username/password login for each shop. Blocked with clear Arabic/English message if subscription expired or suspended. Stores shopName in localStorage for printed receipts.
+    - **Shop Dashboard** (`/shop`): Mirrors internal technician portal. Stats cards (Pending, In-Progress, Completed Today, Revenue). Ticket list with search and status filter. Click ticket → opens ShopTicketDialog. Archive button for owners. Subscription expiry warning banner when within 7 days.
+    - **Shop New Repair** (`/shop/new-request`): Create repair tickets scoped to the shop. Auto-creates SaaS customers (C-001 format per shop). Print barcode label (50mm×25mm) and thermal receipt (72mm with QR code).
+    - **ShopTicketDialog**: Edit ticket status, priority, technician notes, costs. Print label. Multi-device warning.
+    - **Shop Customer Profile** (`/shop/customer/:id`): Full repair history per customer scoped to shop.
+    - **Data Isolation**: 4 new tables (`saas_shops`, `saas_users`, `saas_repair_customers`, `saas_repair_tickets`) with shopId FK ensuring per-shop data isolation.
+    - **Subscription States**: trial (30-day free), active, expired, suspended. `isSaasShopActive()` helper used by all routes.
+    - **Session Namespace**: `saasShopId`, `saasShopName`, `saasUsername`, `saasIsOwner` keys separate from internal sessions.
+    - **API Namespace**: All shop-facing routes under `/api/saas/*`, platform admin routes under `/api/platform/*`.
+    - **Ticket Numbering**: `TKT-XXXXX` format (5-digit, sequential per shop starting at 01001).
 
 # External Dependencies
 

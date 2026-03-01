@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, saasShops, saasUsers, saasRepairCustomers, saasRepairTickets } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte, or, like, ilike, not, inArray } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -1209,5 +1209,175 @@ export class DrizzleStorage implements IStorage {
   async deleteAcAdapter(id: string): Promise<void> {
     // Soft delete
     await db.update(acAdapters).set({ isActive: 0 }).where(eq(acAdapters.id, id));
+  }
+
+  // ─── SaaS Platform Methods ────────────────────────────────────────────────
+
+  isSaasShopActive(shop: SaasShop): boolean {
+    const now = new Date();
+    if (!shop.isActive) return false;
+    if (shop.subscriptionStatus === 'active') {
+      return !shop.subscriptionExpiresAt || shop.subscriptionExpiresAt > now;
+    }
+    if (shop.subscriptionStatus === 'trial') {
+      return shop.trialEndsAt > now;
+    }
+    return false;
+  }
+
+  async createSaasShop(data: InsertSaasShop): Promise<SaasShop> {
+    const [shop] = await db.insert(saasShops).values(data).returning();
+    return shop;
+  }
+
+  async getSaasShops(): Promise<(SaasShop & { ticketCount: number; userCount: number })[]> {
+    const shops = await db.select().from(saasShops).orderBy(desc(saasShops.createdAt));
+    const result = await Promise.all(shops.map(async (shop) => {
+      const [tc] = await db.select({ count: sql<number>`count(*)::int` }).from(saasRepairTickets).where(eq(saasRepairTickets.shopId, shop.id));
+      const [uc] = await db.select({ count: sql<number>`count(*)::int` }).from(saasUsers).where(eq(saasUsers.shopId, shop.id));
+      return { ...shop, ticketCount: tc.count, userCount: uc.count };
+    }));
+    return result;
+  }
+
+  async getSaasShopById(id: number): Promise<SaasShop | undefined> {
+    const [shop] = await db.select().from(saasShops).where(eq(saasShops.id, id));
+    return shop;
+  }
+
+  async getSaasShopByUsername(username: string): Promise<SaasShop | undefined> {
+    const [shop] = await db.select().from(saasShops).where(eq(saasShops.username, username));
+    return shop;
+  }
+
+  async updateSaasShop(id: number, updates: Partial<InsertSaasShop>): Promise<SaasShop | undefined> {
+    const [shop] = await db.update(saasShops).set(updates).where(eq(saasShops.id, id)).returning();
+    return shop;
+  }
+
+  async deleteSaasShop(id: number): Promise<void> {
+    await db.delete(saasRepairTickets).where(eq(saasRepairTickets.shopId, id));
+    await db.delete(saasRepairCustomers).where(eq(saasRepairCustomers.shopId, id));
+    await db.delete(saasUsers).where(eq(saasUsers.shopId, id));
+    await db.delete(saasShops).where(eq(saasShops.id, id));
+  }
+
+  async createSaasUser(data: InsertSaasUser): Promise<SaasUser> {
+    const [user] = await db.insert(saasUsers).values(data).returning();
+    return user;
+  }
+
+  async getSaasUsersByShop(shopId: number): Promise<SaasUser[]> {
+    return db.select().from(saasUsers).where(eq(saasUsers.shopId, shopId)).orderBy(saasUsers.createdAt);
+  }
+
+  async getSaasUserByCredentials(shopId: number, username: string): Promise<SaasUser | undefined> {
+    const [user] = await db.select().from(saasUsers).where(and(eq(saasUsers.shopId, shopId), eq(saasUsers.username, username)));
+    return user;
+  }
+
+  async updateSaasUser(id: number, updates: Partial<InsertSaasUser>): Promise<SaasUser | undefined> {
+    const [user] = await db.update(saasUsers).set(updates).where(eq(saasUsers.id, id)).returning();
+    return user;
+  }
+
+  async deleteSaasUser(id: number): Promise<void> {
+    await db.delete(saasUsers).where(eq(saasUsers.id, id));
+  }
+
+  async getOrCreateSaasCustomer(shopId: number, phone: string, name: string, email?: string): Promise<SaasRepairCustomer> {
+    const [existing] = await db.select().from(saasRepairCustomers).where(and(eq(saasRepairCustomers.shopId, shopId), eq(saasRepairCustomers.phone, phone)));
+    if (existing) return existing;
+    const [lastCustomer] = await db.select().from(saasRepairCustomers).where(eq(saasRepairCustomers.shopId, shopId)).orderBy(desc(saasRepairCustomers.id)).limit(1);
+    let nextNum = 1;
+    if (lastCustomer) {
+      const match = lastCustomer.customerId.match(/C-(\d+)/);
+      if (match) nextNum = parseInt(match[1]) + 1;
+    }
+    const customerId = `C-${String(nextNum).padStart(3, '0')}`;
+    const [customer] = await db.insert(saasRepairCustomers).values({ shopId, customerId, name, phone, email: email || null }).returning();
+    return customer;
+  }
+
+  async getSaasCustomersByShop(shopId: number): Promise<SaasRepairCustomer[]> {
+    return db.select().from(saasRepairCustomers).where(eq(saasRepairCustomers.shopId, shopId)).orderBy(desc(saasRepairCustomers.createdAt));
+  }
+
+  async getSaasCustomerById(id: number): Promise<SaasRepairCustomer | undefined> {
+    const [c] = await db.select().from(saasRepairCustomers).where(eq(saasRepairCustomers.id, id));
+    return c;
+  }
+
+  async getSaasCustomerByPhone(shopId: number, phone: string): Promise<SaasRepairCustomer | undefined> {
+    const [c] = await db.select().from(saasRepairCustomers).where(and(eq(saasRepairCustomers.shopId, shopId), eq(saasRepairCustomers.phone, phone)));
+    return c;
+  }
+
+  async generateSaasTicketNumber(shopId: number): Promise<string> {
+    const [last] = await db.select().from(saasRepairTickets).where(eq(saasRepairTickets.shopId, shopId)).orderBy(desc(saasRepairTickets.id)).limit(1);
+    let nextNum = 1001;
+    if (last) {
+      const match = last.ticketNumber.match(/(\d+)$/);
+      if (match) nextNum = parseInt(match[1]) + 1;
+    }
+    return `TKT-${String(nextNum).padStart(5, '0')}`;
+  }
+
+  async createSaasTicket(data: Omit<InsertSaasRepairTicket, 'ticketNumber'>): Promise<SaasRepairTicket> {
+    const ticketNumber = await this.generateSaasTicketNumber(data.shopId);
+    const [ticket] = await db.insert(saasRepairTickets).values({ ...data, ticketNumber }).returning();
+    return ticket;
+  }
+
+  async getSaasTicketsByShop(shopId: number, filters?: { status?: string; search?: string; archived?: boolean }): Promise<SaasRepairTicket[]> {
+    let query = db.select().from(saasRepairTickets).where(
+      and(
+        eq(saasRepairTickets.shopId, shopId),
+        eq(saasRepairTickets.isArchived, filters?.archived ? 1 : 0)
+      )
+    ).$dynamic();
+    const rows = await query.orderBy(desc(saasRepairTickets.createdAt));
+    let result = rows;
+    if (filters?.status) result = result.filter(t => t.status === filters.status);
+    if (filters?.search) {
+      const s = filters.search.toLowerCase();
+      result = result.filter(t => t.ticketNumber.toLowerCase().includes(s) || t.customerPhone.includes(s) || t.customerName.toLowerCase().includes(s));
+    }
+    return result;
+  }
+
+  async getSaasTicketById(id: number, shopId: number): Promise<SaasRepairTicket | undefined> {
+    const [t] = await db.select().from(saasRepairTickets).where(and(eq(saasRepairTickets.id, id), eq(saasRepairTickets.shopId, shopId)));
+    return t;
+  }
+
+  async updateSaasTicket(id: number, shopId: number, updates: Partial<InsertSaasRepairTicket>): Promise<SaasRepairTicket | undefined> {
+    const [t] = await db.update(saasRepairTickets).set({ ...updates, updatedAt: new Date() }).where(and(eq(saasRepairTickets.id, id), eq(saasRepairTickets.shopId, shopId))).returning();
+    return t;
+  }
+
+  async archiveSaasTicket(id: number, shopId: number, archived: boolean): Promise<void> {
+    await db.update(saasRepairTickets).set({ isArchived: archived ? 1 : 0 }).where(and(eq(saasRepairTickets.id, id), eq(saasRepairTickets.shopId, shopId)));
+  }
+
+  async getActiveSaasTicketsByCustomer(repairCustomerId: number, shopId: number): Promise<SaasRepairTicket[]> {
+    return db.select().from(saasRepairTickets).where(
+      and(
+        eq(saasRepairTickets.shopId, shopId),
+        eq(saasRepairTickets.repairCustomerId, repairCustomerId),
+        eq(saasRepairTickets.isArchived, 0),
+        not(inArray(saasRepairTickets.status, ['delivered', 'rejected', 'unrepairable']))
+      )
+    ).orderBy(saasRepairTickets.createdAt);
+  }
+
+  async getSaasStats(shopId: number): Promise<{ pending: number; inProgress: number; completed: number; totalRevenue: number; completedRevenue: number }> {
+    const tickets = await db.select().from(saasRepairTickets).where(and(eq(saasRepairTickets.shopId, shopId), eq(saasRepairTickets.isArchived, 0)));
+    const pending = tickets.filter(t => t.status === 'pending').length;
+    const inProgress = tickets.filter(t => ['in-progress', 'waiting-parts'].includes(t.status)).length;
+    const completed = tickets.filter(t => ['completed', 'delivered'].includes(t.status)).length;
+    const totalRevenue = tickets.reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+    const completedRevenue = tickets.filter(t => ['completed', 'delivered'].includes(t.status)).reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+    return { pending, inProgress, completed, totalRevenue, completedRevenue };
   }
 }

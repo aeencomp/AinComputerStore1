@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -164,6 +164,31 @@ export interface IStorage {
   createAcAdapter(adapter: InsertAcAdapter): Promise<AcAdapter>;
   updateAcAdapter(id: string, updates: Partial<InsertAcAdapter>): Promise<AcAdapter | undefined>;
   deleteAcAdapter(id: string): Promise<void>;
+
+  // SaaS Platform methods
+  isSaasShopActive(shop: SaasShop): boolean;
+  createSaasShop(data: InsertSaasShop): Promise<SaasShop>;
+  getSaasShops(): Promise<(SaasShop & { ticketCount: number; userCount: number })[]>;
+  getSaasShopById(id: number): Promise<SaasShop | undefined>;
+  getSaasShopByUsername(username: string): Promise<SaasShop | undefined>;
+  updateSaasShop(id: number, updates: Partial<InsertSaasShop>): Promise<SaasShop | undefined>;
+  deleteSaasShop(id: number): Promise<void>;
+  createSaasUser(data: InsertSaasUser): Promise<SaasUser>;
+  getSaasUsersByShop(shopId: number): Promise<SaasUser[]>;
+  getSaasUserByCredentials(shopId: number, username: string): Promise<SaasUser | undefined>;
+  updateSaasUser(id: number, updates: Partial<InsertSaasUser>): Promise<SaasUser | undefined>;
+  deleteSaasUser(id: number): Promise<void>;
+  getOrCreateSaasCustomer(shopId: number, phone: string, name: string, email?: string): Promise<SaasRepairCustomer>;
+  getSaasCustomersByShop(shopId: number): Promise<SaasRepairCustomer[]>;
+  getSaasCustomerById(id: number): Promise<SaasRepairCustomer | undefined>;
+  getSaasCustomerByPhone(shopId: number, phone: string): Promise<SaasRepairCustomer | undefined>;
+  createSaasTicket(data: Omit<InsertSaasRepairTicket, 'ticketNumber'>): Promise<SaasRepairTicket>;
+  getSaasTicketsByShop(shopId: number, filters?: { status?: string; search?: string; archived?: boolean }): Promise<SaasRepairTicket[]>;
+  getSaasTicketById(id: number, shopId: number): Promise<SaasRepairTicket | undefined>;
+  updateSaasTicket(id: number, shopId: number, updates: Partial<InsertSaasRepairTicket>): Promise<SaasRepairTicket | undefined>;
+  archiveSaasTicket(id: number, shopId: number, archived: boolean): Promise<void>;
+  getActiveSaasTicketsByCustomer(repairCustomerId: number, shopId: number): Promise<SaasRepairTicket[]>;
+  getSaasStats(shopId: number): Promise<{ pending: number; inProgress: number; completed: number; totalRevenue: number; completedRevenue: number }>;
 }
 
 export class MemStorage implements IStorage {
@@ -874,6 +899,31 @@ export class MemStorage implements IStorage {
     const dateStr = date.toISOString().slice(0,10).replace(/-/g, '');
     return `BSALE-${dateStr}-001`;
   }
+
+  // SaaS stubs
+  isSaasShopActive(_shop: SaasShop): boolean { return false; }
+  async createSaasShop(_d: InsertSaasShop): Promise<SaasShop> { throw new Error('Not implemented'); }
+  async getSaasShops(): Promise<(SaasShop & { ticketCount: number; userCount: number })[]> { return []; }
+  async getSaasShopById(_id: number): Promise<SaasShop | undefined> { return undefined; }
+  async getSaasShopByUsername(_u: string): Promise<SaasShop | undefined> { return undefined; }
+  async updateSaasShop(_id: number, _u: Partial<InsertSaasShop>): Promise<SaasShop | undefined> { return undefined; }
+  async deleteSaasShop(_id: number): Promise<void> {}
+  async createSaasUser(_d: InsertSaasUser): Promise<SaasUser> { throw new Error('Not implemented'); }
+  async getSaasUsersByShop(_shopId: number): Promise<SaasUser[]> { return []; }
+  async getSaasUserByCredentials(_shopId: number, _u: string): Promise<SaasUser | undefined> { return undefined; }
+  async updateSaasUser(_id: number, _u: Partial<InsertSaasUser>): Promise<SaasUser | undefined> { return undefined; }
+  async deleteSaasUser(_id: number): Promise<void> {}
+  async getOrCreateSaasCustomer(_shopId: number, _phone: string, _name: string): Promise<SaasRepairCustomer> { throw new Error('Not implemented'); }
+  async getSaasCustomersByShop(_shopId: number): Promise<SaasRepairCustomer[]> { return []; }
+  async getSaasCustomerById(_id: number): Promise<SaasRepairCustomer | undefined> { return undefined; }
+  async getSaasCustomerByPhone(_shopId: number, _phone: string): Promise<SaasRepairCustomer | undefined> { return undefined; }
+  async createSaasTicket(_d: Omit<InsertSaasRepairTicket, 'ticketNumber'>): Promise<SaasRepairTicket> { throw new Error('Not implemented'); }
+  async getSaasTicketsByShop(_shopId: number): Promise<SaasRepairTicket[]> { return []; }
+  async getSaasTicketById(_id: number, _shopId: number): Promise<SaasRepairTicket | undefined> { return undefined; }
+  async updateSaasTicket(_id: number, _shopId: number, _u: Partial<InsertSaasRepairTicket>): Promise<SaasRepairTicket | undefined> { return undefined; }
+  async archiveSaasTicket(_id: number, _shopId: number, _archived: boolean): Promise<void> {}
+  async getActiveSaasTicketsByCustomer(_repairCustomerId: number, _shopId: number): Promise<SaasRepairTicket[]> { return []; }
+  async getSaasStats(_shopId: number): Promise<{ pending: number; inProgress: number; completed: number; totalRevenue: number; completedRevenue: number }> { return { pending: 0, inProgress: 0, completed: 0, totalRevenue: 0, completedRevenue: 0 }; }
 }
 
 import { DrizzleStorage } from "./db-storage";

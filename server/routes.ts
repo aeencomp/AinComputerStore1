@@ -5134,5 +5134,269 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   startDesktopPriceSync();
 
+  // ─── SaaS Platform Routes ────────────────────────────────────────────────
+
+  const requireSaasAuth = (req: any, res: any, next: any) => {
+    if (!req.session?.saasShopId) return res.status(401).json({ error: 'Unauthorized' });
+    next();
+  };
+
+  const requirePlatformAdmin = (req: any, res: any, next: any) => {
+    if (!req.session?.adminId && !req.session?.isAdmin) return res.status(401).json({ error: 'Unauthorized' });
+    next();
+  };
+
+  // SaaS Auth
+  app.post('/api/saas/auth/login', async (req: any, res: any) => {
+    const { username, password } = req.body;
+    if (!username || !password) return res.status(400).json({ error: 'Missing credentials' });
+    try {
+      const shop = await storage.getSaasShopByUsername(username);
+      if (!shop) return res.status(401).json({ error: 'Invalid credentials' });
+      const valid = await bcrypt.compare(password, shop.password);
+      if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+      if (!storage.isSaasShopActive(shop)) {
+        return res.status(403).json({
+          error: 'subscription_inactive',
+          status: shop.subscriptionStatus,
+          messageAr: shop.subscriptionStatus === 'suspended' ? 'تم إيقاف حساب متجرك. تواصل مع الدعم.' : 'انتهت صلاحية اشتراك متجرك. تواصل مع الدعم لتجديد الاشتراك.',
+          messageEn: shop.subscriptionStatus === 'suspended' ? 'Your shop account has been suspended. Contact support.' : 'Your shop subscription has expired. Contact support to renew.',
+        });
+      }
+      req.session.saasShopId = shop.id;
+      req.session.saasShopName = shop.shopName;
+      req.session.saasUsername = shop.username;
+      req.session.saasIsOwner = true;
+      await req.session.save();
+      const { password: _pw, ...safeShop } = shop;
+      return res.json({ shop: safeShop });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/saas/auth/logout', (req: any, res: any) => {
+    delete req.session.saasShopId;
+    delete req.session.saasShopName;
+    delete req.session.saasUsername;
+    delete req.session.saasIsOwner;
+    req.session.save(() => res.json({ ok: true }));
+  });
+
+  app.get('/api/saas/auth/me', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      const shop = await storage.getSaasShopById(req.session.saasShopId);
+      if (!shop) return res.status(401).json({ error: 'Not found' });
+      const { password: _pw, ...safeShop } = shop;
+      return res.json({ shop: safeShop, isActive: storage.isSaasShopActive(shop), isOwner: req.session.saasIsOwner === true || req.session.saasIsOwner === 1 });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // SaaS Stats
+  app.get('/api/saas/stats', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      const raw = await storage.getSaasStats(req.session.saasShopId);
+      return res.json({
+        pending: raw.pending,
+        inProgress: raw.inProgress,
+        completedToday: raw.completed,
+        revenue: raw.totalRevenue,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // SaaS Tickets
+  app.get('/api/saas/tickets', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      const { status, search, archived } = req.query;
+      const tickets = await storage.getSaasTicketsByShop(req.session.saasShopId, {
+        status: status as string,
+        search: search as string,
+        archived: archived === 'true',
+      });
+      return res.json(tickets);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/saas/tickets', requireSaasAuth, async (req: any, res: any) => {
+    const shopId = req.session.saasShopId;
+    try {
+      const { customerName, customerPhone, customerEmail, deviceType, deviceBrand, deviceModel, issueDescriptionAr, issueDescriptionEn, priority } = req.body;
+      if (!customerName || !customerPhone || !deviceType || !deviceBrand || !deviceModel || !issueDescriptionAr) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+      const customer = await storage.getOrCreateSaasCustomer(shopId, customerPhone, customerName, customerEmail);
+      const ticket = await storage.createSaasTicket({
+        shopId,
+        repairCustomerId: customer.id,
+        customerName,
+        customerPhone,
+        customerEmail: customerEmail || null,
+        deviceType,
+        deviceBrand,
+        deviceModel,
+        issueDescriptionAr,
+        issueDescriptionEn: issueDescriptionEn || null,
+        priority: priority || 'normal',
+        status: 'pending',
+        isArchived: 0,
+      });
+      return res.json({ ticket, customer });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/saas/tickets/:id', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      const ticket = await storage.getSaasTicketById(parseInt(req.params.id), req.session.saasShopId);
+      if (!ticket) return res.status(404).json({ error: 'Not found' });
+      return res.json(ticket);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch('/api/saas/tickets/:id', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      const ticket = await storage.updateSaasTicket(parseInt(req.params.id), req.session.saasShopId, req.body);
+      if (!ticket) return res.status(404).json({ error: 'Not found' });
+      return res.json(ticket);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/saas/tickets/:id/archive', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      await storage.archiveSaasTicket(parseInt(req.params.id), req.session.saasShopId, req.body.archived !== false);
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // SaaS Customers
+  app.get('/api/saas/customers/:id/active-tickets', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      const tickets = await storage.getActiveSaasTicketsByCustomer(parseInt(req.params.id), req.session.saasShopId);
+      return res.json(tickets);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/saas/customers/:id', requireSaasAuth, async (req: any, res: any) => {
+    try {
+      const customer = await storage.getSaasCustomerById(parseInt(req.params.id));
+      if (!customer || customer.shopId !== req.session.saasShopId) return res.status(404).json({ error: 'Not found' });
+      const tickets = await storage.getSaasTicketsByShop(req.session.saasShopId);
+      const customerTickets = tickets.filter(t => t.repairCustomerId === customer.id);
+      return res.json({ customer, tickets: customerTickets });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Platform Admin — manage all shops
+  app.get('/api/platform/stats', requirePlatformAdmin, async (_req: any, res: any) => {
+    try {
+      const shops = await storage.getSaasShops();
+      const now = new Date();
+      const active = shops.filter(s => s.subscriptionStatus === 'active' && s.isActive).length;
+      const trial = shops.filter(s => s.subscriptionStatus === 'trial' && s.trialEndsAt > now && s.isActive).length;
+      const expired = shops.filter(s => s.subscriptionStatus === 'expired' || (s.subscriptionStatus === 'trial' && s.trialEndsAt <= now)).length;
+      const suspended = shops.filter(s => s.subscriptionStatus === 'suspended').length;
+      return res.json({ total: shops.length, active, trial, expired, suspended });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/platform/shops', requirePlatformAdmin, async (_req: any, res: any) => {
+    try {
+      const shops = await storage.getSaasShops();
+      return res.json(shops.map(s => { const { password: _pw, ...safe } = s; return safe; }));
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/platform/shops', requirePlatformAdmin, async (req: any, res: any) => {
+    const { shopName, ownerName, phone, city, username, password, subscriptionStatus, subscriptionExpiresAt, maxTechnicians, notes } = req.body;
+    if (!shopName || !ownerName || !phone || !username || !password) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    try {
+      const existing = await storage.getSaasShopByUsername(username);
+      if (existing) return res.status(409).json({ error: 'Username already taken' });
+      const hashedPassword = await bcrypt.hash(password, 10);
+      const trialEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+      const shop = await storage.createSaasShop({
+        shopName,
+        ownerName,
+        phone,
+        city: city || '',
+        username,
+        password: hashedPassword,
+        isActive: 1,
+        subscriptionStatus: subscriptionStatus || 'trial',
+        subscriptionExpiresAt: subscriptionExpiresAt ? new Date(subscriptionExpiresAt) : null,
+        trialEndsAt,
+        maxTechnicians: maxTechnicians || 3,
+        notes: notes || null,
+      });
+      await storage.createSaasUser({
+        shopId: shop.id,
+        username,
+        password: hashedPassword,
+        displayName: ownerName,
+        isOwner: 1,
+        isActive: 1,
+        permissions: [],
+      });
+      const { password: _pw, ...safeShop } = shop;
+      return res.json(safeShop);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.patch('/api/platform/shops/:id', requirePlatformAdmin, async (req: any, res: any) => {
+    try {
+      const updates: any = {};
+      const allowed = ['shopName', 'ownerName', 'phone', 'city', 'isActive', 'subscriptionStatus', 'subscriptionExpiresAt', 'maxTechnicians', 'notes'];
+      for (const key of allowed) {
+        if (req.body[key] !== undefined) {
+          updates[key] = key === 'subscriptionExpiresAt' && req.body[key] ? new Date(req.body[key]) : req.body[key];
+        }
+      }
+      if (req.body.password) {
+        updates.password = await bcrypt.hash(req.body.password, 10);
+      }
+      const shop = await storage.updateSaasShop(parseInt(req.params.id), updates);
+      if (!shop) return res.status(404).json({ error: 'Not found' });
+      const { password: _pw, ...safeShop } = shop;
+      return res.json(safeShop);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.delete('/api/platform/shops/:id', requirePlatformAdmin, async (req: any, res: any) => {
+    try {
+      await storage.deleteSaasShop(parseInt(req.params.id));
+      return res.json({ ok: true });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   return httpServer;
 }

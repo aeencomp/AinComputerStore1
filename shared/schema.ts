@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, jsonb, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -844,3 +844,106 @@ export const insertBlockedIpSchema = createInsertSchema(blockedIps).omit({
 
 export type InsertBlockedIp = z.infer<typeof insertBlockedIpSchema>;
 export type BlockedIp = typeof blockedIps.$inferSelect;
+
+// ─── SaaS Platform — Multi-Tenant Repair Management ─────────────────────────
+
+// Subscribed repair shops (the tenants)
+export const saasShops = pgTable("saas_shops", {
+  id: serial("id").primaryKey(),
+  shopName: text("shop_name").notNull(),
+  ownerName: text("owner_name").notNull(),
+  phone: text("phone").notNull(),
+  city: text("city").notNull().default(""),
+  username: text("username").notNull().unique(),
+  password: text("password").notNull(),
+  isActive: integer("is_active").notNull().default(1),
+  subscriptionStatus: text("subscription_status").notNull().default("trial"), // trial | active | expired | suspended
+  subscriptionExpiresAt: timestamp("subscription_expires_at"),
+  trialEndsAt: timestamp("trial_ends_at").notNull(),
+  maxTechnicians: integer("max_technicians").notNull().default(3),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSaasShopSchema = createInsertSchema(saasShops).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSaasShop = z.infer<typeof insertSaasShopSchema>;
+export type SaasShop = typeof saasShops.$inferSelect;
+
+// Staff accounts within each shop
+export const saasUsers = pgTable("saas_users", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").notNull(),
+  username: text("username").notNull(),
+  password: text("password").notNull(),
+  displayName: text("display_name").notNull(),
+  isOwner: integer("is_owner").notNull().default(0),
+  isActive: integer("is_active").notNull().default(1),
+  permissions: jsonb("permissions").notNull().default([]),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSaasUserSchema = createInsertSchema(saasUsers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSaasUser = z.infer<typeof insertSaasUserSchema>;
+export type SaasUser = typeof saasUsers.$inferSelect;
+
+// Repair customers per shop
+export const saasRepairCustomers = pgTable("saas_repair_customers", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").notNull(),
+  customerId: text("customer_id").notNull(), // e.g. "C-001", scoped per shop
+  name: text("name").notNull(),
+  phone: text("phone").notNull(),
+  email: text("email"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertSaasRepairCustomerSchema = createInsertSchema(saasRepairCustomers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertSaasRepairCustomer = z.infer<typeof insertSaasRepairCustomerSchema>;
+export type SaasRepairCustomer = typeof saasRepairCustomers.$inferSelect;
+
+// Repair tickets per shop
+export const saasRepairTickets = pgTable("saas_repair_tickets", {
+  id: serial("id").primaryKey(),
+  shopId: integer("shop_id").notNull(),
+  ticketNumber: text("ticket_number").notNull(),
+  repairCustomerId: integer("repair_customer_id"),
+  customerName: text("customer_name").notNull(),
+  customerPhone: text("customer_phone").notNull(),
+  customerEmail: text("customer_email"),
+  deviceType: text("device_type").notNull(),
+  deviceBrand: text("device_brand").notNull(),
+  deviceModel: text("device_model").notNull(),
+  issueDescriptionAr: text("issue_description_ar").notNull(),
+  issueDescriptionEn: text("issue_description_en"),
+  status: text("status").notNull().default("pending"),
+  priority: text("priority").notNull().default("normal"),
+  technicianNotes: text("technician_notes").default(""),
+  estimatedCompletion: timestamp("estimated_completion"),
+  costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
+  finalCost: decimal("final_cost", { precision: 10, scale: 2 }),
+  isArchived: integer("is_archived").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertSaasRepairTicketSchema = createInsertSchema(saasRepairTickets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertSaasRepairTicket = z.infer<typeof insertSaasRepairTicketSchema>;
+export type SaasRepairTicket = typeof saasRepairTickets.$inferSelect;
