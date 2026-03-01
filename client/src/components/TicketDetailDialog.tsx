@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket } from '@shared/schema';
-import { Trash2, Printer, Lock } from 'lucide-react';
+import { Trash2, Printer } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -54,13 +54,6 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     queryKey: ['/api/repair-tickets', ticketId],
     enabled: !!ticketId && open,
   });
-
-  const { data: currentTechnician } = useQuery<any>({
-    queryKey: ['/api/technician/auth/me'],
-    retry: false,
-  });
-
-  const canChangePrice = currentTechnician?.isAdmin === 1 || (currentTechnician?.isAdmin as any) === true;
 
   const updateSchema = useMemo(() => z.object({
     status: z.string(),
