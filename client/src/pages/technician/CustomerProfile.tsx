@@ -191,7 +191,7 @@ export default function CustomerProfile() {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">{isRTL ? 'إجمالي الإيرادات:' : 'Total Revenue:'}</span>
                 <span className="font-semibold text-green-600 dark:text-green-400" data-testid="text-total-revenue">
-                  {totalSpent.toLocaleString()} {isRTL ? 'د.ع' : 'IQD'}
+                  {totalSpent.toLocaleString(undefined, { maximumFractionDigits: 0 })} {isRTL ? 'د.ع' : 'IQD'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
@@ -257,7 +257,7 @@ export default function CustomerProfile() {
                         </div>
                         {(ticket.finalCost || ticket.costEstimate) && (
                           <p className="text-sm font-bold text-green-600 dark:text-green-400">
-                            {parseFloat(ticket.finalCost || ticket.costEstimate || '0').toLocaleString()} {isRTL ? 'د.ع' : 'IQD'}
+                            {parseFloat(ticket.finalCost || ticket.costEstimate || '0').toLocaleString(undefined, { maximumFractionDigits: 0 })} {isRTL ? 'د.ع' : 'IQD'}
                           </p>
                         )}
                       </div>

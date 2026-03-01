@@ -177,8 +177,8 @@ export default function TechnicianDashboard() {
     if (!price || price === '0' || price === '0.00') return null;
     const num = parseFloat(price);
     return language === 'ar'
-      ? `${num.toLocaleString('ar-IQ')} د.ع`
-      : `${num.toLocaleString('en-US')} IQD`;
+      ? `${num.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+      : `${num.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`;
   };
 
   if (isAuthLoading) {
@@ -297,8 +297,8 @@ export default function TechnicianDashboard() {
                     <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
                     <p className="text-lg font-bold" data-testid="text-total-revenue">
                       {language === 'ar'
-                        ? `${stats.totalRevenue.toLocaleString('ar-IQ')} د.ع`
-                        : `${stats.totalRevenue.toLocaleString('en-US')} IQD`}
+                        ? `${stats.totalRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${stats.totalRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
                     </p>
                   </div>
                 </div>
@@ -321,8 +321,8 @@ export default function TechnicianDashboard() {
                     <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'} ({stats.completedCount})</p>
                     <p className="text-lg font-bold" data-testid="text-completed-count">
                       {language === 'ar'
-                        ? `${stats.completedRevenue.toLocaleString('ar-IQ')} د.ع`
-                        : `${stats.completedRevenue.toLocaleString('en-US')} IQD`}
+                        ? `${stats.completedRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${stats.completedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
                     </p>
                   </div>
                 </div>
