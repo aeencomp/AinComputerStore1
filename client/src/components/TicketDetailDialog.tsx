@@ -528,6 +528,11 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                             placeholder={t('repair.edit.addNotes') || 'Add notes...'}
                             rows={3}
                             {...field}
+                            lang="ar"
+                            dir="auto"
+                            spellCheck={true}
+                            autoCorrect="on"
+                            autoCapitalize="sentences"
                             data-testid="dialog-textarea-technician-notes"
                           />
                         </FormControl>
