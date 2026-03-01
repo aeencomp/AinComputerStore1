@@ -1,6 +1,6 @@
 import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems } from "@shared/schema";
 import { db } from "./db.js";
-import { eq, sql, and, desc, lte, or, like, ilike } from "drizzle-orm";
+import { eq, sql, and, desc, lte, or, like, ilike, not, inArray } from "drizzle-orm";
 import type { IStorage } from "./storage";
 import bcrypt from "bcrypt";
 
@@ -472,6 +472,18 @@ export class DrizzleStorage implements IStorage {
     return await db.select().from(repairTickets)
       .where(eq(repairTickets.repairCustomerId, repairCustomerId))
       .orderBy(desc(repairTickets.createdAt));
+  }
+
+  async getActiveTicketsByRepairCustomer(repairCustomerId: string): Promise<RepairTicket[]> {
+    return await db.select().from(repairTickets)
+      .where(
+        and(
+          eq(repairTickets.repairCustomerId, repairCustomerId),
+          not(inArray(repairTickets.status, ['delivered', 'rejected', 'unrepairable'])),
+          eq(repairTickets.isArchived, 0)
+        )
+      )
+      .orderBy(repairTickets.createdAt);
   }
 
   async updateRepairCustomer(id: string, updates: Partial<Pick<RepairCustomer, 'name' | 'phone' | 'email' | 'notes'>>): Promise<RepairCustomer | undefined> {

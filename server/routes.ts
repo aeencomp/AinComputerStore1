@@ -2341,6 +2341,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/repair-customers/:id/active-tickets", async (req, res) => {
+    try {
+      const tickets = await storage.getActiveTicketsByRepairCustomer(req.params.id);
+      return res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching active customer tickets:", error);
+      return res.status(500).json({ error: "Failed to fetch active tickets" });
+    }
+  });
+
   app.get("/api/repair-customers/:id/tickets", async (req, res) => {
     try {
       const tickets = await storage.getTicketsByRepairCustomer(req.params.id);

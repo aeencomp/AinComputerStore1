@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { ArrowLeft, ArrowRight, Plus, Printer, Receipt } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Printer, Receipt, AlertTriangle, LayoutList } from 'lucide-react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
@@ -60,6 +61,16 @@ export default function NewRepairRequest() {
       return res.json();
     },
     enabled: !!createdTicket?.repairCustomerId,
+  });
+
+  const { data: activeTickets = [] } = useQuery<RepairTicket[]>({
+    queryKey: ['/api/repair-customers', createdCustomer?.id, 'active-tickets'],
+    queryFn: async () => {
+      const res = await fetch(`/api/repair-customers/${createdCustomer!.id}/active-tickets`);
+      if (!res.ok) throw new Error('failed');
+      return res.json();
+    },
+    enabled: !!createdCustomer?.id,
   });
 
   const formSchema = z.object({
@@ -372,6 +383,14 @@ export default function NewRepairRequest() {
           
           <div class="ticket-number">${createdTicket.ticketNumber}</div>
           
+          ${activeTickets.length > 1 ? (() => {
+            const idx = activeTickets.findIndex(t => t.id === createdTicket.id) + 1;
+            const total = activeTickets.length;
+            return `<div style="text-align:center;margin:8px 0;padding:6px 10px;background:#fff3cd;border:2px solid #ffc107;border-radius:6px;font-size:15px;font-weight:900;color:#856404;">
+              ${isRTL ? `الجهاز ${idx} من ${total}` : `Device ${idx} of ${total}`}
+            </div>`;
+          })() : ''}
+          
           <div style="text-align: center; margin: 8px 0;">
             <img src="${qrCodeDataUrl}" alt="QR Code" style="width: 100px; height: 100px; margin: 0 auto;" />
             <div style="font-size: 9px; font-weight: 700; margin-top: 4px;">${isRTL ? 'امسح الكود لتتبع حالة الصيانة' : 'Scan to track repair status'}</div>
@@ -434,6 +453,24 @@ export default function NewRepairRequest() {
           </div>
           ` : ''}
           
+          ${activeTickets.length > 1 ? (() => {
+            const others = activeTickets.filter(t => t.id !== createdTicket.id);
+            const rows = others.map((t, i) => {
+              const typeMap: Record<string,string> = { laptop: isRTL ? 'لابتوب' : 'Laptop', desktop: isRTL ? 'كمبيوتر' : 'Desktop', monitor: isRTL ? 'شاشة' : 'Monitor', printer: isRTL ? 'طابعة' : 'Printer', other: isRTL ? 'أخرى' : 'Other' };
+              const typeTxt = typeMap[t.deviceType] || t.deviceType;
+              return `<div style="display:flex;justify-content:space-between;margin:5px 0;font-size:11px;font-weight:700;">
+                <span style="font-weight:900;">${t.ticketNumber}</span>
+                <span>${t.deviceBrand} ${t.deviceModel} — ${typeTxt}</span>
+              </div>`;
+            }).join('');
+            return `<div style="margin:12px 0;padding:10px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;">
+              <div style="font-weight:900;font-size:13px;margin-bottom:6px;color:#856404;">
+                ${isRTL ? `⚠ طلباتك النشطة الأخرى (${others.length}):` : `⚠ Your Other Active Repairs (${others.length}):`}
+              </div>
+              ${rows}
+            </div>`;
+          })() : ''}
+          
           <div class="terms">
             <div class="terms-title">${isRTL ? 'الشروط والأحكام:' : 'Terms & Conditions:'}</div>
             <ul class="terms-list">
@@ -461,6 +498,89 @@ export default function NewRepairRequest() {
         printWindow.close();
       }, 250);
     }
+  };
+
+  const handlePrintCustomerSummary = () => {
+    if (!createdCustomer || activeTickets.length === 0) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const statusMap: Record<string,string> = {
+      pending: isRTL ? 'قيد الانتظار' : 'Pending',
+      'in-progress': isRTL ? 'جاري العمل' : 'In Progress',
+      'waiting-parts': isRTL ? 'انتظار قطع' : 'Waiting Parts',
+      completed: isRTL ? 'مكتمل' : 'Completed',
+      delivered: isRTL ? 'مسلم' : 'Delivered',
+      rejected: isRTL ? 'مرفوض' : 'Rejected',
+      unrepairable: isRTL ? 'لا يمكن إصلاحه' : 'Unrepairable',
+    };
+    const typeMap: Record<string,string> = {
+      laptop: isRTL ? 'لابتوب' : 'Laptop',
+      desktop: isRTL ? 'كمبيوتر مكتبي' : 'Desktop',
+      monitor: isRTL ? 'شاشة' : 'Monitor',
+      printer: isRTL ? 'طابعة' : 'Printer',
+      other: isRTL ? 'أخرى' : 'Other',
+    };
+    const deviceSections = activeTickets.map((t, i) => `
+      <div class="device-section">
+        <div class="device-header">${isRTL ? `الجهاز ${i + 1}` : `Device ${i + 1}`} / ${i + 1 === 1 ? (isRTL ? 'الأول' : 'First') : ''}</div>
+        <div class="device-ticket">${t.ticketNumber}</div>
+        <div class="device-info-row"><span class="lbl">${isRTL ? 'الجهاز:' : 'Device:'}</span><span>${t.deviceBrand} ${t.deviceModel}</span></div>
+        <div class="device-info-row"><span class="lbl">${isRTL ? 'النوع:' : 'Type:'}</span><span>${typeMap[t.deviceType] || t.deviceType}</span></div>
+        <div class="device-info-row"><span class="lbl">${isRTL ? 'الحالة:' : 'Status:'}</span><span style="font-weight:900;">${statusMap[t.status] || t.status}</span></div>
+        ${t.costEstimate ? `<div class="device-info-row"><span class="lbl">${isRTL ? 'التكلفة:' : 'Cost:'}</span><span style="font-weight:900;">${Number(t.costEstimate).toLocaleString()} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
+        ${t.issueDescriptionAr || t.issueDescriptionEn ? `<div class="device-issue"><span class="lbl">${isRTL ? 'المشكلة:' : 'Issue:'}</span> ${t.issueDescriptionAr || t.issueDescriptionEn}</div>` : ''}
+      </div>
+    `).join('<div class="divider"></div>');
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="${isRTL ? 'rtl' : 'ltr'}">
+      <head>
+        <title>${isRTL ? 'ملخص طلبات العميل' : 'Customer Repairs Summary'}</title>
+        <style>
+          @page { size: 72.1mm auto; margin: 2mm; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: Arial, sans-serif; font-size: 12px; font-weight: 600; width: 68mm; padding: 3mm; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #000; line-height: 1.5; }
+          .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+          .store-name { font-size: 17px; font-weight: 900; }
+          .store-info { font-size: 10px; font-weight: 700; }
+          .summary-title { text-align: center; font-size: 14px; font-weight: 900; margin: 8px 0; padding: 5px; background: #e0e0e0; border: 1px solid #000; border-radius: 3px; }
+          .customer-block { margin: 8px 0; padding: 8px; background: #f5f5f5; border: 1px solid #ccc; border-radius: 3px; }
+          .customer-id { font-size: 18px; font-weight: 900; font-family: monospace; text-align: center; margin-bottom: 4px; }
+          .customer-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin: 3px 0; }
+          .total-badge { text-align: center; font-size: 13px; font-weight: 900; margin: 6px 0; padding: 4px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 4px; color: #856404; }
+          .device-section { margin: 8px 0; }
+          .device-header { font-size: 13px; font-weight: 900; text-decoration: underline; margin-bottom: 4px; }
+          .device-ticket { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin: 4px 0; }
+          .device-info-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin: 3px 0; }
+          .lbl { font-weight: 900; }
+          .device-issue { font-size: 10px; font-weight: 600; margin-top: 4px; padding: 4px; background: #f0f0f0; border-radius: 3px; }
+          .divider { border-top: 2px dashed #666; margin: 8px 0; }
+          .footer { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 3px solid #000; font-size: 11px; font-weight: 900; }
+          .keep-note { text-align: center; margin-top: 6px; padding: 5px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px; font-size: 10px; font-weight: 700; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}</div>
+          <div class="store-info">${isRTL ? 'كربلاء — العراق' : 'Karbala — Iraq'} | 07850006977</div>
+        </div>
+        <div class="summary-title">${isRTL ? 'ملف طلبات الصيانة' : 'Repair Summary Sheet'}</div>
+        <div class="customer-block">
+          <div class="customer-id">${createdCustomer.customerId}</div>
+          <div class="customer-row"><span class="lbl">${isRTL ? 'الاسم:' : 'Name:'}</span><span>${createdCustomer.name}</span></div>
+          <div class="customer-row"><span class="lbl">${isRTL ? 'الهاتف:' : 'Phone:'}</span><span dir="ltr">${createdCustomer.phone}</span></div>
+          <div class="customer-row"><span class="lbl">${isRTL ? 'التاريخ:' : 'Date:'}</span><span>${new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')}</span></div>
+        </div>
+        <div class="total-badge">${isRTL ? `إجمالي الطلبات النشطة: ${activeTickets.length}` : `Total Active Repairs: ${activeTickets.length}`}</div>
+        ${deviceSections}
+        <div class="keep-note">${isRTL ? 'احتفظ بهذه الورقة لاستلام جميع أجهزتك' : 'Keep this sheet to collect all your devices'}</div>
+        <div class="footer">${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
   };
 
   if (isAuthLoading) {
@@ -498,6 +618,32 @@ export default function NewRepairRequest() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Multi-device warning banner */}
+              {activeTickets.length > 1 && createdCustomer && (
+                <div className="flex gap-3 p-4 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700" data-testid="banner-multi-device-warning">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="space-y-2 min-w-0">
+                    <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                      {isRTL
+                        ? `تنبيه: هذا العميل (${createdCustomer.customerId}) لديه ${activeTickets.length} طلبات نشطة في نفس الوقت`
+                        : `Note: This customer (${createdCustomer.customerId}) has ${activeTickets.length} active repairs simultaneously`}
+                    </p>
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      {isRTL
+                        ? 'استخدم "طباعة ملخص" لطباعة ورقة موحدة تشمل جميع الأجهزة'
+                        : 'Use "Print Summary" to print one consolidated sheet covering all devices'}
+                    </p>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {activeTickets.filter(t => t.id !== createdTicket.id).map(t => (
+                        <Badge key={t.id} variant="outline" className="text-xs font-mono bg-white dark:bg-transparent border-amber-400 text-amber-800 dark:text-amber-300">
+                          {t.ticketNumber}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Printable Label Preview */}
               <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
                 <div ref={printRef} data-testid="print-label">
@@ -527,6 +673,12 @@ export default function NewRepairRequest() {
                   <Receipt className="h-4 w-4" />
                   {isRTL ? 'طباعة إيصال العميل' : 'Print Customer Receipt'}
                 </Button>
+                {activeTickets.length > 1 && (
+                  <Button onClick={handlePrintCustomerSummary} variant="secondary" className="gap-2 border-amber-400 dark:border-amber-600" disabled={!createdCustomer} data-testid="button-print-summary">
+                    <LayoutList className="h-4 w-4" />
+                    {isRTL ? `طباعة ملخص (${activeTickets.length} أجهزة)` : `Print Summary (${activeTickets.length} devices)`}
+                  </Button>
+                )}
                 <Button variant="outline" onClick={handleNewRequest} className="gap-2" data-testid="button-new-request">
                   <Plus className="h-4 w-4" />
                   {isRTL ? 'طلب جديد' : 'New Request'}

@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { Trash2, Printer } from 'lucide-react';
+import { Trash2, Printer, AlertTriangle, LayoutList } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -63,6 +63,16 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       return res.json();
     },
     enabled: !!ticket?.repairCustomerId && open,
+  });
+
+  const { data: dialogActiveTickets = [] } = useQuery<RepairTicket[]>({
+    queryKey: ['/api/repair-customers', ticketCustomer?.id, 'active-tickets'],
+    queryFn: async () => {
+      const res = await fetch(`/api/repair-customers/${ticketCustomer!.id}/active-tickets`);
+      if (!res.ok) throw new Error('failed');
+      return res.json();
+    },
+    enabled: !!ticketCustomer?.id && open,
   });
 
   const updateSchema = useMemo(() => z.object({
@@ -209,6 +219,78 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     }
   };
 
+  const handlePrintSummary = () => {
+    if (!ticketCustomer || dialogActiveTickets.length === 0) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const statusMap: Record<string,string> = {
+      pending: isRTL ? 'قيد الانتظار' : 'Pending',
+      'in-progress': isRTL ? 'جاري العمل' : 'In Progress',
+      'waiting-parts': isRTL ? 'انتظار قطع' : 'Waiting Parts',
+      completed: isRTL ? 'مكتمل' : 'Completed',
+      delivered: isRTL ? 'مسلم' : 'Delivered',
+      rejected: isRTL ? 'مرفوض' : 'Rejected',
+      unrepairable: isRTL ? 'لا يمكن إصلاحه' : 'Unrepairable',
+    };
+    const typeMap: Record<string,string> = { laptop: isRTL ? 'لابتوب' : 'Laptop', desktop: isRTL ? 'كمبيوتر مكتبي' : 'Desktop', monitor: isRTL ? 'شاشة' : 'Monitor', printer: isRTL ? 'طابعة' : 'Printer', other: isRTL ? 'أخرى' : 'Other' };
+    const deviceSections = dialogActiveTickets.map((t, i) => `
+      <div class="device-section">
+        <div class="device-header">${isRTL ? `الجهاز ${i + 1}` : `Device ${i + 1}`}</div>
+        <div class="device-ticket">${t.ticketNumber}</div>
+        <div class="device-info-row"><span class="lbl">${isRTL ? 'الجهاز:' : 'Device:'}</span><span>${t.deviceBrand} ${t.deviceModel}</span></div>
+        <div class="device-info-row"><span class="lbl">${isRTL ? 'النوع:' : 'Type:'}</span><span>${typeMap[t.deviceType] || t.deviceType}</span></div>
+        <div class="device-info-row"><span class="lbl">${isRTL ? 'الحالة:' : 'Status:'}</span><span style="font-weight:900;">${statusMap[t.status] || t.status}</span></div>
+        ${t.costEstimate ? `<div class="device-info-row"><span class="lbl">${isRTL ? 'التكلفة:' : 'Cost:'}</span><span style="font-weight:900;">${Number(t.costEstimate).toLocaleString()} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
+        ${t.issueDescriptionAr || t.issueDescriptionEn ? `<div class="device-issue"><span class="lbl">${isRTL ? 'المشكلة:' : 'Issue:'}</span> ${t.issueDescriptionAr || t.issueDescriptionEn}</div>` : ''}
+      </div>
+    `).join('<div class="divider"></div>');
+    printWindow.document.write(`<!DOCTYPE html>
+      <html dir="${isRTL ? 'rtl' : 'ltr'}"><head>
+        <title>${isRTL ? 'ملخص طلبات العميل' : 'Customer Repairs Summary'}</title>
+        <style>
+          @page { size: 72.1mm auto; margin: 2mm; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: Arial, sans-serif; font-size: 12px; font-weight: 600; width: 68mm; padding: 3mm; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #000; line-height: 1.5; }
+          .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+          .store-name { font-size: 17px; font-weight: 900; }
+          .store-info { font-size: 10px; font-weight: 700; }
+          .summary-title { text-align: center; font-size: 14px; font-weight: 900; margin: 8px 0; padding: 5px; background: #e0e0e0; border: 1px solid #000; border-radius: 3px; }
+          .customer-block { margin: 8px 0; padding: 8px; background: #f5f5f5; border: 1px solid #ccc; border-radius: 3px; }
+          .customer-id { font-size: 18px; font-weight: 900; font-family: monospace; text-align: center; margin-bottom: 4px; }
+          .customer-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin: 3px 0; }
+          .total-badge { text-align: center; font-size: 13px; font-weight: 900; margin: 6px 0; padding: 4px; background: #fff3cd; border: 2px solid #ffc107; border-radius: 4px; color: #856404; }
+          .device-section { margin: 8px 0; }
+          .device-header { font-size: 13px; font-weight: 900; text-decoration: underline; margin-bottom: 4px; }
+          .device-ticket { font-size: 16px; font-weight: 900; letter-spacing: 0.5px; margin: 4px 0; }
+          .device-info-row { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin: 3px 0; }
+          .lbl { font-weight: 900; }
+          .device-issue { font-size: 10px; font-weight: 600; margin-top: 4px; padding: 4px; background: #f0f0f0; border-radius: 3px; }
+          .divider { border-top: 2px dashed #666; margin: 8px 0; }
+          .footer { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 3px solid #000; font-size: 11px; font-weight: 900; }
+          .keep-note { text-align: center; margin-top: 6px; padding: 5px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px; font-size: 10px; font-weight: 700; }
+        </style>
+      </head><body>
+        <div class="header">
+          <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}</div>
+          <div class="store-info">${isRTL ? 'كربلاء — العراق' : 'Karbala — Iraq'} | 07850006977</div>
+        </div>
+        <div class="summary-title">${isRTL ? 'ملف طلبات الصيانة' : 'Repair Summary Sheet'}</div>
+        <div class="customer-block">
+          <div class="customer-id">${ticketCustomer.customerId}</div>
+          <div class="customer-row"><span class="lbl">${isRTL ? 'الاسم:' : 'Name:'}</span><span>${ticketCustomer.name}</span></div>
+          <div class="customer-row"><span class="lbl">${isRTL ? 'الهاتف:' : 'Phone:'}</span><span dir="ltr">${ticketCustomer.phone}</span></div>
+          <div class="customer-row"><span class="lbl">${isRTL ? 'التاريخ:' : 'Date:'}</span><span>${new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')}</span></div>
+        </div>
+        <div class="total-badge">${isRTL ? `إجمالي الطلبات النشطة: ${dialogActiveTickets.length}` : `Total Active Repairs: ${dialogActiveTickets.length}`}</div>
+        ${deviceSections}
+        <div class="keep-note">${isRTL ? 'احتفظ بهذه الورقة لاستلام جميع أجهزتك' : 'Keep this sheet to collect all your devices'}</div>
+        <div class="footer">${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
+      </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+  };
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending': return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400';
@@ -282,12 +364,39 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
             </div>
 
             <div className="border-t pt-4">
+              {dialogActiveTickets.length > 1 && ticketCustomer && (
+                <div className="flex gap-2 p-3 mb-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700" data-testid="banner-dialog-multi-device">
+                  <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0 space-y-1">
+                    <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
+                      {isRTL
+                        ? `${ticketCustomer.customerId} لديه ${dialogActiveTickets.length} طلبات نشطة في نفس الوقت`
+                        : `${ticketCustomer.customerId} has ${dialogActiveTickets.length} active repairs simultaneously`}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {dialogActiveTickets.filter(t => t.id !== ticket.id).map(t => (
+                        <Badge key={t.id} variant="outline" className="text-xs font-mono border-amber-400 text-amber-800 dark:text-amber-300">
+                          {t.ticketNumber}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <h3 className="font-semibold text-sm">{isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</h3>
-                <Button size="sm" onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-dialog-print-label">
-                  <Printer className="h-4 w-4" />
-                  {barcodeReady ? (isRTL ? 'طباعة' : 'Print') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
-                </Button>
+                <div className="flex gap-2 flex-wrap">
+                  <Button size="sm" onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-dialog-print-label">
+                    <Printer className="h-4 w-4" />
+                    {barcodeReady ? (isRTL ? 'طباعة' : 'Print') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
+                  </Button>
+                  {dialogActiveTickets.length > 1 && (
+                    <Button size="sm" variant="secondary" onClick={handlePrintSummary} className="gap-2" data-testid="button-dialog-print-summary">
+                      <LayoutList className="h-4 w-4" />
+                      {isRTL ? `ملخص (${dialogActiveTickets.length})` : `Summary (${dialogActiveTickets.length})`}
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="border-2 border-dashed border-muted-foreground/30 rounded-md p-3 bg-white">
                 <div ref={printRef} data-testid="dialog-print-label">
