@@ -12,7 +12,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import { ArrowLeft, ArrowRight, Plus, Printer, Receipt } from 'lucide-react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
-import type { RepairTicket } from '@shared/schema';
+import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -51,6 +51,16 @@ export default function NewRepairRequest() {
   }, [authError, isAuthLoading, currentTechnician, navigate]);
 
   const [qrReady, setQrReady] = useState(false);
+
+  const { data: createdCustomer } = useQuery<RepairCustomer>({
+    queryKey: ['/api/repair-customers', createdTicket?.repairCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/repair-customers/${createdTicket!.repairCustomerId}`);
+      if (!res.ok) throw new Error('not found');
+      return res.json();
+    },
+    enabled: !!createdTicket?.repairCustomerId,
+  });
 
   const formSchema = z.object({
     customerName: z.string().min(2, isRTL ? 'اسم العميل مطلوب' : 'Customer name is required'),
@@ -373,6 +383,11 @@ export default function NewRepairRequest() {
           
           <div class="section">
             <div class="section-title">${isRTL ? 'معلومات العميل' : 'Customer Information'}</div>
+            ${createdCustomer ? `
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'رقم العميل:' : 'Customer ID:'}</span>
+              <span class="info-value" style="font-family: monospace; font-weight: 900;">${createdCustomer.customerId}</span>
+            </div>` : ''}
             <div class="info-row">
               <span class="info-label">${isRTL ? 'الاسم:' : 'Name:'}</span>
               <span class="info-value">${createdTicket.customerName}</span>
@@ -495,6 +510,11 @@ export default function NewRepairRequest() {
                   <div className="serial" style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', letterSpacing: '0.5px' }}>
                     {createdTicket.ticketNumber}
                   </div>
+                  {createdCustomer && (
+                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '9px', letterSpacing: '0.3px', marginTop: '1px' }}>
+                      {createdCustomer.customerId} — {createdTicket.customerName}
+                    </div>
+                  )}
                 </div>
               </div>
 

@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
-import type { RepairTicket } from '@shared/schema';
+import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { ArrowLeft, Trash2, Printer } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
@@ -64,6 +64,16 @@ export default function TicketDetail() {
   const { data: ticket, isLoading } = useQuery<RepairTicket>({
     queryKey: ['/api/repair-tickets', params?.id],
     enabled: !!params?.id,
+  });
+
+  const { data: ticketCustomer } = useQuery<RepairCustomer>({
+    queryKey: ['/api/repair-customers', ticket?.repairCustomerId],
+    queryFn: async () => {
+      const res = await fetch(`/api/repair-customers/${ticket!.repairCustomerId}`);
+      if (!res.ok) throw new Error('not found');
+      return res.json();
+    },
+    enabled: !!ticket?.repairCustomerId,
   });
 
   const updateSchema = useMemo(() => z.object({
@@ -303,6 +313,11 @@ export default function TicketDetail() {
                 <div className="serial" style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', letterSpacing: '0.5px' }}>
                   {ticket.ticketNumber}
                 </div>
+                {ticketCustomer && (
+                  <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '9px', letterSpacing: '0.3px', marginTop: '1px' }}>
+                    {ticketCustomer.customerId} — {ticket.customerName}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
