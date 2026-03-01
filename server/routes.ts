@@ -2219,16 +2219,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
-      // Determine if caller can change prices:
-      // - Regular admin (adminId in session) → allowed
-      // - Admin technician (technicianIsAdmin == 1) → allowed
-      // - Regular technician → price fields are silently ignored
-      const isRegularAdmin = !!(req.session as any).adminId;
-      const techIsAdmin = (req.session as any).technicianIsAdmin;
-      const isAdminTechnician = techIsAdmin === 1 || techIsAdmin === true || techIsAdmin === "1";
-      const canChangePrice = isRegularAdmin || isAdminTechnician;
-
-      // Build update object — price fields only applied when caller has permission
+      // Build update object with all fields including prices (all technicians can edit prices)
       const updateData: Record<string, any> = {};
       
       if (req.body.status !== undefined) {
@@ -2243,13 +2234,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.estimatedCompletion !== undefined) {
         updateData.estimatedCompletion = req.body.estimatedCompletion ? new Date(req.body.estimatedCompletion) : null;
       }
-      if (canChangePrice) {
-        if (req.body.costEstimate !== undefined) {
-          updateData.costEstimate = req.body.costEstimate && req.body.costEstimate !== '' ? req.body.costEstimate : null;
-        }
-        if (req.body.finalCost !== undefined) {
-          updateData.finalCost = req.body.finalCost && req.body.finalCost !== '' ? req.body.finalCost : null;
-        }
+      if (req.body.costEstimate !== undefined) {
+        updateData.costEstimate = req.body.costEstimate && req.body.costEstimate !== '' ? req.body.costEstimate : null;
+      }
+      if (req.body.finalCost !== undefined) {
+        updateData.finalCost = req.body.finalCost && req.body.finalCost !== '' ? req.body.finalCost : null;
       }
       
       const ticket = await storage.updateRepairTicket(id, updateData);

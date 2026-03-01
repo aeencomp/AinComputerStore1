@@ -388,19 +388,9 @@ export default function TicketDetail() {
                     name="costEstimate"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="flex items-center gap-1">
-                          {t('repair.ticket.costEstimate')}
-                          {!canChangePrice && <Lock className="h-3 w-3 text-muted-foreground" />}
-                        </FormLabel>
+                        <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            {...field}
-                            disabled={!canChangePrice}
-                            data-testid="input-cost-estimate"
-                          />
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-cost-estimate" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -411,19 +401,9 @@ export default function TicketDetail() {
                     name="finalCost"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="flex items-center gap-1">
-                          {t('repair.ticket.finalCost')}
-                          {!canChangePrice && <Lock className="h-3 w-3 text-muted-foreground" />}
-                        </FormLabel>
+                        <FormLabel>{t('repair.ticket.finalCost')}</FormLabel>
                         <FormControl>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            placeholder="0.00"
-                            {...field}
-                            disabled={!canChangePrice}
-                            data-testid="input-final-cost"
-                          />
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-final-cost" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
