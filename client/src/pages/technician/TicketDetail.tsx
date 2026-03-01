@@ -85,6 +85,8 @@ export default function TicketDetail() {
     finalCost: z.string().optional(),
   }), []);
 
+  const cleanPrice = (v: string | null | undefined) => v ? String(parseFloat(v)) : '';
+
   const form = useForm<z.infer<typeof updateSchema>>({
     resolver: zodResolver(updateSchema),
     defaultValues: {
@@ -92,8 +94,8 @@ export default function TicketDetail() {
       priority: ticket?.priority || 'normal',
       technicianNotes: ticket?.technicianNotes || '',
       estimatedCompletion: ticket?.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
-      costEstimate: ticket?.costEstimate || '',
-      finalCost: ticket?.finalCost || '',
+      costEstimate: cleanPrice(ticket?.costEstimate),
+      finalCost: cleanPrice(ticket?.finalCost),
     },
   });
 
@@ -104,8 +106,8 @@ export default function TicketDetail() {
         priority: ticket.priority,
         technicianNotes: ticket.technicianNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
-        costEstimate: ticket.costEstimate || '',
-        finalCost: ticket.finalCost || '',
+        costEstimate: cleanPrice(ticket.costEstimate),
+        finalCost: cleanPrice(ticket.finalCost),
       });
     }
   }, [ticket, form]);

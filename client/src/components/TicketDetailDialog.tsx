@@ -96,6 +96,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     },
   });
 
+  const cleanPrice = (v: string | null | undefined) => v ? String(parseFloat(v)) : '';
+
   useEffect(() => {
     if (ticket) {
       form.reset({
@@ -103,8 +105,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         priority: ticket.priority,
         technicianNotes: ticket.technicianNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
-        costEstimate: ticket.costEstimate || '',
-        finalCost: ticket.finalCost || '',
+        costEstimate: cleanPrice(ticket.costEstimate),
+        finalCost: cleanPrice(ticket.finalCost),
       });
     }
   }, [ticket, form]);
