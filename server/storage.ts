@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -36,7 +36,14 @@ export interface IStorage {
   archiveRepairTicket(id: string, archived: boolean): Promise<RepairTicket | undefined>;
   archiveDeliveredTickets(): Promise<number>;
   deleteRepairTicket(id: string): Promise<void>;
-  
+  createRepairCustomer(data: Omit<InsertRepairCustomer, 'customerId'>): Promise<RepairCustomer>;
+  getRepairCustomerByPhone(phone: string): Promise<RepairCustomer | undefined>;
+  getRepairCustomerByReadableId(customerId: string): Promise<RepairCustomer | undefined>;
+  getRepairCustomerById(id: string): Promise<RepairCustomer | undefined>;
+  listRepairCustomers(search?: string): Promise<(RepairCustomer & { ticketCount: number })[]>;
+  getTicketsByRepairCustomer(repairCustomerId: string): Promise<RepairTicket[]>;
+  updateRepairCustomer(id: string, updates: Partial<Pick<RepairCustomer, 'name' | 'phone' | 'email' | 'notes'>>): Promise<RepairCustomer | undefined>;
+
   // User methods (for customer management)
   createUser(user: InsertUser): Promise<User>;
   getUsers(): Promise<User[]>;
@@ -558,6 +565,34 @@ export class MemStorage implements IStorage {
 
   async deleteRepairTicket(id: string): Promise<void> {
     // MemStorage does not support repair tickets
+  }
+
+  async createRepairCustomer(data: Omit<InsertRepairCustomer, 'customerId'>): Promise<RepairCustomer> {
+    throw new Error("MemStorage does not support repair customers");
+  }
+
+  async getRepairCustomerByPhone(phone: string): Promise<RepairCustomer | undefined> {
+    return undefined;
+  }
+
+  async getRepairCustomerByReadableId(customerId: string): Promise<RepairCustomer | undefined> {
+    return undefined;
+  }
+
+  async getRepairCustomerById(id: string): Promise<RepairCustomer | undefined> {
+    return undefined;
+  }
+
+  async listRepairCustomers(search?: string): Promise<(RepairCustomer & { ticketCount: number })[]> {
+    return [];
+  }
+
+  async getTicketsByRepairCustomer(repairCustomerId: string): Promise<RepairTicket[]> {
+    return [];
+  }
+
+  async updateRepairCustomer(id: string, updates: Partial<Pick<RepairCustomer, 'name' | 'phone' | 'email' | 'notes'>>): Promise<RepairCustomer | undefined> {
+    return undefined;
   }
 
   async createTechnician(technician: InsertTechnician): Promise<Technician> {

@@ -9,8 +9,8 @@ import { Input } from '@/components/ui/input';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import type { RepairTicket } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore } from 'lucide-react';
+import type { RepairTicket, RepairCustomer } from '@shared/schema';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch } from 'lucide-react';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 
@@ -33,6 +33,7 @@ export default function TechnicianDashboard() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [customerLookup, setCustomerLookup] = useState('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -43,6 +44,25 @@ export default function TechnicianDashboard() {
     queryKey: ['/api/repair-tickets'],
     enabled: !!currentTechnician,
   });
+
+  const { data: customers } = useQuery<(RepairCustomer & { ticketCount: number })[]>({
+    queryKey: ['/api/repair-customers'],
+    enabled: !!currentTechnician,
+  });
+
+  const customerIdMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    (customers || []).forEach(c => { map[c.id] = c.customerId; });
+    return map;
+  }, [customers]);
+
+  const handleCustomerLookup = () => {
+    const raw = customerLookup.trim().toUpperCase();
+    if (!raw) return;
+    const id = raw.startsWith('C-') ? raw : `C-${raw}`;
+    navigate(`/technician/customer/${id}`);
+    setCustomerLookup('');
+  };
 
   useEffect(() => {
     if (authError || (!isAuthLoading && !currentTechnician)) {
@@ -360,6 +380,24 @@ export default function TechnicianDashboard() {
             />
           </div>
 
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <UserSearch className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                placeholder={language === 'ar' ? 'رقم العميل C-001' : 'Customer ID C-001'}
+                value={customerLookup}
+                onChange={(e) => setCustomerLookup(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleCustomerLookup()}
+                className="ps-10 w-48"
+                data-testid="input-customer-lookup"
+              />
+            </div>
+            <Button size="icon" variant="outline" onClick={handleCustomerLookup} data-testid="button-customer-lookup">
+              <UserSearch className="h-4 w-4" />
+            </Button>
+          </div>
+
           <Select value={filterStatus} onValueChange={setFilterStatus}>
             <SelectTrigger className="w-full md:w-[200px]" data-testid="select-filter-status">
               <SelectValue placeholder={t('repair.technician.dashboard.filterStatus')} />
@@ -431,9 +469,24 @@ export default function TechnicianDashboard() {
                 <CardHeader>
                   <div className="flex justify-between items-start mb-2">
                     <CardTitle className="text-lg">{ticket.ticketNumber}</CardTitle>
-                    <Badge className={getPriorityColor(ticket.priority)}>
-                      {t(`repair.priority.${ticket.priority}`)}
-                    </Badge>
+                    <div className="flex items-center gap-1 flex-wrap justify-end">
+                      {ticket.repairCustomerId && customerIdMap[ticket.repairCustomerId] && (
+                        <Badge
+                          variant="outline"
+                          className="font-mono text-xs cursor-pointer hover-elevate"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/technician/customer/${customerIdMap[ticket.repairCustomerId!]}`);
+                          }}
+                          data-testid={`badge-customer-id-${ticket.id}`}
+                        >
+                          {customerIdMap[ticket.repairCustomerId]}
+                        </Badge>
+                      )}
+                      <Badge className={getPriorityColor(ticket.priority)}>
+                        {t(`repair.priority.${ticket.priority}`)}
+                      </Badge>
+                    </div>
                   </div>
                   <CardDescription>{ticket.customerName}</CardDescription>
                 </CardHeader>

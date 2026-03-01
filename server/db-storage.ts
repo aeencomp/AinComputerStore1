@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, products, cartItems, orders, users, storeSettings, repairTickets, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte, or, like, ilike } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -328,10 +328,29 @@ export class DrizzleStorage implements IStorage {
     const sequenceResult = await db.execute(sql`SELECT nextval('repair_ticket_seq') as next_num`);
     const nextNumber = (sequenceResult.rows[0] as any).next_num;
     const ticketNumber = `AEEN-${String(nextNumber).padStart(5, '0')}`;
-    
+
+    // Auto-link or create repair customer by phone
+    let repairCustomerId: string | undefined;
+    if (insertTicket.customerPhone) {
+      try {
+        let customer = await this.getRepairCustomerByPhone(insertTicket.customerPhone);
+        if (!customer) {
+          customer = await this.createRepairCustomer({
+            name: insertTicket.customerName,
+            phone: insertTicket.customerPhone,
+            email: insertTicket.customerEmail || undefined,
+          });
+        }
+        repairCustomerId = customer.id;
+      } catch (err) {
+        console.error('Failed to link repair customer:', err);
+      }
+    }
+
     const result = await db.insert(repairTickets).values({
       ...insertTicket,
       ticketNumber,
+      repairCustomerId,
     }).returning();
     return result[0];
   }
@@ -384,6 +403,80 @@ export class DrizzleStorage implements IStorage {
 
   async deleteRepairTicket(id: string): Promise<void> {
     await db.delete(repairTickets).where(eq(repairTickets.id, id));
+  }
+
+  // Repair Customer methods
+  async getNextRepairCustomerId(): Promise<string> {
+    const result = await db.select({ customerId: repairCustomers.customerId })
+      .from(repairCustomers)
+      .orderBy(desc(repairCustomers.createdAt))
+      .limit(1);
+    if (result.length === 0) return 'C-001';
+    const last = result[0].customerId; // e.g. "C-042"
+    const num = parseInt(last.replace('C-', ''), 10);
+    return `C-${String(num + 1).padStart(3, '0')}`;
+  }
+
+  async createRepairCustomer(data: Omit<InsertRepairCustomer, 'customerId'>): Promise<RepairCustomer> {
+    const customerId = await this.getNextRepairCustomerId();
+    const result = await db.insert(repairCustomers).values({ ...data, customerId }).returning();
+    return result[0];
+  }
+
+  async getRepairCustomerByPhone(phone: string): Promise<RepairCustomer | undefined> {
+    const normalized = phone.replace(/[\s\-+]/g, '');
+    const result = await db.select().from(repairCustomers)
+      .where(eq(sql`REPLACE(REPLACE(REPLACE(${repairCustomers.phone}, ' ', ''), '-', ''), '+', '')`, normalized))
+      .limit(1);
+    return result[0];
+  }
+
+  async getRepairCustomerByReadableId(customerId: string): Promise<RepairCustomer | undefined> {
+    const result = await db.select().from(repairCustomers)
+      .where(eq(repairCustomers.customerId, customerId.toUpperCase()))
+      .limit(1);
+    return result[0];
+  }
+
+  async getRepairCustomerById(id: string): Promise<RepairCustomer | undefined> {
+    const result = await db.select().from(repairCustomers).where(eq(repairCustomers.id, id)).limit(1);
+    return result[0];
+  }
+
+  async listRepairCustomers(search?: string): Promise<(RepairCustomer & { ticketCount: number })[]> {
+    const rows = await db.select().from(repairCustomers).orderBy(desc(repairCustomers.createdAt));
+    const ticketRows = await db.select({
+      repairCustomerId: repairTickets.repairCustomerId,
+    }).from(repairTickets).where(sql`${repairTickets.repairCustomerId} IS NOT NULL`);
+
+    const countMap: Record<string, number> = {};
+    for (const t of ticketRows) {
+      if (t.repairCustomerId) {
+        countMap[t.repairCustomerId] = (countMap[t.repairCustomerId] || 0) + 1;
+      }
+    }
+
+    let filtered = rows;
+    if (search) {
+      const q = search.toLowerCase();
+      filtered = rows.filter(c =>
+        c.name.toLowerCase().includes(q) ||
+        c.phone.includes(q) ||
+        c.customerId.toLowerCase().includes(q)
+      );
+    }
+    return filtered.map(c => ({ ...c, ticketCount: countMap[c.id] || 0 }));
+  }
+
+  async getTicketsByRepairCustomer(repairCustomerId: string): Promise<RepairTicket[]> {
+    return await db.select().from(repairTickets)
+      .where(eq(repairTickets.repairCustomerId, repairCustomerId))
+      .orderBy(desc(repairTickets.createdAt));
+  }
+
+  async updateRepairCustomer(id: string, updates: Partial<Pick<RepairCustomer, 'name' | 'phone' | 'email' | 'notes'>>): Promise<RepairCustomer | undefined> {
+    const result = await db.update(repairCustomers).set(updates).where(eq(repairCustomers.id, id)).returning();
+    return result[0];
   }
 
   // Technician methods

@@ -339,12 +339,32 @@ export interface FooterLinkGroup {
   links: FooterLink[];
 }
 
+// Repair Customers — unique customer profiles linked across all repair tickets
+export const repairCustomers = pgTable("repair_customers", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  customerId: text("customer_id").notNull().unique(), // e.g. "C-001"
+  name: text("name").notNull(),
+  phone: text("phone").notNull().unique(),
+  email: text("email"),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertRepairCustomerSchema = createInsertSchema(repairCustomers).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertRepairCustomer = z.infer<typeof insertRepairCustomerSchema>;
+export type RepairCustomer = typeof repairCustomers.$inferSelect;
+
 export const repairTickets = pgTable("repair_tickets", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   ticketNumber: text("ticket_number").notNull().unique(),
   customerName: text("customer_name").notNull(),
   customerPhone: text("customer_phone").notNull(),
   customerEmail: text("customer_email"),
+  repairCustomerId: varchar("repair_customer_id"), // links to repair_customers.id
   deviceType: text("device_type").notNull(), // laptop, desktop, monitor, etc.
   deviceBrand: text("device_brand").notNull(),
   deviceModel: text("device_model").notNull(),

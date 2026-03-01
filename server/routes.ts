@@ -2305,6 +2305,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ===============================
+  // Repair Customer Routes
+  // ===============================
+
+  app.get("/api/repair-customers", async (req, res) => {
+    try {
+      const search = req.query.search as string | undefined;
+      const customers = await storage.listRepairCustomers(search);
+      return res.json(customers);
+    } catch (error) {
+      console.error("Error fetching repair customers:", error);
+      return res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
+  app.get("/api/repair-customers/id/:customerId", async (req, res) => {
+    try {
+      const customer = await storage.getRepairCustomerByReadableId(req.params.customerId);
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      return res.json(customer);
+    } catch (error) {
+      console.error("Error fetching repair customer:", error);
+      return res.status(500).json({ error: "Failed to fetch customer" });
+    }
+  });
+
+  app.get("/api/repair-customers/:id/tickets", async (req, res) => {
+    try {
+      const tickets = await storage.getTicketsByRepairCustomer(req.params.id);
+      return res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching customer tickets:", error);
+      return res.status(500).json({ error: "Failed to fetch tickets" });
+    }
+  });
+
+  app.patch("/api/repair-customers/:id", async (req, res) => {
+    try {
+      const { name, phone, email, notes } = req.body;
+      const customer = await storage.updateRepairCustomer(req.params.id, { name, phone, email, notes });
+      if (!customer) return res.status(404).json({ error: "Customer not found" });
+      return res.json(customer);
+    } catch (error) {
+      console.error("Error updating repair customer:", error);
+      return res.status(500).json({ error: "Failed to update customer" });
+    }
+  });
+
+  // ===============================
   // Technician Auth Routes
   // ===============================
 
