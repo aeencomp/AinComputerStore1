@@ -112,11 +112,12 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
           try {
             JsBarcode(barcodeRef.current, ticket.ticketNumber, {
               format: 'CODE128',
-              width: 1.5,
-              height: 35,
+              width: 2,
+              height: 44,
               displayValue: false,
-              margin: 1,
+              margin: 0,
               background: '#ffffff',
+              lineColor: '#000000',
             });
             setBarcodeReady(true);
           } catch (error) {
@@ -191,11 +192,12 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
             <style>
               @page { size: 50mm 25mm; margin: 0; }
               * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1.5mm 2mm; }
-              .store-name { font-size: 8pt; font-weight: 900; text-align: center; letter-spacing: 0.3px; }
-              .barcode-container { text-align: center; margin: 1mm 0; }
-              .barcode-container svg { max-width: 44mm; height: 10mm; }
-              .serial { font-size: 9pt; font-weight: 800; text-align: center; letter-spacing: 0.5px; }
+              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, Helvetica, sans-serif; background: #fff; padding: 0.8mm 1mm; }
+              .store-name { font-size: 7pt; font-weight: 900; text-align: center; letter-spacing: 0.2px; line-height: 1.1; white-space: nowrap; overflow: hidden; max-width: 48mm; }
+              .barcode-container { text-align: center; width: 100%; margin: 0.5mm 0; }
+              .barcode-container svg { width: 48mm; height: 13mm; display: block; margin: 0 auto; }
+              .serial { font-size: 9pt; font-weight: 900; text-align: center; letter-spacing: 1.5px; font-family: 'Courier New', Courier, monospace; }
+              .customer-info { font-size: 6pt; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; max-width: 48mm; margin-top: 0.2mm; }
             </style>
           </head>
           <body>${printContents}</body>
@@ -388,17 +390,17 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
               </div>
               <div className="border-2 border-dashed border-muted-foreground/30 rounded-md p-3 bg-white">
                 <div ref={printRef} data-testid="dialog-print-label">
-                  <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', letterSpacing: '0.3px' }}>
+                  <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '9px', letterSpacing: '0.2px', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     {localStorage.getItem('saasShopName') || 'Repair Shop'}
                   </div>
-                  <div className="barcode-container" style={{ textAlign: 'center', margin: '4px 0' }}>
-                    <svg ref={barcodeRef} />
+                  <div className="barcode-container" style={{ textAlign: 'center', margin: '3px 0' }}>
+                    <svg ref={barcodeRef} style={{ display: 'block', width: '100%' }} />
                   </div>
-                  <div className="serial" style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', letterSpacing: '0.5px' }}>
+                  <div className="serial" style={{ textAlign: 'center', fontWeight: 900, fontSize: '12px', letterSpacing: '1.5px', fontFamily: 'Courier New, Courier, monospace' }}>
                     {ticket.ticketNumber}
                   </div>
                   {ticketCustomer && (
-                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '9px', letterSpacing: '0.3px', marginTop: '1px' }}>
+                    <div className="customer-info" style={{ textAlign: 'center', fontWeight: 700, fontSize: '8px', letterSpacing: '0.2px', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                       {ticketCustomer.customerId} — {ticket.customerName}
                     </div>
                   )}

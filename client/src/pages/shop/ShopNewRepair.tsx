@@ -94,11 +94,12 @@ export default function ShopNewRepair() {
             try {
               JsBarcode(barcodeRef.current, createdTicket.ticketNumber, {
                 format: 'CODE128',
-                width: 1.5,
-                height: 35,
+                width: 2,
+                height: 44,
                 displayValue: false,
-                margin: 1,
+                margin: 0,
                 background: '#ffffff',
+                lineColor: '#000000',
               });
             } catch (error) {
               console.error('Barcode generation error:', error);
@@ -156,11 +157,11 @@ export default function ShopNewRepair() {
             <style>
               @page { size: 50mm 25mm; margin: 0; }
               * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1.5mm 2mm; }
-              .store-name { font-size: 8pt; font-weight: 900; text-align: center; letter-spacing: 0.3px; }
-              .barcode-container { text-align: center; margin: 1mm 0; }
-              .barcode-container svg { max-width: 44mm; height: 10mm; }
-              .serial { font-size: 9pt; font-weight: 800; text-align: center; letter-spacing: 0.5px; }
+              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, Helvetica, sans-serif; background: #fff; padding: 0.8mm 1mm; }
+              .store-name { font-size: 7pt; font-weight: 900; text-align: center; letter-spacing: 0.2px; line-height: 1.1; white-space: nowrap; overflow: hidden; max-width: 48mm; }
+              .barcode-container { text-align: center; width: 100%; margin: 0.5mm 0; }
+              .barcode-container svg { width: 48mm; height: 13mm; display: block; margin: 0 auto; }
+              .serial { font-size: 9pt; font-weight: 900; text-align: center; letter-spacing: 1.5px; font-family: 'Courier New', Courier, monospace; }
             </style>
           </head>
           <body>${printContents}</body>
