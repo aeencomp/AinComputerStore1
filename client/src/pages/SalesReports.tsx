@@ -4,13 +4,15 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { 
   BarChart3, 
   DollarSign,
   ShoppingCart,
   TrendingUp,
   Loader2,
-  Calendar
+  Calendar,
+  Printer
 } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns";
 
@@ -18,7 +20,10 @@ interface Order {
   id: string;
   orderNumber: string;
   customerName: string;
+  customerPhone?: string;
   total: string;
+  subtotal?: string;
+  discount?: string;
   paymentMethod: string;
   orderType: string | null;
   status: string;
@@ -103,6 +108,112 @@ export default function SalesReports({ user }: SalesReportsProps) {
       'cod': { ar: 'عند الاستلام', en: 'COD' },
     };
     return language === 'ar' ? labels[method]?.ar || method : labels[method]?.en || method;
+  };
+
+  const printOrderReceipt = (order: Order) => {
+    const isAr = language === 'ar';
+    const dir = isAr ? 'rtl' : 'ltr';
+    const fmt = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+    const payLabel = order.paymentMethod === 'cash' ? (isAr ? 'نقدي' : 'Cash')
+      : order.paymentMethod === 'card' ? (isAr ? 'بطاقة' : 'Card')
+      : order.paymentMethod === 'zaincash' ? 'ZainCash'
+      : order.paymentMethod === 'qicard' ? 'QiCard'
+      : (isAr ? 'عند الاستلام' : 'COD');
+
+    const parsedItems: any[] = (order.items || []).map((item: any) => {
+      try { return typeof item === 'string' ? JSON.parse(item) : item; }
+      catch { return item; }
+    });
+
+    const rowsHtml = parsedItems.map(item => {
+      const unitPrice = parseFloat(item.price || item.unitPrice || '0');
+      const qty = item.quantity || 1;
+      const lineTotal = unitPrice * qty;
+      const name = isAr ? (item.nameAr || item.name || '-') : (item.nameEn || item.nameAr || item.name || '-');
+      return `<tr>
+        <td style="padding:4px 2px;border-bottom:1px solid #eee;">${name}${item.sku ? `<br/><span style="font-size:9px;color:#888;">SKU: ${item.sku}</span>` : ''}</td>
+        <td style="text-align:center;padding:4px 2px;border-bottom:1px solid #eee;">${qty}</td>
+        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;">${fmt(unitPrice)}</td>
+        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;font-weight:600;">${fmt(lineTotal)}</td>
+      </tr>`;
+    }).join('');
+
+    const subtotalNum = parseFloat(order.subtotal || order.total || '0');
+    const discountNum = parseFloat(order.discount || '0');
+    const totalNum = parseFloat(order.total || '0');
+
+    const discountRow = discountNum > 0 ? `
+      <div style="display:flex;justify-content:space-between;color:#16a34a;">
+        <span>${isAr ? 'الخصم:' : 'Discount:'}</span>
+        <span>-${fmt(discountNum)} ${isAr ? 'د.ع' : 'IQD'}</span>
+      </div>` : '';
+
+    const customerHtml = (order.customerName || order.customerPhone) ? `
+      <div style="background:#f9fafb;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;">
+        ${order.customerName ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الزبون:' : 'Customer:'}</span><span>${order.customerName}</span></div>` : ''}
+        ${order.customerPhone ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الهاتف:' : 'Phone:'}</span><span dir="ltr">${order.customerPhone}</span></div>` : ''}
+      </div>` : '';
+
+    const html = `<!DOCTYPE html>
+<html dir="${dir}" lang="${isAr ? 'ar' : 'en'}">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Cairo', Arial, sans-serif; font-size: 12px; color: #111; margin: 0; padding: 8px; width: 80mm; }
+  h2 { margin: 0 0 2px; font-size: 16px; }
+  p { margin: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { border-bottom: 2px solid #333; padding: 4px 2px; font-weight: 600; }
+  .dashed { border-top: 1px dashed #aaa; margin: 8px 0; }
+  .section { background: #f9fafb; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 12px; }
+  .row { display: flex; justify-content: space-between; }
+  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; border-top: 2px solid #333; padding-top: 6px; margin-top: 4px; }
+  .footer { text-align: center; margin-top: 10px; font-size: 11px; color: #666; }
+</style>
+</head>
+<body>
+  <div style="text-align:center;border-bottom:2px dashed #aaa;padding-bottom:10px;margin-bottom:10px;">
+    <h2>العين لتجارة الحاسبات</h2>
+    <p style="font-size:11px;color:#666;">Al-Ain Computer Trading — العراق، كربلاء</p>
+    <p style="font-size:10px;color:#999;margin-top:4px;">${isAr ? 'إيصال بيع' : 'Sales Receipt'}</p>
+  </div>
+  <div class="section" style="margin-bottom:10px;">
+    <div class="row"><span>${isAr ? 'رقم الطلب:' : 'Order #:'}</span><span style="font-weight:700;font-family:monospace;">${order.orderNumber}</span></div>
+    <div class="row"><span>${isAr ? 'التاريخ:' : 'Date:'}</span><span>${new Date(order.createdAt).toLocaleString(isAr ? 'ar-IQ' : 'en-US')}</span></div>
+    <div class="row"><span>${isAr ? 'طريقة الدفع:' : 'Payment:'}</span><span style="font-weight:600;">${payLabel}</span></div>
+  </div>
+  ${customerHtml}
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:start;">${isAr ? 'المنتج' : 'Product'}</th>
+        <th style="text-align:center;">${isAr ? 'الكمية' : 'Qty'}</th>
+        <th style="text-align:end;">${isAr ? 'السعر' : 'Price'}</th>
+        <th style="text-align:end;">${isAr ? 'المجموع' : 'Total'}</th>
+      </tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+  <div class="dashed"></div>
+  <div style="font-size:12px;margin-bottom:8px;">
+    <div class="row"><span>${isAr ? 'المجموع الفرعي:' : 'Subtotal:'}</span><span>${fmt(subtotalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
+    ${discountRow}
+    <div class="total-row"><span>${isAr ? 'الإجمالي:' : 'Total:'}</span><span>${fmt(totalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
+  </div>
+  <div class="footer">
+    <div class="dashed"></div>
+    <p>${isAr ? 'شكراً لتسوقكم معنا!' : 'Thank you for your purchase!'}</p>
+    <p style="margin-top:4px;font-size:10px;">${isAr ? 'يرجى الاحتفاظ بالوصل' : 'Please keep this receipt'}</p>
+  </div>
+  <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };</script>
+</body>
+</html>`;
+
+    const popup = window.open('', '_blank', 'width=400,height=650');
+    if (popup) { popup.document.write(html); popup.document.close(); }
   };
 
   return (
@@ -243,6 +354,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
                     <th className="text-start p-3">{language === 'ar' ? 'الدفع' : 'Payment'}</th>
                     <th className="text-end p-3">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
+                    <th className="p-3"></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -269,6 +381,17 @@ export default function SalesReports({ user }: SalesReportsProps) {
                       <td className="p-3 text-end font-bold">{formatPrice(parseFloat(order.total))} IQD</td>
                       <td className="p-3 text-muted-foreground">
                         {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
+                      </td>
+                      <td className="p-3">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => printOrderReceipt(order)}
+                          data-testid={`button-print-${order.id}`}
+                          title={language === 'ar' ? 'طباعة الوصل' : 'Print Receipt'}
+                        >
+                          <Printer className="w-4 h-4" />
+                        </Button>
                       </td>
                     </tr>
                   ))}
