@@ -465,7 +465,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       return `<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px;align-items:center;">
         <div>
           <div style="font-weight:800;color:#111;">${item.nameAr || item.nameEn || '-'}</div>
-          ${item.sku ? `<div style="font-size:9px;color:#888;">SKU: ${item.sku}</div>` : ''}
+          ${item.sku ? `<div style="font-size:9px;color:#555;font-weight:700;">SKU: ${item.sku}</div>` : ''}
         </div>
         <div style="text-align:center;font-weight:800;color:#111;padding:0 8px;">${item.quantity}</div>
         <div style="text-align:left;font-weight:800;color:#111;">${fmt(lineTotal)}</div>
