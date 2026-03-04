@@ -236,63 +236,37 @@ export default function SalesInStoreInventory({ user }: Props) {
     const name = product.nameAr || product.nameEn || '';
     const price = formatPrice(product.price);
 
-    // Generate QR code as base64 data URL before opening popup
-    const qrDataUrl = await QRCode.toDataURL(code, {
-      width: 160,
-      margin: 1,
-      color: { dark: '#000000', light: '#ffffff' },
-    });
+    const qrDataUrl = await QRCode.toDataURL(code, { width: 70, margin: 0 });
 
-    const win = window.open('', '_blank', 'width=420,height=480');
+    const win = window.open('', '_blank');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>QR Label</title>
+    win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>Print Label</title>
 <style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; }
-  .label {
-    background: white;
-    border: 1.5px solid #ddd;
-    border-radius: 8px;
-    padding: 14px 18px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 210px;
-    gap: 6px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-  }
-  .store-name { font-size: 10px; font-weight: 700; color: #555; direction: rtl; }
-  .product-name { font-size: 11px; font-weight: 700; text-align: center; line-height: 1.4; color: #111; }
-  .qr-img { width: 140px; height: 140px; }
-  .code { font-size: 9px; color: #666; letter-spacing: 2px; font-family: monospace; }
-  .price { font-size: 16px; font-weight: 900; color: #111; }
-  .currency { font-size: 10px; font-weight: 600; color: #555; }
-  .divider { width: 100%; height: 1px; background: #eee; }
-  .controls { display: flex; gap: 8px; }
-  button { padding: 9px 22px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
-  .btn-print { background: #1d4ed8; color: white; }
-  .btn-close { background: #e5e7eb; color: #374151; }
-  @media print {
-    body { background: white; min-height: unset; gap: 0; padding: 0; }
-    .controls { display: none !important; }
-    .label { border: 1px solid #ccc; border-radius: 0; box-shadow: none; }
-  }
+@page{size:50mm 25mm;margin:0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
+.info{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:0.5mm}
+.store{font-size:5pt;color:#888;direction:rtl}
+.title{font-size:7.5pt;font-weight:900;letter-spacing:0.3px;line-height:1.2}
+.serial{font-size:6.5pt;font-weight:700;margin-top:0.5mm;letter-spacing:0.3px;color:#555}
+.price{font-size:10pt;font-weight:900;margin-top:1mm}
+.qr{display:block;flex-shrink:0}
 </style>
-</head><body>
-<div class="label">
-  <div class="store-name">العين لتجارة الحاسبات</div>
-  <div class="divider"></div>
-  <div class="product-name">${name}</div>
-  <img class="qr-img" src="${qrDataUrl}" alt="QR Code" />
-  <div class="code">${code}</div>
-  <div class="divider"></div>
-  <div class="price">${price} <span class="currency">IQD</span></div>
+</head>
+<body>
+<img class="qr" src="${qrDataUrl}" width="60" height="60" />
+<div class="info">
+  <div class="store">العين لتجارة الحاسبات</div>
+  <div class="title">${name}</div>
+  <div class="serial">${code}</div>
+  <div class="price">${price} IQD</div>
 </div>
-<div class="controls">
-  <button class="btn-print" onclick="window.print()">&#128424; Print</button>
-  <button class="btn-close" onclick="window.close()">Close</button>
-</div>
-</body></html>`);
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
+</body>
+</html>`);
     win.document.close();
   }, [formatPrice]);
 
