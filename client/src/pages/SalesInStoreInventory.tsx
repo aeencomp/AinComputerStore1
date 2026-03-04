@@ -834,13 +834,13 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                             statusEl = <Badge variant="outline" className="text-xs text-muted-foreground">{language === 'ar' ? 'غير ممسوح' : 'Not Scanned'}</Badge>;
                           } else if (row.diff === 0) {
                             rowClass = "bg-green-100 dark:bg-green-950/40";
-                            statusEl = <Badge variant="outline" className="text-xs bg-green-600 text-white border-green-700">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
+                            statusEl = <Badge variant="outline" className="text-xs bg-green-600 text-black border-green-700 font-bold">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
                           } else if (row.diff < 0) {
                             rowClass = "bg-red-100 dark:bg-red-950/40";
-                            statusEl = <Badge variant="outline" className="text-xs bg-red-600 text-white border-red-700">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
+                            statusEl = <Badge variant="outline" className="text-xs bg-red-600 text-black border-red-700 font-bold">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
                           } else {
                             rowClass = "bg-yellow-100 dark:bg-yellow-950/40";
-                            statusEl = <Badge variant="outline" className="text-xs bg-yellow-600 text-white border-yellow-700">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
+                            statusEl = <Badge variant="outline" className="text-xs bg-yellow-600 text-black border-yellow-700 font-bold">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
                           }
                           return (
                             <tr key={row.product.id} className={`border-b ${rowClass}`} data-testid={`row-compare-${row.product.id}`}>
