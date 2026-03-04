@@ -43,7 +43,19 @@ import {
   UserSearch,
   Store
 } from "lucide-react";
-import type { Product } from "@shared/schema";
+import type { InStoreProduct } from "@shared/schema";
+
+interface POSProduct {
+  id: string;
+  nameAr: string;
+  nameEn: string | null;
+  price: string;
+  stockQuantity: number | null;
+  sku: string | null;
+  image: string | null;
+  category: string | null;
+  barcode?: string | null;
+}
 
 interface Category {
   id: string;
@@ -61,7 +73,7 @@ interface SalesUser {
 }
 
 interface CartItem {
-  product: Product;
+  product: POSProduct;
   quantity: number;
 }
 
@@ -103,13 +115,57 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
   const [showCustomerLookup, setShowCustomerLookup] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const { data: mainProducts = [], isLoading: mainLoading } = useQuery<any[]>({
     queryKey: ['/api/products'],
+    enabled: orderType === 'walk-in',
   });
+
+  const { data: inStoreRaw = [], isLoading: inStoreLoading } = useQuery<InStoreProduct[]>({
+    queryKey: ['/api/instore/products'],
+    enabled: orderType === 'in-store',
+  });
+
+  const isLoading = orderType === 'in-store' ? inStoreLoading : mainLoading;
+
+  const products: POSProduct[] = orderType === 'in-store'
+    ? inStoreRaw
+        .filter(p => p.isActive !== 0)
+        .map(p => ({
+          id: String(p.id),
+          nameAr: p.nameAr,
+          nameEn: p.nameEn ?? null,
+          price: String(p.price),
+          stockQuantity: p.stockQuantity,
+          sku: p.sku ?? null,
+          image: null,
+          category: p.category ?? null,
+          barcode: p.barcode ?? null,
+        }))
+    : mainProducts.map(p => ({
+        id: p.id,
+        nameAr: p.nameAr,
+        nameEn: p.nameEn ?? null,
+        price: String(p.price),
+        stockQuantity: p.stockQuantity,
+        sku: p.sku ?? null,
+        image: p.image ?? null,
+        category: p.category ?? null,
+      }));
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
+    enabled: orderType === 'walk-in',
   });
+
+  const inStoreCategories: { id: string; slug: string; nameAr: string; nameEn?: string }[] =
+    orderType === 'in-store'
+      ? Array.from(new Set(inStoreRaw.map(p => p.category).filter(Boolean) as string[])).map(cat => ({
+          id: cat,
+          slug: cat,
+          nameAr: cat,
+          nameEn: cat,
+        }))
+      : [];
 
   const { data: heldOrders = [] } = useQuery<HeldOrder[]>({
     queryKey: ['/api/sales/held-orders'],
@@ -247,6 +303,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/products'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
       }, 100);
     },
     onError: (error: any) => {
@@ -267,7 +324,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     return matchesSearch && matchesCategory;
   });
 
-  const addToCart = (product: Product) => {
+  const addToCart = (product: POSProduct) => {
     const stockQty = product.stockQuantity || 0;
     
     setCart(prev => {
@@ -486,7 +543,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                     {products.length}
                   </Badge>
                 </Button>
-                {categories.map(cat => {
+                {(orderType === 'in-store' ? inStoreCategories : categories).map(cat => {
                   const catName = language === 'ar' ? cat.nameAr : (cat.nameEn || cat.nameAr);
                   const count = products.filter(p => p.category === cat.slug).length;
                   return (

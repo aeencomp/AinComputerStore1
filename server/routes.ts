@@ -721,7 +721,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update inventory for each item sold
       for (const item of items) {
         try {
-          await storage.adjustProductStock(item.productId, -item.quantity, salesUserId, 'walk-in sale', order.orderNumber);
+          if (resolvedOrderType === 'in-store') {
+            await storage.adjustInStoreProductStock(parseInt(item.productId), -item.quantity);
+          } else {
+            await storage.adjustProductStock(item.productId, -item.quantity, salesUserId, 'walk-in sale', order.orderNumber);
+          }
         } catch (stockError) {
           console.error(`Failed to adjust stock for product ${item.productId}:`, stockError);
         }
@@ -981,6 +985,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error ending shift:", error);
       return res.status(500).json({ error: "فشل إنهاء الوردية" });
+    }
+  });
+
+  // ─── In-Store Products CRUD ─────────────────────────────────────────────────
+  app.get("/api/instore/products", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const products = await storage.getInStoreProducts();
+      return res.json(products);
+    } catch (error) {
+      console.error("Error fetching in-store products:", error);
+      return res.status(500).json({ error: "فشل تحميل المنتجات" });
+    }
+  });
+
+  app.post("/api/instore/products", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const product = await storage.createInStoreProduct(req.body);
+      return res.json(product);
+    } catch (error) {
+      console.error("Error creating in-store product:", error);
+      return res.status(500).json({ error: "فشل إضافة المنتج" });
+    }
+  });
+
+  app.put("/api/instore/products/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const product = await storage.updateInStoreProduct(parseInt(req.params.id), req.body);
+      if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
+      return res.json(product);
+    } catch (error) {
+      console.error("Error updating in-store product:", error);
+      return res.status(500).json({ error: "فشل تحديث المنتج" });
+    }
+  });
+
+  app.delete("/api/instore/products/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      await storage.deleteInStoreProduct(parseInt(req.params.id));
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting in-store product:", error);
+      return res.status(500).json({ error: "فشل حذف المنتج" });
+    }
+  });
+
+  app.patch("/api/instore/products/:id/stock", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const { adjustment } = req.body;
+      const product = await storage.adjustInStoreProductStock(parseInt(req.params.id), adjustment);
+      if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
+      return res.json(product);
+    } catch (error) {
+      console.error("Error adjusting in-store product stock:", error);
+      return res.status(500).json({ error: "فشل تعديل المخزون" });
     }
   });
 

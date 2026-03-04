@@ -17,6 +17,7 @@ import {
   X,
   LayoutDashboard,
   Store,
+  Warehouse,
   Settings,
   Bell,
   ChevronDown,
@@ -33,6 +34,7 @@ import {
 import SalesDashboard from "./SalesDashboard";
 import SalesPOS from "./SalesPOS";
 import SalesInventory from "./SalesInventory";
+import SalesInStoreInventory from "./SalesInStoreInventory";
 import SalesUsers from "./SalesUsers";
 import SalesReports from "./SalesReports";
 
@@ -121,6 +123,13 @@ export default function SalesPortal() {
       icon: Store,
       permission: currentUser.permissions.canPos,
       color: 'text-violet-500',
+    },
+    { 
+      path: "/sales/instore-inventory", 
+      label: language === 'ar' ? 'مخزون المتجر' : 'Store Inventory', 
+      icon: Warehouse,
+      permission: currentUser.permissions.canInventory,
+      color: 'text-violet-400',
     },
     { 
       path: "/sales/inventory", 
@@ -322,6 +331,7 @@ export default function SalesPortal() {
         {(location === "/sales" || location === "/sales/") && <SalesDashboard user={currentUser} />}
         {location === "/sales/pos" && <SalesPOS user={currentUser} orderType="walk-in" />}
         {location === "/sales/instore-pos" && <SalesPOS user={currentUser} orderType="in-store" />}
+        {location === "/sales/instore-inventory" && <SalesInStoreInventory user={currentUser} />}
         {location === "/sales/inventory" && <SalesInventory user={currentUser} />}
         {location === "/sales/reports" && <SalesReports user={currentUser} />}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}
