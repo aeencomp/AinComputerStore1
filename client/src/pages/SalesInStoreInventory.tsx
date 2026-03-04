@@ -23,6 +23,7 @@ import {
   RefreshCw,
   Printer,
 } from "lucide-react";
+import QRCode from "qrcode";
 import type { InStoreProduct } from "@shared/schema";
 
 interface SalesUser {
@@ -230,13 +231,21 @@ export default function SalesInStoreInventory({ user }: Props) {
     return `SKU-${String(max + 1).padStart(4, '0')}`;
   }, [products]);
 
-  const printBarcode = useCallback((product: InStoreProduct) => {
+  const printBarcode = useCallback(async (product: InStoreProduct) => {
     const code = product.barcode || product.sku || String(product.id);
     const name = product.nameAr || product.nameEn || '';
     const price = formatPrice(product.price);
+
+    // Generate QR code as base64 data URL before opening popup
+    const qrDataUrl = await QRCode.toDataURL(code, {
+      width: 160,
+      margin: 1,
+      color: { dark: '#000000', light: '#ffffff' },
+    });
+
     const win = window.open('', '_blank', 'width=420,height=480');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>QR Label - ${name}</title>
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>QR Label</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; }
@@ -248,13 +257,13 @@ export default function SalesInStoreInventory({ user }: Props) {
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 200px;
+    width: 210px;
     gap: 6px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
   .store-name { font-size: 8px; font-weight: 600; color: #888; letter-spacing: 1.5px; text-transform: uppercase; }
   .product-name { font-size: 11px; font-weight: 700; text-align: center; line-height: 1.4; color: #111; }
-  canvas { width: 130px !important; height: 130px !important; }
+  .qr-img { width: 140px; height: 140px; }
   .code { font-size: 9px; color: #666; letter-spacing: 2px; font-family: monospace; }
   .price { font-size: 16px; font-weight: 900; color: #111; }
   .currency { font-size: 10px; font-weight: 600; color: #555; }
@@ -274,7 +283,7 @@ export default function SalesInStoreInventory({ user }: Props) {
   <div class="store-name">AL-AIN STORE</div>
   <div class="divider"></div>
   <div class="product-name">${name}</div>
-  <canvas id="qr"></canvas>
+  <img class="qr-img" src="${qrDataUrl}" alt="QR Code" />
   <div class="code">${code}</div>
   <div class="divider"></div>
   <div class="price">${price} <span class="currency">IQD</span></div>
@@ -283,14 +292,6 @@ export default function SalesInStoreInventory({ user }: Props) {
   <button class="btn-print" onclick="window.print()">&#128424; Print</button>
   <button class="btn-close" onclick="window.close()">Close</button>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
-<script>
-  QRCode.toCanvas(document.getElementById('qr'), '${code}', {
-    width: 130,
-    margin: 1,
-    color: { dark: '#000000', light: '#ffffff' }
-  });
-<\/script>
 </body></html>`);
     win.document.close();
   }, [formatPrice]);
