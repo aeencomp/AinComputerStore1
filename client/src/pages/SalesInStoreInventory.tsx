@@ -833,14 +833,14 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                             rowClass = "bg-muted/30";
                             statusEl = <Badge variant="outline" className="text-xs text-muted-foreground">{language === 'ar' ? 'غير ممسوح' : 'Not Scanned'}</Badge>;
                           } else if (row.diff === 0) {
-                            rowClass = "bg-green-50 dark:bg-green-950/20";
-                            statusEl = <Badge className="text-xs bg-green-100 text-green-700 border-green-300">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
+                            rowClass = "bg-green-100 dark:bg-green-950/40";
+                            statusEl = <Badge variant="outline" className="text-xs bg-green-600 text-white border-green-700">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
                           } else if (row.diff < 0) {
-                            rowClass = "bg-red-50 dark:bg-red-950/20";
-                            statusEl = <Badge className="text-xs bg-red-100 text-red-700 border-red-300">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
+                            rowClass = "bg-red-100 dark:bg-red-950/40";
+                            statusEl = <Badge variant="outline" className="text-xs bg-red-600 text-white border-red-700">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
                           } else {
-                            rowClass = "bg-yellow-50 dark:bg-yellow-950/20";
-                            statusEl = <Badge className="text-xs bg-yellow-100 text-yellow-700 border-yellow-300">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
+                            rowClass = "bg-yellow-100 dark:bg-yellow-950/40";
+                            statusEl = <Badge variant="outline" className="text-xs bg-yellow-600 text-white border-yellow-700">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
                           }
                           return (
                             <tr key={row.product.id} className={`border-b ${rowClass}`} data-testid={`row-compare-${row.product.id}`}>
