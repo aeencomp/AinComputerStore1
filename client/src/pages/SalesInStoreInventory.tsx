@@ -20,7 +20,6 @@ import {
   X,
   ArrowUp,
   ArrowDown,
-  Barcode,
   RefreshCw,
   Printer,
 } from "lucide-react";
@@ -219,31 +218,76 @@ export default function SalesInStoreInventory({ user }: Props) {
   const formatPrice = (v: string | number) =>
     new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(String(v)) || 0);
 
-  const generateBarcode = useCallback(() => {
-    return Math.floor(10000 + Math.random() * 90000).toString();
-  }, []);
+  const getNextSequence = useCallback(() => {
+    const pattern = /^SKU-(\d+)$/i;
+    let max = 0;
+    for (const p of products) {
+      for (const val of [p.barcode, p.sku]) {
+        if (!val) continue;
+        const m = val.match(pattern);
+        if (m) max = Math.max(max, parseInt(m[1], 10));
+      }
+    }
+    return `SKU-${String(max + 1).padStart(4, '0')}`;
+  }, [products]);
 
   const printBarcode = useCallback((product: InStoreProduct) => {
     const code = product.barcode || product.sku || String(product.id);
-    const win = window.open('', '_blank', 'width=400,height=300');
+    const name = product.nameAr || product.nameEn || '';
+    const price = formatPrice(product.price);
+    const win = window.open('', '_blank', 'width=500,height=400');
     if (!win) return;
-    const svgId = 'bc-print';
-    win.document.write(`<!DOCTYPE html><html><head><title>Barcode</title>
-      <style>
-        body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
-        .label { font-size: 13px; margin-top: 6px; font-weight: 600; }
-        .price { font-size: 12px; color: #555; }
-        @media print { button { display: none; } }
-      </style>
-      </head><body>
-      <svg id="${svgId}"></svg>
-      <div class="label">${product.nameAr}</div>
-      <div class="price">${formatPrice(product.price)} IQD</div>
-      <br/>
-      <button onclick="window.print()">Print</button>
-      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
-      <script>JsBarcode('#${svgId}','${code}',{format:'CODE128',width:2,height:60,displayValue:true,fontSize:12});<\/script>
-      </body></html>`);
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Barcode Label</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; background: #f0f0f0; display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 16px; }
+  .label {
+    background: white;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 10px 14px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 220px;
+    gap: 4px;
+  }
+  .product-name { font-size: 11px; font-weight: 700; text-align: center; line-height: 1.3; max-width: 200px; word-break: break-word; }
+  .barcode-code { font-size: 9px; color: #555; letter-spacing: 1px; }
+  .price { font-size: 13px; font-weight: 800; color: #111; }
+  svg { max-width: 200px; }
+  .controls { display: flex; gap: 8px; }
+  button { padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+  .btn-print { background: #2563eb; color: white; }
+  .btn-close { background: #e5e7eb; color: #333; }
+  @media print {
+    body { background: white; padding: 0; }
+    .controls { display: none; }
+    .label { border: none; border-radius: 0; box-shadow: none; page-break-inside: avoid; }
+  }
+</style>
+</head><body>
+<div class="label">
+  <div class="product-name">${name}</div>
+  <svg id="bc"></svg>
+  <div class="barcode-code">${code}</div>
+  <div class="price">${price} IQD</div>
+</div>
+<div class="controls">
+  <button class="btn-print" onclick="window.print()">&#128424; Print</button>
+  <button class="btn-close" onclick="window.close()">Close</button>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+<script>
+  JsBarcode('#bc', '${code}', {
+    format: 'CODE128',
+    width: 1.8,
+    height: 55,
+    displayValue: false,
+    margin: 4
+  });
+<\/script>
+</body></html>`);
     win.document.close();
   }, [formatPrice]);
 
@@ -480,8 +524,11 @@ export default function SalesInStoreInventory({ user }: Props) {
                     type="button"
                     variant="outline"
                     size="icon"
-                    onClick={() => setForm(f => ({ ...f, barcode: generateBarcode() }))}
-                    title={language === 'ar' ? 'توليد باركود تلقائي' : 'Auto-generate barcode'}
+                    onClick={() => {
+                      const next = getNextSequence();
+                      setForm(f => ({ ...f, barcode: next, sku: f.sku || next }));
+                    }}
+                    title={language === 'ar' ? 'توليد باركود تسلسلي' : 'Generate sequential barcode'}
                     data-testid="button-generate-barcode"
                   >
                     <RefreshCw className="h-4 w-4" />
