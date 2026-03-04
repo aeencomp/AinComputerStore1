@@ -1430,4 +1430,8 @@ export class DrizzleStorage implements IStorage {
     }
     return count;
   }
+
+  async getInStoreProducts(): Promise<InStoreProduct[]> {
+    return await db.select().from(inStoreProducts);
+  }
 }

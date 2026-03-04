@@ -417,6 +417,10 @@ export class MemStorage implements IStorage {
     return item;
   }
 
+  async bulkSetInStoreStock(updates: { id: number; quantity: number }[]): Promise<number> {
+    return 0;
+  }
+
   async removeFromCart(id: string, sessionId: string): Promise<void> {
     const item = this.cartItems.get(id);
     if (item && item.sessionId === sessionId) {

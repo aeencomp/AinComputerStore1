@@ -68,6 +68,20 @@ export default function SalesReports({ user }: SalesReportsProps) {
     },
   });
 
+  const updateOrderStatusMutation = useMutation({
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
+      const res = await apiRequest('PATCH', `/api/orders/${id}`, { status });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({ title: language === 'ar' ? 'تم تحديث حالة الطلب' : 'Order status updated' });
+    },
+    onError: () => {
+      toast({ title: language === 'ar' ? 'فشل تحديث الحالة' : 'Update failed', variant: 'destructive' });
+    },
+  });
+
   const confirmDelete = (order: Order) => {
     const msg = language === 'ar'
       ? `هل تريد حذف الطلب ${order.orderNumber}؟ لا يمكن التراجع عن هذا الإجراء.`
@@ -408,6 +422,30 @@ export default function SalesReports({ user }: SalesReportsProps) {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center gap-1">
+                          {order.orderType === 'online' && order.status === 'pending' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100"
+                              onClick={() => updateOrderStatusMutation.mutate({ id: order.id, status: 'processing' })}
+                              disabled={updateOrderStatusMutation.isPending}
+                            >
+                              {updateOrderStatusMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : null}
+                              {language === 'ar' ? 'استلام الطلب' : 'Process Order'}
+                            </Button>
+                          )}
+                          {order.orderType === 'online' && order.status === 'processing' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-8 bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+                              onClick={() => updateOrderStatusMutation.mutate({ id: order.id, status: 'completed' })}
+                              disabled={updateOrderStatusMutation.isPending}
+                            >
+                              {updateOrderStatusMutation.isPending ? <Loader2 className="h-3 w-3 animate-spin me-1" /> : null}
+                              {language === 'ar' ? 'تم التوصيل' : 'Mark Completed'}
+                            </Button>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"

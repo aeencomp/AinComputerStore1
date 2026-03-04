@@ -1783,7 +1783,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
       const { status } = req.body;
       
-      if (!status || !['pending', 'processing', 'shipped', 'delivered', 'cancelled'].includes(status)) {
+      if (!status) {
+        return res.status(400).json({ error: "Status is required" });
+      }
+
+      const order = await storage.updateOrderStatus(id, status);
+      if (!order) {
+        return res.status(404).json({ error: "Order not found" });
+      }
+
+      return res.json(order);
+    } catch (error) {
+      console.error("Error updating order status:", error);
+      return res.status(500).json({ error: "Failed to update order status" });
+    }
+  });
+
+  app.post("/api/instore/stock-count/apply", async (req, res) => {
+    try {
+      const { updates } = req.body;
+      if (!updates || !Array.isArray(updates)) {
+        return res.status(400).json({ error: "Updates array is required" });
+      }
+      const updated = await storage.bulkSetInStoreStock(updates);
+      return res.json({ updated });
+    } catch (error) {
+      console.error("Error applying stock count:", error);
+      return res.status(500).json({ error: "Failed to apply stock count" });
+    }
+  });
         return res.status(400).json({ error: "Invalid status" });
       }
 
