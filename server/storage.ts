@@ -196,6 +196,7 @@ export interface IStorage {
   updateInStoreProduct(id: number, updates: Partial<InsertInStoreProduct>): Promise<InStoreProduct | undefined>;
   deleteInStoreProduct(id: number): Promise<void>;
   adjustInStoreProductStock(id: number, adjustment: number): Promise<InStoreProduct | undefined>;
+  bulkSetInStoreStock(updates: { id: number; quantity: number }[]): Promise<number>;
 }
 
 export class MemStorage implements IStorage {
@@ -937,6 +938,7 @@ export class MemStorage implements IStorage {
   async updateInStoreProduct(_id: number, _u: Partial<InsertInStoreProduct>): Promise<InStoreProduct | undefined> { return undefined; }
   async deleteInStoreProduct(_id: number): Promise<void> {}
   async adjustInStoreProductStock(_id: number, _adj: number): Promise<InStoreProduct | undefined> { return undefined; }
+  async bulkSetInStoreStock(_updates: { id: number; quantity: number }[]): Promise<number> { return 0; }
 }
 
 import { DrizzleStorage } from "./db-storage";

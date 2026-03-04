@@ -1418,4 +1418,16 @@ export class DrizzleStorage implements IStorage {
       .returning();
     return result[0];
   }
+
+  async bulkSetInStoreStock(updates: { id: number; quantity: number }[]): Promise<number> {
+    if (!updates.length) return 0;
+    let count = 0;
+    for (const { id, quantity } of updates) {
+      await db.update(inStoreProducts)
+        .set({ stockQuantity: quantity, updatedAt: new Date() })
+        .where(eq(inStoreProducts.id, id));
+      count++;
+    }
+    return count;
+  }
 }

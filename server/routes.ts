@@ -1057,6 +1057,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/instore/stock-count/apply", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const { updates } = req.body;
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ error: "لا توجد تحديثات" });
+      }
+      const valid = updates.every(
+        (u: any) => typeof u.id === 'number' && typeof u.quantity === 'number' && u.quantity >= 0
+      );
+      if (!valid) return res.status(400).json({ error: "بيانات غير صالحة" });
+      const count = await storage.bulkSetInStoreStock(updates);
+      return res.json({ updated: count });
+    } catch (error) {
+      console.error("Error applying stock count:", error);
+      return res.status(500).json({ error: "فشل تطبيق الجرد" });
+    }
+  });
+
   app.get("/api/products", async (req, res) => {
     try {
       const { category, componentType } = req.query;

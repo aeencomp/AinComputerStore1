@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -22,6 +22,14 @@ import {
   ArrowDown,
   RefreshCw,
   Printer,
+  ScanBarcode,
+  ClipboardList,
+  CheckCircle2,
+  XCircle,
+  TrendingUp,
+  MinusCircle,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import QRCode from "qrcode";
 import type { InStoreProduct } from "@shared/schema";
@@ -63,10 +71,19 @@ const emptyForm: ProductForm = {
   lowStockThreshold: "3",
 };
 
+interface ScanEntry {
+  product: InStoreProduct;
+  scanned: number;
+}
+
+type CountPhase = "scanning" | "review" | "done";
+
 export default function SalesInStoreInventory({ user }: Props) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  const [activeTab, setActiveTab] = useState<"inventory" | "stockcount">("inventory");
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showDialog, setShowDialog] = useState(false);
@@ -77,9 +94,25 @@ export default function SalesInStoreInventory({ user }: Props) {
   const [stockAdjustment, setStockAdjustment] = useState("0");
   const [deleteConfirm, setDeleteConfirm] = useState<InStoreProduct | null>(null);
 
+  const [countPhase, setCountPhase] = useState<CountPhase>("scanning");
+  const [scanInput, setScanInput] = useState("");
+  const [scanEntries, setScanEntries] = useState<ScanEntry[]>([]);
+  const [unknownCodes, setUnknownCodes] = useState<string[]>([]);
+  const [showUnknown, setShowUnknown] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+  const [showApplyConfirm, setShowApplyConfirm] = useState(false);
+  const [doneStats, setDoneStats] = useState<{ updated: number; matched: number } | null>(null);
+  const scanInputRef = useRef<HTMLInputElement>(null);
+
   const { data: products = [], isLoading } = useQuery<InStoreProduct[]>({
     queryKey: ['/api/instore/products'],
   });
+
+  useEffect(() => {
+    if (activeTab === "stockcount" && countPhase === "scanning") {
+      setTimeout(() => scanInputRef.current?.focus(), 100);
+    }
+  }, [activeTab, countPhase]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -136,6 +169,24 @@ export default function SalesInStoreInventory({ user }: Props) {
       toast({ title: language === 'ar' ? 'تم تحديث المخزون' : 'Stock updated' });
     },
     onError: (e: any) => toast({ title: e.message, variant: 'destructive' }),
+  });
+
+  const applyCountMutation = useMutation({
+    mutationFn: async (updates: { id: number; quantity: number }[]) => {
+      const res = await apiRequest('POST', '/api/instore/stock-count/apply', { updates });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
+      const matched = scanEntries.filter(e => e.scanned === e.product.stockQuantity).length;
+      setDoneStats({ updated: data.updated, matched });
+      setCountPhase("done");
+      setShowApplyConfirm(false);
+    },
+    onError: (e: any) => {
+      toast({ title: e.message, variant: 'destructive' });
+      setShowApplyConfirm(false);
+    },
   });
 
   const openAdd = () => {
@@ -270,6 +321,93 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     win.document.close();
   }, [formatPrice]);
 
+  const findProductByCode = useCallback((code: string): InStoreProduct | null => {
+    const c = code.trim().toLowerCase();
+    if (!c) return null;
+    return products.find(p =>
+      (p.barcode && p.barcode.toLowerCase() === c) ||
+      (p.sku && p.sku.toLowerCase() === c)
+    ) || null;
+  }, [products]);
+
+  const handleScanSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter') return;
+    const code = scanInput.trim();
+    if (!code) return;
+    setScanInput("");
+    setTimeout(() => scanInputRef.current?.focus(), 50);
+
+    const product = findProductByCode(code);
+    if (product) {
+      setScanEntries(prev => {
+        const existing = prev.find(e => e.product.id === product.id);
+        if (existing) {
+          return prev.map(e => e.product.id === product.id ? { ...e, scanned: e.scanned + 1 } : e);
+        }
+        return [...prev, { product, scanned: 1 }];
+      });
+    } else {
+      setUnknownCodes(prev => [...prev, code]);
+    }
+  };
+
+  const adjustScanCount = (productId: number, delta: number) => {
+    setScanEntries(prev =>
+      prev.map(e => e.product.id === productId
+        ? { ...e, scanned: Math.max(0, e.scanned + delta) }
+        : e
+      )
+    );
+  };
+
+  const removeScanEntry = (productId: number) => {
+    setScanEntries(prev => prev.filter(e => e.product.id !== productId));
+  };
+
+  const resetCount = () => {
+    setScanEntries([]);
+    setUnknownCodes([]);
+    setScanInput("");
+    setCountPhase("scanning");
+    setShowResetConfirm(false);
+    setDoneStats(null);
+    setTimeout(() => scanInputRef.current?.focus(), 100);
+  };
+
+  const applyCount = () => {
+    const updates = scanEntries.map(e => ({ id: e.product.id, quantity: e.scanned }));
+    applyCountMutation.mutate(updates);
+  };
+
+  const totalScannedTypes = scanEntries.length;
+  const totalScannedUnits = scanEntries.reduce((s, e) => s + e.scanned, 0);
+
+  const comparisonRows = [
+    ...scanEntries.map(e => ({
+      product: e.product,
+      systemQty: e.product.stockQuantity,
+      scannedQty: e.scanned,
+      diff: e.scanned - e.product.stockQuantity,
+      notScanned: false,
+    })),
+    ...products
+      .filter(p => !scanEntries.find(e => e.product.id === p.id))
+      .map(p => ({
+        product: p,
+        systemQty: p.stockQuantity,
+        scannedQty: 0,
+        diff: -p.stockQuantity,
+        notScanned: true,
+      })),
+  ];
+
+  const matchCount = comparisonRows.filter(r => !r.notScanned && r.diff === 0).length;
+  const shortCount = comparisonRows.filter(r => !r.notScanned && r.diff < 0).length;
+  const extraCount = comparisonRows.filter(r => !r.notScanned && r.diff > 0).length;
+  const notScannedCount = comparisonRows.filter(r => r.notScanned).length;
+
+  const updatableEntries = scanEntries.filter(e => e.scanned !== e.product.stockQuantity);
+
   return (
     <div className="p-4 space-y-4">
       {/* Header */}
@@ -284,151 +422,506 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
               : 'Manage products separate from the online catalog'}
           </p>
         </div>
-        <Button onClick={openAdd} data-testid="button-add-instore-product">
-          <Plus className="h-4 w-4 me-2" />
-          {language === 'ar' ? 'إضافة منتج' : 'Add Product'}
-        </Button>
+        {activeTab === "inventory" && (
+          <Button onClick={openAdd} data-testid="button-add-instore-product">
+            <Plus className="h-4 w-4 me-2" />
+            {language === 'ar' ? 'إضافة منتج' : 'Add Product'}
+          </Button>
+        )}
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-sm text-muted-foreground">{language === 'ar' ? 'إجمالي المنتجات' : 'Total Products'}</p>
-            <p className="text-2xl font-bold">{products.length}</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-sm text-muted-foreground">{language === 'ar' ? 'إجمالي الوحدات' : 'Total Units'}</p>
-            <p className="text-2xl font-bold">{products.reduce((s, p) => s + p.stockQuantity, 0)}</p>
-          </CardContent>
-        </Card>
-        <Card className={lowStockCount > 0 ? 'border-orange-400' : ''}>
-          <CardContent className="pt-4 pb-3">
-            <p className="text-sm text-muted-foreground">{language === 'ar' ? 'مخزون منخفض' : 'Low Stock'}</p>
-            <p className={`text-2xl font-bold ${lowStockCount > 0 ? 'text-orange-500' : ''}`}>{lowStockCount}</p>
-          </CardContent>
-        </Card>
+      {/* Tabs */}
+      <div className="flex gap-2 border-b pb-0">
+        <button
+          onClick={() => setActiveTab("inventory")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "inventory"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+          data-testid="tab-inventory"
+        >
+          <Package className="h-4 w-4 inline me-1" />
+          {language === 'ar' ? 'المنتجات' : 'Products'}
+        </button>
+        <button
+          onClick={() => setActiveTab("stockcount")}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            activeTab === "stockcount"
+              ? "border-primary text-primary"
+              : "border-transparent text-muted-foreground hover:text-foreground"
+          }`}
+          data-testid="tab-stockcount"
+        >
+          <ClipboardList className="h-4 w-4 inline me-1" />
+          {language === 'ar' ? 'جرد المخزون' : 'Stock Count'}
+        </button>
       </div>
 
-      {/* Search */}
-      <div className="relative">
-        <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-        <Input
-          className="ps-10"
-          placeholder={language === 'ar' ? 'بحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
-          value={searchQuery}
-          onChange={e => setSearchQuery(e.target.value)}
-          data-testid="input-instore-search"
-        />
-      </div>
+      {/* ===== INVENTORY TAB ===== */}
+      {activeTab === "inventory" && (
+        <>
+          {/* Stats */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            <Card>
+              <CardContent className="pt-4 pb-3">
+                <p className="text-sm text-muted-foreground">{language === 'ar' ? 'إجمالي المنتجات' : 'Total Products'}</p>
+                <p className="text-2xl font-bold">{products.length}</p>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-4 pb-3">
+                <p className="text-sm text-muted-foreground">{language === 'ar' ? 'إجمالي الوحدات' : 'Total Units'}</p>
+                <p className="text-2xl font-bold">{products.reduce((s, p) => s + p.stockQuantity, 0)}</p>
+              </CardContent>
+            </Card>
+            <Card className={lowStockCount > 0 ? 'border-orange-400' : ''}>
+              <CardContent className="pt-4 pb-3">
+                <p className="text-sm text-muted-foreground">{language === 'ar' ? 'مخزون منخفض' : 'Low Stock'}</p>
+                <p className={`text-2xl font-bold ${lowStockCount > 0 ? 'text-orange-500' : ''}`}>{lowStockCount}</p>
+              </CardContent>
+            </Card>
+          </div>
 
-      {/* Product List */}
-      {isLoading ? (
-        <div className="flex items-center justify-center py-16">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
-          <Package className="h-12 w-12 opacity-30" />
-          <p>{language === 'ar' ? 'لا توجد منتجات' : 'No products found'}</p>
-          {products.length === 0 && (
-            <Button variant="outline" onClick={openAdd}>
-              <Plus className="h-4 w-4 me-2" />
-              {language === 'ar' ? 'أضف أول منتج' : 'Add your first product'}
-            </Button>
+          {/* Search */}
+          <div className="relative">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              className="ps-10"
+              placeholder={language === 'ar' ? 'بحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              data-testid="input-instore-search"
+            />
+          </div>
+
+          {/* Product List */}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-16">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground gap-3">
+              <Package className="h-12 w-12 opacity-30" />
+              <p>{language === 'ar' ? 'لا توجد منتجات' : 'No products found'}</p>
+              {products.length === 0 && (
+                <Button variant="outline" onClick={openAdd}>
+                  <Plus className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'أضف أول منتج' : 'Add your first product'}
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {filtered.map(product => {
+                const isLow = product.stockQuantity <= product.lowStockThreshold;
+                const isOut = product.stockQuantity <= 0;
+                return (
+                  <Card key={product.id} className={isOut ? 'border-destructive/40' : isLow ? 'border-orange-400/60' : ''}>
+                    <CardContent className="py-3 px-4">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-semibold">{product.nameAr}</span>
+                            {product.nameEn && (
+                              <span className="text-sm text-muted-foreground">{product.nameEn}</span>
+                            )}
+                            {product.category && (
+                              <Badge variant="outline" className="text-xs">{product.category}</Badge>
+                            )}
+                            {isOut ? (
+                              <Badge variant="destructive" className="text-xs">
+                                {language === 'ar' ? 'نفذ' : 'Out of Stock'}
+                              </Badge>
+                            ) : isLow ? (
+                              <Badge className="text-xs bg-orange-500/15 text-orange-600 border-orange-300">
+                                <AlertTriangle className="h-3 w-3 me-1" />
+                                {language === 'ar' ? 'مخزون منخفض' : 'Low Stock'}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
+                            {product.sku && <span className="font-mono">SKU: {product.sku}</span>}
+                            {product.barcode && <span className="font-mono">{language === 'ar' ? 'باركود' : 'Barcode'}: {product.barcode}</span>}
+                            <span className="text-foreground font-medium">
+                              {formatPrice(product.price)} {language === 'ar' ? 'د.ع' : 'IQD'}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <div className="text-center">
+                            <p className={`text-xl font-bold ${isOut ? 'text-destructive' : isLow ? 'text-orange-500' : ''}`}>
+                              {product.stockQuantity}
+                            </p>
+                            <p className="text-xs text-muted-foreground">{language === 'ar' ? 'وحدة' : 'units'}</p>
+                          </div>
+                          <div className="flex gap-1">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => openStock(product)}
+                              data-testid={`button-stock-${product.id}`}
+                              title={language === 'ar' ? 'تعديل المخزون' : 'Adjust Stock'}
+                            >
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                            {(product.barcode || product.sku) && (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => printBarcode(product)}
+                                data-testid={`button-barcode-${product.id}`}
+                                title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => openEdit(product)}
+                              data-testid={`button-edit-${product.id}`}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => setDeleteConfirm(product)}
+                              data-testid={`button-delete-${product.id}`}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
           )}
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(product => {
-            const isLow = product.stockQuantity <= product.lowStockThreshold;
-            const isOut = product.stockQuantity <= 0;
-            return (
-              <Card key={product.id} className={isOut ? 'border-destructive/40' : isLow ? 'border-orange-400/60' : ''}>
-                <CardContent className="py-3 px-4">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-semibold">{product.nameAr}</span>
-                        {product.nameEn && (
-                          <span className="text-sm text-muted-foreground">{product.nameEn}</span>
-                        )}
-                        {product.category && (
-                          <Badge variant="outline" className="text-xs">{product.category}</Badge>
-                        )}
-                        {isOut ? (
-                          <Badge variant="destructive" className="text-xs">
-                            {language === 'ar' ? 'نفذ' : 'Out of Stock'}
-                          </Badge>
-                        ) : isLow ? (
-                          <Badge className="text-xs bg-orange-500/15 text-orange-600 border-orange-300">
-                            <AlertTriangle className="h-3 w-3 me-1" />
-                            {language === 'ar' ? 'مخزون منخفض' : 'Low Stock'}
-                          </Badge>
-                        ) : null}
-                      </div>
-                      <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-                        {product.sku && <span className="font-mono">SKU: {product.sku}</span>}
-                        {product.barcode && <span className="font-mono">{language === 'ar' ? 'باركود' : 'Barcode'}: {product.barcode}</span>}
-                        <span className="text-foreground font-medium">
-                          {formatPrice(product.price)} {language === 'ar' ? 'د.ع' : 'IQD'}
-                        </span>
-                      </div>
+        </>
+      )}
+
+      {/* ===== STOCK COUNT TAB ===== */}
+      {activeTab === "stockcount" && (
+        <div className="space-y-4">
+
+          {/* PHASE: SCANNING */}
+          {countPhase === "scanning" && (
+            <>
+              {/* Counter Strip */}
+              <div className="flex gap-3 flex-wrap">
+                <Card className="flex-1 min-w-[130px]">
+                  <CardContent className="pt-3 pb-3 flex items-center gap-2">
+                    <ScanBarcode className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">{language === 'ar' ? 'أصناف ممسوحة' : 'Types Scanned'}</p>
+                      <p className="text-xl font-bold">{totalScannedTypes}</p>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <div className="text-center">
-                        <p className={`text-xl font-bold ${isOut ? 'text-destructive' : isLow ? 'text-orange-500' : ''}`}>
-                          {product.stockQuantity}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{language === 'ar' ? 'وحدة' : 'units'}</p>
-                      </div>
-                      <div className="flex gap-1">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => openStock(product)}
-                          data-testid={`button-stock-${product.id}`}
-                          title={language === 'ar' ? 'تعديل المخزون' : 'Adjust Stock'}
-                        >
-                          <ArrowUp className="h-4 w-4" />
-                        </Button>
-                        {(product.barcode || product.sku) && (
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => printBarcode(product)}
-                            data-testid={`button-barcode-${product.id}`}
-                            title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}
-                          >
-                            <Printer className="h-4 w-4" />
-                          </Button>
-                        )}
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => openEdit(product)}
-                          data-testid={`button-edit-${product.id}`}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => setDeleteConfirm(product)}
-                          data-testid={`button-delete-${product.id}`}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                  </CardContent>
+                </Card>
+                <Card className="flex-1 min-w-[130px]">
+                  <CardContent className="pt-3 pb-3 flex items-center gap-2">
+                    <Package className="h-5 w-5 text-primary" />
+                    <div>
+                      <p className="text-xs text-muted-foreground">{language === 'ar' ? 'وحدة إجمالي' : 'Total Units'}</p>
+                      <p className="text-xl font-bold">{totalScannedUnits}</p>
                     </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Scan Input */}
+              <Card>
+                <CardContent className="pt-4 pb-4 space-y-3">
+                  <div className="flex items-center gap-2">
+                    <ScanBarcode className="h-5 w-5 text-primary flex-shrink-0" />
+                    <p className="font-semibold text-sm">
+                      {language === 'ar'
+                        ? 'امسح الباركود أو اكتب الرمز واضغط Enter'
+                        : 'Scan barcode or type code and press Enter'}
+                    </p>
+                  </div>
+                  <Input
+                    ref={scanInputRef}
+                    value={scanInput}
+                    onChange={e => setScanInput(e.target.value)}
+                    onKeyDown={handleScanSubmit}
+                    placeholder={language === 'ar' ? 'في انتظار المسح...' : 'Waiting for scan...'}
+                    className="text-lg font-mono h-12"
+                    autoComplete="off"
+                    data-testid="input-scan-barcode"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {language === 'ar'
+                      ? 'اضغط على حقل الإدخال ثم امسح الباركود. كل مسح يضيف وحدة واحدة.'
+                      : 'Click the input then scan. Each scan adds 1 unit.'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Scanned List */}
+              {scanEntries.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {language === 'ar' ? 'المنتجات الممسوحة:' : 'Scanned Products:'}
+                  </p>
+                  {scanEntries.map(entry => (
+                    <Card key={entry.product.id}>
+                      <CardContent className="py-2 px-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{entry.product.nameAr}</p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              {entry.product.sku || entry.product.barcode || `#${entry.product.id}`}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => adjustScanCount(entry.product.id, -1)}
+                              data-testid={`button-scan-minus-${entry.product.id}`}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                            <span className="font-bold text-lg w-8 text-center">{entry.scanned}</span>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => adjustScanCount(entry.product.id, 1)}
+                              data-testid={`button-scan-plus-${entry.product.id}`}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeScanEntry(entry.product.id)}
+                              className="text-destructive"
+                              data-testid={`button-scan-remove-${entry.product.id}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
+              {/* Unknown codes */}
+              {unknownCodes.length > 0 && (
+                <Card className="border-orange-300">
+                  <CardContent className="pt-3 pb-3">
+                    <button
+                      className="flex items-center gap-2 w-full text-start"
+                      onClick={() => setShowUnknown(v => !v)}
+                    >
+                      <AlertTriangle className="h-4 w-4 text-orange-500" />
+                      <span className="text-sm font-medium text-orange-700">
+                        {language === 'ar'
+                          ? `${unknownCodes.length} رمز غير معروف`
+                          : `${unknownCodes.length} unknown code(s)`}
+                      </span>
+                      {showUnknown ? <ChevronDown className="h-4 w-4 ms-auto" /> : <ChevronRight className="h-4 w-4 ms-auto" />}
+                    </button>
+                    {showUnknown && (
+                      <div className="mt-2 space-y-1">
+                        {unknownCodes.map((c, i) => (
+                          <div key={i} className="flex items-center gap-2">
+                            <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{c}</span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6 text-destructive"
+                              onClick={() => setUnknownCodes(prev => prev.filter((_, idx) => idx !== i))}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Action buttons */}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  className="flex-1"
+                  disabled={scanEntries.length === 0}
+                  onClick={() => setCountPhase("review")}
+                  data-testid="button-review-results"
+                >
+                  <ClipboardList className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'مراجعة النتائج' : 'Review Results'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => setShowResetConfirm(true)}
+                  disabled={scanEntries.length === 0 && unknownCodes.length === 0}
+                  data-testid="button-reset-count"
+                >
+                  <RefreshCw className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'إعادة تعيين' : 'Reset'}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* PHASE: REVIEW */}
+          {countPhase === "review" && (
+            <>
+              {/* Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Card className="border-green-400">
+                  <CardContent className="pt-3 pb-3 text-center">
+                    <CheckCircle2 className="h-6 w-6 text-green-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-green-700">{matchCount}</p>
+                    <p className="text-xs text-muted-foreground">{language === 'ar' ? 'مطابق' : 'Match'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-red-400">
+                  <CardContent className="pt-3 pb-3 text-center">
+                    <MinusCircle className="h-6 w-6 text-red-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-red-700">{shortCount}</p>
+                    <p className="text-xs text-muted-foreground">{language === 'ar' ? 'ناقص' : 'Short'}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-yellow-400">
+                  <CardContent className="pt-3 pb-3 text-center">
+                    <TrendingUp className="h-6 w-6 text-yellow-600 mx-auto mb-1" />
+                    <p className="text-2xl font-bold text-yellow-700">{extraCount}</p>
+                    <p className="text-xs text-muted-foreground">{language === 'ar' ? 'زيادة' : 'Extra'}</p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-3 pb-3 text-center">
+                    <XCircle className="h-6 w-6 text-muted-foreground mx-auto mb-1" />
+                    <p className="text-2xl font-bold">{notScannedCount}</p>
+                    <p className="text-xs text-muted-foreground">{language === 'ar' ? 'غير ممسوح' : 'Not Scanned'}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Comparison Table */}
+              <Card>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="bg-muted text-muted-foreground text-xs uppercase border-b">
+                          <th className="text-start px-3 py-2">{language === 'ar' ? 'المنتج' : 'Product'}</th>
+                          <th className="text-center px-3 py-2">SKU</th>
+                          <th className="text-center px-3 py-2">{language === 'ar' ? 'النظام' : 'System'}</th>
+                          <th className="text-center px-3 py-2">{language === 'ar' ? 'الجرد' : 'Counted'}</th>
+                          <th className="text-center px-3 py-2">{language === 'ar' ? 'الفرق' : 'Diff'}</th>
+                          <th className="text-center px-3 py-2">{language === 'ar' ? 'الحالة' : 'Status'}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {comparisonRows.map((row, i) => {
+                          let rowClass = "";
+                          let statusEl = null;
+                          if (row.notScanned) {
+                            rowClass = "bg-muted/30";
+                            statusEl = <Badge variant="outline" className="text-xs text-muted-foreground">{language === 'ar' ? 'غير ممسوح' : 'Not Scanned'}</Badge>;
+                          } else if (row.diff === 0) {
+                            rowClass = "bg-green-50 dark:bg-green-950/20";
+                            statusEl = <Badge className="text-xs bg-green-100 text-green-700 border-green-300">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
+                          } else if (row.diff < 0) {
+                            rowClass = "bg-red-50 dark:bg-red-950/20";
+                            statusEl = <Badge className="text-xs bg-red-100 text-red-700 border-red-300">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
+                          } else {
+                            rowClass = "bg-yellow-50 dark:bg-yellow-950/20";
+                            statusEl = <Badge className="text-xs bg-yellow-100 text-yellow-700 border-yellow-300">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
+                          }
+                          return (
+                            <tr key={row.product.id} className={`border-b ${rowClass}`} data-testid={`row-compare-${row.product.id}`}>
+                              <td className="px-3 py-2 font-medium">{row.product.nameAr}</td>
+                              <td className="px-3 py-2 text-center font-mono text-xs text-muted-foreground">
+                                {row.product.sku || row.product.barcode || '-'}
+                              </td>
+                              <td className="px-3 py-2 text-center font-bold">{row.systemQty}</td>
+                              <td className="px-3 py-2 text-center font-bold">{row.scannedQty}</td>
+                              <td className="px-3 py-2 text-center font-bold">
+                                {row.notScanned ? '—' : (row.diff > 0 ? `+${row.diff}` : row.diff)}
+                              </td>
+                              <td className="px-3 py-2 text-center">{statusEl}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </CardContent>
               </Card>
-            );
-          })}
+
+              <p className="text-xs text-muted-foreground">
+                {language === 'ar'
+                  ? 'ملاحظة: المنتجات "غير الممسوحة" لن يتم تحديثها عند تطبيق الجرد.'
+                  : 'Note: "Not Scanned" products will NOT be updated when applying the count.'}
+              </p>
+
+              {/* Action buttons */}
+              <div className="flex gap-2 pt-1">
+                <Button
+                  variant="outline"
+                  onClick={() => setCountPhase("scanning")}
+                  data-testid="button-back-to-scan"
+                >
+                  {language === 'ar' ? '← رجوع للمسح' : '← Back to Scan'}
+                </Button>
+                <Button
+                  className="flex-1"
+                  disabled={updatableEntries.length === 0 || applyCountMutation.isPending}
+                  onClick={() => setShowApplyConfirm(true)}
+                  data-testid="button-apply-count"
+                >
+                  {applyCountMutation.isPending && <Loader2 className="h-4 w-4 me-2 animate-spin" />}
+                  <CheckCircle2 className="h-4 w-4 me-2" />
+                  {language === 'ar'
+                    ? `تطبيق الجرد (${updatableEntries.length} منتج)`
+                    : `Apply Stock Count (${updatableEntries.length} products)`}
+                </Button>
+              </div>
+            </>
+          )}
+
+          {/* PHASE: DONE */}
+          {countPhase === "done" && doneStats && (
+            <div className="flex flex-col items-center justify-center py-12 text-center space-y-5">
+              <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="h-10 w-10 text-green-600" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-green-700">
+                  {language === 'ar' ? 'تم تطبيق الجرد بنجاح!' : 'Stock Count Applied!'}
+                </h2>
+                <p className="text-muted-foreground mt-1">
+                  {language === 'ar'
+                    ? `تم تحديث ${doneStats.updated} منتج • ${doneStats.matched} منتج مطابق (لم يتغير)`
+                    : `${doneStats.updated} products updated • ${doneStats.matched} matched (no change needed)`}
+                </p>
+              </div>
+              <div className="flex gap-3">
+                <Button onClick={resetCount} data-testid="button-new-count">
+                  <ScanBarcode className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'جرد جديد' : 'New Count'}
+                </Button>
+                <Button variant="outline" onClick={() => { setActiveTab("inventory"); resetCount(); }} data-testid="button-back-inventory">
+                  <Package className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'العودة للمخزون' : 'Back to Inventory'}
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -653,29 +1146,85 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       <Dialog open={!!deleteConfirm} onOpenChange={open => { if (!open) setDeleteConfirm(null); }}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-destructive">
-              {language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}
-            </DialogTitle>
+            <DialogTitle>{language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}</DialogTitle>
           </DialogHeader>
-          <p className="text-sm text-muted-foreground">
-            {language === 'ar'
-              ? `هل أنت متأكد من حذف "${deleteConfirm?.nameAr}"؟ لا يمكن التراجع.`
-              : `Are you sure you want to delete "${deleteConfirm?.nameAr}"? This cannot be undone.`}
-          </p>
-          <div className="flex gap-2 pt-2">
-            <Button
-              variant="destructive"
-              className="flex-1"
-              onClick={() => deleteConfirm && deleteMutation.mutate(deleteConfirm.id)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending && <Loader2 className="h-4 w-4 me-2 animate-spin" />}
-              {language === 'ar' ? 'حذف' : 'Delete'}
-            </Button>
-            <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
-              {language === 'ar' ? 'إلغاء' : 'Cancel'}
-            </Button>
+          {deleteConfirm && (
+            <div className="space-y-4 pt-2">
+              <p className="text-sm text-muted-foreground">
+                {language === 'ar'
+                  ? `هل تريد حذف "${deleteConfirm.nameAr}"؟ لا يمكن التراجع.`
+                  : `Delete "${deleteConfirm.nameAr}"? This cannot be undone.`}
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => deleteMutation.mutate(deleteConfirm.id)}
+                  disabled={deleteMutation.isPending}
+                  data-testid="button-confirm-delete"
+                >
+                  {deleteMutation.isPending && <Loader2 className="h-4 w-4 me-2 animate-spin" />}
+                  {language === 'ar' ? 'حذف' : 'Delete'}
+                </Button>
+                <Button variant="outline" onClick={() => setDeleteConfirm(null)}>
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reset Confirm Dialog */}
+      <Dialog open={showResetConfirm} onOpenChange={setShowResetConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{language === 'ar' ? 'إعادة تعيين الجرد' : 'Reset Count'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar'
+                ? 'سيتم مسح جميع بيانات المسح. هل أنت متأكد؟'
+                : 'All scan data will be cleared. Are you sure?'}
+            </p>
+            <div className="flex gap-2">
+              <Button variant="destructive" className="flex-1" onClick={resetCount} data-testid="button-confirm-reset">
+                {language === 'ar' ? 'نعم، إعادة تعيين' : 'Yes, Reset'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowResetConfirm(false)}>
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Apply Count Confirm Dialog */}
+      <Dialog open={showApplyConfirm} onOpenChange={setShowApplyConfirm}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{language === 'ar' ? 'تطبيق الجرد' : 'Apply Stock Count'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar'
+                ? `سيتم تحديث كميات ${updatableEntries.length} منتج في قاعدة البيانات. هل أنت متأكد؟`
+                : `${updatableEntries.length} product quantities will be updated in the database. Are you sure?`}
+            </p>
+            <div className="flex gap-2">
+              <Button
+                className="flex-1"
+                onClick={applyCount}
+                disabled={applyCountMutation.isPending}
+                data-testid="button-confirm-apply"
+              >
+                {applyCountMutation.isPending && <Loader2 className="h-4 w-4 me-2 animate-spin" />}
+                {language === 'ar' ? 'تأكيد التطبيق' : 'Confirm Apply'}
+              </Button>
+              <Button variant="outline" onClick={() => setShowApplyConfirm(false)}>
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
