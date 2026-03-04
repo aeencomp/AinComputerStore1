@@ -405,7 +405,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
 
   const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(price);
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(price);
   };
 
   const handleCheckout = () => {

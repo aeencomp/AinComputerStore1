@@ -23,7 +23,6 @@ import {
   RefreshCw,
   Printer,
 } from "lucide-react";
-import JsBarcode from "jsbarcode";
 import type { InStoreProduct } from "@shared/schema";
 
 interface SalesUser {
@@ -216,7 +215,7 @@ export default function SalesInStoreInventory({ user }: Props) {
   const lowStockCount = products.filter(p => p.stockQuantity <= p.lowStockThreshold).length;
 
   const formatPrice = (v: string | number) =>
-    new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(String(v)) || 0);
+    new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(parseFloat(String(v)) || 0);
 
   const getNextSequence = useCallback(() => {
     const pattern = /^SKU-(\d+)$/i;
@@ -235,56 +234,61 @@ export default function SalesInStoreInventory({ user }: Props) {
     const code = product.barcode || product.sku || String(product.id);
     const name = product.nameAr || product.nameEn || '';
     const price = formatPrice(product.price);
-    const win = window.open('', '_blank', 'width=500,height=400');
+    const win = window.open('', '_blank', 'width=420,height=480');
     if (!win) return;
-    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Barcode Label</title>
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>QR Label - ${name}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; background: #f0f0f0; display: flex; flex-direction: column; align-items: center; padding: 20px; gap: 16px; }
+  body { font-family: Arial, sans-serif; background: #f5f5f5; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; gap: 16px; }
   .label {
     background: white;
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 10px 14px;
+    border: 1.5px solid #ddd;
+    border-radius: 8px;
+    padding: 14px 18px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    width: 220px;
-    gap: 4px;
+    width: 200px;
+    gap: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
-  .product-name { font-size: 11px; font-weight: 700; text-align: center; line-height: 1.3; max-width: 200px; word-break: break-word; }
-  .barcode-code { font-size: 9px; color: #555; letter-spacing: 1px; }
-  .price { font-size: 13px; font-weight: 800; color: #111; }
-  svg { max-width: 200px; }
+  .store-name { font-size: 8px; font-weight: 600; color: #888; letter-spacing: 1.5px; text-transform: uppercase; }
+  .product-name { font-size: 11px; font-weight: 700; text-align: center; line-height: 1.4; color: #111; }
+  canvas { width: 130px !important; height: 130px !important; }
+  .code { font-size: 9px; color: #666; letter-spacing: 2px; font-family: monospace; }
+  .price { font-size: 16px; font-weight: 900; color: #111; }
+  .currency { font-size: 10px; font-weight: 600; color: #555; }
+  .divider { width: 100%; height: 1px; background: #eee; }
   .controls { display: flex; gap: 8px; }
-  button { padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
-  .btn-print { background: #2563eb; color: white; }
-  .btn-close { background: #e5e7eb; color: #333; }
+  button { padding: 9px 22px; border: none; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+  .btn-print { background: #1d4ed8; color: white; }
+  .btn-close { background: #e5e7eb; color: #374151; }
   @media print {
-    body { background: white; padding: 0; }
-    .controls { display: none; }
-    .label { border: none; border-radius: 0; box-shadow: none; page-break-inside: avoid; }
+    body { background: white; min-height: unset; gap: 0; padding: 0; }
+    .controls { display: none !important; }
+    .label { border: 1px solid #ccc; border-radius: 0; box-shadow: none; }
   }
 </style>
 </head><body>
 <div class="label">
+  <div class="store-name">AL-AIN STORE</div>
+  <div class="divider"></div>
   <div class="product-name">${name}</div>
-  <svg id="bc"></svg>
-  <div class="barcode-code">${code}</div>
-  <div class="price">${price} IQD</div>
+  <canvas id="qr"></canvas>
+  <div class="code">${code}</div>
+  <div class="divider"></div>
+  <div class="price">${price} <span class="currency">IQD</span></div>
 </div>
 <div class="controls">
   <button class="btn-print" onclick="window.print()">&#128424; Print</button>
   <button class="btn-close" onclick="window.close()">Close</button>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.4/build/qrcode.min.js"><\/script>
 <script>
-  JsBarcode('#bc', '${code}', {
-    format: 'CODE128',
-    width: 1.8,
-    height: 55,
-    displayValue: false,
-    margin: 4
+  QRCode.toCanvas(document.getElementById('qr'), '${code}', {
+    width: 130,
+    margin: 1,
+    color: { dark: '#000000', light: '#ffffff' }
   });
 <\/script>
 </body></html>`);
