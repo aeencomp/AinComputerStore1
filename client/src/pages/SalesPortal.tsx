@@ -31,6 +31,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ShoppingBag, CheckCheck, Trash2 } from "lucide-react";
 import SalesDashboard from "./SalesDashboard";
 import SalesPOS from "./SalesPOS";
 import SalesInventory from "./SalesInventory";
@@ -58,11 +64,34 @@ export default function SalesPortal() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [seenOrderIds, setSeenOrderIds] = useState<Set<string>>(() => {
+    try { return new Set<string>(JSON.parse(localStorage.getItem('sales_seen_orders') || '[]')); }
+    catch { return new Set<string>(); }
+  });
 
   const { data: currentUser, isLoading, error } = useQuery<SalesUser>({
     queryKey: ['/api/sales/auth/me'],
     retry: false,
   });
+
+  const { data: recentOrders = [] } = useQuery<any[]>({
+    queryKey: ['/api/orders'],
+    enabled: !!currentUser,
+    refetchInterval: 30000,
+    select: (data) => data
+      .filter((o: any) => !o.orderType || o.orderType === 'online')
+      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 20),
+  });
+
+  const unreadOrderCount = recentOrders.filter((o: any) => !seenOrderIds.has(o.id)).length;
+
+  const markAllOrdersSeen = () => {
+    const allIds = recentOrders.map((o: any) => o.id);
+    const next = new Set<string>(Array.from(seenOrderIds).concat(allIds));
+    setSeenOrderIds(next);
+    localStorage.setItem('sales_seen_orders', JSON.stringify(Array.from(next)));
+  };
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -233,10 +262,77 @@ export default function SalesPortal() {
               </Button>
               
               {/* Notifications */}
-              <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
-                <Bell className="h-5 w-5" />
-                <span className="absolute top-1 end-1 h-2 w-2 rounded-full bg-red-500" />
-              </Button>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
+                    <Bell className="h-5 w-5" />
+                    {unreadOrderCount > 0 && (
+                      <span className="absolute top-1 end-1 h-2 w-2 rounded-full bg-red-500" />
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-80 p-0" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                  <div className="flex items-center justify-between p-3 border-b">
+                    <div className="flex items-center gap-2">
+                      <Bell className="h-4 w-4" />
+                      <span className="font-semibold text-sm">
+                        {language === 'ar' ? 'الطلبات الجديدة' : 'New Orders'}
+                      </span>
+                      {unreadOrderCount > 0 && (
+                        <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                          {unreadOrderCount}
+                        </Badge>
+                      )}
+                    </div>
+                    {recentOrders.length > 0 && (
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={markAllOrdersSeen} title={language === 'ar' ? 'تعيين الكل كمقروء' : 'Mark all read'}>
+                        <CheckCheck className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                  <div className="max-h-80 overflow-y-auto">
+                    {recentOrders.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+                        <Bell className="h-8 w-8 opacity-30" />
+                        <p className="text-sm">
+                          {language === 'ar' ? 'لا توجد طلبات جديدة' : 'No new orders'}
+                        </p>
+                      </div>
+                    ) : (
+                      recentOrders.map((order: any) => {
+                        const isNew = !seenOrderIds.has(order.id);
+                        return (
+                          <div
+                            key={order.id}
+                            className={`flex gap-3 p-3 border-b last:border-0 ${isNew ? 'bg-primary/5' : ''}`}
+                          >
+                            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                              <ShoppingBag className="h-4 w-4 text-primary" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium">
+                                {language === 'ar' ? 'طلب' : 'Order'} #{order.orderNumber}
+                              </p>
+                              <p className="text-xs text-muted-foreground truncate">{order.customerName}</p>
+                              <div className="flex items-center gap-2 mt-0.5">
+                                <p className="text-xs font-semibold text-primary">
+                                  {new Intl.NumberFormat('ar-IQ').format(parseFloat(order.total || '0'))} IQD
+                                </p>
+                                <Badge variant={order.status === 'pending' ? 'destructive' : 'secondary'} className="text-xs py-0 px-1.5">
+                                  {order.status === 'pending'
+                                    ? (language === 'ar' ? 'جديد' : 'New')
+                                    : (language === 'ar' ? 'معالج' : 'Processed')}
+                                </Badge>
+                              </div>
+                            </div>
+                            {isNew && <span className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1.5" />}
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </PopoverContent>
+              </Popover>
 
               {/* User Dropdown */}
               <DropdownMenu>

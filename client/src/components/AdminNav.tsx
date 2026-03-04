@@ -1,5 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   LayoutDashboard, 
   Package, 
@@ -19,12 +20,22 @@ import {
   Tag,
   MessageSquare,
   Languages,
-  Activity
+  Activity,
+  Bell,
+  CheckCheck,
+  ShoppingBag,
+  Trash2
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Separator } from "@/components/ui/separator";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 
 interface AdminNavProps {
   currentAdmin: { 
@@ -48,6 +59,7 @@ interface AdminNavProps {
 export function AdminNav({ currentAdmin }: AdminNavProps) {
   const [location, setLocation] = useLocation();
   const { language, setLanguage } = useLanguage();
+  const { notifications, unreadCount, markAllAsRead, clearNotifications } = useAdminNotifications();
 
   const logoutMutation = useMutation({
     mutationFn: async () => {
@@ -177,6 +189,79 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
               <Languages className="w-4 h-4" />
               <span className="hidden sm:inline">{language === 'ar' ? 'EN' : 'عربي'}</span>
             </Button>
+
+            {/* Notification Bell */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="ghost" size="icon" className="relative" data-testid="button-notifications">
+                  <Bell className="w-4 h-4" />
+                  {unreadCount > 0 && (
+                    <span className="absolute top-1 end-1 h-2 w-2 rounded-full bg-red-500" />
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-80 p-0" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                <div className="flex items-center justify-between p-3 border-b">
+                  <div className="flex items-center gap-2">
+                    <Bell className="w-4 h-4" />
+                    <span className="font-semibold text-sm">
+                      {language === 'ar' ? 'الإشعارات' : 'Notifications'}
+                    </span>
+                    {unreadCount > 0 && (
+                      <Badge variant="destructive" className="text-xs px-1.5 py-0">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {notifications.length > 0 && (
+                      <>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={markAllAsRead} title={language === 'ar' ? 'تعيين الكل كمقروء' : 'Mark all read'}>
+                          <CheckCheck className="w-3.5 h-3.5" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={clearNotifications} title={language === 'ar' ? 'مسح الكل' : 'Clear all'}>
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center py-10 text-muted-foreground gap-2">
+                      <Bell className="w-8 h-8 opacity-30" />
+                      <p className="text-sm">
+                        {language === 'ar' ? 'لا توجد إشعارات' : 'No notifications'}
+                      </p>
+                    </div>
+                  ) : (
+                    notifications.map((notif, i) => (
+                      <div
+                        key={notif.timestamp}
+                        className={`flex gap-3 p-3 border-b last:border-0 transition-colors ${!notif.read ? 'bg-primary/5' : ''}`}
+                      >
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                          <ShoppingBag className="w-4 h-4 text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium">
+                            {language === 'ar' ? 'طلب جديد' : 'New Order'} #{notif.data.orderNumber}
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{notif.data.customerName}</p>
+                          <p className="text-xs font-semibold text-primary mt-0.5">
+                            {new Intl.NumberFormat('ar-IQ').format(parseFloat(notif.data.total))} IQD
+                          </p>
+                        </div>
+                        {!notif.read && (
+                          <span className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1.5" />
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
             <Button
               variant="ghost"
               size="sm"
