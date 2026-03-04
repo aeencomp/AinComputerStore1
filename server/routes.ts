@@ -731,7 +731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true, 
         order: {
           ...order,
-          orderType: 'walk-in',
+          orderType: resolvedOrderType,
           discount,
           discountReason,
         }

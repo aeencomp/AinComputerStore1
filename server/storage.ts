@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -189,6 +189,13 @@ export interface IStorage {
   archiveSaasTicket(id: number, shopId: number, archived: boolean): Promise<void>;
   getActiveSaasTicketsByCustomer(repairCustomerId: number, shopId: number): Promise<SaasRepairTicket[]>;
   getSaasStats(shopId: number): Promise<{ pending: number; inProgress: number; completed: number; totalRevenue: number; completedRevenue: number }>;
+  // In-Store Products
+  getInStoreProducts(): Promise<InStoreProduct[]>;
+  getInStoreProductById(id: number): Promise<InStoreProduct | undefined>;
+  createInStoreProduct(product: InsertInStoreProduct): Promise<InStoreProduct>;
+  updateInStoreProduct(id: number, updates: Partial<InsertInStoreProduct>): Promise<InStoreProduct | undefined>;
+  deleteInStoreProduct(id: number): Promise<void>;
+  adjustInStoreProductStock(id: number, adjustment: number): Promise<InStoreProduct | undefined>;
 }
 
 export class MemStorage implements IStorage {
@@ -924,6 +931,12 @@ export class MemStorage implements IStorage {
   async archiveSaasTicket(_id: number, _shopId: number, _archived: boolean): Promise<void> {}
   async getActiveSaasTicketsByCustomer(_repairCustomerId: number, _shopId: number): Promise<SaasRepairTicket[]> { return []; }
   async getSaasStats(_shopId: number): Promise<{ pending: number; inProgress: number; completed: number; totalRevenue: number; completedRevenue: number }> { return { pending: 0, inProgress: 0, completed: 0, totalRevenue: 0, completedRevenue: 0 }; }
+  async getInStoreProducts(): Promise<InStoreProduct[]> { return []; }
+  async getInStoreProductById(_id: number): Promise<InStoreProduct | undefined> { return undefined; }
+  async createInStoreProduct(_p: InsertInStoreProduct): Promise<InStoreProduct> { throw new Error('Not implemented'); }
+  async updateInStoreProduct(_id: number, _u: Partial<InsertInStoreProduct>): Promise<InStoreProduct | undefined> { return undefined; }
+  async deleteInStoreProduct(_id: number): Promise<void> {}
+  async adjustInStoreProductStock(_id: number, _adj: number): Promise<InStoreProduct | undefined> { return undefined; }
 }
 
 import { DrizzleStorage } from "./db-storage";

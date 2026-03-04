@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, saasShops, saasUsers, saasRepairCustomers, saasRepairTickets } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, saasShops, saasUsers, saasRepairCustomers, saasRepairTickets, inStoreProducts } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte, or, like, ilike, not, inArray } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -1379,5 +1379,43 @@ export class DrizzleStorage implements IStorage {
     const totalRevenue = tickets.reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
     const completedRevenue = tickets.filter(t => ['completed', 'delivered'].includes(t.status)).reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
     return { pending, inProgress, completed, totalRevenue, completedRevenue };
+  }
+
+  // ─── In-Store Products ────────────────────────────────────────────────────────
+  async getInStoreProducts(): Promise<InStoreProduct[]> {
+    return db.select().from(inStoreProducts).orderBy(desc(inStoreProducts.createdAt));
+  }
+
+  async getInStoreProductById(id: number): Promise<InStoreProduct | undefined> {
+    const result = await db.select().from(inStoreProducts).where(eq(inStoreProducts.id, id));
+    return result[0];
+  }
+
+  async createInStoreProduct(product: InsertInStoreProduct): Promise<InStoreProduct> {
+    const result = await db.insert(inStoreProducts).values(product).returning();
+    return result[0];
+  }
+
+  async updateInStoreProduct(id: number, updates: Partial<InsertInStoreProduct>): Promise<InStoreProduct | undefined> {
+    const result = await db.update(inStoreProducts)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(inStoreProducts.id, id))
+      .returning();
+    return result[0];
+  }
+
+  async deleteInStoreProduct(id: number): Promise<void> {
+    await db.delete(inStoreProducts).where(eq(inStoreProducts.id, id));
+  }
+
+  async adjustInStoreProductStock(id: number, adjustment: number): Promise<InStoreProduct | undefined> {
+    const product = await this.getInStoreProductById(id);
+    if (!product) return undefined;
+    const newQty = (product.stockQuantity || 0) + adjustment;
+    const result = await db.update(inStoreProducts)
+      .set({ stockQuantity: newQty, updatedAt: new Date() })
+      .where(eq(inStoreProducts.id, id))
+      .returning();
+    return result[0];
   }
 }

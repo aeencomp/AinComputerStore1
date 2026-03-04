@@ -947,3 +947,30 @@ export const insertSaasRepairTicketSchema = createInsertSchema(saasRepairTickets
 
 export type InsertSaasRepairTicket = z.infer<typeof insertSaasRepairTicketSchema>;
 export type SaasRepairTicket = typeof saasRepairTickets.$inferSelect;
+
+// ─── In-Store Products — Separate inventory for physical store sales ──────────
+export const inStoreProducts = pgTable("in_store_products", {
+  id: serial("id").primaryKey(),
+  nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en"),
+  sku: text("sku"),
+  barcode: text("barcode"),
+  price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  category: text("category"),
+  description: text("description"),
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  lowStockThreshold: integer("low_stock_threshold").notNull().default(3),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertInStoreProductSchema = createInsertSchema(inStoreProducts).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertInStoreProduct = z.infer<typeof insertInStoreProductSchema>;
+export type InStoreProduct = typeof inStoreProducts.$inferSelect;
