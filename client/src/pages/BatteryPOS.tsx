@@ -1002,7 +1002,7 @@ export default function BatteryPOS() {
             <div id="receipt-content" className="bg-white text-black p-4 rounded-lg border print:border-0 print:p-0">
               <div className="text-center border-b-2 border-dashed border-gray-300 pb-3 mb-3">
                 <h2 className="font-bold text-lg">العين لتجارة الحاسبات</h2>
-                <p className="text-xs text-gray-600">Al-Ain Computer Trading</p>
+                <p className="text-xs text-gray-600">AEEN COMPUTER TRADING</p>
                 <p className="text-xs text-gray-500 mt-1">بغداد - العراق</p>
               </div>
 

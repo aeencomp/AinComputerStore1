@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { 
   BarChart3, 
   DollarSign,
@@ -12,7 +14,8 @@ import {
   TrendingUp,
   Loader2,
   Calendar,
-  Printer
+  Printer,
+  Trash2
 } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns";
 
@@ -44,12 +47,33 @@ interface SalesReportsProps {
 
 export default function SalesReports({ user }: SalesReportsProps) {
   const { language } = useLanguage();
+  const { toast } = useToast();
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'online' | 'walk-in' | 'in-store'>('all');
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
   });
+
+  const deleteOrderMutation = useMutation({
+    mutationFn: async (id: string) => {
+      await apiRequest('DELETE', `/api/orders/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      toast({ title: language === 'ar' ? 'تم حذف الطلب' : 'Order deleted' });
+    },
+    onError: () => {
+      toast({ title: language === 'ar' ? 'فشل الحذف' : 'Delete failed', variant: 'destructive' });
+    },
+  });
+
+  const confirmDelete = (order: Order) => {
+    const msg = language === 'ar'
+      ? `هل تريد حذف الطلب ${order.orderNumber}؟ لا يمكن التراجع عن هذا الإجراء.`
+      : `Delete order ${order.orderNumber}? This cannot be undone.`;
+    if (window.confirm(msg)) deleteOrderMutation.mutate(order.id);
+  };
 
   if (!user.permissions.canViewReports) {
     return (
@@ -177,7 +201,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
 <body>
   <div style="text-align:center;border-bottom:2px dashed #aaa;padding-bottom:10px;margin-bottom:10px;">
     <h2>العين لتجارة الحاسبات</h2>
-    <p style="font-size:11px;color:#666;">Al-Ain Computer Trading — العراق، كربلاء</p>
+    <p style="font-size:11px;color:#666;">AEEN COMPUTER TRADING — العراق، كربلاء</p>
     <p style="font-size:10px;color:#999;margin-top:4px;">${isAr ? 'إيصال بيع' : 'Sales Receipt'}</p>
   </div>
   <div class="section" style="margin-bottom:10px;">
@@ -383,15 +407,28 @@ export default function SalesReports({ user }: SalesReportsProps) {
                         {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
                       </td>
                       <td className="p-3">
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => printOrderReceipt(order)}
-                          data-testid={`button-print-${order.id}`}
-                          title={language === 'ar' ? 'طباعة الوصل' : 'Print Receipt'}
-                        >
-                          <Printer className="w-4 h-4" />
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => printOrderReceipt(order)}
+                            data-testid={`button-print-${order.id}`}
+                            title={language === 'ar' ? 'طباعة الوصل' : 'Print Receipt'}
+                          >
+                            <Printer className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => confirmDelete(order)}
+                            disabled={deleteOrderMutation.isPending}
+                            data-testid={`button-delete-${order.id}`}
+                            title={language === 'ar' ? 'حذف الطلب' : 'Delete Order'}
+                            className="text-destructive hover:text-destructive"
+                          >
+                            {deleteOrderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}

@@ -84,7 +84,7 @@ export default function BatteryReceiptPrint() {
         {/* Modern Header */}
         <div className="bg-black text-white p-4 text-center">
           <h2 className="font-extrabold text-xl tracking-wide">العين لتجارة الحاسبات</h2>
-          <p className="text-sm font-semibold mt-1 opacity-90">Al-Ain Computer Trading</p>
+          <p className="text-sm font-semibold mt-1 opacity-90">AEEN COMPUTER TRADING</p>
           <p className="text-xs mt-1 opacity-75">كربلاء - العراق</p>
         </div>
 

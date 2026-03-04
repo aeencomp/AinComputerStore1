@@ -376,7 +376,7 @@ export default function NewRepairRequest() {
         </head>
         <body>
           <div class="header">
-            <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}</div>
+            <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'AEEN COMPUTER TRADING'}</div>
             <div class="store-info">${isRTL ? 'كربلاء - العراق' : 'Karbala - Iraq'}</div>
             <div class="store-info">07850006977</div>
           </div>
@@ -563,7 +563,7 @@ export default function NewRepairRequest() {
       </head>
       <body>
         <div class="header">
-          <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}</div>
+          <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'AEEN COMPUTER TRADING'}</div>
           <div class="store-info">${isRTL ? 'كربلاء — العراق' : 'Karbala — Iraq'} | 07850006977</div>
         </div>
         <div class="summary-title">${isRTL ? 'ملف طلبات الصيانة' : 'Repair Summary Sheet'}</div>

@@ -698,12 +698,12 @@ export default function AdminPOS() {
               <div className="flex justify-center mb-3">
                 <img 
                   src="/icons/icon-128x128.png" 
-                  alt="Al-Ain Computer Trading" 
+                  alt="AEEN COMPUTER TRADING" 
                   className="w-16 h-16 object-contain print:w-20 print:h-20"
                 />
               </div>
               <h2 className="text-2xl font-bold mb-1 print:text-3xl">
-                {language === 'ar' ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
+                {language === 'ar' ? 'العين لتجارة الحاسبات' : 'AEEN COMPUTER TRADING'}
               </h2>
               <p className="text-sm text-muted-foreground print:text-gray-600">
                 {language === 'ar' ? 'بغداد - العراق' : 'Baghdad - Iraq'}

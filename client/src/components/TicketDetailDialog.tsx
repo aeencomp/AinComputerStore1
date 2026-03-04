@@ -275,7 +275,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         </style>
       </head><body>
         <div class="header">
-          <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}</div>
+          <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'AEEN COMPUTER TRADING'}</div>
           <div class="store-info">${isRTL ? 'كربلاء — العراق' : 'Karbala — Iraq'} | 07850006977</div>
         </div>
         <div class="summary-title">${isRTL ? 'ملف طلبات الصيانة' : 'Repair Summary Sheet'}</div>
