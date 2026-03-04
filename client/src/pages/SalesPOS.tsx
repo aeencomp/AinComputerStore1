@@ -1239,7 +1239,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                       <div key={idx} className="px-2 py-2 grid grid-cols-12 text-sm items-center" data-testid={`receipt-item-${idx}`}>
                         <div className="col-span-6">
                           <div className="font-extrabold">{item.nameAr || item.nameEn || '-'}</div>
-                          {item.sku && <div className="text-xs font-bold text-gray-500">SKU: {item.sku}</div>}
+                          {item.sku && <div className="text-xs font-extrabold text-gray-700">SKU: {item.sku}</div>}
                         </div>
                         <div className="col-span-2 text-center font-extrabold">{item.quantity}</div>
                         <div className="col-span-4 text-start font-extrabold">{formatPrice(lineTotal)}</div>
