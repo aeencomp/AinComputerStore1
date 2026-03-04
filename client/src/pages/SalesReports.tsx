@@ -15,7 +15,10 @@ import {
   Loader2,
   Calendar,
   Printer,
-  Trash2
+  Trash2,
+  CheckCheck,
+  Clock,
+  Truck
 } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns";
 
@@ -389,6 +392,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
                     <th className="text-start p-3">{language === 'ar' ? 'رقم الطلب' : 'Order #'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'العميل' : 'Customer'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'النوع' : 'Type'}</th>
+                    <th className="text-start p-3">{language === 'ar' ? 'الحالة' : 'Status'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'الدفع' : 'Payment'}</th>
                     <th className="text-end p-3">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
@@ -413,6 +417,30 @@ export default function SalesReports({ user }: SalesReportsProps) {
                           <Badge variant="secondary">
                             {language === 'ar' ? 'أونلاين' : 'Online'}
                           </Badge>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {order.status === 'pending' ? (
+                          <Badge variant="outline" className="text-xs bg-yellow-50 text-yellow-700 border-yellow-300 gap-1">
+                            <Clock className="h-3 w-3" />
+                            {language === 'ar' ? 'انتظار' : 'Pending'}
+                          </Badge>
+                        ) : order.status === 'processing' ? (
+                          <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700 border-blue-300 gap-1">
+                            <Truck className="h-3 w-3" />
+                            {language === 'ar' ? 'قيد المعالجة' : 'Processing'}
+                          </Badge>
+                        ) : order.status === 'completed' || order.status === 'delivered' ? (
+                          <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-300 gap-1">
+                            <CheckCheck className="h-3 w-3" />
+                            {language === 'ar' ? 'مكتمل' : 'Completed'}
+                          </Badge>
+                        ) : order.status === 'cancelled' ? (
+                          <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300">
+                            {language === 'ar' ? 'ملغي' : 'Cancelled'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs">{order.status}</Badge>
                         )}
                       </td>
                       <td className="p-3">{getPaymentMethodLabel(order.paymentMethod)}</td>
