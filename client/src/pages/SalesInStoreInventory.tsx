@@ -261,7 +261,7 @@ export default function SalesInStoreInventory({ user }: Props) {
     gap: 6px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.08);
   }
-  .store-name { font-size: 8px; font-weight: 600; color: #888; letter-spacing: 1.5px; text-transform: uppercase; }
+  .store-name { font-size: 10px; font-weight: 700; color: #555; direction: rtl; }
   .product-name { font-size: 11px; font-weight: 700; text-align: center; line-height: 1.4; color: #111; }
   .qr-img { width: 140px; height: 140px; }
   .code { font-size: 9px; color: #666; letter-spacing: 2px; font-family: monospace; }
@@ -280,7 +280,7 @@ export default function SalesInStoreInventory({ user }: Props) {
 </style>
 </head><body>
 <div class="label">
-  <div class="store-name">AL-AIN STORE</div>
+  <div class="store-name">العين لتجارة الحاسبات</div>
   <div class="divider"></div>
   <div class="product-name">${name}</div>
   <img class="qr-img" src="${qrDataUrl}" alt="QR Code" />
