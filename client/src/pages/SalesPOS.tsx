@@ -27,6 +27,7 @@ import {
   User,
   Phone,
   Percent,
+  Check,
   CheckCircle2,
   X,
   Grid3X3,
@@ -438,7 +439,114 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
   };
 
   const printReceipt = () => {
-    window.print();
+    if (!lastOrder) return;
+    const isAr = language === 'ar';
+    const dir = isAr ? 'rtl' : 'ltr';
+    const fmt = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+
+    const payLabel = lastOrder.paymentMethod === 'cash'
+      ? (isAr ? 'نقدي' : 'Cash')
+      : lastOrder.paymentMethod === 'card'
+      ? (isAr ? 'بطاقة' : 'Card')
+      : 'ZainCash';
+
+    const rowsHtml = (lastOrder.items || []).map((item: any) => {
+      const unitPrice = parseFloat(item.price);
+      const lineTotal = unitPrice * item.quantity;
+      const name = isAr ? (item.nameAr || '-') : (item.nameEn || item.nameAr || '-');
+      return `<tr>
+        <td style="padding:4px 2px;border-bottom:1px solid #eee;">${name}${item.sku ? `<br/><span style="font-size:9px;color:#888;">SKU: ${item.sku}</span>` : ''}</td>
+        <td style="text-align:center;padding:4px 2px;border-bottom:1px solid #eee;">${item.quantity}</td>
+        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;">${fmt(unitPrice)}</td>
+        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;font-weight:600;">${fmt(lineTotal)}</td>
+      </tr>`;
+    }).join('');
+
+    const discountNum = parseFloat(lastOrder.discount || '0');
+    const subtotalNum = parseFloat(lastOrder.subtotal || '0');
+    const totalNum = parseFloat(lastOrder.total || '0');
+
+    const discountRow = discountNum > 0 ? `
+      <div style="display:flex;justify-content:space-between;color:#16a34a;">
+        <span>${isAr ? 'الخصم' : 'Discount'}</span>
+        <span>-${fmt(discountNum)} ${isAr ? 'د.ع' : 'IQD'}</span>
+      </div>` : '';
+
+    const customerHtml = (lastOrder.customerName || lastOrder.customerPhone) ? `
+      <div style="background:#f9fafb;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;">
+        ${lastOrder.customerName ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الزبون:' : 'Customer:'}</span><span>${lastOrder.customerName}</span></div>` : ''}
+        ${lastOrder.customerPhone ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الهاتف:' : 'Phone:'}</span><span dir="ltr">${lastOrder.customerPhone}</span></div>` : ''}
+      </div>` : '';
+
+    const html = `<!DOCTYPE html>
+<html dir="${dir}" lang="${isAr ? 'ar' : 'en'}">
+<head>
+<meta charset="UTF-8"/>
+<style>
+  @page { size: 80mm auto; margin: 4mm; }
+  * { box-sizing: border-box; }
+  body { font-family: 'Cairo', Arial, sans-serif; font-size: 12px; color: #111; margin: 0; padding: 8px; width: 80mm; }
+  h2 { margin: 0 0 2px; font-size: 16px; }
+  p { margin: 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  th { border-bottom: 2px solid #333; padding: 4px 2px; font-weight: 600; }
+  .dashed { border-top: 1px dashed #aaa; margin: 8px 0; }
+  .section { background: #f9fafb; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 12px; }
+  .row { display: flex; justify-content: space-between; }
+  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; border-top: 2px solid #333; padding-top: 6px; margin-top: 4px; }
+  .footer { text-align: center; margin-top: 10px; font-size: 11px; color: #666; }
+</style>
+</head>
+<body>
+  <div style="text-align:center;border-bottom:2px dashed #aaa;padding-bottom:10px;margin-bottom:10px;">
+    <h2>العين لتجارة الحاسبات</h2>
+    <p style="font-size:11px;color:#666;">Al-Ain Computer Trading — كربلاء، العراق</p>
+    <p style="font-size:10px;color:#999;margin-top:4px;">${isAr ? 'إيصال بيع' : 'Sales Receipt'}</p>
+  </div>
+
+  <div class="section" style="margin-bottom:10px;">
+    <div class="row"><span>${isAr ? 'رقم الطلب:' : 'Order #:'}</span><span style="font-weight:700;font-family:monospace;">${lastOrder.orderNumber}</span></div>
+    <div class="row"><span>${isAr ? 'التاريخ:' : 'Date:'}</span><span>${new Date(lastOrder.createdAt).toLocaleString(isAr ? 'ar-IQ' : 'en-US')}</span></div>
+    ${lastOrder.paymentMethod ? `<div class="row"><span>${isAr ? 'طريقة الدفع:' : 'Payment:'}</span><span style="font-weight:600;">${payLabel}</span></div>` : ''}
+  </div>
+
+  ${customerHtml}
+
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:start;">${isAr ? 'المنتج' : 'Product'}</th>
+        <th style="text-align:center;">${isAr ? 'الكمية' : 'Qty'}</th>
+        <th style="text-align:end;">${isAr ? 'السعر' : 'Price'}</th>
+        <th style="text-align:end;">${isAr ? 'المجموع' : 'Total'}</th>
+      </tr>
+    </thead>
+    <tbody>${rowsHtml}</tbody>
+  </table>
+
+  <div class="dashed"></div>
+
+  <div style="font-size:12px;margin-bottom:8px;">
+    <div class="row"><span>${isAr ? 'المجموع الفرعي:' : 'Subtotal:'}</span><span>${fmt(subtotalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
+    ${discountRow}
+    <div class="total-row"><span>${isAr ? 'الإجمالي:' : 'Total:'}</span><span>${fmt(totalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
+  </div>
+
+  <div class="footer">
+    <div class="dashed"></div>
+    <p>${isAr ? 'شكراً لتسوقكم معنا!' : 'Thank you for your purchase!'}</p>
+    <p style="margin-top:4px;font-size:10px;">${isAr ? 'يرجى الاحتفاظ بالوصل' : 'Please keep this receipt'}</p>
+  </div>
+
+  <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };</script>
+</body>
+</html>`;
+
+    const popup = window.open('', '_blank', 'width=400,height=650');
+    if (popup) {
+      popup.document.write(html);
+      popup.document.close();
+    }
   };
 
   const handleHoldOrder = () => {
@@ -1047,213 +1155,135 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
 
       {/* Receipt Dialog */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt} modal={true}>
-        <DialogContent 
-          className="max-w-lg print:fixed print:inset-0 print:max-w-none print:shadow-none print:border-0 print:bg-white print:z-[9999]" 
+        <DialogContent
+          className="max-w-md max-h-[90vh] overflow-y-auto"
           dir={language === 'ar' ? 'rtl' : 'ltr'}
           data-testid="receipt-dialog"
           aria-describedby={undefined}
         >
-          <DialogHeader className="sr-only">
-            <DialogTitle>{language === 'ar' ? 'إيصال البيع' : 'Sales Receipt'}</DialogTitle>
-          </DialogHeader>
-          <style>{`
-            @media print {
-              @page {
-                size: 80mm auto;
-                margin: 2mm;
-              }
-              html, body {
-                height: auto !important;
-                overflow: visible !important;
-              }
-              body > *:not([data-radix-portal]) { display: none !important; }
-              [data-radix-portal] > *:not([data-state="open"]) { display: none !important; }
-              [data-radix-dialog-overlay] { display: none !important; }
-              .print-hide { display: none !important; }
-              .print-receipt { 
-                display: block !important; 
-                visibility: visible !important; 
-                position: static !important;
-                width: 80mm !important;
-                max-width: 80mm !important;
-                padding: 3mm !important;
-                background: white !important;
-                color: black !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-              .print-receipt * { 
-                visibility: visible !important; 
-                color: black !important;
-                page-break-inside: avoid !important;
-                break-inside: avoid !important;
-              }
-              [role="dialog"] {
-                position: absolute !important;
-                left: 0 !important;
-                top: 0 !important;
-                width: 80mm !important;
-                max-width: 80mm !important;
-                height: auto !important;
-                max-height: none !important;
-                overflow: visible !important;
-                border: none !important;
-                box-shadow: none !important;
-                background: white !important;
-                padding: 0 !important;
-                margin: 0 !important;
-                transform: none !important;
-              }
-            }
-          `}</style>
-          
-          <div className="print-receipt">
-            {/* Store Header */}
-            <div className="text-center mb-6 border-b-2 border-dashed pb-4">
-              <div className="flex justify-center mb-3">
-                <img 
-                  src="/icons/icon-128x128.png" 
-                  alt="Al-Ain Computer Trading" 
-                  className="w-16 h-16 object-contain print:w-20 print:h-20"
-                />
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <Check className="w-4 h-4 text-green-600" />
               </div>
-              <h2 className="text-2xl font-bold mb-1 print:text-3xl">
-                {language === 'ar' ? 'العين لتجارة الحاسبات' : 'Al-Ain Computer Trading'}
-              </h2>
-              <p className="text-sm text-muted-foreground print:text-gray-600">
-                {language === 'ar' ? 'بغداد - العراق' : 'Baghdad - Iraq'}
-              </p>
-              <Badge className="mt-2 text-sm">
-                <Receipt className="h-3 w-3 me-1" />
-                {language === 'ar' ? 'إيصال بيع' : 'Sales Receipt'}
-              </Badge>
-            </div>
-            
-            {lastOrder && (
-              <div className="space-y-4">
-                {/* Order Info */}
-                <div className="grid grid-cols-2 gap-2 text-sm bg-muted/50 p-3 rounded-lg">
-                  <div>
-                    <span className="text-muted-foreground">{language === 'ar' ? 'رقم الطلب:' : 'Order #:'}</span>
-                    <p className="font-mono font-bold text-lg">{lastOrder.orderNumber}</p>
-                  </div>
-                  <div className="text-end">
-                    <span className="text-muted-foreground">{language === 'ar' ? 'التاريخ:' : 'Date:'}</span>
-                    <p className="font-medium">{new Date(lastOrder.createdAt).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')}</p>
-                  </div>
-                  <div className="col-span-2">
-                    <span className="text-muted-foreground">{language === 'ar' ? 'الزبون:' : 'Customer:'}</span>
-                    <p className="font-medium">{lastOrder.customerName}</p>
-                    {lastOrder.customerPhone && (
-                      <p className="text-muted-foreground">{lastOrder.customerPhone}</p>
-                    )}
-                  </div>
+              {language === 'ar' ? 'تمت عملية البيع بنجاح!' : 'Sale Completed!'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {lastOrder && (
+            <div className="bg-white text-black p-4 rounded-lg border">
+              {/* Store Header */}
+              <div className="text-center border-b-2 border-dashed border-gray-300 pb-3 mb-3">
+                <h2 className="font-bold text-lg">العين لتجارة الحاسبات</h2>
+                <p className="text-xs text-gray-600">Al-Ain Computer Trading</p>
+                <p className="text-xs text-gray-500 mt-1">كربلاء — العراق</p>
+              </div>
+
+              {/* Order number + date */}
+              <div className="bg-gray-50 rounded p-2 mb-3 text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="font-semibold">{language === 'ar' ? 'رقم الطلب:' : 'Order #:'}</span>
+                  <span className="font-mono font-bold">{lastOrder.orderNumber}</span>
                 </div>
-                
-                <Separator />
-                
-                {/* Products Table */}
-                <div>
-                  <h3 className="font-bold mb-2 text-sm">
-                    {language === 'ar' ? 'تفاصيل المنتجات' : 'Product Details'}
-                  </h3>
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b-2">
-                        <th className="text-start py-2 font-semibold">{language === 'ar' ? 'المنتج' : 'Product'}</th>
-                        <th className="text-center py-2 font-semibold w-16">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
-                        <th className="text-end py-2 font-semibold w-24">{language === 'ar' ? 'السعر' : 'Price'}</th>
-                        <th className="text-end py-2 font-semibold w-28">{language === 'ar' ? 'المجموع' : 'Total'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {lastOrder.items?.map((item: any, idx: number) => {
-                        const unitPrice = parseFloat(item.price);
-                        const lineTotal = unitPrice * item.quantity;
-                        return (
-                          <tr key={idx} className="border-b">
-                            <td className="py-2">
-                              <div className="font-medium">
-                                {language === 'ar' ? (item.nameAr || '-') : (item.nameEn || item.nameAr || '-')}
-                              </div>
-                              {item.sku ? (
-                                <div className="text-xs text-muted-foreground print:text-gray-600">
-                                  SKU: {item.sku}
-                                </div>
-                              ) : null}
-                            </td>
-                            <td className="text-center py-2">{item.quantity}</td>
-                            <td className="text-end py-2">{formatPrice(unitPrice)}</td>
-                            <td className="text-end py-2 font-medium">{formatPrice(lineTotal)}</td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+                <div className="flex justify-between">
+                  <span>{language === 'ar' ? 'التاريخ:' : 'Date:'}</span>
+                  <span>{new Date(lastOrder.createdAt).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')}</span>
                 </div>
-                
-                <Separator />
-                
-                {/* Totals */}
-                <div className="space-y-2 text-sm">
+                {lastOrder.paymentMethod && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</span>
-                    <span>{formatPrice(parseFloat(lastOrder.subtotal))} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
-                  </div>
-                  {parseFloat(lastOrder.discount) > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>{language === 'ar' ? 'الخصم' : 'Discount'}</span>
-                      <span>-{formatPrice(parseFloat(lastOrder.discount))} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
-                    </div>
-                  )}
-                  <Separator />
-                  <div className="flex justify-between text-lg font-bold">
-                    <span>{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
-                    <span className="text-primary">{formatPrice(parseFloat(lastOrder.total))} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground pt-2">
                     <span>{language === 'ar' ? 'طريقة الدفع:' : 'Payment:'}</span>
-                    <span>
-                      {lastOrder.paymentMethod === 'cash' 
-                        ? (language === 'ar' ? 'نقداً' : 'Cash')
-                        : lastOrder.paymentMethod === 'card'
-                        ? (language === 'ar' ? 'بطاقة' : 'Card')
-                        : lastOrder.paymentMethod
-                      }
+                    <span className="font-semibold">
+                      {lastOrder.paymentMethod === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash')
+                        : lastOrder.paymentMethod === 'card' ? (language === 'ar' ? 'بطاقة' : 'Card')
+                        : 'ZainCash'}
                     </span>
                   </div>
-                </div>
+                )}
+              </div>
 
-                {/* Footer */}
-                <div className="text-center pt-4 border-t border-dashed">
-                  <p className="text-sm font-medium">
-                    {language === 'ar' ? 'شكراً لتسوقكم معنا!' : 'Thank you for shopping with us!'}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {language === 'ar' ? 'للاستفسارات: ٩٢٠٠٠١٢٣٤' : 'Contact: 920001234'}
-                  </p>
+              {/* Customer */}
+              {(lastOrder.customerName || lastOrder.customerPhone) && (
+                <div className="border-t border-gray-200 pt-2 mb-3 text-xs space-y-1">
+                  {lastOrder.customerName && (
+                    <div className="flex justify-between">
+                      <span>{language === 'ar' ? 'الزبون:' : 'Customer:'}</span>
+                      <span>{lastOrder.customerName}</span>
+                    </div>
+                  )}
+                  {lastOrder.customerPhone && (
+                    <div className="flex justify-between">
+                      <span>{language === 'ar' ? 'الهاتف:' : 'Phone:'}</span>
+                      <span dir="ltr">{lastOrder.customerPhone}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Items Table */}
+              <div className="border-t border-b border-gray-300 py-2 mb-3">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-gray-200">
+                      <th className="text-start pb-1">{language === 'ar' ? 'المنتج' : 'Product'}</th>
+                      <th className="text-center pb-1">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
+                      <th className="text-end pb-1">{language === 'ar' ? 'السعر' : 'Price'}</th>
+                      <th className="text-end pb-1">{language === 'ar' ? 'المجموع' : 'Total'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lastOrder.items?.map((item: any, idx: number) => {
+                      const unitPrice = parseFloat(item.price);
+                      const lineTotal = unitPrice * item.quantity;
+                      return (
+                        <tr key={idx} className="border-b border-gray-100" data-testid={`receipt-item-${idx}`}>
+                          <td className="py-1">
+                            <div className="font-medium">{language === 'ar' ? (item.nameAr || '-') : (item.nameEn || item.nameAr || '-')}</div>
+                            {item.sku && <div className="text-gray-400 text-[10px]">SKU: {item.sku}</div>}
+                          </td>
+                          <td className="text-center">{item.quantity}</td>
+                          <td className="text-end">{formatPrice(unitPrice)}</td>
+                          <td className="text-end font-medium">{formatPrice(lineTotal)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Totals */}
+              <div className="space-y-1 text-sm mb-3">
+                <div className="flex justify-between">
+                  <span>{language === 'ar' ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
+                  <span>{formatPrice(parseFloat(lastOrder.subtotal))}</span>
+                </div>
+                {parseFloat(lastOrder.discount) > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>{language === 'ar' ? 'الخصم:' : 'Discount:'}</span>
+                    <span>-{formatPrice(parseFloat(lastOrder.discount))}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-bold text-base border-t border-gray-300 pt-2">
+                  <span>{language === 'ar' ? 'الإجمالي:' : 'Total:'}</span>
+                  <span data-testid="text-receipt-total">{formatPrice(parseFloat(lastOrder.total))} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
                 </div>
               </div>
-            )}
-          </div>
-          
+
+              {/* Footer */}
+              <div className="text-center pt-3 border-t border-dashed border-gray-300">
+                <p className="text-xs text-gray-500">{language === 'ar' ? 'شكراً لتسوقكم معنا!' : 'Thank you for your purchase!'}</p>
+                <p className="text-[10px] text-gray-400 mt-1">{language === 'ar' ? 'يرجى الاحتفاظ بالوصل' : 'Please keep this receipt'}</p>
+              </div>
+            </div>
+          )}
+
           {/* Action Buttons */}
-          <div className="flex gap-3 pt-4 print-hide">
-            <Button 
-              onClick={printReceipt} 
-              className="flex-1 gap-2"
-              data-testid="button-print-receipt"
-            >
-              <Printer className="h-4 w-4" />
-              {language === 'ar' ? 'طباعة' : 'Print'}
+          <div className="flex justify-center gap-3 pt-2">
+            <Button variant="outline" className="gap-2" onClick={() => setShowReceipt(false)} data-testid="button-new-sale">
+              {language === 'ar' ? 'عملية جديدة' : 'New Sale'}
             </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setShowReceipt(false)}
-              className="flex-1"
-              data-testid="button-close-receipt"
-            >
-              {language === 'ar' ? 'إغلاق' : 'Close'}
+            <Button className="gap-2" onClick={printReceipt} data-testid="button-print-receipt">
+              <Printer className="w-4 h-4" />
+              {language === 'ar' ? 'طباعة الوصل' : 'Print Receipt'}
             </Button>
           </div>
         </DialogContent>
