@@ -500,7 +500,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
 <body>
   <div style="text-align:center;border-bottom:2px dashed #aaa;padding-bottom:10px;margin-bottom:10px;">
     <h2>العين لتجارة الحاسبات</h2>
-    <p style="font-size:11px;color:#666;">Al-Ain Computer Trading — كربلاء، العراق</p>
+    <p style="font-size:11px;color:#666;">Al-Ain Computer Trading — العراق، كربلاء</p>
     <p style="font-size:10px;color:#999;margin-top:4px;">${isAr ? 'إيصال بيع' : 'Sales Receipt'}</p>
   </div>
 
@@ -1176,7 +1176,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
               <div className="text-center border-b-2 border-dashed border-gray-300 pb-3 mb-3">
                 <h2 className="font-bold text-lg">العين لتجارة الحاسبات</h2>
                 <p className="text-xs text-gray-600">Al-Ain Computer Trading</p>
-                <p className="text-xs text-gray-500 mt-1">كربلاء — العراق</p>
+                <p className="text-xs text-gray-500 mt-1">العراق — كربلاء</p>
               </div>
 
               {/* Order number + date */}
