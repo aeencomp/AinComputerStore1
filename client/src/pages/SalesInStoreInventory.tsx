@@ -220,9 +220,7 @@ export default function SalesInStoreInventory({ user }: Props) {
     new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(String(v)) || 0);
 
   const generateBarcode = useCallback(() => {
-    const timestamp = Date.now().toString().slice(-9);
-    const rand = Math.floor(Math.random() * 100).toString().padStart(2, '0');
-    return `STR${timestamp}${rand}`;
+    return Math.floor(10000 + Math.random() * 90000).toString();
   }, []);
 
   const printBarcode = useCallback((product: InStoreProduct) => {
