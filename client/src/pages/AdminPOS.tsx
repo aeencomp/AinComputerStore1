@@ -39,7 +39,9 @@ import {
   Percent,
   Receipt,
   X,
-  Printer
+  Printer,
+  Store,
+  Globe
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AdminNav } from "@/components/AdminNav";
@@ -92,6 +94,8 @@ export default function AdminPOS() {
     notes: "",
   });
 
+  const [posMode, setPosMode] = useState<'walk-in' | 'in-store'>('walk-in');
+
   const { data: currentAdmin, isLoading: authLoading, isError: authError } = useQuery<AdminUser>({
     queryKey: ['/api/admin/auth/me'],
     retry: false,
@@ -104,10 +108,37 @@ export default function AdminPOS() {
     }
   }, [authLoading, authError, currentAdmin, setLocation]);
 
-  const { data: products = [], isLoading } = useQuery<Product[]>({
+  const { data: mainProducts = [], isLoading: mainLoading } = useQuery<Product[]>({
     queryKey: ['/api/admin/inventory'],
-    enabled: !!currentAdmin,
+    enabled: !!currentAdmin && posMode === 'walk-in',
   });
+
+  const { data: inStoreProducts = [], isLoading: inStoreLoading } = useQuery<any[]>({
+    queryKey: ['/api/instore/products'],
+    enabled: !!currentAdmin && posMode === 'in-store',
+  });
+
+  const isLoading = posMode === 'in-store' ? inStoreLoading : mainLoading;
+
+  const products: any[] = posMode === 'in-store'
+    ? inStoreProducts
+        .filter((p: any) => p.isActive !== 0)
+        .map((p: any) => ({
+          id: String(p.id),
+          nameAr: p.nameAr,
+          nameEn: p.nameEn || p.nameAr,
+          price: String(p.price),
+          stockQuantity: p.stockQuantity,
+          sku: p.sku,
+          image: null,
+          _isInStore: true,
+        }))
+    : mainProducts;
+
+  const getDisplayPrice = (product: any) =>
+    product._isInStore
+      ? parseFloat(product.price)
+      : parseFloat(product.price) * 1000;
 
   const createOrderMutation = useMutation({
     mutationFn: async (orderData: any) => {
@@ -201,7 +232,7 @@ export default function AdminPOS() {
   };
 
   const subtotal = cart.reduce((sum, item) => 
-    sum + (parseFloat(item.product.price) * 1000 * item.quantity), 0
+    sum + (getDisplayPrice(item.product) * item.quantity), 0
   );
   
   const discount = parseFloat(paymentInfo.discount) || 0;
