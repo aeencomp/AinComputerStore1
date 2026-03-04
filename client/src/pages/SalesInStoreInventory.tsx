@@ -534,7 +534,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                 {language === 'ar' ? 'نفذ' : 'Out of Stock'}
                               </Badge>
                             ) : isLow ? (
-                              <Badge className="text-xs bg-orange-500/15 text-orange-600 border-orange-300">
+                              <Badge variant="outline" className="text-xs bg-orange-500 text-white border-orange-600">
                                 <AlertTriangle className="h-3 w-3 me-1" />
                                 {language === 'ar' ? 'مخزون منخفض' : 'Low Stock'}
                               </Badge>
