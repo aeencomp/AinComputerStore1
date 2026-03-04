@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -20,7 +20,11 @@ import {
   X,
   ArrowUp,
   ArrowDown,
+  Barcode,
+  RefreshCw,
+  Printer,
 } from "lucide-react";
+import JsBarcode from "jsbarcode";
 import type { InStoreProduct } from "@shared/schema";
 
 interface SalesUser {
@@ -213,7 +217,37 @@ export default function SalesInStoreInventory({ user }: Props) {
   const lowStockCount = products.filter(p => p.stockQuantity <= p.lowStockThreshold).length;
 
   const formatPrice = (v: string | number) =>
-    new Intl.NumberFormat('ar-IQ').format(parseFloat(String(v)) || 0);
+    new Intl.NumberFormat('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(parseFloat(String(v)) || 0);
+
+  const generateBarcode = useCallback(() => {
+    const timestamp = Date.now().toString().slice(-9);
+    const rand = Math.floor(Math.random() * 100).toString().padStart(2, '0');
+    return `STR${timestamp}${rand}`;
+  }, []);
+
+  const printBarcode = useCallback((product: InStoreProduct) => {
+    const code = product.barcode || product.sku || String(product.id);
+    const win = window.open('', '_blank', 'width=400,height=300');
+    if (!win) return;
+    const svgId = 'bc-print';
+    win.document.write(`<!DOCTYPE html><html><head><title>Barcode</title>
+      <style>
+        body { margin: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; }
+        .label { font-size: 13px; margin-top: 6px; font-weight: 600; }
+        .price { font-size: 12px; color: #555; }
+        @media print { button { display: none; } }
+      </style>
+      </head><body>
+      <svg id="${svgId}"></svg>
+      <div class="label">${product.nameAr}</div>
+      <div class="price">${formatPrice(product.price)} IQD</div>
+      <br/>
+      <button onclick="window.print()">Print</button>
+      <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"><\/script>
+      <script>JsBarcode('#${svgId}','${code}',{format:'CODE128',width:2,height:60,displayValue:true,fontSize:12});<\/script>
+      </body></html>`);
+    win.document.close();
+  }, [formatPrice]);
 
   return (
     <div className="p-4 space-y-4">
@@ -315,8 +349,8 @@ export default function SalesInStoreInventory({ user }: Props) {
                         ) : null}
                       </div>
                       <div className="flex items-center gap-3 mt-1 text-sm text-muted-foreground flex-wrap">
-                        {product.sku && <span>SKU: {product.sku}</span>}
-                        {product.barcode && <span>{language === 'ar' ? 'باركود' : 'Barcode'}: {product.barcode}</span>}
+                        {product.sku && <span className="font-mono">SKU: {product.sku}</span>}
+                        {product.barcode && <span className="font-mono">{language === 'ar' ? 'باركود' : 'Barcode'}: {product.barcode}</span>}
                         <span className="text-foreground font-medium">
                           {formatPrice(product.price)} {language === 'ar' ? 'د.ع' : 'IQD'}
                         </span>
@@ -339,6 +373,17 @@ export default function SalesInStoreInventory({ user }: Props) {
                         >
                           <ArrowUp className="h-4 w-4" />
                         </Button>
+                        {(product.barcode || product.sku) && (
+                          <Button
+                            size="icon"
+                            variant="outline"
+                            onClick={() => printBarcode(product)}
+                            data-testid={`button-barcode-${product.id}`}
+                            title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}
+                          >
+                            <Printer className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           size="icon"
                           variant="outline"
@@ -425,11 +470,28 @@ export default function SalesInStoreInventory({ user }: Props) {
               </div>
               <div>
                 <Label>{language === 'ar' ? 'الباركود' : 'Barcode'}</Label>
-                <Input
-                  value={form.barcode}
-                  onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
-                  placeholder="1234567890"
-                />
+                <div className="flex gap-2 mt-1">
+                  <Input
+                    value={form.barcode}
+                    onChange={e => setForm(f => ({ ...f, barcode: e.target.value }))}
+                    placeholder="STR..."
+                    className="font-mono text-sm"
+                    data-testid="input-product-barcode"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    onClick={() => setForm(f => ({ ...f, barcode: generateBarcode() }))}
+                    title={language === 'ar' ? 'توليد باركود تلقائي' : 'Auto-generate barcode'}
+                    data-testid="button-generate-barcode"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                  </Button>
+                </div>
+                {form.barcode && (
+                  <p className="text-xs text-muted-foreground mt-1 font-mono">{form.barcode}</p>
+                )}
               </div>
               <div>
                 <Label>{language === 'ar' ? 'الفئة' : 'Category'}</Label>
