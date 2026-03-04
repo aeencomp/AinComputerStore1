@@ -833,24 +833,24 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                             rowClass = "bg-muted/30";
                             statusEl = <Badge variant="outline" className="text-xs text-muted-foreground">{language === 'ar' ? 'غير ممسوح' : 'Not Scanned'}</Badge>;
                           } else if (row.diff === 0) {
-                            rowClass = "bg-green-50 dark:bg-green-950/20";
-                            statusEl = <Badge className="text-xs bg-green-100 text-green-700 border-green-300">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
+                            rowClass = "bg-green-100 dark:bg-green-900/40";
+                            statusEl = <Badge className="text-xs bg-green-200 text-green-900 border-green-300 font-bold">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
                           } else if (row.diff < 0) {
-                            rowClass = "bg-red-50 dark:bg-red-950/20";
-                            statusEl = <Badge className="text-xs bg-red-100 text-red-700 border-red-300">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
+                            rowClass = "bg-red-100 dark:bg-red-900/40";
+                            statusEl = <Badge className="text-xs bg-red-200 text-red-900 border-red-300 font-bold">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
                           } else {
-                            rowClass = "bg-yellow-50 dark:bg-yellow-950/20";
-                            statusEl = <Badge className="text-xs bg-yellow-100 text-yellow-700 border-yellow-300">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
+                            rowClass = "bg-yellow-100 dark:bg-yellow-900/40";
+                            statusEl = <Badge className="text-xs bg-yellow-200 text-yellow-900 border-yellow-300 font-bold">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
                           }
                           return (
-                            <tr key={row.product.id} className={`border-b ${rowClass}`} data-testid={`row-compare-${row.product.id}`}>
-                              <td className="px-3 py-2 font-medium">{row.product.nameAr}</td>
-                              <td className="px-3 py-2 text-center font-mono text-xs text-muted-foreground">
+                            <tr key={row.product.id} className={`border-b ${rowClass} text-black dark:text-white`} data-testid={`row-compare-${row.product.id}`}>
+                              <td className="px-3 py-2 font-medium text-black dark:text-white">{row.product.nameAr}</td>
+                              <td className="px-3 py-2 text-center font-mono text-xs text-black dark:text-white opacity-80">
                                 {row.product.sku || row.product.barcode || '-'}
                               </td>
-                              <td className="px-3 py-2 text-center font-bold">{row.systemQty}</td>
-                              <td className="px-3 py-2 text-center font-bold">{row.scannedQty}</td>
-                              <td className="px-3 py-2 text-center font-bold">
+                              <td className="px-3 py-2 text-center font-bold text-black dark:text-white">{row.systemQty}</td>
+                              <td className="px-3 py-2 text-center font-bold text-black dark:text-white">{row.scannedQty}</td>
+                              <td className="px-3 py-2 text-center font-bold text-black dark:text-white">
                                 {row.notScanned ? '—' : (row.diff > 0 ? `+${row.diff}` : row.diff)}
                               </td>
                               <td className="px-3 py-2 text-center">{statusEl}</td>
