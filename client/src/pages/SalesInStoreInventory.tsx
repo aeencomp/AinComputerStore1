@@ -848,9 +848,9 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                               <td className="px-3 py-2 text-center font-mono text-xs text-black dark:text-white opacity-80">
                                 {row.product.sku || row.product.barcode || '-'}
                               </td>
-                              <td className="px-3 py-2 text-center font-bold text-black dark:text-white">{row.systemQty}</td>
-                              <td className="px-3 py-2 text-center font-bold text-black dark:text-white">{row.scannedQty}</td>
-                              <td className="px-3 py-2 text-center font-bold text-black dark:text-white">
+                              <td className="px-3 py-2 text-center font-bold text-[#121111]">{row.systemQty}</td>
+                              <td className="px-3 py-2 text-center font-bold text-[#121111]">{row.scannedQty}</td>
+                              <td className="px-3 py-2 text-center font-bold text-[#121111]">
                                 {row.notScanned ? '—' : (row.diff > 0 ? `+${row.diff}` : row.diff)}
                               </td>
                               <td className="px-3 py-2 text-center">{statusEl}</td>
