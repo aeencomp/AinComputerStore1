@@ -44,6 +44,7 @@ import {
   UserSearch,
   Store
 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import type { InStoreProduct } from "@shared/schema";
 
 interface POSProduct {
@@ -438,115 +439,114 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     createOrderMutation.mutate(orderData);
   };
 
-  const printReceipt = () => {
+  const printReceipt = async () => {
     if (!lastOrder) return;
-    const isAr = language === 'ar';
-    const dir = isAr ? 'rtl' : 'ltr';
-    const fmt = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    const { toDataURL } = await import('qrcode');
+    const qrDataUrl = await toDataURL(
+      `ORDER:${lastOrder.orderNumber}|TOTAL:${lastOrder.total}`,
+      { width: 70, margin: 0 }
+    );
 
-    const payLabel = lastOrder.paymentMethod === 'cash'
-      ? (isAr ? 'نقدي' : 'Cash')
-      : lastOrder.paymentMethod === 'card'
-      ? (isAr ? 'بطاقة' : 'Card')
-      : 'ZainCash';
+    const fmt = (v: number) => v.toLocaleString('ar-IQ') + ' د.ع';
+    const subtotalNum = parseFloat(lastOrder.subtotal || '0');
+    const discountNum = parseFloat(lastOrder.discount || '0');
+    const totalNum = parseFloat(lastOrder.total || '0');
+    const saleDate = new Date(lastOrder.createdAt);
 
-    const rowsHtml = (lastOrder.items || []).map((item: any) => {
+    const payLabel = lastOrder.paymentMethod === 'cash' ? 'نقدي'
+      : lastOrder.paymentMethod === 'card' ? 'بطاقة'
+      : lastOrder.paymentMethod === 'zaincash' ? 'زين كاش'
+      : lastOrder.paymentMethod === 'qicard' ? 'كي كارد'
+      : 'عند الاستلام';
+
+    const itemRowsHtml = (lastOrder.items || []).map((item: any) => {
       const unitPrice = parseFloat(item.price);
       const lineTotal = unitPrice * item.quantity;
-      const name = isAr ? (item.nameAr || '-') : (item.nameEn || item.nameAr || '-');
-      return `<tr>
-        <td style="padding:4px 2px;border-bottom:1px solid #eee;">${name}${item.sku ? `<br/><span style="font-size:9px;color:#888;">SKU: ${item.sku}</span>` : ''}</td>
-        <td style="text-align:center;padding:4px 2px;border-bottom:1px solid #eee;">${item.quantity}</td>
-        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;">${fmt(unitPrice)}</td>
-        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;font-weight:600;">${fmt(lineTotal)}</td>
-      </tr>`;
+      return `<div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px;align-items:center;">
+        <div>
+          <div style="font-weight:800;color:#111;">${item.nameAr || item.nameEn || '-'}</div>
+          ${item.sku ? `<div style="font-size:9px;color:#888;">SKU: ${item.sku}</div>` : ''}
+        </div>
+        <div style="text-align:center;font-weight:800;color:#111;padding:0 8px;">${item.quantity}</div>
+        <div style="text-align:left;font-weight:800;color:#111;">${fmt(lineTotal)}</div>
+      </div>`;
     }).join('');
 
-    const discountNum = parseFloat(lastOrder.discount || '0');
-    const subtotalNum = parseFloat(lastOrder.subtotal || '0');
-    const totalNum = parseFloat(lastOrder.total || '0');
-
-    const discountRow = discountNum > 0 ? `
-      <div style="display:flex;justify-content:space-between;color:#16a34a;">
-        <span>${isAr ? 'الخصم' : 'Discount'}</span>
-        <span>-${fmt(discountNum)} ${isAr ? 'د.ع' : 'IQD'}</span>
+    const customerHtml = (lastOrder.customerName || lastOrder.customerPhone) ? `
+      <div style="border-bottom:1px solid #d1d5db;padding:8px 16px;font-size:12px;">
+        ${lastOrder.customerName ? `<div style="display:flex;justify-content:space-between;"><span style="font-weight:700;">الزبون:</span><span style="font-weight:800;">${lastOrder.customerName}</span></div>` : ''}
+        ${lastOrder.customerPhone ? `<div style="display:flex;justify-content:space-between;margin-top:4px;"><span style="font-weight:700;">الهاتف:</span><span style="font-weight:800;" dir="ltr">${lastOrder.customerPhone}</span></div>` : ''}
       </div>` : '';
 
-    const customerHtml = (lastOrder.customerName || lastOrder.customerPhone) ? `
-      <div style="background:#f9fafb;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;">
-        ${lastOrder.customerName ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الزبون:' : 'Customer:'}</span><span>${lastOrder.customerName}</span></div>` : ''}
-        ${lastOrder.customerPhone ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الهاتف:' : 'Phone:'}</span><span dir="ltr">${lastOrder.customerPhone}</span></div>` : ''}
+    const discountHtml = discountNum > 0 ? `
+      <div style="display:flex;justify-content:space-between;font-weight:700;color:#111;">
+        <span>الخصم:</span><span>-${fmt(discountNum)}</span>
       </div>` : '';
 
     const html = `<!DOCTYPE html>
-<html dir="${dir}" lang="${isAr ? 'ar' : 'en'}">
+<html dir="rtl" lang="ar">
 <head>
 <meta charset="UTF-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
-  @page { size: 80mm auto; margin: 4mm; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Cairo', Arial, sans-serif; font-size: 12px; color: #111; margin: 0; padding: 8px; width: 80mm; }
-  h2 { margin: 0 0 2px; font-size: 16px; }
-  p { margin: 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { border-bottom: 2px solid #333; padding: 4px 2px; font-weight: 600; }
-  .dashed { border-top: 1px dashed #aaa; margin: 8px 0; }
-  .section { background: #f9fafb; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 12px; }
-  .row { display: flex; justify-content: space-between; }
-  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; border-top: 2px solid #333; padding-top: 6px; margin-top: 4px; }
-  .footer { text-align: center; margin-top: 10px; font-size: 11px; color: #666; }
+  @page { size: 72.1mm auto; margin: 2mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  body { font-family: 'Cairo', 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; width: 72.1mm; background: white; color: #000; }
 </style>
 </head>
 <body>
-  <div style="text-align:center;border-bottom:2px dashed #aaa;padding-bottom:10px;margin-bottom:10px;">
-    <h2>العين لتجارة الحاسبات</h2>
-    <p style="font-size:11px;color:#666;">AEEN COMPUTER TRADING — العراق، كربلاء</p>
-    <p style="font-size:10px;color:#999;margin-top:4px;">${isAr ? 'إيصال بيع' : 'Sales Receipt'}</p>
+  <div style="background:#000;color:#fff;padding:14px;text-align:center;">
+    <div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">العين لتجارة الحاسبات</div>
+    <div style="font-size:12px;font-weight:700;margin-top:2px;opacity:0.9;">AEEN COMPUTER TRADING</div>
+    <div style="font-size:10px;margin-top:2px;opacity:0.75;">كربلاء - العراق</div>
   </div>
 
-  <div class="section" style="margin-bottom:10px;">
-    <div class="row"><span>${isAr ? 'رقم الطلب:' : 'Order #:'}</span><span style="font-weight:700;font-family:monospace;">${lastOrder.orderNumber}</span></div>
-    <div class="row"><span>${isAr ? 'التاريخ:' : 'Date:'}</span><span>${new Date(lastOrder.createdAt).toLocaleString(isAr ? 'ar-IQ' : 'en-US')}</span></div>
-    ${lastOrder.paymentMethod ? `<div class="row"><span>${isAr ? 'طريقة الدفع:' : 'Payment:'}</span><span style="font-weight:600;">${payLabel}</span></div>` : ''}
+  <div style="padding:10px 16px;border-bottom:2px solid #000;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;">رقم الطلب</div>
+      <div style="font-family:monospace;font-weight:900;font-size:14px;">${lastOrder.orderNumber}</div>
+    </div>
+    <img src="${qrDataUrl}" width="50" height="50"/>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px 16px;border-bottom:1px solid #d1d5db;font-size:12px;">
+    <div><div style="font-weight:700;">التاريخ</div><div style="font-weight:800;">${saleDate.toLocaleDateString('ar-IQ')}</div></div>
+    <div style="text-align:left;"><div style="font-weight:700;">الوقت</div><div style="font-weight:800;">${saleDate.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}</div></div>
   </div>
 
   ${customerHtml}
 
-  <table>
-    <thead>
-      <tr>
-        <th style="text-align:start;">${isAr ? 'المنتج' : 'Product'}</th>
-        <th style="text-align:center;">${isAr ? 'الكمية' : 'Qty'}</th>
-        <th style="text-align:end;">${isAr ? 'السعر' : 'Price'}</th>
-        <th style="text-align:end;">${isAr ? 'المجموع' : 'Total'}</th>
-      </tr>
-    </thead>
-    <tbody>${rowsHtml}</tbody>
-  </table>
-
-  <div class="dashed"></div>
-
-  <div style="font-size:12px;margin-bottom:8px;">
-    <div class="row"><span>${isAr ? 'المجموع الفرعي:' : 'Subtotal:'}</span><span>${fmt(subtotalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
-    ${discountRow}
-    <div class="total-row"><span>${isAr ? 'الإجمالي:' : 'Total:'}</span><span>${fmt(totalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
+  <div style="border:2px solid #000;border-radius:6px;overflow:hidden;margin:8px;">
+    <div style="background:#000;color:#fff;display:grid;grid-template-columns:1fr auto auto;gap:4px;padding:6px 8px;font-size:11px;font-weight:700;">
+      <div>المنتج</div><div style="padding:0 8px;">الكمية</div><div>السعر</div>
+    </div>
+    ${itemRowsHtml}
   </div>
 
-  <div class="footer">
-    <div class="dashed"></div>
-    <p>${isAr ? 'شكراً لتسوقكم معنا!' : 'Thank you for your purchase!'}</p>
-    <p style="margin-top:4px;font-size:10px;">${isAr ? 'يرجى الاحتفاظ بالوصل' : 'Please keep this receipt'}</p>
+  <div style="padding:8px 16px;font-size:12px;">
+    <div style="display:flex;justify-content:space-between;font-weight:700;"><span>المجموع:</span><span>${fmt(subtotalNum)}</span></div>
+    ${discountHtml}
+    <div style="display:flex;justify-content:space-between;background:#000;color:#fff;padding:8px 10px;border-radius:6px;margin-top:6px;font-size:15px;font-weight:900;">
+      <span>الإجمالي:</span><span>${fmt(totalNum)}</span>
+    </div>
   </div>
 
-  <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };</script>
+  <div style="text-align:center;padding:6px 16px;border-top:1px solid #d1d5db;border-bottom:1px solid #d1d5db;font-size:12px;">
+    <span style="font-weight:700;">طريقة الدفع: </span><span style="font-weight:800;">${payLabel}</span>
+  </div>
+
+  <div style="text-align:center;padding:10px 16px;border-top:2px dashed #000;margin-top:4px;">
+    <div style="font-weight:800;font-size:13px;">شكراً لتسوقكم معنا</div>
+    <div style="font-size:10px;font-weight:700;margin-top:4px;">يرجى الاحتفاظ بالوصل</div>
+    <div style="font-weight:900;font-size:14px;margin-top:6px;" dir="ltr">07850006977</div>
+  </div>
+
+  <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();};}</script>
 </body>
 </html>`;
 
-    const popup = window.open('', '_blank', 'width=400,height=650');
-    if (popup) {
-      popup.document.write(html);
-      popup.document.close();
-    }
+    const popup = window.open('', '_blank', 'width=420,height=700');
+    if (popup) { popup.document.write(html); popup.document.close(); }
   };
 
   const handleHoldOrder = () => {
@@ -1172,106 +1172,118 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
 
           {lastOrder && (
             <div className="bg-white text-black p-4 rounded-lg border">
-              {/* Store Header */}
-              <div className="text-center border-b-2 border-dashed border-gray-300 pb-3 mb-3">
-                <h2 className="font-bold text-lg">العين لتجارة الحاسبات</h2>
-                <p className="text-xs text-gray-600">AEEN COMPUTER TRADING</p>
-                <p className="text-xs text-gray-500 mt-1">العراق — كربلاء</p>
+              {/* Black Header */}
+              <div className="bg-black text-white p-4 text-center -mx-4 -mt-4 mb-4">
+                <h2 className="font-extrabold text-xl tracking-wide">العين لتجارة الحاسبات</h2>
+                <p className="text-sm font-semibold mt-1 opacity-90">AEEN COMPUTER TRADING</p>
+                <p className="text-xs mt-1 opacity-75">كربلاء - العراق</p>
               </div>
 
-              {/* Order number + date */}
-              <div className="bg-gray-50 rounded p-2 mb-3 text-xs space-y-1">
-                <div className="flex justify-between">
-                  <span className="font-semibold">{language === 'ar' ? 'رقم الطلب:' : 'Order #:'}</span>
-                  <span className="font-mono font-bold">{lastOrder.orderNumber}</span>
+              {/* Receipt Number + QR */}
+              <div className="flex justify-between items-center border-b-2 border-black pb-3 mb-3">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-wide">رقم الطلب</p>
+                  <p className="font-mono font-extrabold text-base">{lastOrder.orderNumber}</p>
                 </div>
-                <div className="flex justify-between">
-                  <span>{language === 'ar' ? 'التاريخ:' : 'Date:'}</span>
-                  <span>{new Date(lastOrder.createdAt).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')}</span>
+                <QRCodeSVG
+                  value={`ORDER:${lastOrder.orderNumber}|TOTAL:${lastOrder.total}`}
+                  size={50}
+                  level="H"
+                />
+              </div>
+
+              {/* Date / Time */}
+              <div className="grid grid-cols-2 gap-2 text-sm border-b border-gray-300 pb-3 mb-3">
+                <div>
+                  <p className="text-xs font-bold">التاريخ</p>
+                  <p className="font-extrabold">{new Date(lastOrder.createdAt).toLocaleDateString('ar-IQ')}</p>
                 </div>
-                {lastOrder.paymentMethod && (
-                  <div className="flex justify-between">
-                    <span>{language === 'ar' ? 'طريقة الدفع:' : 'Payment:'}</span>
-                    <span className="font-semibold">
-                      {lastOrder.paymentMethod === 'cash' ? (language === 'ar' ? 'نقدي' : 'Cash')
-                        : lastOrder.paymentMethod === 'card' ? (language === 'ar' ? 'بطاقة' : 'Card')
-                        : 'ZainCash'}
-                    </span>
-                  </div>
-                )}
+                <div>
+                  <p className="text-xs font-bold">الوقت</p>
+                  <p className="font-extrabold">{new Date(lastOrder.createdAt).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}</p>
+                </div>
               </div>
 
               {/* Customer */}
               {(lastOrder.customerName || lastOrder.customerPhone) && (
-                <div className="border-t border-gray-200 pt-2 mb-3 text-xs space-y-1">
+                <div className="border-b border-gray-300 pb-3 mb-3 text-sm space-y-1">
                   {lastOrder.customerName && (
                     <div className="flex justify-between">
-                      <span>{language === 'ar' ? 'الزبون:' : 'Customer:'}</span>
-                      <span>{lastOrder.customerName}</span>
+                      <span className="font-bold">الزبون:</span>
+                      <span className="font-extrabold">{lastOrder.customerName}</span>
                     </div>
                   )}
                   {lastOrder.customerPhone && (
                     <div className="flex justify-between">
-                      <span>{language === 'ar' ? 'الهاتف:' : 'Phone:'}</span>
-                      <span dir="ltr">{lastOrder.customerPhone}</span>
+                      <span className="font-bold">الهاتف:</span>
+                      <span className="font-extrabold" dir="ltr">{lastOrder.customerPhone}</span>
                     </div>
                   )}
                 </div>
               )}
 
               {/* Items Table */}
-              <div className="border-t border-b border-gray-300 py-2 mb-3">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-gray-200">
-                      <th className="text-start pb-1">{language === 'ar' ? 'المنتج' : 'Product'}</th>
-                      <th className="text-center pb-1">{language === 'ar' ? 'الكمية' : 'Qty'}</th>
-                      <th className="text-end pb-1">{language === 'ar' ? 'السعر' : 'Price'}</th>
-                      <th className="text-end pb-1">{language === 'ar' ? 'المجموع' : 'Total'}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lastOrder.items?.map((item: any, idx: number) => {
-                      const unitPrice = parseFloat(item.price);
-                      const lineTotal = unitPrice * item.quantity;
-                      return (
-                        <tr key={idx} className="border-b border-gray-100" data-testid={`receipt-item-${idx}`}>
-                          <td className="py-1">
-                            <div className="font-medium">{language === 'ar' ? (item.nameAr || '-') : (item.nameEn || item.nameAr || '-')}</div>
-                            {item.sku && <div className="text-gray-400 text-[10px]">SKU: {item.sku}</div>}
-                          </td>
-                          <td className="text-center">{item.quantity}</td>
-                          <td className="text-end">{formatPrice(unitPrice)}</td>
-                          <td className="text-end font-medium">{formatPrice(lineTotal)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+              <div className="border-2 border-black rounded-lg overflow-hidden mb-3">
+                <div className="bg-black text-white px-2 py-1">
+                  <div className="grid grid-cols-12 text-xs font-bold">
+                    <div className="col-span-6">المنتج</div>
+                    <div className="col-span-2 text-center">الكمية</div>
+                    <div className="col-span-4 text-start">المجموع</div>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {lastOrder.items?.map((item: any, idx: number) => {
+                    const unitPrice = parseFloat(item.price);
+                    const lineTotal = unitPrice * item.quantity;
+                    return (
+                      <div key={idx} className="px-2 py-2 grid grid-cols-12 text-sm items-center" data-testid={`receipt-item-${idx}`}>
+                        <div className="col-span-6">
+                          <div className="font-extrabold">{item.nameAr || item.nameEn || '-'}</div>
+                          {item.sku && <div className="text-xs font-bold text-gray-500">SKU: {item.sku}</div>}
+                        </div>
+                        <div className="col-span-2 text-center font-extrabold">{item.quantity}</div>
+                        <div className="col-span-4 text-start font-extrabold">{formatPrice(lineTotal)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Totals */}
-              <div className="space-y-1 text-sm mb-3">
-                <div className="flex justify-between">
-                  <span>{language === 'ar' ? 'المجموع الفرعي:' : 'Subtotal:'}</span>
-                  <span>{formatPrice(parseFloat(lastOrder.subtotal))}</span>
+              <div className="space-y-2 text-sm mb-3">
+                <div className="flex justify-between font-bold">
+                  <span>المجموع:</span>
+                  <span>{formatPrice(parseFloat(lastOrder.subtotal || lastOrder.total))}</span>
                 </div>
-                {parseFloat(lastOrder.discount) > 0 && (
-                  <div className="flex justify-between text-green-600">
-                    <span>{language === 'ar' ? 'الخصم:' : 'Discount:'}</span>
+                {parseFloat(lastOrder.discount || '0') > 0 && (
+                  <div className="flex justify-between font-bold">
+                    <span>الخصم:</span>
                     <span>-{formatPrice(parseFloat(lastOrder.discount))}</span>
                   </div>
                 )}
-                <div className="flex justify-between font-bold text-base border-t border-gray-300 pt-2">
-                  <span>{language === 'ar' ? 'الإجمالي:' : 'Total:'}</span>
-                  <span data-testid="text-receipt-total">{formatPrice(parseFloat(lastOrder.total))} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                <div className="flex justify-between font-extrabold text-lg bg-black text-white px-3 py-2 rounded-lg -mx-1" data-testid="text-receipt-total">
+                  <span>الإجمالي:</span>
+                  <span>{formatPrice(parseFloat(lastOrder.total))} د.ع</span>
                 </div>
               </div>
 
+              {/* Payment */}
+              <div className="text-center py-2 border-y border-gray-300 text-sm mb-3">
+                <span className="font-bold">طريقة الدفع: </span>
+                <span className="font-extrabold">
+                  {lastOrder.paymentMethod === 'cash' ? 'نقدي'
+                    : lastOrder.paymentMethod === 'card' ? 'بطاقة'
+                    : lastOrder.paymentMethod === 'zaincash' ? 'زين كاش'
+                    : lastOrder.paymentMethod === 'qicard' ? 'كي كارد'
+                    : 'عند الاستلام'}
+                </span>
+              </div>
+
               {/* Footer */}
-              <div className="text-center pt-3 border-t border-dashed border-gray-300">
-                <p className="text-xs text-gray-500">{language === 'ar' ? 'شكراً لتسوقكم معنا!' : 'Thank you for your purchase!'}</p>
-                <p className="text-[10px] text-gray-400 mt-1">{language === 'ar' ? 'يرجى الاحتفاظ بالوصل' : 'Please keep this receipt'}</p>
+              <div className="text-center pt-2 border-t-2 border-dashed border-black">
+                <p className="font-extrabold text-sm">شكراً لتسوقكم معنا</p>
+                <p className="text-xs font-bold text-gray-600 mt-1">يرجى الاحتفاظ بالوصل</p>
+                <p className="font-extrabold text-base mt-2" dir="ltr">07850006977</p>
               </div>
             </div>
           )}
