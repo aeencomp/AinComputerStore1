@@ -40,7 +40,8 @@ import {
   Clock,
   RotateCcw,
   History,
-  UserSearch
+  UserSearch,
+  Store
 } from "lucide-react";
 import type { Product } from "@shared/schema";
 
@@ -78,9 +79,10 @@ interface HeldOrder {
 
 interface SalesPOSProps {
   user: SalesUser;
+  orderType?: 'walk-in' | 'in-store';
 }
 
-export default function SalesPOS({ user }: SalesPOSProps) {
+export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -372,6 +374,7 @@ export default function SalesPOS({ user }: SalesPOSProps) {
       paymentStatus: 'success',
       discount: calculatedDiscount.toString(),
       discountReason,
+      orderType,
     };
 
     createOrderMutation.mutate(orderData);
@@ -426,6 +429,18 @@ export default function SalesPOS({ user }: SalesPOSProps) {
         <Card className="flex-1 flex flex-col overflow-hidden">
           {/* Search & Filter Header */}
           <CardHeader className="pb-3 space-y-3 border-b bg-muted/30">
+            <div className="flex items-center gap-2 mb-1">
+              {orderType === 'in-store' ? (
+                <Store className="h-5 w-5 text-violet-500" />
+              ) : (
+                <ShoppingCart className="h-5 w-5 text-green-500" />
+              )}
+              <h2 className="font-bold text-base">
+                {orderType === 'in-store'
+                  ? (language === 'ar' ? 'مبيعات المتجر' : 'In-Store Sales')
+                  : (language === 'ar' ? 'نقطة البيع' : 'Point of Sale')}
+              </h2>
+            </div>
             <div className="flex items-center gap-3">
               <div className="relative flex-1">
                 <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />

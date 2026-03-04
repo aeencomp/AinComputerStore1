@@ -151,15 +151,19 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
   const myWalkInOrders = todaysOrders.filter(o => 
     o.orderType === 'walk-in' && o.salespersonId === user.id
   );
+  const myInStoreOrders = todaysOrders.filter(o =>
+    o.orderType === 'in-store' && o.salespersonId === user.id
+  );
+  const myAllPosOrders = [...myWalkInOrders, ...myInStoreOrders];
   const onlineOrders = todaysOrders.filter(o => o.orderType === 'online');
   
   // Calculate stats based on current salesperson's orders only
-  const todaySales = myWalkInOrders.reduce((sum, order) => 
+  const todaySales = myAllPosOrders.reduce((sum, order) => 
     sum + parseFloat(order.total || '0'), 0
   );
   
-  const avgTicket = myWalkInOrders.length > 0 
-    ? todaySales / myWalkInOrders.length 
+  const avgTicket = myAllPosOrders.length > 0 
+    ? todaySales / myAllPosOrders.length 
     : 0;
 
   // Low stock products (less than 5 items)
@@ -235,7 +239,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       </div>
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
         <Card className="border-s-4 border-s-primary">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
@@ -266,7 +270,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'ar' ? 'معاملاتي' : 'My Transactions'}
+                  {language === 'ar' ? 'كاونتر (POS عام)' : 'Counter (General POS)'}
                 </p>
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin mt-2" />
@@ -286,26 +290,26 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
           </CardContent>
         </Card>
 
-        <Card className="border-s-4 border-s-blue-500">
+        <Card className="border-s-4 border-s-violet-500">
           <CardContent className="p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'ar' ? 'متوسط الفاتورة' : 'Avg. Ticket'}
+                  {language === 'ar' ? 'مبيعات المتجر' : 'In-Store Sales'}
                 </p>
                 {isLoading ? (
                   <Loader2 className="h-5 w-5 animate-spin mt-2" />
                 ) : (
-                  <p className="text-2xl font-bold text-blue-600">
-                    {formatPrice(Math.round(avgTicket))}
+                  <p className="text-2xl font-bold text-violet-600">
+                    {myInStoreOrders.length}
                     <span className="text-sm font-normal text-muted-foreground me-1">
-                      {language === 'ar' ? 'د.ع' : 'IQD'}
+                      {language === 'ar' ? 'طلب' : 'orders'}
                     </span>
                   </p>
                 )}
               </div>
-              <div className="h-12 w-12 rounded-full bg-blue-500/10 flex items-center justify-center">
-                <Calculator className="h-6 w-6 text-blue-500" />
+              <div className="h-12 w-12 rounded-full bg-violet-500/10 flex items-center justify-center">
+                <ShoppingCart className="h-6 w-6 text-violet-500" />
               </div>
             </div>
           </CardContent>
@@ -415,9 +419,9 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       </Card>
 
       <div className="grid md:grid-cols-2 gap-6">
-        {/* Recent Walk-in Sales */}
+        {/* Recent Sales - all my POS orders */}
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
+          <CardHeader className="flex flex-row items-center justify-between gap-1 pb-3">
             <CardTitle className="text-lg flex items-center gap-2">
               <Receipt className="h-5 w-5 text-primary" />
               {language === 'ar' ? 'آخر مبيعاتي' : 'My Recent Sales'}
@@ -431,21 +435,29 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin" />
               </div>
-            ) : myWalkInOrders.length === 0 ? (
+            ) : myAllPosOrders.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 <Receipt className="h-12 w-12 mx-auto mb-3 opacity-20" />
                 <p>{language === 'ar' ? 'لا توجد مبيعات اليوم' : 'No sales today'}</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {myWalkInOrders.slice(0, 5).map((order) => (
+                {myAllPosOrders
+                  .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+                  .slice(0, 5)
+                  .map((order) => (
                   <div key={order.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
                     <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                        <Users className="h-5 w-5 text-primary" />
+                      <div className={`h-10 w-10 rounded-full flex items-center justify-center ${order.orderType === 'in-store' ? 'bg-violet-500/10' : 'bg-primary/10'}`}>
+                        <Users className={`h-5 w-5 ${order.orderType === 'in-store' ? 'text-violet-500' : 'text-primary'}`} />
                       </div>
                       <div>
-                        <p className="font-medium text-sm">{order.customerName || (language === 'ar' ? 'زبون' : 'Customer')}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="font-medium text-sm">{order.customerName || (language === 'ar' ? 'زبون' : 'Customer')}</p>
+                          <Badge variant="outline" className={`text-xs py-0 ${order.orderType === 'in-store' ? 'text-violet-600 border-violet-300' : 'text-green-600 border-green-300'}`}>
+                            {order.orderType === 'in-store' ? (language === 'ar' ? 'متجر' : 'In-Store') : (language === 'ar' ? 'كاونتر' : 'Counter')}
+                          </Badge>
+                        </div>
                         <p className="text-xs text-muted-foreground">
                           {order.orderNumber} • {new Date(order.createdAt).toLocaleTimeString(language === 'ar' ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                         </p>

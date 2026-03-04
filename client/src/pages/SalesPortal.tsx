@@ -110,10 +110,17 @@ export default function SalesPortal() {
     },
     { 
       path: "/sales/pos", 
-      label: language === 'ar' ? 'نقطة البيع' : 'Point of Sale', 
+      label: language === 'ar' ? 'POS عام' : 'General POS', 
       icon: ShoppingCart,
       permission: currentUser.permissions.canPos,
       color: 'text-green-500',
+    },
+    { 
+      path: "/sales/instore-pos", 
+      label: language === 'ar' ? 'مبيعات المتجر' : 'In-Store', 
+      icon: Store,
+      permission: currentUser.permissions.canPos,
+      color: 'text-violet-500',
     },
     { 
       path: "/sales/inventory", 
@@ -313,7 +320,8 @@ export default function SalesPortal() {
 
         {/* Render Active Page */}
         {(location === "/sales" || location === "/sales/") && <SalesDashboard user={currentUser} />}
-        {location === "/sales/pos" && <SalesPOS user={currentUser} />}
+        {location === "/sales/pos" && <SalesPOS user={currentUser} orderType="walk-in" />}
+        {location === "/sales/instore-pos" && <SalesPOS user={currentUser} orderType="in-store" />}
         {location === "/sales/inventory" && <SalesInventory user={currentUser} />}
         {location === "/sales/reports" && <SalesReports user={currentUser} />}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}

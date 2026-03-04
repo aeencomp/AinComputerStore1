@@ -40,7 +40,7 @@ interface SalesReportsProps {
 export default function SalesReports({ user }: SalesReportsProps) {
   const { language } = useLanguage();
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
-  const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'online' | 'walk-in'>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'online' | 'walk-in' | 'in-store'>('all');
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
@@ -76,6 +76,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
     if (orderTypeFilter !== 'all') {
       const orderType = order.orderType || 'online';
       if (orderTypeFilter === 'walk-in' && orderType !== 'walk-in') return false;
+      if (orderTypeFilter === 'in-store' && orderType !== 'in-store') return false;
       if (orderTypeFilter === 'online' && orderType !== 'online') return false;
     }
     
@@ -86,7 +87,8 @@ export default function SalesReports({ user }: SalesReportsProps) {
   const orderCount = filteredOrders.length;
   const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
   const walkInOrders = filteredOrders.filter(o => o.orderType === 'walk-in').length;
-  const onlineOrders = filteredOrders.filter(o => o.orderType !== 'walk-in').length;
+  const inStoreOrders = filteredOrders.filter(o => o.orderType === 'in-store').length;
+  const onlineOrders = filteredOrders.filter(o => o.orderType === 'online').length;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ar-IQ').format(price);
@@ -125,20 +127,21 @@ export default function SalesReports({ user }: SalesReportsProps) {
             </SelectContent>
           </Select>
           <Select value={orderTypeFilter} onValueChange={(v: any) => setOrderTypeFilter(v)}>
-            <SelectTrigger className="w-40" data-testid="select-order-type">
+            <SelectTrigger className="w-44" data-testid="select-order-type">
               <ShoppingCart className="h-4 w-4 me-2" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">{language === 'ar' ? 'جميع الطلبات' : 'All Orders'}</SelectItem>
-              <SelectItem value="walk-in">{language === 'ar' ? 'في المتجر' : 'Walk-in'}</SelectItem>
+              <SelectItem value="walk-in">{language === 'ar' ? 'كاونتر (POS عام)' : 'Counter (General POS)'}</SelectItem>
+              <SelectItem value="in-store">{language === 'ar' ? 'مبيعات المتجر' : 'In-Store Sales'}</SelectItem>
               <SelectItem value="online">{language === 'ar' ? 'أونلاين' : 'Online'}</SelectItem>
             </SelectContent>
           </Select>
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -192,9 +195,24 @@ export default function SalesReports({ user }: SalesReportsProps) {
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'ar' ? 'في المتجر / أونلاين' : 'Walk-in / Online'}
+                  {language === 'ar' ? 'كاونتر / متجر' : 'Counter / In-Store'}
                 </p>
-                <p className="text-xl font-bold">{walkInOrders} / {onlineOrders}</p>
+                <p className="text-xl font-bold">{walkInOrders} / {inStoreOrders}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-sky-500/10 rounded-lg">
+                <TrendingUp className="h-5 w-5 text-sky-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'ar' ? 'أونلاين' : 'Online'}
+                </p>
+                <p className="text-xl font-bold">{onlineOrders}</p>
               </div>
             </div>
           </CardContent>
@@ -233,12 +251,19 @@ export default function SalesReports({ user }: SalesReportsProps) {
                       <td className="p-3 font-mono">{order.orderNumber}</td>
                       <td className="p-3">{order.customerName}</td>
                       <td className="p-3">
-                        <Badge variant={order.orderType === 'walk-in' ? 'default' : 'secondary'}>
-                          {order.orderType === 'walk-in' 
-                            ? (language === 'ar' ? 'في المتجر' : 'Walk-in')
-                            : (language === 'ar' ? 'أونلاين' : 'Online')
-                          }
-                        </Badge>
+                        {order.orderType === 'in-store' ? (
+                          <Badge className="bg-violet-500/15 text-violet-700 border-violet-300">
+                            {language === 'ar' ? 'مبيعات المتجر' : 'In-Store'}
+                          </Badge>
+                        ) : order.orderType === 'walk-in' ? (
+                          <Badge variant="default">
+                            {language === 'ar' ? 'كاونتر' : 'Counter'}
+                          </Badge>
+                        ) : (
+                          <Badge variant="secondary">
+                            {language === 'ar' ? 'أونلاين' : 'Online'}
+                          </Badge>
+                        )}
                       </td>
                       <td className="p-3">{getPaymentMethodLabel(order.paymentMethod)}</td>
                       <td className="p-3 text-end font-bold">{formatPrice(parseFloat(order.total))} IQD</td>

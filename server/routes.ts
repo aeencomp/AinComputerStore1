@@ -666,12 +666,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         paymentStatus,
         discount,
         discountReason,
-        notes 
+        notes,
+        orderType: requestedOrderType,
       } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ error: "السلة فارغة" });
       }
+
+      const allowedOrderTypes = ['walk-in', 'in-store'];
+      const resolvedOrderType = allowedOrderTypes.includes(requestedOrderType) ? requestedOrderType : 'walk-in';
 
       // Validate discount permission
       if (discount && parseFloat(discount) > 0 && !currentUser.canApplyDiscount) {
@@ -707,7 +711,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Update order with additional POS fields
       await db.update(orders).set({
-        orderType: 'walk-in',
+        orderType: resolvedOrderType,
         discount: discount || "0",
         discountReason: discountReason || null,
         salespersonId: salesUserId,
