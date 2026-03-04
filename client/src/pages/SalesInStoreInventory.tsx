@@ -829,28 +829,29 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                         {comparisonRows.map((row, i) => {
                           let rowClass = "";
                           let statusEl = null;
+                          const textClass = "text-black";
                           if (row.notScanned) {
                             rowClass = "bg-muted/30";
-                            statusEl = <Badge variant="outline" className="text-xs text-muted-foreground">{language === 'ar' ? 'غير ممسوح' : 'Not Scanned'}</Badge>;
+                            statusEl = <Badge variant="outline" className="text-xs text-black border-muted-foreground/30">{language === 'ar' ? 'غير ممسوح' : 'Not Scanned'}</Badge>;
                           } else if (row.diff === 0) {
                             rowClass = "bg-green-100 dark:bg-green-950/40";
-                            statusEl = <Badge variant="outline" className="text-xs bg-green-600 text-black border-green-700 font-bold">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
+                            statusEl = <Badge variant="outline" className="text-xs bg-green-500 text-black border-green-600 font-bold">{language === 'ar' ? 'مطابق' : 'Match'}</Badge>;
                           } else if (row.diff < 0) {
                             rowClass = "bg-red-100 dark:bg-red-950/40";
-                            statusEl = <Badge variant="outline" className="text-xs bg-red-600 text-black border-red-700 font-bold">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
+                            statusEl = <Badge variant="outline" className="text-xs bg-red-500 text-black border-red-600 font-bold">{language === 'ar' ? 'ناقص' : 'Short'}</Badge>;
                           } else {
                             rowClass = "bg-yellow-100 dark:bg-yellow-950/40";
-                            statusEl = <Badge variant="outline" className="text-xs bg-yellow-600 text-black border-yellow-700 font-bold">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
+                            statusEl = <Badge variant="outline" className="text-xs bg-yellow-500 text-black border-yellow-600 font-bold">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
                           }
                           return (
-                            <tr key={row.product.id} className={`border-b ${rowClass}`} data-testid={`row-compare-${row.product.id}`}>
-                              <td className="px-3 py-2 font-medium">{row.product.nameAr}</td>
-                              <td className="px-3 py-2 text-center font-mono text-xs text-muted-foreground">
+                            <tr key={row.product.id} className={`border-b ${rowClass} text-black`} data-testid={`row-compare-${row.product.id}`}>
+                              <td className="px-3 py-2 font-medium text-black">{row.product.nameAr}</td>
+                              <td className="px-3 py-2 text-center font-mono text-xs text-black">
                                 {row.product.sku || row.product.barcode || '-'}
                               </td>
-                              <td className="px-3 py-2 text-center font-bold">{row.systemQty}</td>
-                              <td className="px-3 py-2 text-center font-bold">{row.scannedQty}</td>
-                              <td className="px-3 py-2 text-center font-bold">
+                              <td className="px-3 py-2 text-center font-bold text-black">{row.systemQty}</td>
+                              <td className="px-3 py-2 text-center font-bold text-black">{row.scannedQty}</td>
+                              <td className="px-3 py-2 text-center font-bold text-black">
                                 {row.notScanned ? '—' : (row.diff > 0 ? `+${row.diff}` : row.diff)}
                               </td>
                               <td className="px-3 py-2 text-center">{statusEl}</td>
