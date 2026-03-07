@@ -214,6 +214,7 @@ export default function NewRepairRequest() {
       high: isRTL ? 'مرتفع' : 'High',
       normal: isRTL ? 'عادي' : 'Normal',
       low: isRTL ? 'منخفض' : 'Low',
+      vip: isRTL ? 'VIP - عميل مميز' : 'VIP',
     }[createdTicket.priority] || createdTicket.priority;
 
     const deviceTypeText = {
@@ -830,6 +831,7 @@ export default function NewRepairRequest() {
                               <SelectItem value="normal">{isRTL ? 'عادية' : 'Normal'}</SelectItem>
                               <SelectItem value="high">{isRTL ? 'عالية' : 'High'}</SelectItem>
                               <SelectItem value="urgent">{isRTL ? 'عاجلة' : 'Urgent'}</SelectItem>
+                              <SelectItem value="vip">{isRTL ? 'VIP - عميل مميز' : 'VIP'}</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
