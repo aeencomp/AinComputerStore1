@@ -5511,5 +5511,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // ============ WHATSAPP MARKETING ROUTES ============
+
+  app.get('/api/admin/whatsapp/templates', async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
+    const wabaId = process.env.WHATSAPP_WABA_ID;
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    if (!wabaId || !token) return res.status(500).json({ error: 'WhatsApp not configured' });
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/v18.0/${wabaId}/message_templates?fields=name,status,language,components&access_token=${token}`
+      );
+      const data = await response.json() as any;
+      return res.json(data);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/admin/whatsapp/send', async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
+    const { to, templateName, language, params } = req.body;
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    if (!phoneNumberId || !token) return res.status(500).json({ error: 'WhatsApp not configured' });
+    if (!to || !templateName) return res.status(400).json({ error: 'Missing required fields' });
+
+    let cleanPhone = to.replace(/[\s\-]/g, '');
+    if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
+    if (cleanPhone.startsWith('07')) cleanPhone = '964' + cleanPhone.substring(1);
+    if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
+
+    const components: any[] = [];
+    if (params && params.length > 0) {
+      components.push({
+        type: 'body',
+        parameters: params.map((p: string) => ({ type: 'text', text: p }))
+      });
+    }
+
+    try {
+      const response = await fetch(
+        `https://graph.facebook.com/v18.0/${phoneNumberId}/messages`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            messaging_product: 'whatsapp',
+            to: cleanPhone,
+            type: 'template',
+            template: {
+              name: templateName,
+              language: { code: language || 'ar' },
+              ...(components.length > 0 && { components })
+            }
+          })
+        }
+      );
+      const data = await response.json() as any;
+      if (!response.ok) return res.status(400).json({ error: data.error?.message || 'Send failed' });
+      return res.json({ success: true, messageId: data.messages?.[0]?.id });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
   return httpServer;
 }
