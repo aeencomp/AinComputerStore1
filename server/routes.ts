@@ -6,7 +6,7 @@ import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
-import { sendTicketCreatedMessage, sendTicketUpdatedMessage } from "./whatsapp";
+import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
 import { adminNotifications } from "./admin-notifications";
 import { zaincash } from "./zaincash";
@@ -5747,6 +5747,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.json({ success: true, messageId: data.messages?.[0]?.id });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ============ WHATSAPP INCOMING WEBHOOK ============
+
+  // Meta verification handshake (GET)
+  app.get('/api/whatsapp/webhook', (req: any, res: any) => {
+    const mode      = req.query['hub.mode'];
+    const token     = req.query['hub.verify_token'];
+    const challenge = req.query['hub.challenge'];
+
+    const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'alain_verify_token';
+
+    if (mode === 'subscribe' && token === verifyToken) {
+      console.log('WhatsApp webhook verified');
+      return res.status(200).send(challenge);
+    }
+    return res.status(403).json({ error: 'Forbidden' });
+  });
+
+  // Incoming message handler (POST) — auto-reply to any customer message
+  app.post('/api/whatsapp/webhook', async (req: any, res: any) => {
+    // Always respond 200 immediately so Meta doesn't retry
+    res.status(200).send('EVENT_RECEIVED');
+
+    try {
+      const body = req.body;
+      if (body?.object !== 'whatsapp_business_account') return;
+
+      const entries = body.entry || [];
+      for (const entry of entries) {
+        for (const change of (entry.changes || [])) {
+          const value = change.value;
+          const messages = value?.messages || [];
+
+          for (const msg of messages) {
+            // Skip status updates (delivered/read receipts), only handle real incoming messages
+            if (!msg.from || !msg.type) continue;
+            // Avoid replying to our own outgoing messages echoed back
+            if (msg.type === 'reaction') continue;
+
+            const from = msg.from; // phone in international format e.g. 9647850006977
+
+            const autoReply =
+              'عذراً، هذا الخط مخصص للرسائل الصادرة فقط.\n' +
+              'للتواصل معنا يرجى الاتصال على: 07850006977\n\n' +
+              'Sorry, this line is for outgoing messages only.\n' +
+              'To contact us please call: 07850006977';
+
+            await sendWhatsAppMessage(from, autoReply);
+            console.log(`WhatsApp auto-reply sent to ${from}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('WhatsApp webhook handler error:', err);
     }
   });
 
