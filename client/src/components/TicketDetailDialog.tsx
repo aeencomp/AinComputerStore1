@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt } from 'lucide-react';
+import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt, MessageCircle, MessageCircleOff } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
 import { format } from 'date-fns';
@@ -200,13 +200,29 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
       });
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets', ticketId] });
       toast({
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
       });
+      if (response?._whatsappStatus === 'sent') {
+        toast({
+          title: isRTL ? 'تم إرسال رسالة واتساب' : 'WhatsApp Message Sent',
+          description: isRTL
+            ? 'تم إشعار العميل بتحديث حالة التذكرة عبر واتساب'
+            : 'Customer was notified about the ticket status update via WhatsApp',
+        });
+      } else if (response?._whatsappStatus && response._whatsappStatus.startsWith('failed')) {
+        toast({
+          title: isRTL ? 'فشل إرسال واتساب' : 'WhatsApp Not Sent',
+          description: isRTL
+            ? 'لم يتم إرسال إشعار واتساب للعميل'
+            : 'Could not send WhatsApp notification to customer',
+          variant: 'destructive',
+        });
+      }
     },
     onError: () => {
       toast({
