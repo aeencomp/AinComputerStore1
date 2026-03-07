@@ -186,7 +186,7 @@ export async function sendTicketUpdatedMessage(
   if (costEstimate)   extras.push(`التكلفة المقدرة: ${costEstimate} د.ع`);
   if (finalCost)      extras.push(`التكلفة النهائية: ${finalCost} د.ع`);
   if (technicianNotes) extras.push(`ملاحظات: ${technicianNotes}`);
-  const extraText = extras.length > 0 ? extras.join('\n') : 'للاستفسار تواصل معنا على 07850006977';
+  const extraText = extras.length > 0 ? extras.join('\n') : '-';
 
   // Use the repair_status_update template (approved template — works for any number)
   const templateResult = await sendWhatsAppTemplate(
