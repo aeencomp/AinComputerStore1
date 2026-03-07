@@ -738,11 +738,15 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                 </div>
               )}
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <h3 className="font-semibold text-sm">{isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</h3>
+                <h3 className="font-semibold text-sm">{isRTL ? 'خيارات الطباعة' : 'Print Options'}</h3>
                 <div className="flex gap-2 flex-wrap">
                   <Button size="sm" onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-dialog-print-label">
                     <Printer className="h-4 w-4" />
-                    {barcodeReady ? (isRTL ? 'طباعة' : 'Print') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
+                    {barcodeReady ? (isRTL ? 'بطاقة الباركود' : 'Barcode Label') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
+                  </Button>
+                  <Button size="sm" variant="secondary" onClick={handlePrintCustomerReceipt} className="gap-2" disabled={!qrCodeDataUrl} data-testid="button-dialog-print-receipt">
+                    <Receipt className="h-4 w-4" />
+                    {qrCodeDataUrl ? (isRTL ? 'إيصال العميل' : 'Customer Receipt') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
                   </Button>
                   {dialogActiveTickets.length > 1 && (
                     <Button size="sm" variant="secondary" onClick={handlePrintSummary} className="gap-2" data-testid="button-dialog-print-summary">
