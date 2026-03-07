@@ -97,14 +97,31 @@ export default function TechnicianDashboard() {
 
   const statusUpdateMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      return await apiRequest('PATCH', `/api/admin/repair-tickets/${id}`, { status });
+      const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${id}`, { status });
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
       toast({
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
       });
+      if (response?._whatsappStatus === 'sent') {
+        toast({
+          title: language === 'ar' ? 'تم إرسال رسالة واتساب' : 'WhatsApp Message Sent',
+          description: language === 'ar'
+            ? 'تم إشعار العميل بتحديث حالة التذكرة عبر واتساب'
+            : 'Customer was notified about the ticket status update via WhatsApp',
+        });
+      } else if (response?._whatsappStatus?.startsWith('failed')) {
+        toast({
+          title: language === 'ar' ? 'فشل إرسال واتساب' : 'WhatsApp Not Sent',
+          description: language === 'ar'
+            ? 'لم يتم إرسال إشعار واتساب للعميل'
+            : 'Could not send WhatsApp notification to customer',
+          variant: 'destructive',
+        });
+      }
     },
     onError: () => {
       toast({

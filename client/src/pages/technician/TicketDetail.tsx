@@ -115,18 +115,35 @@ export default function TicketDetail() {
   const updateMutation = useMutation({
     mutationFn: async (data: z.infer<typeof updateSchema>) => {
       if (!params?.id) throw new Error('No ticket ID');
-      return await apiRequest('PATCH', `/api/admin/repair-tickets/${params.id}`, {
+      const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${params.id}`, {
         ...data,
         estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
       });
+      return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets', params?.id] });
       toast({
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
       });
+      if (response?._whatsappStatus === 'sent') {
+        toast({
+          title: isRTL ? 'تم إرسال رسالة واتساب' : 'WhatsApp Message Sent',
+          description: isRTL
+            ? 'تم إشعار العميل بتحديث حالة التذكرة عبر واتساب'
+            : 'Customer was notified about the ticket status update via WhatsApp',
+        });
+      } else if (response?._whatsappStatus?.startsWith('failed')) {
+        toast({
+          title: isRTL ? 'فشل إرسال واتساب' : 'WhatsApp Not Sent',
+          description: isRTL
+            ? 'لم يتم إرسال إشعار واتساب للعميل'
+            : 'Could not send WhatsApp notification to customer',
+          variant: 'destructive',
+        });
+      }
     },
     onError: () => {
       toast({
