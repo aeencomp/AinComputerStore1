@@ -974,3 +974,19 @@ export const insertInStoreProductSchema = createInsertSchema(inStoreProducts).om
 
 export type InsertInStoreProduct = z.infer<typeof insertInStoreProductSchema>;
 export type InStoreProduct = typeof inStoreProducts.$inferSelect;
+
+// ==================== Recycle Bin ====================
+
+export const recycleBin = pgTable("recycle_bin", {
+  id: serial("id").primaryKey(),
+  itemType: text("item_type").notNull(), // 'order' | 'repair_ticket' | 'product'
+  itemId: text("item_id").notNull(),
+  itemLabel: text("item_label").notNull(),
+  section: text("section").notNull(), // 'online' | 'walk-in' | 'repair' | 'product'
+  data: jsonb("data").notNull(),
+  deletedAt: timestamp("deleted_at").defaultNow().notNull(),
+  deletedBy: text("deleted_by").notNull().default("admin"),
+});
+
+export type RecycleBinItem = typeof recycleBin.$inferSelect;
+export type InsertRecycleBinItem = typeof recycleBin.$inferInsert;

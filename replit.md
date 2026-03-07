@@ -68,6 +68,14 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
       - Merge mode updates existing records by serial number
     - Routes: /battery/login, /battery (dashboard), /battery/manage, /battery/pos, /battery/reports
     - Dashboard displays stats for both batteries and adapters (types, units, low stock)
+-   **Recycle Bin**: Admin panel recycle bin at `/admin/recycle-bin` for recovering deleted records:
+    - Captures soft-delete snapshots for: online orders, walk-in orders, repair tickets, products
+    - Filter by section (all / online / walk-in / repair / product) + search by label
+    - Restore items back to their original tables with one click
+    - Permanent delete with confirmation dialog
+    - "Empty recycle bin" button to clear all items
+    - API: GET/DELETE `/api/admin/recycle-bin`, POST `/api/admin/recycle-bin/:id/restore`, DELETE `/api/admin/recycle-bin/all`
+    - Database table: `recycle_bin` (id, item_type, item_id, item_label, section, data jsonb, deleted_at, deleted_by)
 -   **SaaS Repair Shop Platform**: Multi-tenant platform allowing external repair shops to subscribe and use an isolated version of the repair management system.
     - **Platform Admin** (`/admin/platform`): Platform owner manages all shops — create shops, set subscription status (trial/active/expired/suspended), set expiry dates, view ticket counts. Manual payment workflow (platform owner marks shop active after receiving payment).
     - **Shop Login** (`/shop/login`): Username/password login for each shop. Blocked with clear Arabic/English message if subscription expired or suspended. Stores shopName in localStorage for printed receipts.

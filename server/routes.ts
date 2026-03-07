@@ -1163,6 +1163,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/products/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      const product = await storage.getProduct(id);
+      if (product) {
+        await storage.addToRecycleBin({
+          itemType: 'product',
+          itemId: id,
+          itemLabel: (product as any).nameAr || (product as any).nameEn || id,
+          section: 'product',
+          data: product,
+          deletedBy: 'admin',
+        });
+      }
       await storage.deleteProduct(id);
       return res.json({ success: true });
     } catch (error) {
@@ -1816,6 +1827,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/orders/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      const order = await storage.getOrder(id);
+      if (order) {
+        await storage.addToRecycleBin({
+          itemType: 'order',
+          itemId: id,
+          itemLabel: order.orderNumber || id,
+          section: order.orderType || 'online',
+          data: order,
+          deletedBy: 'admin',
+        });
+      }
       await storage.deleteOrder(id);
       return res.json({ success: true });
     } catch (error) {
@@ -2434,6 +2456,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.delete("/api/admin/repair-tickets/:id", async (req, res) => {
     try {
       const { id } = req.params;
+      const ticket = await storage.getRepairTicket(id);
+      if (ticket) {
+        await storage.addToRecycleBin({
+          itemType: 'repair_ticket',
+          itemId: id,
+          itemLabel: ticket.ticketNumber || id,
+          section: 'repair',
+          data: ticket,
+          deletedBy: 'admin',
+        });
+      }
       await storage.deleteRepairTicket(id);
       return res.json({ success: true });
     } catch (error) {
@@ -5271,6 +5304,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   startDesktopPriceSync();
+
+  // ─── Recycle Bin Routes ───────────────────────────────────────────────────
+
+  app.get("/api/admin/recycle-bin", async (req: any, res) => {
+    if (!(req.session as any).adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const items = await storage.getRecycleBin();
+      return res.json(items);
+    } catch (error) {
+      console.error("Error fetching recycle bin:", error);
+      return res.status(500).json({ error: "Failed to fetch recycle bin" });
+    }
+  });
+
+  app.post("/api/admin/recycle-bin/:id/restore", async (req: any, res) => {
+    if (!(req.session as any).adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const id = parseInt(req.params.id);
+      const result = await storage.restoreRecycleBinItem(id);
+      if (!result.success) {
+        return res.status(404).json({ error: "Item not found or could not be restored" });
+      }
+      return res.json({ success: true, itemType: result.itemType });
+    } catch (error) {
+      console.error("Error restoring recycle bin item:", error);
+      return res.status(500).json({ error: "Failed to restore item" });
+    }
+  });
+
+  app.delete("/api/admin/recycle-bin/all", async (req: any, res) => {
+    if (!(req.session as any).adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      await storage.clearRecycleBin();
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error clearing recycle bin:", error);
+      return res.status(500).json({ error: "Failed to clear recycle bin" });
+    }
+  });
+
+  app.delete("/api/admin/recycle-bin/:id", async (req: any, res) => {
+    if (!(req.session as any).adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const id = parseInt(req.params.id);
+      await storage.deleteFromRecycleBin(id);
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting recycle bin item:", error);
+      return res.status(500).json({ error: "Failed to delete item" });
+    }
+  });
 
   // ─── SaaS Platform Routes ────────────────────────────────────────────────
 

@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct, type RecycleBinItem } from "@shared/schema";
 import bcrypt from "bcrypt";
 import { randomUUID } from "crypto";
 
@@ -197,6 +197,14 @@ export interface IStorage {
   deleteInStoreProduct(id: number): Promise<void>;
   adjustInStoreProductStock(id: number, adjustment: number): Promise<InStoreProduct | undefined>;
   bulkSetInStoreStock(updates: { id: number; quantity: number }[]): Promise<number>;
+
+  // Recycle Bin
+  addToRecycleBin(item: { itemType: string; itemId: string; itemLabel: string; section: string; data: any; deletedBy: string }): Promise<RecycleBinItem>;
+  getRecycleBin(): Promise<RecycleBinItem[]>;
+  getRecycleBinItem(id: number): Promise<RecycleBinItem | undefined>;
+  restoreRecycleBinItem(id: number): Promise<{ success: boolean; itemType: string }>;
+  deleteFromRecycleBin(id: number): Promise<void>;
+  clearRecycleBin(): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -943,6 +951,13 @@ export class MemStorage implements IStorage {
   async deleteInStoreProduct(_id: number): Promise<void> {}
   async adjustInStoreProductStock(_id: number, _adj: number): Promise<InStoreProduct | undefined> { return undefined; }
   async bulkSetInStoreStock(_updates: { id: number; quantity: number }[]): Promise<number> { return 0; }
+
+  async addToRecycleBin(_item: any): Promise<RecycleBinItem> { throw new Error('Not implemented'); }
+  async getRecycleBin(): Promise<RecycleBinItem[]> { return []; }
+  async getRecycleBinItem(_id: number): Promise<RecycleBinItem | undefined> { return undefined; }
+  async restoreRecycleBinItem(_id: number): Promise<{ success: boolean; itemType: string }> { return { success: false, itemType: '' }; }
+  async deleteFromRecycleBin(_id: number): Promise<void> {}
+  async clearRecycleBin(): Promise<void> {}
 }
 
 import { DrizzleStorage } from "./db-storage";

@@ -31,6 +31,7 @@ import AdminDiscountCodes from "@/pages/AdminDiscountCodes";
 import AdminAnalytics from "@/pages/AdminAnalytics";
 import PlatformAdmin from "@/pages/admin/PlatformAdmin";
 import AdminWhatsApp from "@/pages/AdminWhatsApp";
+import RecycleBin from "@/pages/RecycleBin";
 import ShopLogin from "@/pages/shop/ShopLogin";
 import ShopDashboard from "@/pages/shop/ShopDashboard";
 import ShopNewRepair from "@/pages/shop/ShopNewRepair";
@@ -89,6 +90,7 @@ function Router() {
       <Route path="/admin/analytics" component={AdminAnalytics}/>
       <Route path="/admin/whatsapp" component={AdminWhatsApp}/>
       <Route path="/admin/platform" component={PlatformAdmin}/>
+      <Route path="/admin/recycle-bin" component={RecycleBin}/>
       <Route path="/sales/login" component={SalesLogin}/>
       <Route path="/sales" component={SalesPortal}/>
       <Route path="/sales/:rest*" component={SalesPortal}/>

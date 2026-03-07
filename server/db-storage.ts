@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, saasShops, saasUsers, saasRepairCustomers, saasRepairTickets, inStoreProducts } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct, type RecycleBinItem, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, saasShops, saasUsers, saasRepairCustomers, saasRepairTickets, inStoreProducts, recycleBin } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte, or, like, ilike, not, inArray } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -1433,5 +1433,67 @@ export class DrizzleStorage implements IStorage {
 
   async getInStoreProducts(): Promise<InStoreProduct[]> {
     return await db.select().from(inStoreProducts);
+  }
+
+  // ==================== Recycle Bin ====================
+
+  async addToRecycleBin(item: { itemType: string; itemId: string; itemLabel: string; section: string; data: any; deletedBy: string }): Promise<RecycleBinItem> {
+    const result = await db.insert(recycleBin).values({
+      itemType: item.itemType,
+      itemId: item.itemId,
+      itemLabel: item.itemLabel,
+      section: item.section,
+      data: item.data,
+      deletedBy: item.deletedBy,
+    }).returning();
+    return result[0];
+  }
+
+  async getRecycleBin(): Promise<RecycleBinItem[]> {
+    return await db.select().from(recycleBin).orderBy(desc(recycleBin.deletedAt));
+  }
+
+  async getRecycleBinItem(id: number): Promise<RecycleBinItem | undefined> {
+    const result = await db.select().from(recycleBin).where(eq(recycleBin.id, id));
+    return result[0];
+  }
+
+  async restoreRecycleBinItem(id: number): Promise<{ success: boolean; itemType: string }> {
+    const item = await this.getRecycleBinItem(id);
+    if (!item) return { success: false, itemType: '' };
+
+    const data = item.data as any;
+
+    try {
+      if (item.itemType === 'order') {
+        const restored = { ...data };
+        if (restored.createdAt) restored.createdAt = new Date(restored.createdAt);
+        await db.insert(orders).values(restored).onConflictDoNothing();
+      } else if (item.itemType === 'repair_ticket') {
+        const restored = { ...data };
+        if (restored.createdAt) restored.createdAt = new Date(restored.createdAt);
+        if (restored.updatedAt) restored.updatedAt = new Date(restored.updatedAt);
+        if (restored.estimatedCompletion) restored.estimatedCompletion = new Date(restored.estimatedCompletion);
+        await db.insert(repairTickets).values(restored).onConflictDoNothing();
+      } else if (item.itemType === 'product') {
+        const restored = { ...data };
+        if (restored.createdAt) restored.createdAt = new Date(restored.createdAt);
+        await db.insert(products).values(restored).onConflictDoNothing();
+      }
+
+      await db.delete(recycleBin).where(eq(recycleBin.id, id));
+      return { success: true, itemType: item.itemType };
+    } catch (err) {
+      console.error('[RecycleBin] Restore error:', err);
+      return { success: false, itemType: item.itemType };
+    }
+  }
+
+  async deleteFromRecycleBin(id: number): Promise<void> {
+    await db.delete(recycleBin).where(eq(recycleBin.id, id));
+  }
+
+  async clearRecycleBin(): Promise<void> {
+    await db.delete(recycleBin);
   }
 }
