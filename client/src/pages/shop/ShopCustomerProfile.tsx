@@ -45,7 +45,6 @@ export default function ShopCustomerProfile() {
       case 'waiting-parts': return 'bg-orange-500/20 text-orange-700 dark:text-orange-400';
       case 'completed': return 'bg-green-500/20 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/20 text-gray-700 dark:text-gray-400';
-      case 'vip': return 'bg-purple-500/20 text-purple-700 dark:text-purple-400';
       case 'rejected': return 'bg-red-500/20 text-red-700 dark:text-red-400';
       case 'unrepairable': return 'bg-red-500/20 text-red-700 dark:text-red-400';
       default: return '';

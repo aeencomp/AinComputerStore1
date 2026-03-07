@@ -91,7 +91,7 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
 
   useEffect(() => {
     if (ticket) {
-      prevStatusRef.current = ticket.status;
+      prevStatusRef.current = ticket.priority;
       form.reset({
         status: ticket.status,
         priority: ticket.priority,
@@ -103,10 +103,10 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
     }
   }, [ticket, form]);
 
-  const watchedStatus = form.watch('status');
+  const watchedPriority = form.watch('priority');
   useEffect(() => {
     const prev = prevStatusRef.current;
-    const current = watchedStatus;
+    const current = watchedPriority;
     if (!prev || prev === current) return;
     if (current === 'vip' && prev !== 'vip') {
       const cur = parseFloat(form.getValues('finalCost') || '0') || 0;
@@ -116,7 +116,7 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
       form.setValue('finalCost', String(Math.max(0, cur - 25000)));
     }
     prevStatusRef.current = current;
-  }, [watchedStatus, form]);
+  }, [watchedPriority, form]);
 
   useEffect(() => {
     setBarcodeReady(false);
@@ -240,7 +240,6 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
       'waiting-parts': isRTL ? 'انتظار قطع' : 'Waiting Parts',
       completed: isRTL ? 'مكتمل' : 'Completed',
       delivered: isRTL ? 'مسلم' : 'Delivered',
-      vip: isRTL ? 'VIP - عميل مميز' : 'VIP',
       rejected: isRTL ? 'مرفوض' : 'Rejected',
       unrepairable: isRTL ? 'لا يمكن إصلاحه' : 'Unrepairable',
     };
@@ -312,7 +311,6 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
       case 'waiting-parts': return 'bg-orange-500/20 text-orange-700 dark:text-orange-400';
       case 'completed': return 'bg-green-500/20 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/20 text-gray-700 dark:text-gray-400';
-      case 'vip': return 'bg-purple-500/20 text-purple-700 dark:text-purple-400';
       case 'rejected': return 'bg-red-500/20 text-red-700 dark:text-red-400';
       case 'unrepairable': return 'bg-red-500/20 text-red-700 dark:text-red-400';
       default: return '';
@@ -450,7 +448,6 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
                               <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                               <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                               <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
-                              <SelectItem value="vip">{t('repair.status.vip')}</SelectItem>
                               <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                               <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
                             </SelectContent>
@@ -477,6 +474,7 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
                               <SelectItem value="normal">{t('repair.priority.normal')}</SelectItem>
                               <SelectItem value="high">{t('repair.priority.high')}</SelectItem>
                               <SelectItem value="urgent">{t('repair.priority.urgent')}</SelectItem>
+                              <SelectItem value="vip">{t('repair.priority.vip')}</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />

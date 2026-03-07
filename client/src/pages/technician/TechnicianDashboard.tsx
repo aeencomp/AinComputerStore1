@@ -240,7 +240,6 @@ export default function TechnicianDashboard() {
       case 'waiting-parts': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400';
       case 'completed': return 'bg-green-500/10 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
-      case 'vip': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400';
       case 'rejected': return 'bg-red-500/10 text-red-700 dark:text-red-400';
       case 'unrepairable': return 'bg-red-500/10 text-red-700 dark:text-red-400';
       default: return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
@@ -253,6 +252,7 @@ export default function TechnicianDashboard() {
       case 'high': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400';
       case 'normal': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
       case 'low': return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
+      case 'vip': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400';
       default: return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
     }
   };
@@ -427,7 +427,6 @@ export default function TechnicianDashboard() {
               <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
               <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
               <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
-              <SelectItem value="vip">{t('repair.status.vip')}</SelectItem>
               <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
               <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
             </SelectContent>
@@ -443,6 +442,7 @@ export default function TechnicianDashboard() {
               <SelectItem value="high">{t('repair.priority.high')}</SelectItem>
               <SelectItem value="normal">{t('repair.priority.normal')}</SelectItem>
               <SelectItem value="low">{t('repair.priority.low')}</SelectItem>
+              <SelectItem value="vip">{t('repair.priority.vip')}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -563,7 +563,6 @@ export default function TechnicianDashboard() {
                         <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                         <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                         <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
-                        <SelectItem value="vip">{t('repair.status.vip')}</SelectItem>
                         <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                         <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
                       </SelectContent>

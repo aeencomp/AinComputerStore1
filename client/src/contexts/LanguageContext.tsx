@@ -649,7 +649,6 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.status.waiting-parts': 'بانتظار القطع',
     'repair.status.completed': 'مكتمل',
     'repair.status.delivered': 'تم التسليم',
-    'repair.status.vip': 'VIP - عميل مميز',
     'repair.status.rejected': 'تم رفض الصيانة',
     'repair.status.unrepairable': 'لا يصلح',
     
@@ -657,6 +656,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.priority.normal': 'عادية',
     'repair.priority.high': 'عالية',
     'repair.priority.urgent': 'عاجلة',
+    'repair.priority.vip': 'VIP - عميل مميز',
     
     'repair.deviceType.laptop': 'لابتوب',
     'repair.deviceType.desktop': 'جهاز مكتبي',
@@ -1457,7 +1457,6 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.status.waiting-parts': 'Waiting for Parts',
     'repair.status.completed': 'Completed',
     'repair.status.delivered': 'Delivered',
-    'repair.status.vip': 'VIP',
     'repair.status.rejected': 'Repair Rejected',
     'repair.status.unrepairable': 'Unrepairable',
     
@@ -1465,6 +1464,7 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.priority.normal': 'Normal',
     'repair.priority.high': 'High',
     'repair.priority.urgent': 'Urgent',
+    'repair.priority.vip': 'VIP',
     
     'repair.deviceType.laptop': 'Laptop',
     'repair.deviceType.desktop': 'Desktop',

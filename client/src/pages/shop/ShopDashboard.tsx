@@ -130,7 +130,6 @@ export default function ShopDashboard() {
       case 'in-progress': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
       case 'completed': return 'bg-green-500/10 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
-      case 'vip': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400';
       default: return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
     }
   };
@@ -274,7 +273,6 @@ export default function ShopDashboard() {
                 <SelectItem value="in-progress">{language === 'ar' ? 'جاري' : 'In-Progress'}</SelectItem>
                 <SelectItem value="completed">{language === 'ar' ? 'مكتمل' : 'Completed'}</SelectItem>
                 <SelectItem value="delivered">{language === 'ar' ? 'تم التسليم' : 'Delivered'}</SelectItem>
-                <SelectItem value="vip">{language === 'ar' ? 'VIP - عميل مميز' : 'VIP'}</SelectItem>
               </SelectContent>
             </Select>
           </div>
