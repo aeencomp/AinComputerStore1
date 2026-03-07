@@ -5758,7 +5758,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const token     = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
-    const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'alain_verify_token';
+    const verifyToken = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'alaintoken';
 
     if (mode === 'subscribe' && token === verifyToken) {
       console.log('WhatsApp webhook verified');
