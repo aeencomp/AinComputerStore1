@@ -1281,8 +1281,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const validatedData = requestSchema.parse(req.body);
       
       await db.execute(
-        `INSERT INTO product_requests (id, product_name, customer_name, customer_phone, customer_email, notes, status, created_at) 
-         VALUES (gen_random_uuid(), '${validatedData.productName.replace(/'/g, "''")}', '${validatedData.customerName.replace(/'/g, "''")}', '${validatedData.customerPhone.replace(/'/g, "''")}', ${validatedData.customerEmail ? `'${validatedData.customerEmail.replace(/'/g, "''")}'` : 'NULL'}, ${validatedData.notes ? `'${validatedData.notes.replace(/'/g, "''")}'` : 'NULL'}, 'pending', NOW())`
+        sql`INSERT INTO product_requests (id, product_name, customer_name, customer_phone, customer_email, notes, status, created_at)
+         VALUES (gen_random_uuid(), ${validatedData.productName}, ${validatedData.customerName}, ${validatedData.customerPhone}, ${validatedData.customerEmail || null}, ${validatedData.notes || null}, 'pending', NOW())`
       );
       
       return res.status(201).json({ success: true, message: "تم إرسال طلبك بنجاح" });
