@@ -2248,15 +2248,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const ticket = await storage.createRepairTicket(validatedData);
       
       // Send WhatsApp notification (non-blocking)
-      sendTicketCreatedMessage(
+      const whatsappResult = await sendTicketCreatedMessage(
         ticket.customerPhone,
         ticket.customerName,
         ticket.ticketNumber,
         ticket.deviceType,
         ticket.deviceBrand
-      ).catch(err => console.error('WhatsApp notification failed:', err));
+      ).catch(err => {
+        console.error('WhatsApp notification failed:', err);
+        return { success: false, error: err.message };
+      });
       
-      return res.json(ticket);
+      return res.json({
+        ...ticket,
+        _whatsappStatus: whatsappResult.success ? 'sent' : `failed: ${whatsappResult.error || 'unknown'}`
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
@@ -2408,7 +2414,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Send WhatsApp update notification (non-blocking)
-      sendTicketUpdatedMessage(
+      const whatsappResult = await sendTicketUpdatedMessage(
         ticket.customerPhone,
         ticket.customerName,
         ticket.ticketNumber,
@@ -2416,9 +2422,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ticket.technicianNotes,
         ticket.costEstimate,
         ticket.finalCost
-      ).catch(err => console.error('WhatsApp update notification failed:', err));
+      ).catch(err => {
+        console.error('WhatsApp update notification failed:', err);
+        return { success: false, error: err.message };
+      });
       
-      return res.json(ticket);
+      return res.json({
+        ...ticket,
+        _whatsappStatus: whatsappResult.success ? 'sent' : `failed: ${whatsappResult.error || 'unknown'}`
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
