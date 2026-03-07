@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { Trash2, Printer, AlertTriangle, LayoutList } from 'lucide-react';
+import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -49,6 +49,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   const printRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
   const [barcodeReady, setBarcodeReady] = useState(false);
+  const [editingCustomerInfo, setEditingCustomerInfo] = useState(false);
 
   const { data: ticket, isLoading } = useQuery<RepairTicket>({
     queryKey: ['/api/repair-tickets', ticketId],
@@ -84,6 +85,17 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     finalCost: z.string().optional(),
   }), []);
 
+  const customerSchema = useMemo(() => z.object({
+    customerName: z.string().min(2, isRTL ? 'الاسم مطلوب' : 'Name required'),
+    customerPhone: z.string().min(7, isRTL ? 'رقم الهاتف مطلوب' : 'Phone required'),
+    customerEmail: z.string().optional(),
+    deviceType: z.string().min(1, isRTL ? 'نوع الجهاز مطلوب' : 'Device type required'),
+    deviceBrand: z.string().min(1, isRTL ? 'الماركة مطلوبة' : 'Brand required'),
+    deviceModel: z.string().min(1, isRTL ? 'الموديل مطلوب' : 'Model required'),
+    issueDescriptionAr: z.string().min(2, isRTL ? 'وصف المشكلة مطلوب' : 'Issue description required'),
+    issueDescriptionEn: z.string().optional(),
+  }), [isRTL]);
+
   const form = useForm<z.infer<typeof updateSchema>>({
     resolver: zodResolver(updateSchema),
     defaultValues: {
@@ -93,6 +105,20 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       estimatedCompletion: '',
       costEstimate: '',
       finalCost: '',
+    },
+  });
+
+  const customerForm = useForm<z.infer<typeof customerSchema>>({
+    resolver: zodResolver(customerSchema),
+    defaultValues: {
+      customerName: '',
+      customerPhone: '',
+      customerEmail: '',
+      deviceType: 'laptop',
+      deviceBrand: '',
+      deviceModel: '',
+      issueDescriptionAr: '',
+      issueDescriptionEn: '',
     },
   });
 
@@ -113,7 +139,23 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
 
   useEffect(() => {
     setBarcodeReady(false);
+    setEditingCustomerInfo(false);
   }, [ticketId]);
+
+  useEffect(() => {
+    if (ticket) {
+      customerForm.reset({
+        customerName: ticket.customerName,
+        customerPhone: ticket.customerPhone,
+        customerEmail: ticket.customerEmail || '',
+        deviceType: ticket.deviceType,
+        deviceBrand: ticket.deviceBrand,
+        deviceModel: ticket.deviceModel,
+        issueDescriptionAr: ticket.issueDescriptionAr,
+        issueDescriptionEn: ticket.issueDescriptionEn || '',
+      });
+    }
+  }, [ticket, customerForm]);
 
   useEffect(() => {
     if (ticket && barcodeRef.current && open) {
@@ -158,6 +200,29 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       toast({
         title: t('common.error'),
         description: t('repair.edit.errorMessage'),
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const updateCustomerMutation = useMutation({
+    mutationFn: async (data: z.infer<typeof customerSchema>) => {
+      if (!ticketId) throw new Error('No ticket ID');
+      return await apiRequest('PATCH', `/api/admin/repair-tickets/${ticketId}`, data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets', ticketId] });
+      setEditingCustomerInfo(false);
+      toast({
+        title: isRTL ? 'تم الحفظ' : 'Saved',
+        description: isRTL ? 'تم تحديث بيانات العميل بنجاح' : 'Customer info updated successfully',
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: isRTL ? 'فشل تحديث بيانات العميل' : 'Failed to update customer info',
         variant: 'destructive',
       });
     },
@@ -333,38 +398,142 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
           </div>
         ) : ticket ? (
           <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerName')}</Label>
-                <p className="font-medium" data-testid="text-dialog-customer-name">{ticket.customerName}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerPhone')}</Label>
-                <p className="font-medium" data-testid="text-dialog-customer-phone">{ticket.customerPhone}</p>
-              </div>
-              {ticket.customerEmail && (
-                <div>
-                  <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerEmail')}</Label>
-                  <p className="font-medium">{ticket.customerEmail}</p>
-                </div>
-              )}
-              <div>
-                <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceType')}</Label>
-                <p className="font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceBrand')}</Label>
-                <p className="font-medium">{ticket.deviceBrand}</p>
-              </div>
-              <div>
-                <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceModel')}</Label>
-                <p className="font-medium">{ticket.deviceModel}</p>
-              </div>
-            </div>
-
+            {/* Customer & Device Info Section */}
             <div>
-              <Label className="text-muted-foreground text-xs">{t('repair.ticket.issueDescription')}</Label>
-              <p className="mt-1 text-sm">{ticket.issueDescriptionAr || ticket.issueDescriptionEn}</p>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-semibold text-sm">{isRTL ? 'بيانات العميل والجهاز' : 'Customer & Device Info'}</h3>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={editingCustomerInfo ? 'secondary' : 'outline'}
+                  onClick={() => setEditingCustomerInfo(v => !v)}
+                  data-testid="button-toggle-edit-customer"
+                >
+                  {editingCustomerInfo ? (
+                    <><X className="h-3 w-3 ltr:mr-1 rtl:ml-1" />{isRTL ? 'إلغاء' : 'Cancel'}</>
+                  ) : (
+                    <><Pencil className="h-3 w-3 ltr:mr-1 rtl:ml-1" />{isRTL ? 'تعديل' : 'Edit'}</>
+                  )}
+                </Button>
+              </div>
+
+              {editingCustomerInfo ? (
+                <Form {...customerForm}>
+                  <form onSubmit={customerForm.handleSubmit(d => updateCustomerMutation.mutate(d))} className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <FormField control={customerForm.control} name="customerName" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.customerName')}</FormLabel>
+                          <FormControl><Input {...field} data-testid="input-edit-customer-name" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={customerForm.control} name="customerPhone" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.customerPhone')}</FormLabel>
+                          <FormControl><Input {...field} dir="ltr" data-testid="input-edit-customer-phone" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={customerForm.control} name="customerEmail" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.customerEmail')}</FormLabel>
+                          <FormControl><Input {...field} dir="ltr" type="email" placeholder="example@email.com" data-testid="input-edit-customer-email" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={customerForm.control} name="deviceType" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.deviceType')}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-edit-device-type"><SelectValue /></SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="laptop">{t('repair.deviceType.laptop')}</SelectItem>
+                              <SelectItem value="desktop">{t('repair.deviceType.desktop')}</SelectItem>
+                              <SelectItem value="monitor">{t('repair.deviceType.monitor')}</SelectItem>
+                              <SelectItem value="printer">{t('repair.deviceType.printer')}</SelectItem>
+                              <SelectItem value="other">{t('repair.deviceType.other')}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={customerForm.control} name="deviceBrand" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.deviceBrand')}</FormLabel>
+                          <FormControl><Input {...field} data-testid="input-edit-device-brand" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                      <FormField control={customerForm.control} name="deviceModel" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.deviceModel')}</FormLabel>
+                          <FormControl><Input {...field} data-testid="input-edit-device-model" /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )} />
+                    </div>
+                    <FormField control={customerForm.control} name="issueDescriptionAr" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{isRTL ? 'وصف المشكلة' : 'Issue Description'}</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} rows={3} lang="ar" dir="auto" spellCheck autoCorrect="on" data-testid="textarea-edit-issue-ar" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={customerForm.control} name="issueDescriptionEn" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{isRTL ? 'وصف المشكلة (English)' : 'Issue Description (English)'}</FormLabel>
+                        <FormControl>
+                          <Textarea {...field} rows={2} dir="ltr" placeholder="Optional..." data-testid="textarea-edit-issue-en" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <Button type="submit" size="sm" disabled={updateCustomerMutation.isPending} data-testid="button-save-customer-info">
+                      {updateCustomerMutation.isPending ? (isRTL ? 'جاري الحفظ...' : 'Saving...') : (isRTL ? 'حفظ البيانات' : 'Save Info')}
+                    </Button>
+                  </form>
+                </Form>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerName')}</Label>
+                      <p className="font-medium" data-testid="text-dialog-customer-name">{ticket.customerName}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerPhone')}</Label>
+                      <p className="font-medium" data-testid="text-dialog-customer-phone">{ticket.customerPhone}</p>
+                    </div>
+                    {ticket.customerEmail && (
+                      <div>
+                        <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerEmail')}</Label>
+                        <p className="font-medium">{ticket.customerEmail}</p>
+                      </div>
+                    )}
+                    <div>
+                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceType')}</Label>
+                      <p className="font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceBrand')}</Label>
+                      <p className="font-medium">{ticket.deviceBrand}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceModel')}</Label>
+                      <p className="font-medium">{ticket.deviceModel}</p>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <Label className="text-muted-foreground text-xs">{t('repair.ticket.issueDescription')}</Label>
+                    <p className="mt-1 text-sm">{ticket.issueDescriptionAr || ticket.issueDescriptionEn}</p>
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="border-t pt-4">

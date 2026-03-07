@@ -2353,6 +2353,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.finalCost !== undefined) {
         updateData.finalCost = req.body.finalCost && req.body.finalCost !== '' ? req.body.finalCost : null;
       }
+      // Customer & device info fields
+      if (req.body.customerName !== undefined && req.body.customerName.trim()) {
+        updateData.customerName = req.body.customerName.trim();
+      }
+      if (req.body.customerPhone !== undefined && req.body.customerPhone.trim()) {
+        updateData.customerPhone = req.body.customerPhone.trim();
+      }
+      if (req.body.customerEmail !== undefined) {
+        updateData.customerEmail = req.body.customerEmail.trim() || null;
+      }
+      if (req.body.deviceType !== undefined && req.body.deviceType.trim()) {
+        updateData.deviceType = req.body.deviceType.trim();
+      }
+      if (req.body.deviceBrand !== undefined && req.body.deviceBrand.trim()) {
+        updateData.deviceBrand = req.body.deviceBrand.trim();
+      }
+      if (req.body.deviceModel !== undefined && req.body.deviceModel.trim()) {
+        updateData.deviceModel = req.body.deviceModel.trim();
+      }
+      if (req.body.issueDescriptionAr !== undefined && req.body.issueDescriptionAr.trim()) {
+        updateData.issueDescriptionAr = req.body.issueDescriptionAr.trim();
+      }
+      if (req.body.issueDescriptionEn !== undefined) {
+        updateData.issueDescriptionEn = req.body.issueDescriptionEn.trim() || null;
+      }
       
       const ticket = await storage.updateRepairTicket(id, updateData);
       
