@@ -258,7 +258,10 @@ export const storeSettings = pgTable("store_settings", {
   twitterUrl: text("twitter_url").default(""),
   instagramUrl: text("instagram_url").default(""),
   whatsappNumber: text("whatsapp_number").default(""),
-  
+  whatsappPhoneNumberId: text("whatsapp_phone_number_id").default(""),
+  whatsappAccessToken: text("whatsapp_access_token").default(""),
+  whatsappWabaId: text("whatsapp_waba_id").default(""),
+
   // Theme & Branding
   logoUrl: text("logo_url").default(""),
   faviconUrl: text("favicon_url").default(""),

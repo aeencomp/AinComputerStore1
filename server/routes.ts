@@ -5687,8 +5687,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/whatsapp/templates', async (req: any, res: any) => {
     if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
-    const wabaId = process.env.WHATSAPP_WABA_ID;
-    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const dbSettings = await storage.getSettings();
+    const wabaId = (dbSettings?.whatsappWabaId && dbSettings.whatsappWabaId.trim()) ? dbSettings.whatsappWabaId.trim() : process.env.WHATSAPP_WABA_ID;
+    const token = (dbSettings?.whatsappAccessToken && dbSettings.whatsappAccessToken.trim()) ? dbSettings.whatsappAccessToken.trim() : process.env.WHATSAPP_ACCESS_TOKEN;
     if (!wabaId || !token) return res.status(500).json({ error: 'WhatsApp not configured' });
     try {
       const response = await fetch(
@@ -5704,8 +5705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/whatsapp/send', async (req: any, res: any) => {
     if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
     const { to, templateName, language, params } = req.body;
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const token = process.env.WHATSAPP_ACCESS_TOKEN;
+    const dbSettings = await storage.getSettings();
+    const phoneNumberId = (dbSettings?.whatsappPhoneNumberId && dbSettings.whatsappPhoneNumberId.trim()) ? dbSettings.whatsappPhoneNumberId.trim() : process.env.WHATSAPP_PHONE_NUMBER_ID;
+    const token = (dbSettings?.whatsappAccessToken && dbSettings.whatsappAccessToken.trim()) ? dbSettings.whatsappAccessToken.trim() : process.env.WHATSAPP_ACCESS_TOKEN;
     if (!phoneNumberId || !token) return res.status(500).json({ error: 'WhatsApp not configured' });
     if (!to || !templateName) return res.status(400).json({ error: 'Missing required fields' });
 

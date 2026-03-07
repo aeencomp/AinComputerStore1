@@ -43,6 +43,9 @@ export default function AdminSettings() {
     twitterUrl: z.string().optional(),
     instagramUrl: z.string().optional(),
     whatsappNumber: z.string().optional(),
+    whatsappPhoneNumberId: z.string().optional(),
+    whatsappAccessToken: z.string().optional(),
+    whatsappWabaId: z.string().optional(),
     logoUrl: z.string().optional(),
     faviconUrl: z.string().optional(),
     primaryColor: z.string().optional(),
@@ -104,6 +107,9 @@ export default function AdminSettings() {
       twitterUrl: settings.twitterUrl || "",
       instagramUrl: settings.instagramUrl || "",
       whatsappNumber: settings.whatsappNumber || "",
+      whatsappPhoneNumberId: settings.whatsappPhoneNumberId || "",
+      whatsappAccessToken: settings.whatsappAccessToken || "",
+      whatsappWabaId: settings.whatsappWabaId || "",
       logoUrl: settings.logoUrl || "",
       faviconUrl: settings.faviconUrl || "",
       primaryColor: settings.primaryColor || "#3B82F6",
@@ -497,6 +503,49 @@ export default function AdminSettings() {
                       data-testid="input-whatsapp"
                     />
                     <p className="text-sm text-muted-foreground">{t("admin.settings.whatsappNumberHint")}</p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>{language === 'ar' ? 'إعدادات WhatsApp Business API' : 'WhatsApp Business API Settings'}</CardTitle>
+                  <CardDescription>{language === 'ar' ? 'بيانات اعتماد WhatsApp API للإشعارات التلقائية. تُخزَّن بأمان في قاعدة البيانات.' : 'WhatsApp API credentials for automated notifications. Stored securely in the database.'}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsappPhoneNumberId">{language === 'ar' ? 'Phone Number ID' : 'Phone Number ID'}</Label>
+                    <Input
+                      id="whatsappPhoneNumberId"
+                      {...form.register("whatsappPhoneNumberId")}
+                      placeholder="1060414573815696"
+                      data-testid="input-whatsapp-phone-number-id"
+                      dir="ltr"
+                    />
+                    <p className="text-sm text-muted-foreground">{language === 'ar' ? 'معرّف رقم الهاتف من لوحة Meta Business' : 'Phone Number ID from Meta Business dashboard'}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsappWabaId">{language === 'ar' ? 'WABA ID (معرّف حساب WhatsApp Business)' : 'WABA ID (WhatsApp Business Account ID)'}</Label>
+                    <Input
+                      id="whatsappWabaId"
+                      {...form.register("whatsappWabaId")}
+                      placeholder="2096468877767910"
+                      data-testid="input-whatsapp-waba-id"
+                      dir="ltr"
+                    />
+                    <p className="text-sm text-muted-foreground">{language === 'ar' ? 'معرّف حساب WhatsApp Business من Meta' : 'WhatsApp Business Account ID from Meta'}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="whatsappAccessToken">{language === 'ar' ? 'رمز الوصول (Access Token)' : 'Access Token'}</Label>
+                    <Input
+                      id="whatsappAccessToken"
+                      {...form.register("whatsappAccessToken")}
+                      placeholder="EAAxxxxxxxx..."
+                      data-testid="input-whatsapp-access-token"
+                      dir="ltr"
+                      type="password"
+                    />
+                    <p className="text-sm text-muted-foreground">{language === 'ar' ? 'رمز الوصول الدائم من Meta Business. القيمة المحفوظة هنا تُلغي متغيرات البيئة.' : 'Long-lived access token from Meta Business. Value saved here overrides environment variables.'}</p>
                   </div>
                 </CardContent>
               </Card>

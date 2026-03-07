@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { storage } from './storage';
 
 const WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0';
 
@@ -15,13 +16,34 @@ function formatPhoneNumber(phone: string): string {
   return cleaned;
 }
 
+async function getCredentials(): Promise<{ phoneNumberId: string; accessToken: string; wabaId: string }> {
+  try {
+    const dbSettings = await storage.getSettings();
+    const phoneNumberId = (dbSettings?.whatsappPhoneNumberId && dbSettings.whatsappPhoneNumberId.trim())
+      ? dbSettings.whatsappPhoneNumberId.trim()
+      : (process.env.WHATSAPP_PHONE_NUMBER_ID || '');
+    const accessToken = (dbSettings?.whatsappAccessToken && dbSettings.whatsappAccessToken.trim())
+      ? dbSettings.whatsappAccessToken.trim()
+      : (process.env.WHATSAPP_ACCESS_TOKEN || '');
+    const wabaId = (dbSettings?.whatsappWabaId && dbSettings.whatsappWabaId.trim())
+      ? dbSettings.whatsappWabaId.trim()
+      : (process.env.WHATSAPP_WABA_ID || '');
+    return { phoneNumberId, accessToken, wabaId };
+  } catch {
+    return {
+      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
+      accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
+      wabaId: process.env.WHATSAPP_WABA_ID || '',
+    };
+  }
+}
+
 // Send a free-form text message (only works within 24h after customer messages first)
 export async function sendWhatsAppMessage(
   to: string,
   message: string
 ): Promise<WhatsAppMessageResult> {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const { phoneNumberId, accessToken } = await getCredentials();
 
   if (!phoneNumberId || !accessToken) {
     console.log('WhatsApp credentials not configured, skipping message');
@@ -62,8 +84,7 @@ export async function sendWhatsAppTemplate(
   language: string,
   params: string[]
 ): Promise<WhatsAppMessageResult> {
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+  const { phoneNumberId, accessToken } = await getCredentials();
 
   if (!phoneNumberId || !accessToken) {
     console.log('WhatsApp credentials not configured, skipping template');
