@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X } from 'lucide-react';
+import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
+import QRCode from 'qrcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useForm } from 'react-hook-form';
@@ -49,6 +50,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   const printRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
   const [barcodeReady, setBarcodeReady] = useState(false);
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [editingCustomerInfo, setEditingCustomerInfo] = useState(false);
 
   const { data: ticket, isLoading } = useQuery<RepairTicket>({
@@ -139,8 +141,18 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
 
   useEffect(() => {
     setBarcodeReady(false);
+    setQrCodeDataUrl('');
     setEditingCustomerInfo(false);
   }, [ticketId]);
+
+  useEffect(() => {
+    if (ticket && open) {
+      const trackingUrl = `${window.location.origin}/track-repair?ticket=${ticket.ticketNumber}`;
+      QRCode.toDataURL(trackingUrl, { width: 200, margin: 1, color: { dark: '#000000', light: '#ffffff' } })
+        .then(url => setQrCodeDataUrl(url))
+        .catch(() => setQrCodeDataUrl(''));
+    }
+  }, [ticket, open]);
 
   useEffect(() => {
     if (ticket) {
@@ -286,6 +298,175 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         }, 250);
       }
     }
+  };
+
+  const handlePrintCustomerReceipt = () => {
+    if (!ticket) return;
+
+    const priorityText: Record<string, string> = {
+      urgent: isRTL ? 'عاجل' : 'Urgent',
+      high: isRTL ? 'مرتفع' : 'High',
+      normal: isRTL ? 'عادي' : 'Normal',
+      low: isRTL ? 'منخفض' : 'Low',
+    };
+    const deviceTypeText: Record<string, string> = {
+      laptop: isRTL ? 'لابتوب' : 'Laptop',
+      desktop: isRTL ? 'كمبيوتر مكتبي' : 'Desktop',
+      monitor: isRTL ? 'شاشة' : 'Monitor',
+      printer: isRTL ? 'طابعة' : 'Printer',
+      other: isRTL ? 'أخرى' : 'Other',
+    };
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const otherTickets = dialogActiveTickets.filter(t => t.id !== ticket.id);
+    const ticketIndex = dialogActiveTickets.findIndex(t => t.id === ticket.id) + 1;
+    const totalTickets = dialogActiveTickets.length;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html dir="${isRTL ? 'rtl' : 'ltr'}">
+      <head>
+        <title>${isRTL ? 'إيصال صيانة' : 'Repair Receipt'}</title>
+        <style>
+          @page { size: 72.1mm auto; margin: 2mm; }
+          * { box-sizing: border-box; margin: 0; padding: 0; page-break-inside: avoid; break-inside: avoid; }
+          body { font-family: Arial, sans-serif; font-size: 13px; font-weight: 600; width: 68mm; height: auto; overflow: visible; padding: 3mm; direction: ${isRTL ? 'rtl' : 'ltr'}; line-height: 1.5; color: #000; }
+          .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 10px; margin-bottom: 10px; }
+          .store-name { font-size: 18px; font-weight: 900; margin-bottom: 6px; letter-spacing: 0.5px; }
+          .store-info { font-size: 11px; font-weight: 700; color: #000; }
+          .receipt-title { text-align: center; font-size: 16px; font-weight: 900; margin: 10px 0; padding: 6px; background: #e0e0e0; border-radius: 4px; border: 1px solid #000; }
+          .ticket-number { text-align: center; font-size: 22px; font-weight: 900; margin: 10px 0; padding: 8px; border: 3px dashed #000; letter-spacing: 1px; }
+          .section { margin: 12px 0; padding-bottom: 10px; border-bottom: 2px dashed #333; }
+          .section-title { font-weight: 900; font-size: 14px; margin-bottom: 8px; color: #000; text-decoration: underline; }
+          .info-row { display: flex; justify-content: space-between; margin: 6px 0; font-size: 12px; font-weight: 700; }
+          .info-label { font-weight: 900; color: #000; }
+          .info-value { text-align: ${isRTL ? 'left' : 'right'}; font-weight: 700; }
+          .problem-box { background: #f0f0f0; padding: 10px; border-radius: 4px; margin-top: 8px; font-size: 12px; font-weight: 700; min-height: 50px; border: 1px solid #999; }
+          .terms { margin-top: 14px; padding-top: 10px; border-top: 2px solid #000; }
+          .terms-title { font-weight: 900; font-size: 12px; margin-bottom: 6px; }
+          .terms-list { font-size: 10px; font-weight: 600; color: #000; padding-${isRTL ? 'right' : 'left'}: 10px; }
+          .terms-list li { margin: 4px 0; }
+          .footer { text-align: center; margin-top: 14px; padding-top: 10px; border-top: 3px solid #000; font-size: 12px; font-weight: 900; }
+          .track-info { margin-top: 10px; padding: 8px; background: #e0e0e0; border-radius: 4px; text-align: center; font-size: 11px; font-weight: 700; border: 1px solid #666; }
+          .date-time { text-align: center; font-size: 11px; font-weight: 700; color: #000; margin: 10px 0; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="store-name">${isRTL ? 'العين لتجارة الحاسبات' : 'AEEN COMPUTER TRADING'}</div>
+          <div class="store-info">${isRTL ? 'كربلاء - العراق' : 'Karbala - Iraq'}</div>
+          <div class="store-info">07850006977</div>
+        </div>
+
+        <div class="receipt-title">${isRTL ? 'إيصال استلام جهاز للصيانة' : 'Device Repair Receipt'}</div>
+        <div class="ticket-number">${ticket.ticketNumber}</div>
+
+        ${totalTickets > 1 ? `
+          <div style="text-align:center;margin:8px 0;padding:6px 10px;background:#fff3cd;border:2px solid #ffc107;border-radius:6px;font-size:15px;font-weight:900;color:#856404;">
+            ${isRTL ? `الجهاز ${ticketIndex} من ${totalTickets}` : `Device ${ticketIndex} of ${totalTickets}`}
+          </div>` : ''}
+
+        ${qrCodeDataUrl ? `
+          <div style="text-align:center;margin:8px 0;">
+            <img src="${qrCodeDataUrl}" alt="QR" style="width:100px;height:100px;margin:0 auto;"/>
+            <div style="font-size:9px;font-weight:700;margin-top:4px;">${isRTL ? 'امسح الكود لتتبع حالة الصيانة' : 'Scan to track repair status'}</div>
+          </div>` : ''}
+
+        <div class="date-time">
+          ${new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')} - ${new Date().toLocaleTimeString(isRTL ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+        </div>
+
+        <div class="section">
+          <div class="section-title">${isRTL ? 'معلومات العميل' : 'Customer Information'}</div>
+          ${ticketCustomer ? `
+            <div class="info-row">
+              <span class="info-label">${isRTL ? 'رقم العميل:' : 'Customer ID:'}</span>
+              <span class="info-value" style="font-family:monospace;font-weight:900;">${ticketCustomer.customerId}</span>
+            </div>` : ''}
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'الاسم:' : 'Name:'}</span>
+            <span class="info-value">${ticket.customerName}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'الهاتف:' : 'Phone:'}</span>
+            <span class="info-value" dir="ltr">${ticket.customerPhone}</span>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">${isRTL ? 'معلومات الجهاز' : 'Device Information'}</div>
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'النوع:' : 'Type:'}</span>
+            <span class="info-value">${deviceTypeText[ticket.deviceType] || ticket.deviceType}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'الماركة:' : 'Brand:'}</span>
+            <span class="info-value">${ticket.deviceBrand}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'الموديل:' : 'Model:'}</span>
+            <span class="info-value">${ticket.deviceModel}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'الأولوية:' : 'Priority:'}</span>
+            <span class="info-value">${priorityText[ticket.priority] || ticket.priority}</span>
+          </div>
+          ${ticket.costEstimate ? `
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'التكلفة المتوقعة:' : 'Estimated Cost:'}</span>
+            <span class="info-value">${Number(ticket.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span>
+          </div>` : ''}
+          ${ticket.finalCost ? `
+          <div class="info-row">
+            <span class="info-label">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span>
+            <span class="info-value">${Number(ticket.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span>
+          </div>` : ''}
+        </div>
+
+        <div class="section">
+          <div class="section-title">${isRTL ? 'وصف المشكلة' : 'Problem Description'}</div>
+          <div class="problem-box">${ticket.issueDescriptionAr || ticket.issueDescriptionEn}</div>
+        </div>
+
+        ${otherTickets.length > 0 ? `
+          <div style="margin:12px 0;padding:10px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;">
+            <div style="font-weight:900;font-size:13px;margin-bottom:6px;color:#856404;">
+              ${isRTL ? `طلباتك النشطة الأخرى (${otherTickets.length}):` : `Your Other Active Repairs (${otherTickets.length}):`}
+            </div>
+            ${otherTickets.map(t => {
+              const typeMap: Record<string,string> = { laptop: isRTL ? 'لابتوب' : 'Laptop', desktop: isRTL ? 'كمبيوتر' : 'Desktop', monitor: isRTL ? 'شاشة' : 'Monitor', printer: isRTL ? 'طابعة' : 'Printer', other: isRTL ? 'أخرى' : 'Other' };
+              return `<div style="display:flex;justify-content:space-between;margin:5px 0;font-size:11px;font-weight:700;">
+                <span style="font-weight:900;">${t.ticketNumber}</span>
+                <span>${t.deviceBrand} ${t.deviceModel} — ${typeMap[t.deviceType] || t.deviceType}</span>
+              </div>`;
+            }).join('')}
+          </div>` : ''}
+
+        <div class="terms">
+          <div class="terms-title">${isRTL ? 'الشروط والأحكام:' : 'Terms & Conditions:'}</div>
+          <ul class="terms-list">
+            <li>${isRTL ? 'يرجى الاحتفاظ بهذا الإيصال لاستلام الجهاز' : 'Please keep this receipt to collect your device'}</li>
+            <li>${isRTL ? 'مدة الصيانة تعتمد على نوع العطل وتوفر القطع' : 'Repair time depends on issue type and parts availability'}</li>
+            <li>${isRTL ? 'سيتم التواصل معكم عند الانتهاء' : 'We will contact you when ready'}</li>
+            <li>${isRTL ? 'الأجهزة غير المستلمة خلال 30 يوم لا نتحمل مسؤوليتها' : 'We are not responsible for devices not collected within 30 days'}</li>
+          </ul>
+        </div>
+
+        <div class="track-info">
+          ${isRTL ? 'امسح رمز QR أعلاه لتتبع حالة جهازك مباشرة' : 'Scan the QR code above to track your device status directly'}
+        </div>
+
+        <div class="footer">
+          <div>${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
+        </div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
   };
 
   const handlePrintSummary = () => {
