@@ -49,6 +49,7 @@ export default function TicketDetail() {
   const printRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
   const [barcodeReady, setBarcodeReady] = useState(false);
+  const prevStatusRef = useRef<string>('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -101,6 +102,7 @@ export default function TicketDetail() {
 
   useEffect(() => {
     if (ticket) {
+      prevStatusRef.current = ticket.status;
       form.reset({
         status: ticket.status,
         priority: ticket.priority,
@@ -111,6 +113,21 @@ export default function TicketDetail() {
       });
     }
   }, [ticket, form]);
+
+  const watchedStatus = form.watch('status');
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const current = watchedStatus;
+    if (!prev || prev === current) return;
+    if (current === 'vip' && prev !== 'vip') {
+      const cur = parseFloat(form.getValues('finalCost') || '0') || 0;
+      form.setValue('finalCost', String(cur + 25000));
+    } else if (prev === 'vip' && current !== 'vip') {
+      const cur = parseFloat(form.getValues('finalCost') || '0') || 0;
+      form.setValue('finalCost', String(Math.max(0, cur - 25000)));
+    }
+    prevStatusRef.current = current;
+  }, [watchedStatus, form]);
 
   const updateMutation = useMutation({
     mutationFn: async (data: z.infer<typeof updateSchema>) => {
@@ -368,6 +385,7 @@ export default function TicketDetail() {
                             <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                             <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                             <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+                            <SelectItem value="vip">{isRTL ? 'VIP - عميل مميز' : 'VIP'}</SelectItem>
                             <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                             <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
                           </SelectContent>

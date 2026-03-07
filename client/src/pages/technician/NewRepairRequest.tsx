@@ -512,6 +512,7 @@ export default function NewRepairRequest() {
       'waiting-parts': isRTL ? 'انتظار قطع' : 'Waiting Parts',
       completed: isRTL ? 'مكتمل' : 'Completed',
       delivered: isRTL ? 'مسلم' : 'Delivered',
+      vip: isRTL ? 'VIP - عميل مميز' : 'VIP',
       rejected: isRTL ? 'مرفوض' : 'Rejected',
       unrepairable: isRTL ? 'لا يمكن إصلاحه' : 'Unrepairable',
     };
