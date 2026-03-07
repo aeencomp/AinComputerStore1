@@ -446,7 +446,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       customerName: customerName || 'عميل في المتجر',
       customerPhone,
       paymentMethod,
-      paymentStatus: 'success',
+      paymentStatus: paymentMethod === 'deferred' ? 'deferred' : 'success',
       discount: calculatedDiscount.toString(),
       discountReason,
       orderType,
@@ -1102,12 +1102,13 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                       <Wallet className="h-3 w-3" />
                       {language === 'ar' ? 'طريقة الدفع' : 'Payment'}
                     </Label>
-                    <div className="grid grid-cols-4 gap-2">
+                    <div className="grid grid-cols-5 gap-2">
                       {[
                         { value: 'cash', label: language === 'ar' ? 'نقداً' : 'Cash', icon: Banknote },
                         { value: 'card', label: language === 'ar' ? 'بطاقة' : 'Card', icon: CreditCard },
                         { value: 'zaincash', label: 'ZainCash', icon: Wallet },
                         { value: 'qicard', label: 'QiCard', icon: CreditCard },
+                        { value: 'deferred', label: 'أجل', icon: Clock },
                       ].map(method => (
                         <Button
                           key={method.value}
@@ -1348,6 +1349,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                     : lastOrder.paymentMethod === 'card' ? 'بطاقة'
                     : lastOrder.paymentMethod === 'zaincash' ? 'زين كاش'
                     : lastOrder.paymentMethod === 'qicard' ? 'كي كارد'
+                    : lastOrder.paymentMethod === 'deferred' ? 'أجل - غير مدفوع'
                     : 'عند الاستلام'}
                 </span>
               </div>

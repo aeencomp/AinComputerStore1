@@ -47,7 +47,8 @@ import {
   Package,
   ChevronLeft,
   Plug,
-  Languages
+  Languages,
+  Clock
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { LaptopBattery, AcAdapter } from "@shared/schema";
@@ -388,6 +389,7 @@ export default function BatteryPOS() {
       discount: discountAmount,
       total,
       paymentMethod,
+      paymentStatus: paymentMethod === 'deferred' ? 'deferred' : 'paid',
       notes,
     };
     
@@ -896,7 +898,7 @@ export default function BatteryPOS() {
 
             <div className="space-y-2">
               <Label>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</Label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-4 gap-2">
                 <Button
                   type="button"
                   variant={paymentMethod === 'cash' ? 'default' : 'outline'}
@@ -926,6 +928,16 @@ export default function BatteryPOS() {
                 >
                   <DollarSign className="w-4 h-4" />
                   ZainCash
+                </Button>
+                <Button
+                  type="button"
+                  variant={paymentMethod === 'deferred' ? 'default' : 'outline'}
+                  className="gap-2"
+                  onClick={() => setPaymentMethod('deferred')}
+                  data-testid="button-payment-deferred"
+                >
+                  <Clock className="w-4 h-4" />
+                  {isRTL ? 'أجل' : 'Deferred'}
                 </Button>
               </div>
             </div>
@@ -1129,6 +1141,7 @@ export default function BatteryPOS() {
                 <span className="font-semibold">
                   {lastSaleData.paymentMethod === 'cash' ? (isRTL ? 'نقدي' : 'Cash') :
                    lastSaleData.paymentMethod === 'card' ? (isRTL ? 'بطاقة' : 'Card') :
+                   lastSaleData.paymentMethod === 'deferred' ? (isRTL ? 'أجل - غير مدفوع' : 'Deferred - Unpaid') :
                    (isRTL ? 'زين كاش' : 'ZainCash')}
                 </span>
               </div>

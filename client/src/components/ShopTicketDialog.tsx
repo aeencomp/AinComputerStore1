@@ -73,6 +73,7 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
     estimatedCompletion: z.string().optional(),
     costEstimate: z.string().optional(),
     finalCost: z.string().optional(),
+    paymentStatus: z.string().optional(),
   }), []);
 
   const form = useForm<z.infer<typeof updateSchema>>({
@@ -84,6 +85,7 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
       estimatedCompletion: '',
       costEstimate: '',
       finalCost: '',
+      paymentStatus: 'unpaid',
     },
   });
 
@@ -99,6 +101,7 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
         costEstimate: cleanPrice(ticket.costEstimate),
         finalCost: cleanPrice(ticket.finalCost),
+        paymentStatus: ticket.paymentStatus || 'unpaid',
       });
     }
   }, [ticket, form]);
@@ -519,6 +522,28 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
                             <FormControl>
                               <Input type="number" {...field} data-testid="input-final-cost" />
                             </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      <FormField
+                        control={form.control}
+                        name="paymentStatus"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('repair.ticket.paymentStatus') || 'حالة الدفع'}</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="select-payment-status">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="unpaid">{t('repair.payment.unpaid') || 'غير مدفوع'}</SelectItem>
+                                <SelectItem value="paid">{t('repair.payment.paid') || 'مدفوع'}</SelectItem>
+                                <SelectItem value="deferred">{t('repair.payment.deferred') || 'أجل'}</SelectItem>
+                              </SelectContent>
+                            </Select>
                             <FormMessage />
                           </FormItem>
                         )}

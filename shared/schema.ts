@@ -379,6 +379,7 @@ export const repairTickets = pgTable("repair_tickets", {
   estimatedCompletion: timestamp("estimated_completion"),
   costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
   finalCost: decimal("final_cost", { precision: 10, scale: 2 }),
+  paymentStatus: text("payment_status").default("unpaid"), // unpaid, paid, deferred
   userId: varchar("user_id"), // optional - if customer has account
   isArchived: integer("is_archived").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -668,7 +669,8 @@ export const batterySales = pgTable("battery_sales", {
   subtotal: decimal("subtotal", { precision: 10, scale: 2 }).notNull(),
   discount: decimal("discount", { precision: 10, scale: 2 }).default("0"),
   total: decimal("total", { precision: 10, scale: 2 }).notNull(),
-  paymentMethod: text("payment_method").notNull().default("cash"), // cash, zaincash, qicard
+  paymentMethod: text("payment_method").notNull().default("cash"), // cash, zaincash, qicard, deferred
+  paymentStatus: text("payment_status").notNull().default("paid"), // paid, deferred
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -937,6 +939,7 @@ export const saasRepairTickets = pgTable("saas_repair_tickets", {
   estimatedCompletion: timestamp("estimated_completion"),
   costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
   finalCost: decimal("final_cost", { precision: 10, scale: 2 }),
+  paymentStatus: text("payment_status").default("unpaid"),
   isArchived: integer("is_archived").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
