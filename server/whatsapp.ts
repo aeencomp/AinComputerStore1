@@ -18,7 +18,7 @@ function formatPhoneNumber(phone: string): string {
 
 async function getCredentials(): Promise<{ phoneNumberId: string; accessToken: string; wabaId: string }> {
   try {
-    const dbSettings = await storage.getSettings();
+    const dbSettings = await storage.getStoreSettings();
     const phoneNumberId = (dbSettings?.whatsappPhoneNumberId && dbSettings.whatsappPhoneNumberId.trim())
       ? dbSettings.whatsappPhoneNumberId.trim()
       : (process.env.WHATSAPP_PHONE_NUMBER_ID || '');
