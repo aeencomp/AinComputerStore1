@@ -5538,6 +5538,57 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ============ WHATSAPP MARKETING ROUTES ============
 
+  // Aggregated customers endpoint for WhatsApp bulk send
+  // Merges: registered users + repair customers + order customers (deduped by phone)
+  app.get('/api/admin/whatsapp/customers', async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const phoneMap = new Map<string, { id: string; name: string; phone: string; email?: string; source: string }>();
+
+      // 1. Registered website accounts
+      const users = await storage.getUsers();
+      for (const u of users) {
+        if (u.phone && u.phone.trim()) {
+          const phone = u.phone.trim();
+          phoneMap.set(phone, { id: u.id, name: u.name || u.email, phone, email: u.email, source: 'account' });
+        }
+      }
+
+      // 2. Repair customers (largest source)
+      const repairCustomers = await storage.listRepairCustomers();
+      for (const c of repairCustomers) {
+        if (c.phone && c.phone.trim()) {
+          const phone = c.phone.trim();
+          if (!phoneMap.has(phone)) {
+            phoneMap.set(phone, { id: c.id, name: c.name, phone, source: 'repair' });
+          }
+        }
+      }
+
+      // 3. Order customers (guest checkouts with phone)
+      const orders = await storage.getOrders();
+      for (const o of orders) {
+        if (o.customerPhone && o.customerPhone.trim()) {
+          const phone = o.customerPhone.trim();
+          if (!phoneMap.has(phone)) {
+            phoneMap.set(phone, {
+              id: `order-${o.id}`,
+              name: o.customerName || phone,
+              phone,
+              email: o.customerEmail || undefined,
+              source: 'order',
+            });
+          }
+        }
+      }
+
+      return res.json(Array.from(phoneMap.values()));
+    } catch (err: any) {
+      console.error('Error fetching WhatsApp customers:', err);
+      return res.status(500).json({ error: 'Failed to fetch customers' });
+    }
+  });
+
   app.get('/api/admin/whatsapp/templates', async (req: any, res: any) => {
     if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
     const wabaId = process.env.WHATSAPP_WABA_ID;

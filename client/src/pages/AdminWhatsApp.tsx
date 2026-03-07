@@ -59,6 +59,7 @@ interface Customer {
   name: string;
   phone: string;
   email?: string;
+  source: 'account' | 'repair' | 'order';
 }
 
 const TEMPLATE_DEFINITIONS: Record<string, { labelAr: string; labelEn: string; params: { nameAr: string; nameEn: string; placeholder: string }[] }> = {
@@ -115,9 +116,8 @@ export default function AdminWhatsApp() {
   });
 
   const { data: customers = [] } = useQuery<Customer[]>({
-    queryKey: ["/api/admin/customers"],
+    queryKey: ["/api/admin/whatsapp/customers"],
     enabled: !!currentAdmin,
-    select: (data) => data.filter((c: any) => c.phone),
   });
 
   const templates = templatesData?.data || [];
@@ -431,8 +431,8 @@ export default function AdminWhatsApp() {
                 <CardTitle className="text-base">{language === "ar" ? "إرسال جماعي للعملاء" : "Bulk Send to Customers"}</CardTitle>
                 <CardDescription>
                   {language === "ar"
-                    ? `سيتم الإرسال لـ ${customers.length} عميل لديهم أرقام هاتف مسجلة`
-                    : `Will send to ${customers.length} customers with registered phone numbers`}
+                    ? `سيتم الإرسال لـ ${customers.length} عميل (صيانة + حسابات + طلبات) — بدون تكرار`
+                    : `Will send to ${customers.length} unique customers (repair + accounts + orders)`}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -485,20 +485,34 @@ export default function AdminWhatsApp() {
                     )}
 
                     <div className="rounded-md border p-3">
-                      <p className="text-sm font-medium mb-2 flex items-center gap-2">
+                      <p className="text-sm font-medium mb-1 flex items-center gap-2">
                         <Users className="h-4 w-4" />
                         {language === "ar" ? "العملاء المستهدفون" : "Target Customers"} ({customers.length})
                       </p>
-                      <div className="max-h-40 overflow-y-auto space-y-1">
-                        {customers.slice(0, 10).map((c) => (
+                      <div className="flex gap-3 text-xs text-muted-foreground mb-2">
+                        <span>{language === "ar" ? "إصلاح:" : "Repair:"} {customers.filter(c => c.source === 'repair').length}</span>
+                        <span>{language === "ar" ? "حسابات:" : "Accounts:"} {customers.filter(c => c.source === 'account').length}</span>
+                        <span>{language === "ar" ? "طلبات:" : "Orders:"} {customers.filter(c => c.source === 'order').length}</span>
+                      </div>
+                      <div className="max-h-48 overflow-y-auto space-y-1">
+                        {customers.slice(0, 20).map((c) => (
                           <div key={c.id} className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <User className="h-3 w-3" />
-                            <span>{c.name}</span>
-                            <span className="font-mono text-xs">{c.phone}</span>
+                            <User className="h-3 w-3 shrink-0" />
+                            <span className="truncate flex-1">{c.name}</span>
+                            <span className="font-mono text-xs shrink-0" dir="ltr">{c.phone}</span>
+                            <span className={`text-xs px-1 rounded shrink-0 ${
+                              c.source === 'repair' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                              c.source === 'account' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
+                              'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                            }`}>
+                              {c.source === 'repair' ? (language === "ar" ? "إصلاح" : "repair") :
+                               c.source === 'account' ? (language === "ar" ? "حساب" : "account") :
+                               (language === "ar" ? "طلب" : "order")}
+                            </span>
                           </div>
                         ))}
-                        {customers.length > 10 && (
-                          <p className="text-xs text-muted-foreground">+{customers.length - 10} {language === "ar" ? "آخرون" : "more"}</p>
+                        {customers.length > 20 && (
+                          <p className="text-xs text-muted-foreground pt-1">+{customers.length - 20} {language === "ar" ? "آخرون" : "more"}</p>
                         )}
                       </div>
                     </div>
