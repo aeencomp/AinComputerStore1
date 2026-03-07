@@ -10,18 +10,12 @@ interface WhatsAppMessageResult {
 
 function formatPhoneNumber(phone: string): string {
   let cleaned = phone.replace(/[\s\-\+]/g, '');
-  
-  if (cleaned.startsWith('00')) {
-    cleaned = cleaned.substring(2);
-  }
-  
-  if (cleaned.startsWith('07')) {
-    cleaned = '964' + cleaned.substring(1);
-  }
-  
+  if (cleaned.startsWith('00')) cleaned = cleaned.substring(2);
+  if (cleaned.startsWith('07')) cleaned = '964' + cleaned.substring(1);
   return cleaned;
 }
 
+// Send a free-form text message (only works within 24h after customer messages first)
 export async function sendWhatsAppMessage(
   to: string,
   message: string
@@ -48,24 +42,76 @@ export async function sendWhatsAppMessage(
         messaging_product: 'whatsapp',
         to: formattedPhone,
         type: 'text',
-        text: {
-          body: message
+        text: { body: message }
+      }
+    });
+
+    console.log('WhatsApp text message sent:', response.data);
+    return { success: true, messageId: response.data.messages?.[0]?.id };
+  } catch (error: any) {
+    const errorMessage = error.response?.data?.error?.message || error.message;
+    console.error('WhatsApp text send error:', errorMessage);
+    return { success: false, error: errorMessage };
+  }
+}
+
+// Send a pre-approved template message (works for any phone number, no 24h restriction)
+export async function sendWhatsAppTemplate(
+  to: string,
+  templateName: string,
+  language: string,
+  params: string[]
+): Promise<WhatsAppMessageResult> {
+  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const accessToken = process.env.WHATSAPP_ACCESS_TOKEN;
+
+  if (!phoneNumberId || !accessToken) {
+    console.log('WhatsApp credentials not configured, skipping template');
+    return { success: false, error: 'WhatsApp not configured' };
+  }
+
+  const formattedPhone = formatPhoneNumber(to);
+
+  const components: any[] = [];
+  if (params.length > 0) {
+    components.push({
+      type: 'body',
+      parameters: params.map(p => ({ type: 'text', text: p }))
+    });
+  }
+
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/json'
+      },
+      data: {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'template',
+        template: {
+          name: templateName,
+          language: { code: language },
+          ...(components.length > 0 && { components })
         }
       }
     });
 
-    console.log('WhatsApp message sent successfully:', response.data);
-    return { 
-      success: true, 
-      messageId: response.data.messages?.[0]?.id 
-    };
+    console.log(`WhatsApp template "${templateName}" sent to ${formattedPhone}:`, response.data);
+    return { success: true, messageId: response.data.messages?.[0]?.id };
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error?.message || error.message;
-    console.error('Error sending WhatsApp message:', errorMessage);
-    return { 
-      success: false, 
-      error: errorMessage 
-    };
+    const errorDetail = error.response?.data?.error;
+    const errorMessage = errorDetail?.message || error.message;
+    // Template not yet approved is a known transient state — log clearly
+    if (errorDetail?.code === 132001 || errorMessage?.includes('not approved') || errorMessage?.includes('pending')) {
+      console.warn(`WhatsApp template "${templateName}" is not yet approved. Message not sent to ${formattedPhone}.`);
+    } else {
+      console.error(`WhatsApp template "${templateName}" error for ${formattedPhone}:`, errorMessage);
+    }
+    return { success: false, error: errorMessage };
   }
 }
 
@@ -76,28 +122,19 @@ export async function sendTicketCreatedMessage(
   deviceType: string,
   deviceBrand: string
 ): Promise<WhatsAppMessageResult> {
-  const message = `مرحباً ${customerName}! 👋
+  // Try the repair_ticket_created template first; fall back to free-form text
+  const templateResult = await sendWhatsAppTemplate(
+    customerPhone,
+    'repair_ticket_created',
+    'ar',
+    [customerName, ticketNumber, `${deviceBrand} - ${deviceType}`]
+  );
 
-تم استلام طلب إصلاح جهازك بنجاح ✅
+  if (templateResult.success) return templateResult;
 
-📋 رقم التذكرة: ${ticketNumber}
-📱 الجهاز: ${deviceBrand} - ${deviceType}
-
-سيتم التواصل معك قريباً لتحديد موعد الاستلام والتكلفة المتوقعة.
-
-شكراً لاختيارك العين لتجارة الحاسبات! 🖥️
-
----
-Hello ${customerName}! 👋
-
-Your repair request has been received successfully ✅
-
-📋 Ticket Number: ${ticketNumber}
-📱 Device: ${deviceBrand} - ${deviceType}
-
-We will contact you soon to schedule pickup and provide a cost estimate.
-
-Thank you for choosing Al-Ain Computer Trading! 🖥️`;
+  // Fallback: free-form text (works if customer messaged within last 24h)
+  const message =
+    `مرحباً ${customerName}!\n\nتم استلام طلب إصلاح جهازك بنجاح.\n\nرقم التذكرة: ${ticketNumber}\nالجهاز: ${deviceBrand} - ${deviceType}\n\nسيتم التواصل معك قريباً.\n\nالعين لتجارة الحاسبات - 07850006977`;
 
   return sendWhatsAppMessage(customerPhone, message);
 }
@@ -111,63 +148,41 @@ export async function sendTicketUpdatedMessage(
   costEstimate?: string | null,
   finalCost?: string | null
 ): Promise<WhatsAppMessageResult> {
-  const statusMessages: Record<string, { ar: string; en: string }> = {
-    'pending': { ar: 'قيد الانتظار', en: 'Pending' },
-    'in-progress': { ar: 'جاري العمل عليه', en: 'In Progress' },
-    'waiting-parts': { ar: 'بانتظار القطع', en: 'Waiting for Parts' },
-    'completed': { ar: 'تم الإصلاح', en: 'Completed' },
-    'delivered': { ar: 'تم التسليم', en: 'Delivered' },
-    'rejected': { ar: 'تم رفض الصيانة', en: 'Repair Rejected' },
-    'unrepairable': { ar: 'لا يصلح', en: 'Unrepairable' }
+  const statusLabels: Record<string, string> = {
+    'pending':         'قيد الانتظار',
+    'in-progress':     'جاري العمل عليه',
+    'waiting-parts':   'بانتظار قطع الغيار',
+    'completed':       'تم الإصلاح - جاهز للاستلام',
+    'delivered':       'تم التسليم',
+    'rejected':        'تم رفض الصيانة',
+    'unrepairable':    'الجهاز لا يصلح للإصلاح',
   };
 
-  const statusText = statusMessages[status] || { ar: status, en: status };
+  const statusAr = statusLabels[status] || status;
 
-  let message = `مرحباً ${customerName}! 👋
+  // Build the 4th parameter: extra details line
+  const extras: string[] = [];
+  if (costEstimate)   extras.push(`التكلفة المقدرة: ${costEstimate} د.ع`);
+  if (finalCost)      extras.push(`التكلفة النهائية: ${finalCost} د.ع`);
+  if (technicianNotes) extras.push(`ملاحظات: ${technicianNotes}`);
+  const extraText = extras.length > 0 ? extras.join('\n') : 'للاستفسار تواصل معنا على 07850006977';
 
-تحديث على طلب الإصلاح الخاص بك:
+  // Use the repair_status_update template (approved template — works for any number)
+  const templateResult = await sendWhatsAppTemplate(
+    customerPhone,
+    'repair_status_update',
+    'ar',
+    [customerName, ticketNumber, statusAr, extraText]
+  );
 
-📋 رقم التذكرة: ${ticketNumber}
-📊 الحالة الجديدة: ${statusText.ar}`;
+  if (templateResult.success) return templateResult;
 
-  if (costEstimate) {
-    message += `\n💰 التكلفة المقدرة: ${costEstimate} د.ع`;
-  }
-
-  if (finalCost) {
-    message += `\n💵 التكلفة النهائية: ${finalCost} د.ع`;
-  }
-
-  if (technicianNotes) {
-    message += `\n📝 ملاحظات الفني: ${technicianNotes}`;
-  }
-
-  message += `
-
----
-Hello ${customerName}! 👋
-
-Update on your repair request:
-
-📋 Ticket Number: ${ticketNumber}
-📊 New Status: ${statusText.en}`;
-
-  if (costEstimate) {
-    message += `\n💰 Estimated Cost: ${costEstimate} IQD`;
-  }
-
-  if (finalCost) {
-    message += `\n💵 Final Cost: ${finalCost} IQD`;
-  }
-
-  if (technicianNotes) {
-    message += `\n📝 Technician Notes: ${technicianNotes}`;
-  }
-
-  message += `
-
-شكراً لصبركم! 🙏
-Thank you for your patience! 🙏`;
+  // Fallback: free-form text (only works within 24h window)
+  console.warn(`Template send failed for ticket ${ticketNumber}, falling back to free-form text. Reason: ${templateResult.error}`);
+  const message =
+    `مرحباً ${customerName}!\n\nتحديث على طلب الإصلاح:\n\nرقم التذكرة: ${ticketNumber}\nالحالة: ${statusAr}` +
+    (extras.length ? '\n' + extras.join('\n') : '') +
+    `\n\nالعين لتجارة الحاسبات - 07850006977`;
 
   return sendWhatsAppMessage(customerPhone, message);
 }
