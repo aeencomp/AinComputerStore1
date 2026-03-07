@@ -50,4 +50,3 @@ integrations = ["javascript_object_storage:2.0.0"]
 [userenv]
 
 [userenv.shared]
-WHATSAPP_WABA_ID = "2096468877767910"
