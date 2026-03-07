@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -6,6 +6,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminNotifications } from "@/hooks/useAdminNotifications";
 import { 
   ShoppingCart, 
   Package, 
@@ -73,6 +74,26 @@ export default function SalesPortal() {
     queryKey: ['/api/sales/auth/me'],
     retry: false,
   });
+
+  const { notifications: wsNotifications } = useAdminNotifications('/ws/sales');
+  const lastNotifTimestampRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!currentUser || wsNotifications.length === 0) return;
+    const latest = wsNotifications[0];
+    if (!latest || latest.timestamp === lastNotifTimestampRef.current) return;
+    lastNotifTimestampRef.current = latest.timestamp;
+
+    queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+
+    toast({
+      title: language === 'ar' ? 'طلب جديد!' : 'New Order!',
+      description: language === 'ar'
+        ? `رقم ${latest.data.orderNumber} — ${latest.data.customerName}`
+        : `#${latest.data.orderNumber} — ${latest.data.customerName}`,
+      duration: 6000,
+    });
+  }, [wsNotifications, currentUser, queryClient, toast, language]);
 
   const { data: recentOrders = [] } = useQuery<any[]>({
     queryKey: ['/api/orders'],

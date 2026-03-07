@@ -45,16 +45,18 @@ function parseSessionId(signedCookie: string, secret: string): string | null {
 
 class AdminNotificationService {
   private wss: WebSocketServer | null = null;
+  private salesWss: WebSocketServer | null = null;
   private clients: Set<WebSocket> = new Set();
+  private salesClients: Set<WebSocket> = new Set();
   private sessionSecret: string = process.env.SESSION_SECRET || 'default-secret-please-change-in-production';
   private sql: ReturnType<typeof neon> | null = null;
 
   initialize(server: Server) {
-    // Initialize neon HTTP client for session verification
     if (process.env.DATABASE_URL) {
       this.sql = neon(process.env.DATABASE_URL);
     }
 
+    // --- Admin WebSocket ---
     this.wss = new WebSocketServer({ 
       server, 
       path: '/ws/admin',
@@ -76,7 +78,6 @@ class AdminNotificationService {
             return;
           }
 
-          // Check if admin session exists in database
           const isAdmin = await this.verifyAdminSession(sessionId);
           if (!isAdmin) {
             console.log('WebSocket connection rejected: Not an admin session');
@@ -93,7 +94,7 @@ class AdminNotificationService {
       }
     });
 
-    this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+    this.wss.on('connection', (ws: WebSocket) => {
       console.log('Admin WebSocket client connected (authenticated)');
       this.clients.add(ws);
 
@@ -111,27 +112,84 @@ class AdminNotificationService {
     });
 
     console.log('Admin WebSocket server initialized on /ws/admin (with authentication)');
+
+    // --- Sales WebSocket ---
+    this.salesWss = new WebSocketServer({
+      server,
+      path: '/ws/sales',
+      verifyClient: async (info, callback) => {
+        try {
+          const cookies = parseCookies(info.req.headers.cookie);
+          const sessionCookie = cookies['connect.sid'];
+
+          if (!sessionCookie) {
+            callback(false, 401, 'Unauthorized');
+            return;
+          }
+
+          const sessionId = parseSessionId(sessionCookie, this.sessionSecret);
+          if (!sessionId) {
+            callback(false, 401, 'Unauthorized');
+            return;
+          }
+
+          const isSales = await this.verifySalesSession(sessionId);
+          if (!isSales) {
+            callback(false, 403, 'Forbidden');
+            return;
+          }
+
+          console.log('WebSocket connection authorized for sales');
+          callback(true);
+        } catch (error) {
+          console.error('Sales WebSocket auth error:', error);
+          callback(false, 500, 'Internal Server Error');
+        }
+      }
+    });
+
+    this.salesWss.on('connection', (ws: WebSocket) => {
+      console.log('Sales WebSocket client connected (authenticated)');
+      this.salesClients.add(ws);
+
+      ws.on('close', () => {
+        console.log('Sales WebSocket client disconnected');
+        this.salesClients.delete(ws);
+      });
+
+      ws.on('error', (error) => {
+        console.error('Sales WebSocket error:', error);
+        this.salesClients.delete(ws);
+      });
+
+      ws.send(JSON.stringify({ type: 'connected', message: 'Connected to sales notifications' }));
+    });
+
+    console.log('Sales WebSocket server initialized on /ws/sales (with authentication)');
   }
 
   private async verifyAdminSession(sessionId: string): Promise<boolean> {
     try {
-      if (!this.sql) {
-        console.error('Database not initialized for session verification');
-        return false;
-      }
-
-      // Use neon HTTP client for session verification
+      if (!this.sql) return false;
       const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
-      
-      if (result.length === 0) {
-        return false;
-      }
-
+      if (result.length === 0) return false;
       const session = result[0].sess as any;
-      // Check if session has adminId (set during admin login)
       return session && typeof session.adminId === 'string' && session.adminId.length > 0;
     } catch (error) {
       console.error('Error verifying admin session:', error);
+      return false;
+    }
+  }
+
+  private async verifySalesSession(sessionId: string): Promise<boolean> {
+    try {
+      if (!this.sql) return false;
+      const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
+      if (result.length === 0) return false;
+      const session = result[0].sess as any;
+      return session && typeof session.salesUserId === 'string' && session.salesUserId.length > 0;
+    } catch (error) {
+      console.error('Error verifying sales session:', error);
       return false;
     }
   }
@@ -157,17 +215,26 @@ class AdminNotificationService {
 
     const message = JSON.stringify(notification);
     
+    let sent = 0;
     this.clients.forEach((client) => {
       if (client.readyState === WebSocket.OPEN) {
         client.send(message);
+        sent++;
       }
     });
 
-    console.log(`Broadcasted new order notification: ${order.orderNumber} to ${this.clients.size} clients`);
+    this.salesClients.forEach((client) => {
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(message);
+        sent++;
+      }
+    });
+
+    console.log(`Broadcasted new order notification: ${order.orderNumber} to ${sent} clients (${this.clients.size} admin, ${this.salesClients.size} sales)`);
   }
 
   getConnectedClientsCount(): number {
-    return this.clients.size;
+    return this.clients.size + this.salesClients.size;
   }
 }
 

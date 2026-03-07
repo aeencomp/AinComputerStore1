@@ -13,7 +13,7 @@ export interface OrderNotification {
   read: boolean;
 }
 
-export function useAdminNotifications() {
+export function useAdminNotifications(wsPath: string = '/ws/admin') {
   const [notifications, setNotifications] = useState<OrderNotification[]>([]);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
@@ -25,13 +25,13 @@ export function useAdminNotifications() {
     }
 
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const wsUrl = `${protocol}//${window.location.host}/ws/admin`;
+    const wsUrl = `${protocol}//${window.location.host}${wsPath}`;
     
     try {
       wsRef.current = new WebSocket(wsUrl);
 
       wsRef.current.onopen = () => {
-        console.log('Admin notifications connected');
+        console.log(`Notifications connected (${wsPath})`);
         setIsConnected(true);
       };
 
@@ -52,10 +52,9 @@ export function useAdminNotifications() {
       };
 
       wsRef.current.onclose = () => {
-        console.log('Admin notifications disconnected');
+        console.log(`Notifications disconnected (${wsPath})`);
         setIsConnected(false);
         
-        // Attempt to reconnect after 5 seconds
         if (reconnectTimeoutRef.current) {
           clearTimeout(reconnectTimeoutRef.current);
         }
@@ -70,7 +69,7 @@ export function useAdminNotifications() {
     } catch (error) {
       console.error('Failed to create WebSocket connection:', error);
     }
-  }, []);
+  }, [wsPath]);
 
   const disconnect = useCallback(() => {
     if (reconnectTimeoutRef.current) {
