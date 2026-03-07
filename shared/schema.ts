@@ -959,6 +959,7 @@ export const inStoreProducts = pgTable("in_store_products", {
   sku: text("sku"),
   barcode: text("barcode"),
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   category: text("category"),
   description: text("description"),

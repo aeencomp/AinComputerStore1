@@ -51,6 +51,7 @@ interface ProductForm {
   sku: string;
   barcode: string;
   price: string;
+  wholesalePrice: string;
   costPrice: string;
   category: string;
   description: string;
@@ -64,6 +65,7 @@ const emptyForm: ProductForm = {
   sku: "",
   barcode: "",
   price: "",
+  wholesalePrice: "",
   costPrice: "",
   category: "",
   description: "",
@@ -203,6 +205,7 @@ export default function SalesInStoreInventory({ user }: Props) {
       sku: p.sku || "",
       barcode: p.barcode || "",
       price: String(p.price),
+      wholesalePrice: String(p.wholesalePrice || ""),
       costPrice: String(p.costPrice || ""),
       category: p.category || "",
       description: p.description || "",
@@ -232,6 +235,7 @@ export default function SalesInStoreInventory({ user }: Props) {
       sku: form.sku.trim() || null,
       barcode: form.barcode.trim() || null,
       price: form.price,
+      wholesalePrice: form.wholesalePrice || null,
       costPrice: form.costPrice || null,
       category: form.category.trim() || null,
       description: form.description.trim() || null,
@@ -963,6 +967,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                   onChange={e => setForm(f => ({ ...f, price: e.target.value }))}
                   placeholder="0"
                   data-testid="input-product-price"
+                />
+              </div>
+              <div>
+                <Label>{language === 'ar' ? 'سعر الجملة (د.ع)' : 'Wholesale Price (IQD)'}</Label>
+                <Input
+                  type="number"
+                  value={form.wholesalePrice}
+                  onChange={e => setForm(f => ({ ...f, wholesalePrice: e.target.value }))}
+                  placeholder="0"
+                  data-testid="input-product-wholesale-price"
                 />
               </div>
               <div>

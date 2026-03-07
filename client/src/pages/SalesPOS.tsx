@@ -52,6 +52,7 @@ interface POSProduct {
   nameAr: string;
   nameEn: string | null;
   price: string;
+  wholesalePrice?: string | null;
   stockQuantity: number | null;
   sku: string | null;
   image: string | null;
@@ -77,6 +78,7 @@ interface SalesUser {
 interface CartItem {
   product: POSProduct;
   quantity: number;
+  useWholesale: boolean;
 }
 
 interface HeldOrder {
@@ -137,6 +139,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           nameAr: p.nameAr,
           nameEn: p.nameEn ?? null,
           price: String(p.price),
+          wholesalePrice: p.wholesalePrice ? String(p.wholesalePrice) : null,
           stockQuantity: p.stockQuantity,
           sku: p.sku ?? null,
           image: null,
@@ -280,7 +283,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           nameEn: item.product.nameEn,
           sku: item.product.sku,
           category: item.product.category,
-          price: item.product.price,
+          price: getEffectivePrice(item),
           quantity: item.quantity,
         })),
         subtotal: subtotal.toString(),
@@ -349,7 +352,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
             : item
         );
       }
-      return [...prev, { product, quantity: 1 }];
+      return [...prev, { product, quantity: 1, useWholesale: false }];
     });
   };
 
@@ -387,6 +390,19 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     setCart(prev => prev.filter(item => item.product.id !== productId));
   };
 
+  const toggleWholesale = (productId: string) => {
+    setCart(prev => prev.map(item =>
+      item.product.id === productId
+        ? { ...item, useWholesale: !item.useWholesale }
+        : item
+    ));
+  };
+
+  const getEffectivePrice = (item: CartItem): string => {
+    if (item.useWholesale && item.product.wholesalePrice) return item.product.wholesalePrice;
+    return item.product.price;
+  };
+
   const clearCart = () => {
     setCart([]);
     setCustomerName("");
@@ -395,8 +411,8 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     setDiscountReason("");
   };
 
-  const subtotal = cart.reduce((sum, item) => 
-    sum + parseFloat(item.product.price) * item.quantity, 0
+  const subtotal = cart.reduce((sum, item) =>
+    sum + parseFloat(getEffectivePrice(item)) * item.quantity, 0
   );
   
   const discountValue = parseFloat(discount) || 0;
@@ -424,7 +440,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         productId: item.product.id,
         nameAr: item.product.nameAr,
         nameEn: item.product.nameEn,
-        price: item.product.price,
+        price: getEffectivePrice(item),
         quantity: item.quantity,
       })),
       customerName: customerName || 'عميل في المتجر',
@@ -977,11 +993,26 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                           <p className="font-medium text-sm line-clamp-1">
                             {language === 'ar' ? item.product.nameAr : (item.product.nameEn || item.product.nameAr)}
                           </p>
-                          <p className="text-sm text-primary font-bold">
-                            {formatPrice(parseFloat(item.product.price))} × {item.quantity}
-                          </p>
+                          <div className="flex items-center gap-1 flex-wrap">
+                            <p className="text-sm text-primary font-bold">
+                              {formatPrice(parseFloat(getEffectivePrice(item)))} × {item.quantity}
+                            </p>
+                            {item.product.wholesalePrice && orderType === 'in-store' && (
+                              <button
+                                onClick={() => toggleWholesale(item.product.id)}
+                                className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${
+                                  item.useWholesale
+                                    ? 'bg-amber-500 text-white border-amber-500'
+                                    : 'bg-transparent text-amber-600 border-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950'
+                                }`}
+                                data-testid={`button-wholesale-toggle-${item.product.id}`}
+                              >
+                                {language === 'ar' ? 'جملة' : 'Wholesale'}
+                              </button>
+                            )}
+                          </div>
                           <p className="text-xs text-muted-foreground">
-                            = {formatPrice(parseFloat(item.product.price) * item.quantity)} {language === 'ar' ? 'د.ع' : 'IQD'}
+                            = {formatPrice(parseFloat(getEffectivePrice(item)) * item.quantity)} {language === 'ar' ? 'د.ع' : 'IQD'}
                           </p>
                         </div>
                         
