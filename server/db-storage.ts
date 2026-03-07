@@ -1431,10 +1431,6 @@ export class DrizzleStorage implements IStorage {
     return count;
   }
 
-  async getInStoreProducts(): Promise<InStoreProduct[]> {
-    return await db.select().from(inStoreProducts);
-  }
-
   // ==================== Recycle Bin ====================
 
   async addToRecycleBin(item: { itemType: string; itemId: string; itemLabel: string; section: string; data: any; deletedBy: string }): Promise<RecycleBinItem> {

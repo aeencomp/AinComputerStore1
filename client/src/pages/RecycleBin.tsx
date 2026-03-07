@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import AdminNav from "@/components/AdminNav";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { AdminNav } from "@/components/AdminNav";
+import type { AdminUser } from "@shared/schema";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -57,6 +58,10 @@ export default function RecycleBin() {
   const [activeFilter, setActiveFilter] = useState<string>("all");
   const [clearDialogOpen, setClearDialogOpen] = useState(false);
   const [deleteDialogId, setDeleteDialogId] = useState<number | null>(null);
+
+  const { data: currentAdmin } = useQuery<AdminUser>({
+    queryKey: ["/api/admin/auth/me"],
+  });
 
   const { data: items = [], isLoading } = useQuery<RecycleBinItem[]>({
     queryKey: ["/api/admin/recycle-bin"],
@@ -149,7 +154,7 @@ export default function RecycleBin() {
 
   return (
     <div className="min-h-screen bg-background flex" dir="rtl">
-      <AdminNav />
+      <AdminNav currentAdmin={currentAdmin ?? null} />
       <main className="flex-1 p-6 space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
