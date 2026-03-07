@@ -230,9 +230,14 @@ export class DrizzleStorage implements IStorage {
     const sequenceResult = await db.execute(sql`SELECT nextval('order_number_seq') as next_num`);
     const nextNumber = (sequenceResult.rows[0] as any).next_num;
     const orderNumber = `ORD-${String(nextNumber).padStart(5, '0')}`;
+
+    const serializedItems = (insertOrder.items || []).map((item: any) =>
+      typeof item === 'string' ? item : JSON.stringify(item)
+    );
     
     const result = await db.insert(orders).values({
       ...insertOrder,
+      items: serializedItems,
       sessionId,
       userId: userId || null,
       orderNumber,

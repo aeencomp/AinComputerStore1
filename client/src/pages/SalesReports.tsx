@@ -167,9 +167,12 @@ export default function SalesReports({ user }: SalesReportsProps) {
       : '\u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645';
 
     const parsedItems: any[] = (order.items || []).map((item: any) => {
-      try { return typeof item === 'string' ? JSON.parse(item) : item; }
-      catch { return item; }
-    });
+      if (typeof item === 'string') {
+        try { return JSON.parse(item); }
+        catch { return null; }
+      }
+      return item;
+    }).filter((item: any) => item !== null && typeof item === 'object');
 
     const saleDate = new Date(order.createdAt);
 
