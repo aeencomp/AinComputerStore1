@@ -151,109 +151,151 @@ export default function SalesReports({ user }: SalesReportsProps) {
     return language === 'ar' ? labels[method]?.ar || method : labels[method]?.en || method;
   };
 
-  const printOrderReceipt = (order: Order) => {
-    const isAr = language === 'ar';
-    const dir = isAr ? 'rtl' : 'ltr';
-    const fmt = (v: number) => v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const printOrderReceipt = async (order: Order) => {
+    const { toDataURL } = await import('qrcode');
+    const qrDataUrl = await toDataURL(
+      `ORDER:${order.orderNumber}|TOTAL:${order.total}`,
+      { width: 70, margin: 0 }
+    );
 
-    const payLabel = order.paymentMethod === 'cash' ? (isAr ? 'نقدي' : 'Cash')
-      : order.paymentMethod === 'card' ? (isAr ? 'بطاقة' : 'Card')
-      : order.paymentMethod === 'zaincash' ? 'ZainCash'
-      : order.paymentMethod === 'qicard' ? 'QiCard'
-      : (isAr ? 'عند الاستلام' : 'COD');
+    const fmt = (v: number) => v.toLocaleString('ar-IQ') + ' \u062f.\u0639';
+
+    const payLabel = order.paymentMethod === 'cash' ? '\u0646\u0642\u062f\u064a'
+      : order.paymentMethod === 'card' ? '\u0628\u0637\u0627\u0642\u0629'
+      : order.paymentMethod === 'zaincash' ? '\u0632\u064a\u0646 \u0643\u0627\u0634'
+      : order.paymentMethod === 'qicard' ? '\u0643\u064a \u0643\u0627\u0631\u062f'
+      : '\u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645';
 
     const parsedItems: any[] = (order.items || []).map((item: any) => {
       try { return typeof item === 'string' ? JSON.parse(item) : item; }
       catch { return item; }
     });
 
-    const rowsHtml = parsedItems.map(item => {
-      const unitPrice = parseFloat(item.price || item.unitPrice || '0');
-      const qty = item.quantity || 1;
+    const saleDate = new Date(order.createdAt);
+
+    const itemRowsHtml = parsedItems.map((item: any) => {
+      const unitPrice = parseFloat(item.price || item.unitPrice || '0') || 0;
+      const qty = parseInt(item.quantity) || 1;
       const lineTotal = unitPrice * qty;
-      const name = isAr ? (item.nameAr || item.name || '-') : (item.nameEn || item.nameAr || item.name || '-');
-      return `<tr>
-        <td style="padding:4px 2px;border-bottom:1px solid #eee;">${name}${item.sku ? `<br/><span style="font-size:9px;color:#888;">SKU: ${item.sku}</span>` : ''}</td>
-        <td style="text-align:center;padding:4px 2px;border-bottom:1px solid #eee;">${qty}</td>
-        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;">${fmt(unitPrice)}</td>
-        <td style="text-align:end;padding:4px 2px;border-bottom:1px solid #eee;font-weight:600;">${fmt(lineTotal)}</td>
-      </tr>`;
+      const name = item.nameAr || item.nameEn || item.name || '-';
+      const nameEn = item.nameEn && item.nameEn !== item.nameAr ? item.nameEn : '';
+      const skuLine = item.sku ? `<div style="font-size:9px;color:#333;font-weight:700;">SKU: ${item.sku}</div>` : '';
+      const catLine = item.category ? `<div style="font-size:9px;color:#333;font-weight:700;">${item.category}</div>` : '';
+      const nameLine = nameEn ? `<div style="font-size:9px;color:#333;font-weight:700;">${nameEn}</div>` : '';
+      const unitPriceLine = `<div style="font-size:9px;color:#333;font-weight:700;">${fmt(unitPrice)} \xd7 ${qty}</div>`;
+      return `<div style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px;">
+        <div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;align-items:start;">
+          <div>
+            <div style="font-weight:800;color:#000;">${name}</div>
+            ${nameLine}
+            ${catLine}
+            ${skuLine}
+            ${unitPriceLine}
+          </div>
+          <div style="text-align:center;font-weight:800;color:#000;padding:0 6px;min-width:24px;">${qty}</div>
+          <div style="text-align:left;font-weight:800;color:#000;white-space:nowrap;">${fmt(lineTotal)}</div>
+        </div>
+      </div>`;
     }).join('');
 
     const subtotalNum = parseFloat(order.subtotal || order.total || '0');
     const discountNum = parseFloat(order.discount || '0');
     const totalNum = parseFloat(order.total || '0');
 
-    const discountRow = discountNum > 0 ? `
-      <div style="display:flex;justify-content:space-between;color:#16a34a;">
-        <span>${isAr ? 'الخصم:' : 'Discount:'}</span>
-        <span>-${fmt(discountNum)} ${isAr ? 'د.ع' : 'IQD'}</span>
+    const discountHtml = discountNum > 0 ? `
+      <div style="display:flex;justify-content:space-between;font-weight:700;color:#000;margin-bottom:4px;">
+        <span>\u0627\u0644\u062e\u0635\u0645:</span><span>-${fmt(discountNum)}</span>
       </div>` : '';
 
     const customerHtml = (order.customerName || order.customerPhone) ? `
-      <div style="background:#f9fafb;border-radius:6px;padding:8px 10px;margin-bottom:10px;font-size:12px;">
-        ${order.customerName ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الزبون:' : 'Customer:'}</span><span>${order.customerName}</span></div>` : ''}
-        ${order.customerPhone ? `<div style="display:flex;justify-content:space-between;"><span>${isAr ? 'الهاتف:' : 'Phone:'}</span><span dir="ltr">${order.customerPhone}</span></div>` : ''}
+      <div style="border-bottom:1px solid #d1d5db;padding:8px 12px;font-size:12px;">
+        ${order.customerName ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-weight:700;">\u0627\u0644\u0632\u0628\u0648\u0646:</span><span style="font-weight:800;">${order.customerName}</span></div>` : ''}
+        ${order.customerPhone ? `<div style="display:flex;justify-content:space-between;"><span style="font-weight:700;">\u0627\u0644\u0647\u0627\u062a\u0641:</span><span style="font-weight:800;" dir="ltr">${order.customerPhone}</span></div>` : ''}
       </div>` : '';
 
     const html = `<!DOCTYPE html>
-<html dir="${dir}" lang="${isAr ? 'ar' : 'en'}">
+<html dir="rtl" lang="ar">
 <head>
 <meta charset="UTF-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
-  @page { size: 80mm auto; margin: 4mm; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Cairo', Arial, sans-serif; font-size: 12px; color: #111; margin: 0; padding: 8px; width: 80mm; }
-  h2 { margin: 0 0 2px; font-size: 16px; }
-  p { margin: 0; }
-  table { width: 100%; border-collapse: collapse; font-size: 11px; }
-  th { border-bottom: 2px solid #333; padding: 4px 2px; font-weight: 600; }
-  .dashed { border-top: 1px dashed #aaa; margin: 8px 0; }
-  .section { background: #f9fafb; border-radius: 6px; padding: 8px 10px; margin-bottom: 10px; font-size: 12px; }
-  .row { display: flex; justify-content: space-between; }
-  .total-row { display: flex; justify-content: space-between; font-size: 15px; font-weight: 700; border-top: 2px solid #333; padding-top: 6px; margin-top: 4px; }
-  .footer { text-align: center; margin-top: 10px; font-size: 11px; color: #666; }
+  @page { size: 72.1mm auto; margin: 2mm; }
+  * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+  body { font-family: 'Cairo', 'Segoe UI', Arial, sans-serif; margin: 0; padding: 0; width: 72.1mm; background: white !important; color: #000; }
+  .bg-black { background-color: #000 !important; }
+  .text-white { color: #fff !important; }
 </style>
 </head>
 <body>
-  <div style="text-align:center;border-bottom:2px dashed #aaa;padding-bottom:10px;margin-bottom:10px;">
-    <h2>العين لتجارة الحاسبات</h2>
-    <p style="font-size:11px;color:#666;">AEEN COMPUTER TRADING — العراق، كربلاء</p>
-    <p style="font-size:10px;color:#999;margin-top:4px;">${isAr ? 'إيصال بيع' : 'Sales Receipt'}</p>
+  <div class="bg-black text-white" style="padding:14px;text-align:center;">
+    <div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">\u0627\u0644\u0639\u064a\u0646 \u0644\u062a\u062c\u0627\u0631\u0629 \u0627\u0644\u062d\u0627\u0633\u0628\u0627\u062a</div>
+    <div style="font-size:12px;font-weight:700;margin-top:2px;opacity:0.9;">AEEN COMPUTER TRADING</div>
+    <div style="font-size:10px;margin-top:2px;opacity:0.75;">\u0643\u0631\u0628\u0644\u0627\u0621 - \u0627\u0644\u0639\u0631\u0627\u0642</div>
   </div>
-  <div class="section" style="margin-bottom:10px;">
-    <div class="row"><span>${isAr ? 'رقم الطلب:' : 'Order #:'}</span><span style="font-weight:700;font-family:monospace;">${order.orderNumber}</span></div>
-    <div class="row"><span>${isAr ? 'التاريخ:' : 'Date:'}</span><span>${new Date(order.createdAt).toLocaleString(isAr ? 'ar-IQ' : 'en-US')}</span></div>
-    <div class="row"><span>${isAr ? 'طريقة الدفع:' : 'Payment:'}</span><span style="font-weight:600;">${payLabel}</span></div>
+
+  <div style="padding:10px 12px;border-bottom:2px solid #000;display:flex;justify-content:space-between;align-items:center;">
+    <div>
+      <div style="font-size:10px;font-weight:700;letter-spacing:1px;">\u0631\u0642\u0645 \u0627\u0644\u0648\u0635\u0644</div>
+      <div style="font-family:monospace;font-weight:900;font-size:13px;">${order.orderNumber}</div>
+    </div>
+    <img src="${qrDataUrl}" width="50" height="50" style="display:block;"/>
   </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px 12px;border-bottom:1px solid #d1d5db;font-size:12px;">
+    <div>
+      <div style="font-weight:700;">\u0627\u0644\u062a\u0627\u0631\u064a\u062e</div>
+      <div style="font-weight:800;">${saleDate.toLocaleDateString('ar-IQ')}</div>
+    </div>
+    <div style="text-align:left;">
+      <div style="font-weight:700;">\u0627\u0644\u0648\u0642\u062a</div>
+      <div style="font-weight:800;">${saleDate.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}</div>
+    </div>
+  </div>
+
   ${customerHtml}
-  <table>
-    <thead>
-      <tr>
-        <th style="text-align:start;">${isAr ? 'المنتج' : 'Product'}</th>
-        <th style="text-align:center;">${isAr ? 'الكمية' : 'Qty'}</th>
-        <th style="text-align:end;">${isAr ? 'السعر' : 'Price'}</th>
-        <th style="text-align:end;">${isAr ? 'المجموع' : 'Total'}</th>
-      </tr>
-    </thead>
-    <tbody>${rowsHtml}</tbody>
-  </table>
-  <div class="dashed"></div>
-  <div style="font-size:12px;margin-bottom:8px;">
-    <div class="row"><span>${isAr ? 'المجموع الفرعي:' : 'Subtotal:'}</span><span>${fmt(subtotalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
-    ${discountRow}
-    <div class="total-row"><span>${isAr ? 'الإجمالي:' : 'Total:'}</span><span>${fmt(totalNum)} ${isAr ? 'د.ع' : 'IQD'}</span></div>
+
+  <div style="border:2px solid #000;border-radius:6px;overflow:hidden;margin:8px;">
+    <div class="bg-black text-white" style="display:grid;grid-template-columns:1fr auto auto;gap:4px;padding:6px 8px;font-size:11px;font-weight:700;">
+      <div>\u0627\u0644\u0645\u0646\u062a\u062c</div>
+      <div style="padding:0 6px;">\u0627\u0644\u0643\u0645\u064a\u0629</div>
+      <div>\u0627\u0644\u0633\u0639\u0631</div>
+    </div>
+    ${parsedItems.length > 0 ? itemRowsHtml : '<div style="padding:10px;text-align:center;font-size:11px;color:#666;">\u0644\u0627 \u062a\u0648\u062c\u062f \u0645\u0646\u062a\u062c\u0627\u062a</div>'}
   </div>
-  <div class="footer">
-    <div class="dashed"></div>
-    <p>${isAr ? 'شكراً لتسوقكم معنا!' : 'Thank you for your purchase!'}</p>
-    <p style="margin-top:4px;font-size:10px;">${isAr ? 'يرجى الاحتفاظ بالوصل' : 'Please keep this receipt'}</p>
+
+  <div style="padding:8px 12px;font-size:12px;">
+    <div style="display:flex;justify-content:space-between;font-weight:700;margin-bottom:4px;">
+      <span>\u0627\u0644\u0645\u062c\u0645\u0648\u0639:</span><span>${fmt(subtotalNum)}</span>
+    </div>
+    ${discountHtml}
+    <div class="bg-black text-white" style="display:flex;justify-content:space-between;padding:8px 10px;border-radius:6px;margin-top:4px;font-size:15px;font-weight:900;">
+      <span>\u0627\u0644\u0625\u062c\u0645\u0627\u0644\u064a:</span><span>${fmt(totalNum)}</span>
+    </div>
   </div>
-  <script>window.onload = function() { window.print(); window.onafterprint = function() { window.close(); }; };</script>
+
+  <div style="text-align:center;padding:6px 12px;border-top:1px solid #d1d5db;border-bottom:1px solid #d1d5db;font-size:12px;">
+    <span style="font-weight:700;">\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639: </span>
+    <span style="font-weight:800;">${payLabel}</span>
+  </div>
+
+  <div style="text-align:center;padding:10px 12px;border-top:2px dashed #000;margin-top:4px;">
+    <div style="font-weight:800;font-size:13px;">\u0634\u0643\u0631\u0627\u064b \u0644\u062a\u0633\u0648\u0642\u0643\u0645 \u0645\u0639\u0646\u0627</div>
+    <div style="font-size:10px;font-weight:700;margin-top:4px;">\u064a\u0631\u062c\u0649 \u0627\u0644\u0627\u062d\u062a\u0641\u0627\u0638 \u0628\u0627\u0644\u0648\u0635\u0644 \u0644\u063a\u0631\u0636 \u0627\u0644\u0636\u0645\u0627\u0646</div>
+    <div style="font-weight:900;font-size:14px;margin-top:6px;" dir="ltr">07850006977</div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      }, 500);
+    };
+  </script>
 </body>
 </html>`;
 
-    const popup = window.open('', '_blank', 'width=400,height=650');
+    const popup = window.open('', '_blank', 'width=420,height=700');
     if (popup) { popup.document.write(html); popup.document.close(); }
   };
 
