@@ -8,10 +8,28 @@ import express, {
 } from "express";
 import session from "express-session";
 import connectPgSimple from "connect-pg-simple";
+import pg from "pg";
+const { Pool } = pg;
 
 import { registerRoutes } from "./routes";
 
 const PgStore = connectPgSimple(session);
+
+// Create a dedicated pg pool for the session store with generous timeouts.
+// Neon serverless databases wake from sleep slowly — without a longer timeout
+// the first connection after inactivity throws "Authentication timed out".
+const sessionPool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 20000, // wait up to 20s for Neon cold start
+  idleTimeoutMillis: 60000,
+  max: 5,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+});
+
+// Log pool errors instead of crashing
+sessionPool.on('error', (err) => {
+  console.error('[session-pool] idle client error:', err.message);
+});
 
 declare module "express-session" {
   interface SessionData {
@@ -34,9 +52,7 @@ export function log(message: string, source = "express") {
 export const app = express();
 
 // Trust proxy - required for secure cookies behind Replit's reverse proxy
-if (process.env.NODE_ENV === 'production') {
-  app.set('trust proxy', 1);
-}
+app.set('trust proxy', 1);
 
 declare module 'http' {
   interface IncomingMessage {
@@ -46,12 +62,13 @@ declare module 'http' {
 
 app.use(session({
   store: new PgStore({
-    conString: process.env.DATABASE_URL,
+    pool: sessionPool,
     createTableIfMissing: true,
+    errorLog: (err: string) => console.error('[session-store]', err),
   }),
   secret: process.env.SESSION_SECRET || 'default-secret-please-change-in-production',
   resave: false,
-  saveUninitialized: true,
+  saveUninitialized: false,
   cookie: {
     maxAge: 30 * 24 * 60 * 60 * 1000,
     httpOnly: true,
@@ -102,10 +119,16 @@ export default async function runApp(
 ) {
   const server = await registerRoutes(app);
 
+  // Catch session store / DB connection errors and return a friendly response
+  // instead of crashing the request with a raw pg error message.
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
-    const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
-
+    const isDbTimeout = message.includes('timed out') || message.includes('timeout') || message.includes('ECONNREFUSED');
+    if (isDbTimeout) {
+      console.error('[session-error] DB connection issue during request:', message);
+      return res.status(503).json({ error: 'Service starting up, please refresh and try again.' });
+    }
+    const status = err.status || err.statusCode || 500;
     res.status(status).json({ message });
     throw err;
   });
