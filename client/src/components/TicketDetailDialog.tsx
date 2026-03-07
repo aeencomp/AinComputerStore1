@@ -195,10 +195,11 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   const updateMutation = useMutation({
     mutationFn: async (data: z.infer<typeof updateSchema>) => {
       if (!ticketId) throw new Error('No ticket ID');
-      return await apiRequest('PATCH', `/api/admin/repair-tickets/${ticketId}`, {
+      const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${ticketId}`, {
         ...data,
         estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
       });
+      return res.json();
     },
     onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
