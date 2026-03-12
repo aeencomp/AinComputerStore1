@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { storage } from './storage';
 
-const WHATSAPP_API_URL = 'https://graph.facebook.com/v18.0';
+const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
 
 interface WhatsAppMessageResult {
   success: boolean;
@@ -71,8 +71,9 @@ export async function sendWhatsAppMessage(
     console.log('WhatsApp text message sent:', response.data);
     return { success: true, messageId: response.data.messages?.[0]?.id };
   } catch (error: any) {
-    const errorMessage = error.response?.data?.error?.message || error.message;
-    console.error('WhatsApp text send error:', errorMessage);
+    const errData = error.response?.data?.error;
+    const errorMessage = errData?.message || error.message;
+    console.error('WhatsApp text send error:', JSON.stringify(errData || error.message));
     return { success: false, error: errorMessage };
   }
 }
@@ -130,7 +131,7 @@ export async function sendWhatsAppTemplate(
     if (errorDetail?.code === 132001 || errorMessage?.includes('not approved') || errorMessage?.includes('pending')) {
       console.warn(`WhatsApp template "${templateName}" is not yet approved. Message not sent to ${formattedPhone}.`);
     } else {
-      console.error(`WhatsApp template "${templateName}" error for ${formattedPhone}:`, errorMessage);
+      console.error(`WhatsApp template "${templateName}" error for ${formattedPhone}:`, JSON.stringify(errorDetail || error.message));
     }
     return { success: false, error: errorMessage };
   }

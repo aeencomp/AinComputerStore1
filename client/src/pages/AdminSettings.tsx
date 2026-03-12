@@ -26,6 +26,9 @@ export default function AdminSettings() {
   const { toast } = useToast();
   const [activeTab, setActiveTab] = useState("store");
   const [footerLinks, setFooterLinks] = useState<FooterLinkGroup[]>([]);
+  const [whatsappTestPhone, setWhatsappTestPhone] = useState('');
+  const [whatsappTestResult, setWhatsappTestResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [whatsappTesting, setWhatsappTesting] = useState(false);
 
   const storeSettingsFormSchema = useMemo(() => z.object({
     storeNameAr: z.string().min(1, t("admin.settings.validation.storeNameArRequired")),
@@ -546,6 +549,57 @@ export default function AdminSettings() {
                       type="password"
                     />
                     <p className="text-sm text-muted-foreground">{language === 'ar' ? 'رمز الوصول الدائم من Meta Business. القيمة المحفوظة هنا تُلغي متغيرات البيئة.' : 'Long-lived access token from Meta Business. Value saved here overrides environment variables.'}</p>
+                  </div>
+
+                  <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+                    <p className="text-sm font-medium">{language === 'ar' ? 'اختبار الاتصال بـ WhatsApp' : 'Test WhatsApp Connection'}</p>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder={language === 'ar' ? 'أدخل رقم هاتف للاختبار (مثال: 07801234567)' : 'Test phone number (e.g. 07801234567)'}
+                        value={whatsappTestPhone}
+                        onChange={e => { setWhatsappTestPhone(e.target.value); setWhatsappTestResult(null); }}
+                        dir="ltr"
+                        data-testid="input-whatsapp-test-phone"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={whatsappTesting || !whatsappTestPhone.trim()}
+                        data-testid="button-whatsapp-test"
+                        onClick={async () => {
+                          setWhatsappTesting(true);
+                          setWhatsappTestResult(null);
+                          try {
+                            const res = await apiRequest('POST', '/api/admin/whatsapp/test', { to: whatsappTestPhone.trim() });
+                            const data = await res.json();
+                            if (data.ok) {
+                              setWhatsappTestResult({ ok: true, message: language === 'ar' ? 'تم إرسال رسالة الاختبار بنجاح!' : 'Test message sent successfully!' });
+                            } else {
+                              const errMsg = data.data?.error?.message || data.error || 'Unknown error';
+                              setWhatsappTestResult({ ok: false, message: errMsg });
+                            }
+                          } catch (e: any) {
+                            setWhatsappTestResult({ ok: false, message: e.message });
+                          } finally {
+                            setWhatsappTesting(false);
+                          }
+                        }}
+                      >
+                        {whatsappTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : (language === 'ar' ? 'اختبار' : 'Test')}
+                      </Button>
+                    </div>
+                    {whatsappTestResult && (
+                      <p className={`text-sm font-medium ${whatsappTestResult.ok ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`} data-testid="text-whatsapp-test-result">
+                        {whatsappTestResult.ok ? '✓ ' : '✗ '}{whatsappTestResult.message}
+                      </p>
+                    )}
+                    {!whatsappTestResult && (
+                      <p className="text-xs text-muted-foreground">
+                        {language === 'ar'
+                          ? 'احفظ الإعدادات أولاً ثم اختبر الاتصال. إذا ظهر خطأ "Invalid parameter" فهذا يعني أن رمز الوصول لا يتطابق مع Phone Number ID.'
+                          : 'Save settings first, then test. If you see "Invalid parameter" it means the access token does not match the Phone Number ID.'}
+                      </p>
+                    )}
                   </div>
                 </CardContent>
               </Card>
