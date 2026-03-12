@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -721,7 +721,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update inventory for each item sold
       for (const item of items) {
         try {
-          if (resolvedOrderType === 'in-store') {
+          if (item.productSource === 'battery' && item.batteryId) {
+            await db.update(laptopBatteries)
+              .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
+              .where(eq(laptopBatteries.id, item.batteryId));
+          } else if (item.productSource === 'adapter' && item.adapterId) {
+            await db.update(acAdapters)
+              .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
+              .where(eq(acAdapters.id, item.adapterId));
+          } else if (resolvedOrderType === 'in-store') {
             await storage.adjustInStoreProductStock(parseInt(item.productId), -item.quantity);
           } else {
             await storage.adjustProductStock(item.productId, -item.quantity, salesUserId, 'walk-in sale', order.orderNumber);
@@ -3582,7 +3590,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/battery/batteries", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
-      if (!batteryUserId) {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!batteryUserId && !salesUserId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
@@ -4026,7 +4035,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/battery/adapters", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
-      if (!batteryUserId) {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!batteryUserId && !salesUserId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
       

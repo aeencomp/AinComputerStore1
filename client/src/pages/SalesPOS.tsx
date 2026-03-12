@@ -42,10 +42,12 @@ import {
   RotateCcw,
   History,
   UserSearch,
-  Store
+  Store,
+  Battery,
+  Plug
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { InStoreProduct } from "@shared/schema";
+import type { InStoreProduct, LaptopBattery, AcAdapter } from "@shared/schema";
 
 interface POSProduct {
   id: string;
@@ -58,6 +60,8 @@ interface POSProduct {
   image: string | null;
   category: string | null;
   barcode?: string | null;
+  productSource?: 'instore' | 'battery' | 'adapter';
+  sourceId?: string;
 }
 
 interface Category {
@@ -129,9 +133,19 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     enabled: orderType === 'in-store',
   });
 
-  const isLoading = orderType === 'in-store' ? inStoreLoading : mainLoading;
+  const { data: batteriesRaw = [], isLoading: batteriesLoading } = useQuery<LaptopBattery[]>({
+    queryKey: ['/api/battery/batteries'],
+    enabled: orderType === 'in-store',
+  });
 
-  const products: POSProduct[] = orderType === 'in-store'
+  const { data: adaptersRaw = [], isLoading: adaptersLoading } = useQuery<AcAdapter[]>({
+    queryKey: ['/api/battery/adapters'],
+    enabled: orderType === 'in-store',
+  });
+
+  const isLoading = orderType === 'in-store' ? (inStoreLoading || batteriesLoading || adaptersLoading) : mainLoading;
+
+  const instoreProducts: POSProduct[] = orderType === 'in-store'
     ? inStoreRaw
         .filter(p => p.isActive !== 0)
         .map(p => ({
@@ -145,7 +159,48 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           image: null,
           category: p.category ?? null,
           barcode: p.barcode ?? null,
+          productSource: 'instore' as const,
         }))
+    : [];
+
+  const batteryProducts: POSProduct[] = orderType === 'in-store'
+    ? batteriesRaw
+        .filter(b => (b.stockQuantity || 0) >= 0)
+        .map(b => ({
+          id: `bat-${b.id}`,
+          nameAr: `${b.brand} ${b.serialNumber}`,
+          nameEn: `${b.brand} ${b.serialNumber}`,
+          price: String(b.sellingPrice || '0'),
+          wholesalePrice: b.wholesalePrice ? String(b.wholesalePrice) : null,
+          stockQuantity: b.stockQuantity,
+          sku: b.serialNumber,
+          image: null,
+          category: language === 'ar' ? 'بطاريات' : 'Batteries',
+          productSource: 'battery' as const,
+          sourceId: b.id,
+        }))
+    : [];
+
+  const adapterProducts: POSProduct[] = orderType === 'in-store'
+    ? adaptersRaw
+        .filter(a => (a.stockQuantity || 0) >= 0)
+        .map(a => ({
+          id: `ada-${a.id}`,
+          nameAr: `${a.brand} ${a.serialNumber}${a.wattage ? ` ${a.wattage}W` : ''}`,
+          nameEn: `${a.brand} ${a.serialNumber}${a.wattage ? ` ${a.wattage}W` : ''}`,
+          price: String(a.sellingPrice || '0'),
+          wholesalePrice: a.wholesalePrice ? String(a.wholesalePrice) : null,
+          stockQuantity: a.stockQuantity,
+          sku: a.serialNumber,
+          image: null,
+          category: language === 'ar' ? 'شواحن' : 'Chargers',
+          productSource: 'adapter' as const,
+          sourceId: a.id,
+        }))
+    : [];
+
+  const products: POSProduct[] = orderType === 'in-store'
+    ? [...instoreProducts, ...batteryProducts, ...adapterProducts]
     : mainProducts.map(p => ({
         id: p.id,
         nameAr: p.nameAr,
@@ -155,6 +210,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         sku: p.sku ?? null,
         image: p.image ?? null,
         category: p.category ?? null,
+        productSource: 'instore' as const,
       }));
 
   const { data: categories = [] } = useQuery<Category[]>({
@@ -164,7 +220,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
 
   const inStoreCategories: { id: string; slug: string; nameAr: string; nameEn?: string }[] =
     orderType === 'in-store'
-      ? Array.from(new Set(inStoreRaw.map(p => p.category).filter(Boolean) as string[])).map(cat => ({
+      ? Array.from(new Set(products.map(p => p.category).filter(Boolean) as string[])).map(cat => ({
           id: cat,
           slug: cat,
           nameAr: cat,
@@ -309,6 +365,8 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       setTimeout(() => {
         queryClient.invalidateQueries({ queryKey: ['/api/products'] });
         queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
+        queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
       }, 100);
     },
     onError: (error: any) => {
@@ -442,6 +500,9 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         nameEn: item.product.nameEn,
         price: getEffectivePrice(item),
         quantity: item.quantity,
+        productSource: item.product.productSource || 'instore',
+        batteryId: item.product.productSource === 'battery' ? item.product.sourceId : undefined,
+        adapterId: item.product.productSource === 'adapter' ? item.product.sourceId : undefined,
       })),
       customerName: customerName || 'عميل في المتجر',
       customerPhone,
@@ -792,7 +853,13 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Package className="h-10 w-10 text-muted-foreground/30" />
+                            {product.productSource === 'battery' ? (
+                              <Battery className="h-10 w-10 text-primary/40" />
+                            ) : product.productSource === 'adapter' ? (
+                              <Plug className="h-10 w-10 text-primary/40" />
+                            ) : (
+                              <Package className="h-10 w-10 text-muted-foreground/30" />
+                            )}
                           </div>
                         )}
                       </div>
@@ -846,7 +913,13 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            <Package className="h-6 w-6 text-muted-foreground/30" />
+                            {product.productSource === 'battery' ? (
+                              <Battery className="h-6 w-6 text-primary/40" />
+                            ) : product.productSource === 'adapter' ? (
+                              <Plug className="h-6 w-6 text-primary/40" />
+                            ) : (
+                              <Package className="h-6 w-6 text-muted-foreground/30" />
+                            )}
                           </div>
                         )}
                       </div>
@@ -983,7 +1056,13 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <Package className="h-6 w-6 text-muted-foreground/30" />
+                              {item.product.productSource === 'battery' ? (
+                                <Battery className="h-6 w-6 text-primary/40" />
+                              ) : item.product.productSource === 'adapter' ? (
+                                <Plug className="h-6 w-6 text-primary/40" />
+                              ) : (
+                                <Package className="h-6 w-6 text-muted-foreground/30" />
+                              )}
                             </div>
                           )}
                         </div>
@@ -997,7 +1076,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                             <p className="text-sm text-primary font-bold">
                               {formatPrice(parseFloat(getEffectivePrice(item)))} × {item.quantity}
                             </p>
-                            {item.product.wholesalePrice && orderType === 'in-store' && (
+                            {item.product.wholesalePrice && (orderType === 'in-store' || item.product.productSource === 'battery' || item.product.productSource === 'adapter') && (
                               <button
                                 onClick={() => toggleWholesale(item.product.id)}
                                 className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${
