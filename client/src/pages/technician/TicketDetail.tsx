@@ -255,6 +255,83 @@ export default function TicketDetail() {
     }
   };
 
+  const handlePrintReceipt = () => {
+    if (!ticket) return;
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+    const statusMap: Record<string, string> = {
+      pending: isRTL ? 'قيد الانتظار' : 'Pending',
+      'in-progress': isRTL ? 'جاري العمل' : 'In Progress',
+      'waiting-parts': isRTL ? 'انتظار قطع' : 'Waiting Parts',
+      completed: isRTL ? 'مكتمل' : 'Completed',
+      delivered: isRTL ? 'مُسلَّم' : 'Delivered',
+      rejected: isRTL ? 'مرفوض' : 'Rejected',
+      unrepairable: isRTL ? 'لا يمكن إصلاحه' : 'Unrepairable',
+    };
+    const priorityMap: Record<string, string> = {
+      low: isRTL ? 'منخفضة' : 'Low',
+      normal: isRTL ? 'عادية' : 'Normal',
+      high: isRTL ? 'عالية' : 'High',
+      urgent: isRTL ? 'عاجلة' : 'Urgent',
+      vip: 'VIP',
+    };
+    const paymentMap: Record<string, string> = {
+      unpaid: isRTL ? 'غير مدفوع' : 'Unpaid',
+      paid: isRTL ? 'مدفوع' : 'Paid',
+      deferred: isRTL ? 'أجل' : 'Deferred',
+    };
+    const intakeDate = format(new Date(ticket.createdAt), 'dd/MM/yyyy');
+    const deliveryDate = ticket.deliveredAt
+      ? format(new Date(ticket.deliveredAt), 'dd/MM/yyyy')
+      : (isRTL ? 'لم يُسلَّم بعد' : 'Not delivered yet');
+
+    printWindow.document.write(`<!DOCTYPE html>
+      <html dir="${isRTL ? 'rtl' : 'ltr'}"><head>
+        <title>${isRTL ? 'وصل الصيانة' : 'Repair Receipt'}</title>
+        <style>
+          @page { size: 72.1mm auto; margin: 2mm; }
+          * { box-sizing: border-box; margin: 0; padding: 0; }
+          body { font-family: Arial, sans-serif; font-size: 12px; font-weight: 600; width: 68mm; padding: 3mm; direction: ${isRTL ? 'rtl' : 'ltr'}; color: #000; line-height: 1.5; }
+          .header { text-align: center; border-bottom: 3px solid #000; padding-bottom: 8px; margin-bottom: 8px; }
+          .store-name { font-size: 17px; font-weight: 900; }
+          .receipt-title { text-align: center; font-size: 14px; font-weight: 900; margin: 8px 0; padding: 5px; background: #e0e0e0; border: 1px solid #000; border-radius: 3px; }
+          .ticket-number { font-size: 18px; font-weight: 900; font-family: monospace; text-align: center; margin: 8px 0; letter-spacing: 1px; }
+          .section { margin: 8px 0; padding: 8px; background: #f5f5f5; border: 1px solid #ccc; border-radius: 3px; }
+          .row { display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; margin: 3px 0; }
+          .lbl { font-weight: 900; }
+          .date-row { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; margin: 4px 0; padding: 4px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; }
+          .cost-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 900; margin: 4px 0; padding: 5px; background: #d4edda; border: 2px solid #28a745; border-radius: 3px; color: #155724; }
+          .notes { font-size: 10px; font-weight: 600; margin-top: 4px; padding: 5px; background: #f0f0f0; border-radius: 3px; }
+          .footer { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 3px solid #000; font-size: 11px; font-weight: 900; }
+          .keep-note { text-align: center; margin-top: 6px; padding: 5px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px; font-size: 10px; font-weight: 700; }
+        </style>
+      </head><body>
+        <div class="header">
+          <div class="store-name">العين لتجارة الحاسبات</div>
+        </div>
+        <div class="receipt-title">${isRTL ? 'وصل الصيانة' : 'Repair Receipt'}</div>
+        <div class="ticket-number">${ticket.ticketNumber}</div>
+        <div class="section">
+          <div class="row"><span class="lbl">${isRTL ? 'الاسم:' : 'Name:'}</span><span>${ticket.customerName}</span></div>
+          <div class="row"><span class="lbl">${isRTL ? 'الهاتف:' : 'Phone:'}</span><span dir="ltr">${ticket.customerPhone}</span></div>
+          <div class="row"><span class="lbl">${isRTL ? 'الجهاز:' : 'Device:'}</span><span>${ticket.deviceBrand} ${ticket.deviceModel}</span></div>
+          <div class="row"><span class="lbl">${isRTL ? 'المشكلة:' : 'Issue:'}</span><span style="max-width:60%;text-align:end;">${ticket.issueDescriptionAr || ticket.issueDescriptionEn || ''}</span></div>
+          <div class="row"><span class="lbl">${isRTL ? 'الحالة:' : 'Status:'}</span><span style="font-weight:900;">${statusMap[ticket.status] || ticket.status}</span></div>
+          <div class="row"><span class="lbl">${isRTL ? 'الأولوية:' : 'Priority:'}</span><span>${priorityMap[ticket.priority] || ticket.priority}</span></div>
+          <div class="row"><span class="lbl">${isRTL ? 'الدفع:' : 'Payment:'}</span><span>${paymentMap[ticket.paymentStatus || 'unpaid'] || ticket.paymentStatus}</span></div>
+        </div>
+        <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ الاستلام:' : 'Intake Date:'}</span><span>${intakeDate}</span></div>
+        <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ التسليم:' : 'Delivery Date:'}</span><span>${deliveryDate}</span></div>
+        ${ticket.finalCost ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span><span>${Number(ticket.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ticket.costEstimate ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة التقديرية:' : 'Est. Cost:'}</span><span>${Number(ticket.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
+        ${ticket.technicianNotes ? `<div class="notes"><span style="font-weight:900;">${isRTL ? 'ملاحظات:' : 'Notes:'}</span> ${ticket.technicianNotes}</div>` : ''}
+        <div class="keep-note">${isRTL ? 'احتفظ بهذا الوصل لاستلام جهازك' : 'Keep this receipt to collect your device'}</div>
+        <div class="footer">${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
+      </body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => { printWindow.print(); printWindow.close(); }, 250);
+  };
+
   if (isAuthLoading || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -309,6 +386,21 @@ export default function TicketDetail() {
                 </div>
               )}
               <div>
+                <Label className="text-muted-foreground">{isRTL ? 'تاريخ الاستلام' : 'Intake Date'}</Label>
+                <p className="font-medium" data-testid="text-intake-date">
+                  {format(new Date(ticket.createdAt), 'dd/MM/yyyy')}
+                </p>
+              </div>
+              <div>
+                <Label className="text-muted-foreground">{isRTL ? 'تاريخ التسليم' : 'Delivery Date'}</Label>
+                <p className="font-medium" data-testid="text-delivery-date">
+                  {ticket.deliveredAt
+                    ? format(new Date(ticket.deliveredAt), 'dd/MM/yyyy')
+                    : <span className="text-muted-foreground text-sm">{isRTL ? 'لم يُسلَّم بعد' : 'Not delivered yet'}</span>
+                  }
+                </p>
+              </div>
+              <div>
                 <Label className="text-muted-foreground">{t('repair.ticket.deviceType')}</Label>
                 <p className="font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</p>
               </div>
@@ -335,10 +427,16 @@ export default function TicketDetail() {
               <CardTitle>{isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</CardTitle>
               <CardDescription>{isRTL ? 'اطبع البطاقة لتعليقها على الجهاز' : 'Print label to attach to device'}</CardDescription>
             </div>
-            <Button onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-print-label">
-              <Printer className="h-4 w-4" />
-              {barcodeReady ? (isRTL ? 'طباعة' : 'Print') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
-            </Button>
+            <div className="flex gap-2 flex-wrap">
+              <Button onClick={handlePrintReceipt} variant="secondary" className="gap-2" data-testid="button-print-receipt">
+                <Printer className="h-4 w-4" />
+                {isRTL ? 'طباعة الوصل' : 'Print Receipt'}
+              </Button>
+              <Button onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-print-label">
+                <Printer className="h-4 w-4" />
+                {barcodeReady ? (isRTL ? 'طباعة البطاقة' : 'Print Label') : (isRTL ? 'جاري التحميل...' : 'Loading...')}
+              </Button>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">

@@ -247,17 +247,22 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
       unrepairable: isRTL ? 'لا يمكن إصلاحه' : 'Unrepairable',
     };
     const typeMap: Record<string,string> = { laptop: isRTL ? 'لابتوب' : 'Laptop', desktop: isRTL ? 'كمبيوتر مكتبي' : 'Desktop', monitor: isRTL ? 'شاشة' : 'Monitor', printer: isRTL ? 'طابعة' : 'Printer', other: isRTL ? 'أخرى' : 'Other' };
-    const deviceSections = dialogActiveTickets.map((t, i) => `
+    const deviceSections = dialogActiveTickets.map((t, i) => {
+      const intakeDate = t.createdAt ? new Date(t.createdAt).toLocaleDateString(isRTL ? 'ar-IQ' : 'en-GB') : '';
+      const deliveryDate = (t as any).deliveredAt ? new Date((t as any).deliveredAt).toLocaleDateString(isRTL ? 'ar-IQ' : 'en-GB') : '';
+      return `
       <div class="device-section">
         <div class="device-header">${isRTL ? `الجهاز ${i + 1}` : `Device ${i + 1}`}</div>
         <div class="device-ticket">${t.ticketNumber}</div>
         <div class="device-info-row"><span class="lbl">${isRTL ? 'الجهاز:' : 'Device:'}</span><span>${t.deviceBrand} ${t.deviceModel}</span></div>
         <div class="device-info-row"><span class="lbl">${isRTL ? 'النوع:' : 'Type:'}</span><span>${typeMap[t.deviceType] || t.deviceType}</span></div>
         <div class="device-info-row"><span class="lbl">${isRTL ? 'الحالة:' : 'Status:'}</span><span style="font-weight:900;">${statusMap[t.status] || t.status}</span></div>
+        ${intakeDate ? `<div class="device-info-row"><span class="lbl">${isRTL ? 'تاريخ الاستلام:' : 'Intake Date:'}</span><span>${intakeDate}</span></div>` : ''}
+        ${deliveryDate ? `<div class="device-info-row"><span class="lbl">${isRTL ? 'تاريخ التسليم:' : 'Delivery Date:'}</span><span style="font-weight:900;">${deliveryDate}</span></div>` : ''}
         ${t.costEstimate ? `<div class="device-info-row"><span class="lbl">${isRTL ? 'التكلفة:' : 'Cost:'}</span><span style="font-weight:900;">${Number(t.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
         ${t.issueDescriptionAr || t.issueDescriptionEn ? `<div class="device-issue"><span class="lbl">${isRTL ? 'المشكلة:' : 'Issue:'}</span> ${t.issueDescriptionAr || t.issueDescriptionEn}</div>` : ''}
       </div>
-    `).join('<div class="divider"></div>');
+    `}).join('<div class="divider"></div>');
 
     // Use a placeholder store name for SaaS
     const shopName = localStorage.getItem('saasShopName') || (isRTL ? 'نظام الصيانة' : 'Repair System');
