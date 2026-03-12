@@ -33,6 +33,7 @@ export default function TechnicianDashboard() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  const [sortOrder, setSortOrder] = useState<string>('newest');
   const [customerLookup, setCustomerLookup] = useState('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
@@ -231,6 +232,10 @@ export default function TechnicianDashboard() {
       if (!nameMatch && !phoneMatch && !ticketNumberMatch) return false;
     }
     return true;
+  })?.sort((a, b) => {
+    const dateA = new Date(a.createdAt).getTime();
+    const dateB = new Date(b.createdAt).getTime();
+    return sortOrder === 'newest' ? dateB - dateA : dateA - dateB;
   });
 
   const getStatusColor = (status: string) => {
@@ -446,6 +451,16 @@ export default function TechnicianDashboard() {
             </SelectContent>
           </Select>
 
+          <Select value={sortOrder} onValueChange={setSortOrder}>
+            <SelectTrigger className="w-full md:w-[200px]" data-testid="select-sort-order">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="newest">{language === 'ar' ? 'الأحدث أولاً' : 'Newest First'}</SelectItem>
+              <SelectItem value="oldest">{language === 'ar' ? 'الأقدم أولاً' : 'Oldest First'}</SelectItem>
+            </SelectContent>
+          </Select>
+
           <Button
             variant={showArchived ? 'default' : 'outline'}
             onClick={() => setShowArchived(!showArchived)}
@@ -569,10 +584,20 @@ export default function TechnicianDashboard() {
                     </Select>
                   </div>
 
-                  <div className="flex justify-between items-center pt-1">
-                    <span className="text-xs text-muted-foreground">
-                      {format(new Date(ticket.createdAt), 'MMM dd, yyyy')}
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{language === 'ar' ? 'تاريخ الاستلام:' : 'Intake Date:'}</span>
+                    <span className="text-sm font-medium" data-testid={`text-intake-date-${ticket.id}`}>
+                      {format(new Date(ticket.createdAt), 'dd/MM/yyyy')}
                     </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">{language === 'ar' ? 'تاريخ التسليم:' : 'Delivery Date:'}</span>
+                    <span className={`text-sm font-medium ${ticket.deliveredAt ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} data-testid={`text-delivery-date-${ticket.id}`}>
+                      {ticket.deliveredAt ? format(new Date(ticket.deliveredAt), 'dd/MM/yyyy') : (language === 'ar' ? 'لم يُسلَّم' : 'Not yet')}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between items-center pt-1">
                     {showArchived ? (
                       <Button
                         size="sm"
