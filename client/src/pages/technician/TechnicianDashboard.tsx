@@ -33,7 +33,7 @@ export default function TechnicianDashboard() {
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
-  const [sortOrder, setSortOrder] = useState<string>('newest');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [customerLookup, setCustomerLookup] = useState('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
