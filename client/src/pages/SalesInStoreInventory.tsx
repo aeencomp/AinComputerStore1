@@ -57,6 +57,7 @@ interface ProductForm {
   description: string;
   stockQuantity: string;
   lowStockThreshold: string;
+  image: string;
 }
 
 const emptyForm: ProductForm = {
@@ -71,6 +72,7 @@ const emptyForm: ProductForm = {
   description: "",
   stockQuantity: "0",
   lowStockThreshold: "3",
+  image: "",
 };
 
 interface ScanEntry {
@@ -95,6 +97,9 @@ export default function SalesInStoreInventory({ user }: Props) {
   const [stockProduct, setStockProduct] = useState<InStoreProduct | null>(null);
   const [stockAdjustment, setStockAdjustment] = useState("0");
   const [deleteConfirm, setDeleteConfirm] = useState<InStoreProduct | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
 
   const [countPhase, setCountPhase] = useState<CountPhase>("scanning");
   const [scanInput, setScanInput] = useState("");
@@ -194,6 +199,8 @@ export default function SalesInStoreInventory({ user }: Props) {
   const openAdd = () => {
     setEditingProduct(null);
     setForm(emptyForm);
+    setImageFile(null);
+    setImagePreview(null);
     setShowDialog(true);
   };
 
@@ -211,7 +218,10 @@ export default function SalesInStoreInventory({ user }: Props) {
       description: p.description || "",
       stockQuantity: String(p.stockQuantity),
       lowStockThreshold: String(p.lowStockThreshold),
+      image: p.image || "",
     });
+    setImageFile(null);
+    setImagePreview(p.image || null);
     setShowDialog(true);
   };
 
@@ -221,13 +231,27 @@ export default function SalesInStoreInventory({ user }: Props) {
     setShowStockDialog(true);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!form.nameAr.trim() || !form.price.trim()) {
       toast({
         title: language === 'ar' ? 'الاسم والسعر مطلوبان' : 'Name and price are required',
         variant: 'destructive',
       });
       return;
+    }
+    let imageUrl = form.image || null;
+    if (imageFile) {
+      try {
+        const fd = new FormData();
+        fd.append("image", imageFile);
+        const res = await fetch("/api/sales/upload/image", { method: "POST", body: fd });
+        if (!res.ok) throw new Error(await res.text());
+        const data = await res.json();
+        imageUrl = data.url;
+      } catch (e: any) {
+        toast({ title: language === 'ar' ? 'فشل رفع الصورة' : 'Image upload failed', description: e.message, variant: 'destructive' });
+        return;
+      }
     }
     const payload = {
       nameAr: form.nameAr.trim(),
@@ -239,6 +263,7 @@ export default function SalesInStoreInventory({ user }: Props) {
       costPrice: form.costPrice || null,
       category: form.category.trim() || null,
       description: form.description.trim() || null,
+      image: imageUrl,
       stockQuantity: parseInt(form.stockQuantity) || 0,
       lowStockThreshold: parseInt(form.lowStockThreshold) || 3,
       isActive: 1,
@@ -524,6 +549,13 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                   <Card key={product.id} className={isOut ? 'border-destructive/40' : isLow ? 'border-orange-400/60' : ''}>
                     <CardContent className="py-3 px-4">
                       <div className="flex items-center gap-3 flex-wrap">
+                        {product.image && (
+                          <img
+                            src={product.image}
+                            alt={product.nameAr}
+                            className="h-12 w-12 object-cover rounded-md border flex-shrink-0"
+                          />
+                        )}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className="font-semibold">{product.nameAr}</span>
@@ -930,7 +962,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       )}
 
       {/* Add / Edit Dialog */}
-      <Dialog open={showDialog} onOpenChange={open => { if (!open) { setShowDialog(false); setEditingProduct(null); setForm(emptyForm); } }}>
+      <Dialog open={showDialog} onOpenChange={open => { if (!open) { setShowDialog(false); setEditingProduct(null); setForm(emptyForm); setImageFile(null); setImagePreview(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -1065,6 +1097,57 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                   placeholder={language === 'ar' ? 'وصف اختياري' : 'Optional description'}
                 />
               </div>
+              <div className="col-span-2">
+                <Label>{language === 'ar' ? 'صورة المنتج' : 'Product Image'}</Label>
+                <div className="flex items-center gap-3 mt-1">
+                  <input
+                    ref={imageInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    className="hidden"
+                    data-testid="input-product-image"
+                    onChange={e => {
+                      const file = e.target.files?.[0] || null;
+                      setImageFile(file);
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = ev => setImagePreview(ev.target?.result as string);
+                        reader.readAsDataURL(file);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => imageInputRef.current?.click()}
+                    data-testid="button-browse-image"
+                  >
+                    {language === 'ar' ? 'استعراض...' : 'Browse...'}
+                  </Button>
+                  {imagePreview && (
+                    <div className="relative">
+                      <img
+                        src={imagePreview}
+                        alt="preview"
+                        className="h-14 w-14 object-cover rounded-md border"
+                      />
+                      <button
+                        type="button"
+                        className="absolute -top-1 -end-1 bg-destructive text-destructive-foreground rounded-full h-4 w-4 flex items-center justify-center text-xs leading-none"
+                        onClick={() => { setImageFile(null); setImagePreview(null); setForm(f => ({ ...f, image: "" })); if (imageInputRef.current) imageInputRef.current.value = ""; }}
+                        data-testid="button-remove-image"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
+                  {!imagePreview && (
+                    <span className="text-sm text-muted-foreground">
+                      {language === 'ar' ? 'لم يتم اختيار صورة' : 'No image selected'}
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
             <div className="flex gap-2 pt-2">
               <Button
@@ -1076,7 +1159,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 me-2 animate-spin" />}
                 {editingProduct ? (language === 'ar' ? 'حفظ التغييرات' : 'Save Changes') : (language === 'ar' ? 'إضافة المنتج' : 'Add Product')}
               </Button>
-              <Button variant="outline" onClick={() => { setShowDialog(false); setEditingProduct(null); setForm(emptyForm); }}>
+              <Button variant="outline" onClick={() => { setShowDialog(false); setEditingProduct(null); setForm(emptyForm); setImageFile(null); setImagePreview(null); }}>
                 {language === 'ar' ? 'إلغاء' : 'Cancel'}
               </Button>
             </div>

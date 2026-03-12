@@ -97,6 +97,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json({ url, filename: req.file.filename });
   });
 
+  // Image upload route for sales users
+  app.post("/api/sales/upload/image", (req, res, next) => {
+    const salesUserId = (req.session as any).salesUserId;
+    const adminId = (req.session as any).adminId;
+    if (!salesUserId && !adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    next();
+  }, (req, res, next) => {
+    imageUpload.single("image")(req, res, (err) => {
+      if (err) {
+        if (err.code === 'LIMIT_FILE_SIZE') {
+          return res.status(400).json({ error: "File too large. Maximum size is 5MB" });
+        }
+        if (err.message === 'Invalid file type') {
+          return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, or WebP" });
+        }
+        return res.status(400).json({ error: err.message || "Upload failed" });
+      }
+      next();
+    });
+  }, (req, res) => {
+    if (!req.file) {
+      return res.status(400).json({ error: "No file uploaded" });
+    }
+    const url = `/uploads/${req.file.filename}`;
+    return res.json({ url, filename: req.file.filename });
+  });
+
   // Admin Authentication Routes
   app.post("/api/admin/auth/login", async (req, res) => {
     try {

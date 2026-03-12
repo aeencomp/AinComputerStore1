@@ -966,6 +966,7 @@ export const inStoreProducts = pgTable("in_store_products", {
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
   category: text("category"),
   description: text("description"),
+  image: text("image"),
   stockQuantity: integer("stock_quantity").notNull().default(0),
   lowStockThreshold: integer("low_stock_threshold").notNull().default(3),
   isActive: integer("is_active").notNull().default(1),
