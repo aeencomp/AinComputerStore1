@@ -2457,6 +2457,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.issueDescriptionEn !== undefined) {
         updateData.issueDescriptionEn = req.body.issueDescriptionEn.trim() || null;
       }
+      if (req.body.paymentStatus !== undefined) {
+        updateData.paymentStatus = req.body.paymentStatus;
+      }
       
       const ticket = await storage.updateRepairTicket(id, updateData);
       
