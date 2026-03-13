@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
-import { ArrowLeft, ArrowRight, Plus, Printer, Receipt, AlertTriangle, LayoutList } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Plus, Printer, Receipt, AlertTriangle, LayoutList, Search, UserCheck, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import JsBarcode from 'jsbarcode';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
@@ -39,6 +39,9 @@ export default function NewRepairRequest() {
   const printRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
+  const [customerLookupQuery, setCustomerLookupQuery] = useState('');
+  const [debouncedLookup, setDebouncedLookup] = useState('');
+  const [selectedCustomer, setSelectedCustomer] = useState<(RepairCustomer & { ticketCount: number }) | null>(null);
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -50,6 +53,24 @@ export default function NewRepairRequest() {
       navigate('/technician/login');
     }
   }, [authError, isAuthLoading, currentTechnician, navigate]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedLookup(customerLookupQuery.trim());
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [customerLookupQuery]);
+
+  const { data: lookupResults = [], isFetching: isLookingUp, isError: isLookupError } = useQuery<(RepairCustomer & { ticketCount: number })[]>({
+    queryKey: ['/api/repair-customers', { search: debouncedLookup }],
+    queryFn: async () => {
+      const res = await fetch(`/api/repair-customers?search=${encodeURIComponent(debouncedLookup)}`);
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
+    enabled: debouncedLookup.length >= 2 && !selectedCustomer,
+    retry: 1,
+  });
 
   const [qrReady, setQrReady] = useState(false);
 
@@ -99,6 +120,23 @@ export default function NewRepairRequest() {
       priority: 'normal',
     },
   });
+
+  const handleSelectCustomer = (customer: RepairCustomer & { ticketCount: number }) => {
+    setSelectedCustomer(customer);
+    setCustomerLookupQuery('');
+    form.setValue('customerName', customer.name);
+    form.setValue('customerPhone', customer.phone);
+    form.setValue('customerEmail', customer.email || '');
+  };
+
+  const handleClearCustomer = () => {
+    setSelectedCustomer(null);
+    setCustomerLookupQuery('');
+    setDebouncedLookup('');
+    form.setValue('customerName', '');
+    form.setValue('customerPhone', '');
+    form.setValue('customerEmail', '');
+  };
 
   useEffect(() => {
     if (createdTicket) {
@@ -203,6 +241,9 @@ export default function NewRepairRequest() {
     setCreatedTicket(null);
     setQrReady(false);
     setQrCodeDataUrl('');
+    setSelectedCustomer(null);
+    setCustomerLookupQuery('');
+    setDebouncedLookup('');
     form.reset();
   };
 
@@ -724,6 +765,96 @@ export default function NewRepairRequest() {
                   <h3 className="font-semibold text-lg border-b pb-2">
                     {isRTL ? 'معلومات العميل' : 'Customer Information'}
                   </h3>
+
+                  {/* Customer Lookup */}
+                  {!selectedCustomer ? (
+                    <div className="space-y-2">
+                      <Label>{isRTL ? 'ابحث عن عميل حالي' : 'Search existing customer'}</Label>
+                      <div className="relative">
+                        <Search className="absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground ltr:left-3 rtl:right-3" />
+                        <Input
+                          value={customerLookupQuery}
+                          onChange={(e) => setCustomerLookupQuery(e.target.value)}
+                          placeholder={isRTL ? 'رقم الهاتف أو رقم العميل (مثال: 07801234567 أو CUST-001)' : 'Phone number or Customer ID (e.g. 07801234567 or CUST-001)'}
+                          dir="ltr"
+                          className="ltr:pl-9 rtl:pr-9"
+                          data-testid="input-customer-lookup"
+                        />
+                        {isLookingUp && (
+                          <div className="absolute top-1/2 -translate-y-1/2 ltr:right-3 rtl:left-3">
+                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Lookup Results */}
+                      {debouncedLookup.length >= 2 && !isLookingUp && lookupResults.length > 0 && (
+                        <div className="border rounded-md divide-y max-h-48 overflow-y-auto">
+                          {lookupResults.map((customer) => (
+                            <button
+                              key={customer.id}
+                              type="button"
+                              onClick={() => handleSelectCustomer(customer)}
+                              className="w-full flex items-center gap-3 p-3 text-start hover-elevate active-elevate-2"
+                              data-testid={`button-select-customer-${customer.customerId}`}
+                            >
+                              <UserCheck className="h-5 w-5 text-muted-foreground shrink-0" />
+                              <div className="flex-1 min-w-0">
+                                <div className="font-medium truncate">{customer.name}</div>
+                                <div className="text-sm text-muted-foreground flex items-center gap-2 flex-wrap">
+                                  <span dir="ltr">{customer.phone}</span>
+                                  <span className="text-xs opacity-60">{customer.customerId}</span>
+                                </div>
+                              </div>
+                              <Badge variant="secondary" className="shrink-0">
+                                {customer.ticketCount} {isRTL ? 'طلب' : (customer.ticketCount === 1 ? 'ticket' : 'tickets')}
+                              </Badge>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+
+                      {debouncedLookup.length >= 2 && !isLookingUp && !isLookupError && lookupResults.length === 0 && (
+                        <p className="text-sm text-muted-foreground">
+                          {isRTL ? 'لم يتم العثور على عميل. أدخل البيانات يدوياً أدناه.' : 'No customer found. Enter details manually below.'}
+                        </p>
+                      )}
+
+                      {isLookupError && (
+                        <p className="text-sm text-destructive">
+                          {isRTL ? 'فشل البحث. أدخل البيانات يدوياً أدناه.' : 'Search failed. Enter details manually below.'}
+                        </p>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-3 border rounded-md bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-800">
+                      <UserCheck className="h-5 w-5 text-green-600 dark:text-green-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-green-800 dark:text-green-200">
+                          {selectedCustomer.name}
+                          <span className="text-xs text-green-600 dark:text-green-400 mx-2">
+                            {selectedCustomer.customerId}
+                          </span>
+                        </div>
+                        <div className="text-sm text-green-700 dark:text-green-300">
+                          {isRTL
+                            ? `عميل مسجّل — ${selectedCustomer.ticketCount} طلب سابق`
+                            : `Returning customer — ${selectedCustomer.ticketCount} previous ${selectedCustomer.ticketCount === 1 ? 'ticket' : 'tickets'}`}
+                        </div>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleClearCustomer}
+                        data-testid="button-clear-customer"
+                      >
+                        <X className="h-4 w-4 me-1" />
+                        {isRTL ? 'تغيير' : 'Change'}
+                      </Button>
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
@@ -736,6 +867,8 @@ export default function NewRepairRequest() {
                               {...field}
                               placeholder={isRTL ? 'أدخل اسم العميل' : 'Enter customer name'}
                               data-testid="input-customer-name"
+                              readOnly={!!selectedCustomer}
+                              className={selectedCustomer ? 'bg-muted' : ''}
                             />
                           </FormControl>
                           <FormMessage />
@@ -755,6 +888,8 @@ export default function NewRepairRequest() {
                               dir="ltr"
                               placeholder="07XX XXX XXXX"
                               data-testid="input-customer-phone"
+                              readOnly={!!selectedCustomer}
+                              className={selectedCustomer ? 'bg-muted' : ''}
                             />
                           </FormControl>
                           <FormMessage />
@@ -774,6 +909,8 @@ export default function NewRepairRequest() {
                               dir="ltr"
                               placeholder="email@example.com"
                               data-testid="input-customer-email"
+                              readOnly={!!selectedCustomer}
+                              className={selectedCustomer ? 'bg-muted' : ''}
                             />
                           </FormControl>
                           <FormMessage />
