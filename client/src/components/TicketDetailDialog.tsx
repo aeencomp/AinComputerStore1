@@ -128,10 +128,18 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
 
   const cleanPrice = (v: string | null | undefined) => v ? String(parseFloat(v)) : '';
 
+  const resolveStatusField = (status: string, paymentStatus: string) => {
+    if (status === 'delivered') {
+      if (paymentStatus === 'deferred') return 'delivered-deferred';
+      return 'delivered-paid';
+    }
+    return status;
+  };
+
   useEffect(() => {
     if (ticket) {
       form.reset({
-        status: ticket.status,
+        status: resolveStatusField(ticket.status, ticket.paymentStatus || 'unpaid'),
         priority: ticket.priority,
         paymentStatus: ticket.paymentStatus || 'unpaid',
         technicianNotes: ticket.technicianNotes || '',
@@ -283,7 +291,16 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   });
 
   const onSubmit = (data: z.infer<typeof updateSchema>) => {
-    updateMutation.mutate(data);
+    let status = data.status;
+    let paymentStatus = data.paymentStatus;
+    if (data.status === 'delivered-paid') {
+      status = 'delivered';
+      paymentStatus = 'paid';
+    } else if (data.status === 'delivered-deferred') {
+      status = 'delivered';
+      paymentStatus = 'deferred';
+    }
+    updateMutation.mutate({ ...data, status, paymentStatus });
   };
 
   const handlePrint = () => {
@@ -807,7 +824,14 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t('repair.ticket.status')}</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              if (val === 'delivered-paid') form.setValue('paymentStatus', 'paid');
+                              else if (val === 'delivered-deferred') form.setValue('paymentStatus', 'deferred');
+                            }}
+                            value={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger data-testid="dialog-select-status">
                                 <SelectValue />
@@ -818,7 +842,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                               <SelectItem value="in-progress">{t('repair.status.in-progress')}</SelectItem>
                               <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                               <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
-                              <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+                              <SelectItem value="delivered-paid">{isRTL ? 'مُسلَّم - مدفوع' : 'Delivered - Paid'}</SelectItem>
+                              <SelectItem value="delivered-deferred">{isRTL ? 'مُسلَّم - آجل' : 'Delivered - Deferred'}</SelectItem>
                               <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                               <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
                             </SelectContent>
@@ -894,28 +919,30 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="paymentStatus"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('repair.ticket.paymentStatus')}</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger data-testid="dialog-select-payment-status">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="unpaid">{t('repair.payment.unpaid')}</SelectItem>
-                              <SelectItem value="paid">{t('repair.payment.paid')}</SelectItem>
-                              <SelectItem value="deferred">{t('repair.payment.deferred')}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                    {!['delivered-paid', 'delivered-deferred'].includes(form.watch('status')) && (
+                      <FormField
+                        control={form.control}
+                        name="paymentStatus"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>{t('repair.ticket.paymentStatus')}</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl>
+                                <SelectTrigger data-testid="dialog-select-payment-status">
+                                  <SelectValue />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="unpaid">{t('repair.payment.unpaid')}</SelectItem>
+                                <SelectItem value="paid">{t('repair.payment.paid')}</SelectItem>
+                                <SelectItem value="deferred">{t('repair.payment.deferred')}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    )}
                   </div>
 
                   <FormField
