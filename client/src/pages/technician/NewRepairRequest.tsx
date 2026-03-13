@@ -771,18 +771,18 @@ export default function NewRepairRequest() {
                     <div className="space-y-2">
                       <Label>{isRTL ? 'ابحث عن عميل حالي' : 'Search existing customer'}</Label>
                       <div className="relative">
-                        <Search className="absolute top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground ltr:left-3 rtl:right-3" />
+                        <Search className="absolute top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground ltr:left-3 rtl:right-3" />
                         <Input
                           value={customerLookupQuery}
                           onChange={(e) => setCustomerLookupQuery(e.target.value)}
                           placeholder={isRTL ? 'رقم الهاتف أو رقم العميل (مثال: 07801234567 أو CUST-001)' : 'Phone number or Customer ID (e.g. 07801234567 or CUST-001)'}
                           dir="ltr"
-                          className="ltr:pl-9 rtl:pr-9"
+                          className="ltr:pl-11 rtl:pr-11 text-base"
                           data-testid="input-customer-lookup"
                         />
                         {isLookingUp && (
                           <div className="absolute top-1/2 -translate-y-1/2 ltr:right-3 rtl:left-3">
-                            <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                           </div>
                         )}
                       </div>
