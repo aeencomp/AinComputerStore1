@@ -47,6 +47,7 @@ interface RepairSale {
   costEstimate?: string;
   paymentStatus: string;
   status: string;
+  deliveredAt?: string;
   updatedAt: string;
 }
 
@@ -118,6 +119,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
 
   const repairRows = repairSales.map((t, i) => {
     const amount = parseFloat(t.finalCost || t.costEstimate || "0");
+    const isDelivered = t.status === 'delivered';
     return `
       <tr>
         <td>${i + 1}</td>
@@ -127,7 +129,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
           ${t.customerPhone ? `<br><span style="font-size:11px;color:#666">${t.customerPhone}</span>` : ""}
         </td>
         <td style="color:#666">${t.deviceBrand ? t.deviceBrand + " " : ""}${t.deviceType}</td>
-        <td><span class="badge badge-green">نقداً</span></td>
+        <td><span class="badge ${isDelivered ? 'badge-delivered' : 'badge-green'}">${isDelivered ? 'مُسلَّم ✓' : 'مدفوع'}</span></td>
         <td style="text-align:end;font-weight:600">${fmtNum(amount)}</td>
       </tr>`;
   }).join("");
@@ -246,10 +248,11 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
       font-weight: 600;
       border: 1px solid;
     }
-    .badge-green  { color: #15803d; border-color: #86efac; background: #f0fdf4; }
-    .badge-blue   { color: #1d4ed8; border-color: #93c5fd; background: #eff6ff; }
-    .badge-purple { color: #7e22ce; border-color: #c4b5fd; background: #faf5ff; }
-    .badge-orange { color: #c2410c; border-color: #fdba74; background: #fff7ed; }
+    .badge-green     { color: #15803d; border-color: #86efac; background: #f0fdf4; }
+    .badge-delivered { color: #047857; border-color: #34d399; background: #ecfdf5; font-weight:700; }
+    .badge-blue      { color: #1d4ed8; border-color: #93c5fd; background: #eff6ff; }
+    .badge-purple    { color: #7e22ce; border-color: #c4b5fd; background: #faf5ff; }
+    .badge-orange    { color: #c2410c; border-color: #fdba74; background: #fff7ed; }
 
     /* ---- Grand total bar ---- */
     .grand-total-bar {
@@ -698,7 +701,10 @@ export default function DailyReport({ user }: DailyReportProps) {
                               {ticket.deviceBrand ? `${ticket.deviceBrand} ` : ""}{ticket.deviceType}
                             </td>
                             <td className="py-2 px-4">
-                              <Badge variant="outline" className="text-green-700 border-green-400">نقداً</Badge>
+                              {ticket.status === 'delivered'
+                                ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم ✓</Badge>
+                                : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
+                              }
                             </td>
                             <td className="py-2 px-4 text-end font-semibold">
                               {fmtNum(amount)}

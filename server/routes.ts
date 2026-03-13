@@ -5913,7 +5913,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // In-store sales (walk-in and in-store order types)
       const { db } = await import("./db");
       const { orders, repairTickets } = await import("../shared/schema");
-      const { and, gte, lte, inArray, eq } = await import("drizzle-orm");
+      const { and, or, gte, lte, inArray, eq, isNotNull } = await import("drizzle-orm");
 
       const inStoreOrders = await db.select().from(orders).where(
         and(
@@ -5923,12 +5923,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
         )
       );
 
-      // Repair ticket payments for the day (paid tickets updated on this date)
+      // Repair ticket payments for the day:
+      // - explicitly marked as 'paid' (filtered by updatedAt)
+      // - OR status = 'delivered' (delivered = customer collected = paid, filtered by deliveredAt)
       const paidRepairTickets = await db.select().from(repairTickets).where(
-        and(
-          eq(repairTickets.paymentStatus, 'paid'),
-          gte(repairTickets.updatedAt, startOfDay),
-          lte(repairTickets.updatedAt, endOfDay)
+        or(
+          and(
+            eq(repairTickets.paymentStatus, 'paid'),
+            gte(repairTickets.updatedAt, startOfDay),
+            lte(repairTickets.updatedAt, endOfDay)
+          ),
+          and(
+            eq(repairTickets.status, 'delivered'),
+            isNotNull(repairTickets.deliveredAt),
+            gte(repairTickets.deliveredAt, startOfDay),
+            lte(repairTickets.deliveredAt, endOfDay)
+          )
         )
       );
 
