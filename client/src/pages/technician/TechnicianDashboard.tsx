@@ -392,13 +392,13 @@ export default function TechnicianDashboard() {
 
         <div className="flex flex-col md:flex-row gap-4 mb-6">
           <div className="relative flex-1">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+            <Search className="absolute start-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground" />
             <Input
               type="text"
               placeholder={t('repair.technician.dashboard.searchAll')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="ps-11 text-base"
+              className="ps-12 py-6 text-lg"
               data-testid="input-search-query"
             />
           </div>
