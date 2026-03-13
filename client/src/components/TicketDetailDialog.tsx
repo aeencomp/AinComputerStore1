@@ -81,6 +81,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   const updateSchema = useMemo(() => z.object({
     status: z.string(),
     priority: z.string(),
+    paymentStatus: z.string(),
     technicianNotes: z.string().optional(),
     estimatedCompletion: z.string().optional(),
     costEstimate: z.string().optional(),
@@ -103,6 +104,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     defaultValues: {
       status: 'pending',
       priority: 'normal',
+      paymentStatus: 'unpaid',
       technicianNotes: '',
       estimatedCompletion: '',
       costEstimate: '',
@@ -131,6 +133,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       form.reset({
         status: ticket.status,
         priority: ticket.priority,
+        paymentStatus: ticket.paymentStatus || 'unpaid',
         technicianNotes: ticket.technicianNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
         costEstimate: cleanPrice(ticket.costEstimate),
@@ -886,6 +889,29 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                           <FormControl>
                             <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="dialog-input-final-cost" />
                           </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="paymentStatus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.paymentStatus')}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="dialog-select-payment-status">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="unpaid">{t('repair.payment.unpaid')}</SelectItem>
+                              <SelectItem value="paid">{t('repair.payment.paid')}</SelectItem>
+                              <SelectItem value="deferred">{t('repair.payment.deferred')}</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
                       )}
