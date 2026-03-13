@@ -60,6 +60,7 @@ interface DailyReportSummary {
   inStoreTotalDeferred: number;
   repairCount: number;
   repairTotal: number;
+  repairTotalDeferred: number;
   grandTotal: number;
   grandTotalCash: number;
   grandTotalZain: number;
@@ -143,9 +144,12 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
 
   const repairRows = repairSales.map((t, i) => {
     const amount = parseFloat(t.finalCost || t.costEstimate || "0");
+    const isDeferred = t.paymentStatus === 'deferred';
     const isDelivered = t.status === 'delivered';
+    const badgeCls = isDeferred ? 'badge-orange' : isDelivered ? 'badge-delivered' : 'badge-green';
+    const badgeTxt = isDeferred ? 'آجل' : isDelivered ? 'مُسلَّم ✓' : 'مدفوع';
     return `
-      <tr>
+      <tr style="${isDeferred ? "color:#c2410c" : ""}">
         <td>${i + 1}</td>
         <td style="font-family:monospace;font-size:11px">${t.ticketNumber}</td>
         <td>
@@ -153,8 +157,8 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
           ${t.customerPhone ? `<br><span style="font-size:11px;color:#666">${t.customerPhone}</span>` : ""}
         </td>
         <td style="color:#666">${t.deviceBrand ? t.deviceBrand + " " : ""}${t.deviceType}</td>
-        <td><span class="badge ${isDelivered ? 'badge-delivered' : 'badge-green'}">${isDelivered ? 'مُسلَّم ✓' : 'مدفوع'}</span></td>
-        <td style="text-align:end;font-weight:600">${fmtNum(amount)}</td>
+        <td><span class="badge ${badgeCls}">${badgeTxt}</span></td>
+        <td style="text-align:end;font-weight:600${isDeferred ? ";color:#c2410c" : ""}">${fmtNum(amount)}</td>
       </tr>`;
   }).join("");
 
@@ -393,7 +397,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
   <div class="section-title">
     <span class="icon-dot" style="background:#2563eb"></span>
     مدفوعات التصليح
-    <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${repairSales.length} سجل</span>
+    <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${repairSales.filter(t => t.paymentStatus !== 'deferred').length} سجل${repairSales.some(t => t.paymentStatus === 'deferred') ? ` + ${repairSales.filter(t => t.paymentStatus === 'deferred').length} آجل` : ""}</span>
   </div>
   ${repairSales.length === 0
     ? `<div class="empty-msg">لا توجد مدفوعات تصليح لهذا اليوم</div>`
@@ -411,7 +415,10 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
       <tbody>${repairRows}</tbody>
       <tfoot>
         <tr>
-          <td colspan="5">المجموع</td>
+          <td colspan="5">
+            المجموع
+            ${(summary.repairTotalDeferred ?? 0) > 0 ? `<span style="font-size:10px;font-weight:400;color:#c2410c;margin-right:8px">(آجل غير محسوب: ${fmtNum(summary.repairTotalDeferred)})</span>` : ""}
+          </td>
           <td style="color:#2563eb">${fmtNum(summary.repairTotal)}</td>
         </tr>
       </tfoot>
@@ -753,12 +760,14 @@ export default function DailyReport({ user }: DailyReportProps) {
                               {ticket.deviceBrand ? `${ticket.deviceBrand} ` : ""}{ticket.deviceType}
                             </td>
                             <td className="py-2 px-4">
-                              {ticket.status === 'delivered'
-                                ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم ✓</Badge>
-                                : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
+                              {ticket.paymentStatus === 'deferred'
+                                ? <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>
+                                : ticket.status === 'delivered'
+                                  ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم ✓</Badge>
+                                  : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
                               }
                             </td>
-                            <td className="py-2 px-4 text-end font-semibold">
+                            <td className={`py-2 px-4 text-end font-semibold ${ticket.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
                               {fmtNum(amount)}
                             </td>
                           </tr>
@@ -769,6 +778,11 @@ export default function DailyReport({ user }: DailyReportProps) {
                       <tr className="bg-muted/30 border-t-2 font-semibold">
                         <td colSpan={5} className="py-2 px-4">
                           {language === "ar" ? "المجموع" : "Total"}
+                          {(data.summary.repairTotalDeferred ?? 0) > 0 && (
+                            <span className="text-xs text-orange-500 font-normal ms-2">
+                              (آجل غير محسوب: {fmtNum(data.summary.repairTotalDeferred)})
+                            </span>
+                          )}
                         </td>
                         <td className="py-2 px-4 text-end text-blue-600 dark:text-blue-400">
                           {fmtNum(data.summary.repairTotal)}

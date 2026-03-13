@@ -5958,8 +5958,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(o => o.paymentStatus !== 'deferred')
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
 
-      // Repair tickets don't have paymentMethod field, treat all paid as cash
+      // Repair totals — deferred (آجل) are excluded from revenue just like in-store deferred
+      const repairTotalDeferred = paidRepairTickets
+        .filter(t => t.paymentStatus === 'deferred')
+        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
       const repairTotal = paidRepairTickets
+        .filter(t => t.paymentStatus !== 'deferred')
         .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
       const repairTotalCash = repairTotal;
       const repairTotalZain = 0;
@@ -5976,8 +5980,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inStoreTotalZain,
           inStoreTotalQi,
           inStoreTotalDeferred,
-          repairCount: paidRepairTickets.length,
+          repairCount: paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').length,
           repairTotal,
+          repairTotalDeferred,
           repairTotalCash,
           repairTotalZain,
           repairTotalQi,

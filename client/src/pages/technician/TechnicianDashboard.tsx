@@ -609,6 +609,15 @@ export default function TechnicianDashboard() {
                     </span>
                   </div>
 
+                  {ticket.paymentStatus === 'deferred' && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{language === 'ar' ? 'الدفع:' : 'Payment:'}</span>
+                      <Badge variant="outline" className="text-orange-600 border-orange-400 text-xs" data-testid={`badge-payment-${ticket.id}`}>
+                        {language === 'ar' ? 'آجل' : 'Deferred'}
+                      </Badge>
+                    </div>
+                  )}
+
                   <div className="flex justify-between items-center pt-1">
                     {showArchived ? (
                       <Button
