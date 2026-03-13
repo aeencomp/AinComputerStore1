@@ -103,6 +103,29 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
   const inStoreRows = inStoreSales.map((o, i) => {
     const pay = paymentLabel(o.paymentMethod, o.paymentStatus);
     const isDeferred = o.paymentStatus === "deferred";
+    const parsedItems: { nameAr?: string; nameEn?: string; price: string; quantity: number }[] =
+      (o.items || []).map((it: any) => {
+        try { return typeof it === "string" ? JSON.parse(it) : it; }
+        catch { return null; }
+      }).filter(Boolean);
+    const itemsHtml = parsedItems.length > 0
+      ? `<tr class="items-row">
+          <td></td>
+          <td colspan="5" style="padding:2px 8px 6px;">
+            <div style="display:flex;flex-wrap:wrap;gap:4px 16px;">
+              ${parsedItems.map(it =>
+                `<span style="font-size:10px;color:#555">
+                  ${it.nameAr || it.nameEn || ""}
+                  <span style="color:#aaa">×</span>
+                  <strong>${it.quantity}</strong>
+                  <span style="color:#aaa">=</span>
+                  <strong>${fmtNum(parseFloat(it.price) * it.quantity)}</strong>
+                </span>`
+              ).join("")}
+            </div>
+          </td>
+        </tr>`
+      : "";
     return `
       <tr style="${isDeferred ? "color:#c2410c" : ""}">
         <td>${i + 1}</td>
@@ -114,7 +137,8 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
         <td style="color:#666">${format(new Date(o.createdAt), "HH:mm")}</td>
         <td><span class="badge ${isDeferred ? "badge-orange" : o.paymentMethod === "zaincash" ? "badge-blue" : o.paymentMethod === "qicard" ? "badge-purple" : "badge-green"}">${pay}</span></td>
         <td style="text-align:end;font-weight:600${isDeferred ? ";color:#c2410c" : ""}">${fmtNum(parseFloat(o.total))}</td>
-      </tr>`;
+      </tr>
+      ${itemsHtml}`;
   }).join("");
 
   const repairRows = repairSales.map((t, i) => {
@@ -226,6 +250,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
     }
     td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
     tr:last-child td { border-bottom: none; }
+    .items-row td { background: #fafafa; border-bottom: 1px solid #f0f0f0; padding-top: 0; }
     tfoot tr td {
       background: #f4f4f5;
       font-weight: 700;
@@ -604,27 +629,54 @@ export default function DailyReport({ user }: DailyReportProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {data.inStoreSales.map((order, idx) => (
-                        <tr key={order.id} className="border-b last:border-0" data-testid={`row-instore-${order.id}`}>
-                          <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
-                          <td className="py-2 px-4 font-mono text-xs">{order.orderNumber}</td>
-                          <td className="py-2 px-4">
-                            <div>{order.customerName}</div>
-                            {order.customerPhone && (
-                              <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
+                      {data.inStoreSales.map((order, idx) => {
+                        const parsedItems: { nameAr?: string; nameEn?: string; price: string; quantity: number }[] =
+                          (order.items || []).map((i: any) => {
+                            try { return typeof i === "string" ? JSON.parse(i) : i; }
+                            catch { return null; }
+                          }).filter(Boolean);
+                        return (
+                          <>
+                            <tr key={order.id} className="border-b" data-testid={`row-instore-${order.id}`}>
+                              <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
+                              <td className="py-2 px-4 font-mono text-xs">{order.orderNumber}</td>
+                              <td className="py-2 px-4">
+                                <div>{order.customerName}</div>
+                                {order.customerPhone && (
+                                  <div className="text-xs text-muted-foreground">{order.customerPhone}</div>
+                                )}
+                              </td>
+                              <td className="py-2 px-4 text-muted-foreground text-xs">
+                                {format(new Date(order.createdAt), "HH:mm")}
+                              </td>
+                              <td className="py-2 px-4">
+                                {paymentBadge(order.paymentMethod, order.paymentStatus)}
+                              </td>
+                              <td className={`py-2 px-4 text-end font-semibold ${order.paymentStatus === "deferred" ? "text-orange-600" : ""}`}>
+                                {fmtNum(parseFloat(order.total))}
+                              </td>
+                            </tr>
+                            {parsedItems.length > 0 && (
+                              <tr key={`${order.id}-items`} className="border-b last:border-0 bg-muted/20">
+                                <td />
+                                <td colSpan={5} className="py-1 px-4 pb-2">
+                                  <div className="flex flex-wrap gap-x-4 gap-y-1">
+                                    {parsedItems.map((item, ii) => (
+                                      <span key={ii} className="text-xs text-muted-foreground">
+                                        {item.nameAr || item.nameEn}
+                                        <span className="mx-1 text-foreground/50">×</span>
+                                        <span className="font-medium text-foreground">{item.quantity}</span>
+                                        <span className="mx-1 text-foreground/50">=</span>
+                                        <span className="font-medium">{fmtNum(parseFloat(item.price) * item.quantity)}</span>
+                                      </span>
+                                    ))}
+                                  </div>
+                                </td>
+                              </tr>
                             )}
-                          </td>
-                          <td className="py-2 px-4 text-muted-foreground text-xs">
-                            {format(new Date(order.createdAt), "HH:mm")}
-                          </td>
-                          <td className="py-2 px-4">
-                            {paymentBadge(order.paymentMethod, order.paymentStatus)}
-                          </td>
-                          <td className={`py-2 px-4 text-end font-semibold ${order.paymentStatus === "deferred" ? "text-orange-600" : ""}`}>
-                            {fmtNum(parseFloat(order.total))}
-                          </td>
-                        </tr>
-                      ))}
+                          </>
+                        );
+                      })}
                     </tbody>
                     <tfoot>
                       <tr className="bg-muted/30 border-t-2 font-semibold">
