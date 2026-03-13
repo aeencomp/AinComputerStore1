@@ -59,9 +59,6 @@ interface DailyReportSummary {
   inStoreTotalDeferred: number;
   repairCount: number;
   repairTotal: number;
-  repairTotalCash: number;
-  repairTotalZain: number;
-  repairTotalQi: number;
   grandTotal: number;
   grandTotalCash: number;
   grandTotalZain: number;
@@ -79,24 +76,355 @@ interface DailyReportProps {
   user: { id: string };
 }
 
-function fmt(n: number) {
+function fmtNum(n: number) {
   return n.toLocaleString("ar-IQ") + " د.ع";
 }
 
-function paymentLabel(method: string | undefined, lang: string) {
-  if (!method || method === "cash") return lang === "ar" ? "نقداً" : "Cash";
+function paymentLabel(method: string | undefined, status: string | undefined): string {
+  if (status === "deferred") return "آجل";
+  if (!method || method === "cash") return "نقداً";
   if (method === "zaincash") return "ZainCash";
   if (method === "qicard") return "QiCard";
-  if (method === "deferred") return lang === "ar" ? "آجل" : "Deferred";
   return method;
 }
 
 function paymentBadge(method: string | undefined, status: string | undefined) {
-  if (status === "deferred") return <Badge variant="outline" className="text-orange-600 border-orange-400">{method === "ar" ? "آجل" : "آجل"}</Badge>;
+  if (status === "deferred") return <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>;
   if (!method || method === "cash") return <Badge variant="outline" className="text-green-700 border-green-400">نقداً</Badge>;
   if (method === "zaincash") return <Badge variant="outline" className="text-blue-700 border-blue-400">ZainCash</Badge>;
   if (method === "qicard") return <Badge variant="outline" className="text-purple-700 border-purple-400">QiCard</Badge>;
   return <Badge variant="outline">{method}</Badge>;
+}
+
+function buildPrintHTML(data: DailyReportData, displayDate: string): string {
+  const { inStoreSales, repairSales, summary } = data;
+
+  const inStoreRows = inStoreSales.map((o, i) => {
+    const pay = paymentLabel(o.paymentMethod, o.paymentStatus);
+    const isDeferred = o.paymentStatus === "deferred";
+    return `
+      <tr style="${isDeferred ? "color:#c2410c" : ""}">
+        <td>${i + 1}</td>
+        <td style="font-family:monospace;font-size:11px">${o.orderNumber}</td>
+        <td>
+          ${o.customerName}
+          ${o.customerPhone ? `<br><span style="font-size:11px;color:#666">${o.customerPhone}</span>` : ""}
+        </td>
+        <td style="color:#666">${format(new Date(o.createdAt), "HH:mm")}</td>
+        <td><span class="badge ${isDeferred ? "badge-orange" : o.paymentMethod === "zaincash" ? "badge-blue" : o.paymentMethod === "qicard" ? "badge-purple" : "badge-green"}">${pay}</span></td>
+        <td style="text-align:end;font-weight:600${isDeferred ? ";color:#c2410c" : ""}">${fmtNum(parseFloat(o.total))}</td>
+      </tr>`;
+  }).join("");
+
+  const repairRows = repairSales.map((t, i) => {
+    const amount = parseFloat(t.finalCost || t.costEstimate || "0");
+    return `
+      <tr>
+        <td>${i + 1}</td>
+        <td style="font-family:monospace;font-size:11px">${t.ticketNumber}</td>
+        <td>
+          ${t.customerName}
+          ${t.customerPhone ? `<br><span style="font-size:11px;color:#666">${t.customerPhone}</span>` : ""}
+        </td>
+        <td style="color:#666">${t.deviceBrand ? t.deviceBrand + " " : ""}${t.deviceType}</td>
+        <td><span class="badge badge-green">نقداً</span></td>
+        <td style="text-align:end;font-weight:600">${fmtNum(amount)}</td>
+      </tr>`;
+  }).join("");
+
+  const payBreakdown = [
+    summary.grandTotalCash > 0 ? `<div class="breakdown-item"><span class="dot green"></span><span>نقداً</span><strong>${fmtNum(summary.grandTotalCash)}</strong></div>` : "",
+    summary.grandTotalZain > 0 ? `<div class="breakdown-item"><span class="dot blue"></span><span>ZainCash</span><strong>${fmtNum(summary.grandTotalZain)}</strong></div>` : "",
+    summary.grandTotalQi > 0 ? `<div class="breakdown-item"><span class="dot purple"></span><span>QiCard</span><strong>${fmtNum(summary.grandTotalQi)}</strong></div>` : "",
+    summary.inStoreTotalDeferred > 0 ? `<div class="breakdown-item"><span class="dot orange"></span><span>آجل (غير محصّل)</span><strong style="color:#c2410c">${fmtNum(summary.inStoreTotalDeferred)}</strong></div>` : "",
+  ].join("");
+
+  return `<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8"/>
+  <title>التقرير اليومي - ${displayDate}</title>
+  <style>
+    @page { size: A4; margin: 15mm 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 12px;
+      color: #111;
+      direction: rtl;
+      background: white;
+    }
+
+    /* ---- Header ---- */
+    .report-header {
+      text-align: center;
+      border-bottom: 2px solid #111;
+      padding-bottom: 10px;
+      margin-bottom: 14px;
+    }
+    .report-header h1 { font-size: 20px; font-weight: 700; }
+    .report-header h2 { font-size: 14px; font-weight: 600; margin-top: 2px; }
+    .report-header .date { font-size: 12px; color: #555; margin-top: 4px; }
+
+    /* ---- Summary boxes ---- */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+    .summary-box {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .summary-box .label { font-size: 10px; color: #666; margin-bottom: 2px; }
+    .summary-box .value { font-size: 16px; font-weight: 700; }
+    .summary-box .sub { font-size: 10px; color: #888; margin-top: 2px; }
+    .violet { color: #7c3aed; }
+    .blue   { color: #2563eb; }
+    .primary{ color: #111; }
+
+    /* ---- Section title ---- */
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #f4f4f5;
+      padding: 6px 10px;
+      border-radius: 5px;
+      margin-bottom: 0;
+      border: 1px solid #e4e4e7;
+      border-bottom: none;
+      border-radius: 5px 5px 0 0;
+    }
+    .icon-dot {
+      width: 10px; height: 10px; border-radius: 50%; display: inline-block;
+    }
+
+    /* ---- Table ---- */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      border: 1px solid #e4e4e7;
+      border-radius: 0 0 5px 5px;
+      margin-bottom: 14px;
+      overflow: hidden;
+    }
+    th {
+      background: #f9fafb;
+      font-weight: 600;
+      color: #555;
+      padding: 6px 8px;
+      border-bottom: 1px solid #e4e4e7;
+      text-align: start;
+    }
+    td { padding: 6px 8px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tfoot tr td {
+      background: #f4f4f5;
+      font-weight: 700;
+      border-top: 2px solid #d1d5db;
+      border-bottom: none;
+    }
+    td:last-child, th:last-child { text-align: end; }
+    .empty-msg {
+      text-align: center; color: #888; padding: 16px; font-style: italic;
+      border: 1px solid #e4e4e7; border-top: none; border-radius: 0 0 5px 5px;
+      margin-bottom: 14px;
+    }
+
+    /* ---- Badges ---- */
+    .badge {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 20px;
+      font-size: 10px;
+      font-weight: 600;
+      border: 1px solid;
+    }
+    .badge-green  { color: #15803d; border-color: #86efac; background: #f0fdf4; }
+    .badge-blue   { color: #1d4ed8; border-color: #93c5fd; background: #eff6ff; }
+    .badge-purple { color: #7e22ce; border-color: #c4b5fd; background: #faf5ff; }
+    .badge-orange { color: #c2410c; border-color: #fdba74; background: #fff7ed; }
+
+    /* ---- Grand total bar ---- */
+    .grand-total-bar {
+      border: 2px solid #111;
+      border-radius: 6px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+    .grand-total-bar .title { font-size: 13px; font-weight: 700; }
+    .grand-total-bar .right { display: flex; align-items: center; gap: 20px; }
+    .breakdown-item {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+    }
+    .breakdown-item span { font-size: 10px; color: #555; display: flex; align-items: center; gap: 3px; }
+    .breakdown-item strong { font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+    .dot.green  { background: #16a34a; }
+    .dot.blue   { background: #2563eb; }
+    .dot.purple { background: #7c3aed; }
+    .dot.orange { background: #ea580c; }
+    .divider { width: 1px; height: 40px; background: #d1d5db; }
+    .total-big { text-align: center; }
+    .total-big .lbl { font-size: 10px; color: #666; }
+    .total-big .amt { font-size: 22px; font-weight: 800; }
+
+    /* ---- Signature row ---- */
+    .sig-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 16px;
+      margin-top: 20px;
+      border-top: 1px dashed #ccc;
+      padding-top: 14px;
+    }
+    .sig-box { text-align: center; }
+    .sig-box .sig-label { font-size: 10px; color: #666; margin-bottom: 24px; }
+    .sig-box .sig-line { border-top: 1px solid #555; width: 80%; margin: 0 auto; }
+
+    /* ---- Footer ---- */
+    .report-footer {
+      text-align: center;
+      font-size: 10px;
+      color: #888;
+      border-top: 1px solid #eee;
+      padding-top: 8px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="report-header">
+    <h1>العين لتجارة الحاسبات</h1>
+    <h2>التقرير اليومي للمبيعات</h2>
+    <div class="date">تاريخ: ${displayDate}</div>
+  </div>
+
+  <!-- Summary -->
+  <div class="summary-grid">
+    <div class="summary-box">
+      <div class="label">مبيعات المتجر</div>
+      <div class="value violet">${fmtNum(summary.inStoreTotal)}</div>
+      <div class="sub">${summary.inStoreCount} فاتورة${summary.inStoreTotalDeferred > 0 ? ` · آجل: ${fmtNum(summary.inStoreTotalDeferred)}` : ""}</div>
+    </div>
+    <div class="summary-box">
+      <div class="label">مدفوعات التصليح</div>
+      <div class="value blue">${fmtNum(summary.repairTotal)}</div>
+      <div class="sub">${summary.repairCount} تذكرة</div>
+    </div>
+    <div class="summary-box">
+      <div class="label">الإجمالي المحصّل</div>
+      <div class="value primary">${fmtNum(summary.grandTotal)}</div>
+      <div class="sub">&nbsp;</div>
+    </div>
+  </div>
+
+  <!-- In-Store Sales -->
+  <div class="section-title">
+    <span class="icon-dot" style="background:#7c3aed"></span>
+    مبيعات المتجر
+    <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${inStoreSales.length} سجل</span>
+  </div>
+  ${inStoreSales.length === 0
+    ? `<div class="empty-msg">لا توجد مبيعات لهذا اليوم</div>`
+    : `<table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>رقم الفاتورة</th>
+          <th>العميل</th>
+          <th>الوقت</th>
+          <th>طريقة الدفع</th>
+          <th>المبلغ</th>
+        </tr>
+      </thead>
+      <tbody>${inStoreRows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5">
+            المجموع
+            ${summary.inStoreTotalDeferred > 0 ? `<span style="font-size:10px;font-weight:400;color:#c2410c;margin-right:8px">(آجل غير محسوب: ${fmtNum(summary.inStoreTotalDeferred)})</span>` : ""}
+          </td>
+          <td style="color:#7c3aed">${fmtNum(summary.inStoreTotal)}</td>
+        </tr>
+      </tfoot>
+    </table>`}
+
+  <!-- Repair Payments -->
+  <div class="section-title">
+    <span class="icon-dot" style="background:#2563eb"></span>
+    مدفوعات التصليح
+    <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${repairSales.length} سجل</span>
+  </div>
+  ${repairSales.length === 0
+    ? `<div class="empty-msg">لا توجد مدفوعات تصليح لهذا اليوم</div>`
+    : `<table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>رقم التذكرة</th>
+          <th>العميل</th>
+          <th>الجهاز</th>
+          <th>طريقة الدفع</th>
+          <th>المبلغ</th>
+        </tr>
+      </thead>
+      <tbody>${repairRows}</tbody>
+      <tfoot>
+        <tr>
+          <td colspan="5">المجموع</td>
+          <td style="color:#2563eb">${fmtNum(summary.repairTotal)}</td>
+        </tr>
+      </tfoot>
+    </table>`}
+
+  <!-- Grand Total -->
+  <div class="grand-total-bar">
+    <div class="title">الإجمالي الكلي ليوم ${displayDate}</div>
+    <div class="right">
+      ${payBreakdown}
+      <div class="divider"></div>
+      <div class="total-big">
+        <div class="lbl">الكلي المحصّل</div>
+        <div class="amt">${fmtNum(summary.grandTotal)}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Signature Row -->
+  <div class="sig-row">
+    <div class="sig-box">
+      <div class="sig-label">توقيع المسؤول</div>
+      <div class="sig-line"></div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-label">ملاحظات</div>
+      <div class="sig-line"></div>
+    </div>
+    <div class="sig-box">
+      <div class="sig-label">مراجعة الصندوق</div>
+      <div class="sig-line"></div>
+    </div>
+  </div>
+
+  <div class="report-footer">
+    طُبع بتاريخ ${format(new Date(), "dd/MM/yyyy HH:mm")} · العين لتجارة الحاسبات · نظام إدارة المبيعات
+  </div>
+
+  <script>window.onload = () => { window.print(); }</script>
+</body>
+</html>`;
 }
 
 export default function DailyReport({ user }: DailyReportProps) {
@@ -111,24 +439,31 @@ export default function DailyReport({ user }: DailyReportProps) {
         .then((r) => r.json()),
   });
 
-  const handlePrint = () => window.print();
-
   const displayDate = selectedDate
-    ? format(new Date(selectedDate + "T12:00:00"), "dd/MM/yyyy", { locale: language === "ar" ? ar : undefined })
+    ? format(new Date(selectedDate + "T12:00:00"), "dd/MM/yyyy", { locale: ar })
     : "";
 
+  const handlePrint = () => {
+    if (!data) return;
+    const html = buildPrintHTML(data, displayDate);
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+  };
+
   return (
-    <div className="space-y-6" dir={language === "ar" ? "rtl" : "ltr"} id="daily-report-content">
-      {/* Header row - hidden on print */}
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+    <div className="space-y-6" dir={language === "ar" ? "rtl" : "ltr"}>
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-2xl font-bold">
             {language === "ar" ? "التقرير اليومي" : "Daily Report"}
           </h2>
           <p className="text-muted-foreground text-sm">
             {language === "ar"
-              ? "مبيعات المتجر + مدفوعات التصليح في تقرير واحد"
-              : "In-store sales + repair payments in one report"}
+              ? "مبيعات المتجر + مدفوعات التصليح في تقرير واحد قابل للطباعة"
+              : "In-store sales + repair payments — printable A4 report"}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -143,9 +478,14 @@ export default function DailyReport({ user }: DailyReportProps) {
               className="ps-9 pe-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
-          <Button onClick={handlePrint} className="gap-2" data-testid="button-print-report">
+          <Button
+            onClick={handlePrint}
+            disabled={!data || isLoading}
+            className="gap-2"
+            data-testid="button-print-report"
+          >
             <Printer className="h-4 w-4" />
-            {language === "ar" ? "طباعة" : "Print"}
+            {language === "ar" ? "طباعة A4" : "Print A4"}
           </Button>
         </div>
       </div>
@@ -155,72 +495,67 @@ export default function DailyReport({ user }: DailyReportProps) {
           <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
         </div>
       ) : !data ? null : (
-        <div className="space-y-6 print:space-y-4">
-          {/* Print header - only visible on print */}
-          <div className="hidden print:block text-center mb-4 pb-4 border-b-2">
-            <h1 className="text-xl font-bold">العين لتجارة الحاسبات</h1>
-            <h2 className="text-lg font-semibold mt-1">التقرير اليومي</h2>
-            <p className="text-sm text-muted-foreground mt-1">{displayDate}</p>
-          </div>
-
+        <div className="space-y-6">
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4 print:grid-cols-4 print:gap-2">
-            <Card className="print:shadow-none print:border">
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+            <Card>
               <CardContent className="pt-4 pb-3">
                 <p className="text-xs text-muted-foreground mb-1">
                   {language === "ar" ? "مجموع المتجر" : "In-Store Total"}
                 </p>
                 <p className="text-lg font-bold text-violet-600 dark:text-violet-400" data-testid="text-instore-total">
-                  {fmt(data.summary.inStoreTotal)}
+                  {fmtNum(data.summary.inStoreTotal)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {data.summary.inStoreCount} {language === "ar" ? "فاتورة" : "txn"}
                   {data.summary.inStoreTotalDeferred > 0 && (
                     <span className="text-orange-500 ms-1">
-                      + {fmt(data.summary.inStoreTotalDeferred)} آجل
+                      · آجل: {fmtNum(data.summary.inStoreTotalDeferred)}
                     </span>
                   )}
                 </p>
               </CardContent>
             </Card>
-            <Card className="print:shadow-none print:border">
+
+            <Card>
               <CardContent className="pt-4 pb-3">
                 <p className="text-xs text-muted-foreground mb-1">
                   {language === "ar" ? "مجموع التصليح" : "Repair Total"}
                 </p>
                 <p className="text-lg font-bold text-blue-600 dark:text-blue-400" data-testid="text-repair-total">
-                  {fmt(data.summary.repairTotal)}
+                  {fmtNum(data.summary.repairTotal)}
                 </p>
                 <p className="text-xs text-muted-foreground mt-0.5">
                   {data.summary.repairCount} {language === "ar" ? "تذكرة" : "ticket"}
                 </p>
               </CardContent>
             </Card>
-            <Card className="col-span-2 print:shadow-none print:border">
+
+            <Card className="col-span-2">
               <CardContent className="pt-4 pb-3">
                 <p className="text-xs text-muted-foreground mb-1">
-                  {language === "ar" ? "الإجمالي الكلي" : "Grand Total"}
+                  {language === "ar" ? "الإجمالي المحصّل" : "Grand Total"}
                 </p>
                 <p className="text-2xl font-bold text-primary" data-testid="text-grand-total">
-                  {fmt(data.summary.grandTotal)}
+                  {fmtNum(data.summary.grandTotal)}
                 </p>
-                <div className="flex flex-wrap gap-2 mt-1 text-xs text-muted-foreground">
+                <div className="flex flex-wrap gap-3 mt-1 text-xs text-muted-foreground">
                   {data.summary.grandTotalCash > 0 && (
                     <span className="flex items-center gap-1">
                       <Banknote className="h-3 w-3 text-green-500" />
-                      {fmt(data.summary.grandTotalCash)} نقداً
+                      {fmtNum(data.summary.grandTotalCash)} نقداً
                     </span>
                   )}
                   {data.summary.grandTotalZain > 0 && (
                     <span className="flex items-center gap-1">
                       <CreditCard className="h-3 w-3 text-blue-500" />
-                      {fmt(data.summary.grandTotalZain)} زين
+                      {fmtNum(data.summary.grandTotalZain)} ZainCash
                     </span>
                   )}
                   {data.summary.grandTotalQi > 0 && (
                     <span className="flex items-center gap-1">
                       <CreditCard className="h-3 w-3 text-purple-500" />
-                      {fmt(data.summary.grandTotalQi)} QiCard
+                      {fmtNum(data.summary.grandTotalQi)} QiCard
                     </span>
                   )}
                 </div>
@@ -228,9 +563,9 @@ export default function DailyReport({ user }: DailyReportProps) {
             </Card>
           </div>
 
-          {/* In-Store Sales Section */}
-          <Card className="print:shadow-none print:border">
-            <CardHeader className="pb-3 print:pb-2">
+          {/* In-Store Sales */}
+          <Card>
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Store className="h-5 w-5 text-violet-500" />
                 {language === "ar" ? "مبيعات المتجر" : "In-Store Sales"}
@@ -267,7 +602,7 @@ export default function DailyReport({ user }: DailyReportProps) {
                     </thead>
                     <tbody>
                       {data.inStoreSales.map((order, idx) => (
-                        <tr key={order.id} className="border-b last:border-0 hover-elevate" data-testid={`row-instore-${order.id}`}>
+                        <tr key={order.id} className="border-b last:border-0" data-testid={`row-instore-${order.id}`}>
                           <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
                           <td className="py-2 px-4 font-mono text-xs">{order.orderNumber}</td>
                           <td className="py-2 px-4">
@@ -282,8 +617,8 @@ export default function DailyReport({ user }: DailyReportProps) {
                           <td className="py-2 px-4">
                             {paymentBadge(order.paymentMethod, order.paymentStatus)}
                           </td>
-                          <td className={`py-2 px-4 text-end font-semibold ${order.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
-                            {fmt(parseFloat(order.total))}
+                          <td className={`py-2 px-4 text-end font-semibold ${order.paymentStatus === "deferred" ? "text-orange-600" : ""}`}>
+                            {fmtNum(parseFloat(order.total))}
                           </td>
                         </tr>
                       ))}
@@ -294,12 +629,12 @@ export default function DailyReport({ user }: DailyReportProps) {
                           {language === "ar" ? "المجموع" : "Total"}
                           {data.summary.inStoreTotalDeferred > 0 && (
                             <span className="text-xs text-orange-500 font-normal ms-2">
-                              ({fmt(data.summary.inStoreTotalDeferred)} آجل غير محسوب)
+                              (آجل غير محسوب: {fmtNum(data.summary.inStoreTotalDeferred)})
                             </span>
                           )}
                         </td>
                         <td className="py-2 px-4 text-end text-violet-600 dark:text-violet-400">
-                          {fmt(data.summary.inStoreTotal)}
+                          {fmtNum(data.summary.inStoreTotal)}
                         </td>
                       </tr>
                     </tfoot>
@@ -309,9 +644,9 @@ export default function DailyReport({ user }: DailyReportProps) {
             </CardContent>
           </Card>
 
-          {/* Repair Sales Section */}
-          <Card className="print:shadow-none print:border">
-            <CardHeader className="pb-3 print:pb-2">
+          {/* Repair Sales */}
+          <Card>
+            <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <Wrench className="h-5 w-5 text-blue-500" />
                 {language === "ar" ? "مدفوعات التصليح" : "Repair Payments"}
@@ -350,7 +685,7 @@ export default function DailyReport({ user }: DailyReportProps) {
                       {data.repairSales.map((ticket, idx) => {
                         const amount = parseFloat(ticket.finalCost || ticket.costEstimate || "0");
                         return (
-                          <tr key={ticket.id} className="border-b last:border-0 hover-elevate" data-testid={`row-repair-${ticket.id}`}>
+                          <tr key={ticket.id} className="border-b last:border-0" data-testid={`row-repair-${ticket.id}`}>
                             <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
                             <td className="py-2 px-4 font-mono text-xs">{ticket.ticketNumber}</td>
                             <td className="py-2 px-4">
@@ -366,7 +701,7 @@ export default function DailyReport({ user }: DailyReportProps) {
                               <Badge variant="outline" className="text-green-700 border-green-400">نقداً</Badge>
                             </td>
                             <td className="py-2 px-4 text-end font-semibold">
-                              {fmt(amount)}
+                              {fmtNum(amount)}
                             </td>
                           </tr>
                         );
@@ -378,7 +713,7 @@ export default function DailyReport({ user }: DailyReportProps) {
                           {language === "ar" ? "المجموع" : "Total"}
                         </td>
                         <td className="py-2 px-4 text-end text-blue-600 dark:text-blue-400">
-                          {fmt(data.summary.repairTotal)}
+                          {fmtNum(data.summary.repairTotal)}
                         </td>
                       </tr>
                     </tfoot>
@@ -388,8 +723,8 @@ export default function DailyReport({ user }: DailyReportProps) {
             </CardContent>
           </Card>
 
-          {/* Grand Total Summary Bar */}
-          <Card className="border-primary/30 print:shadow-none print:border-2">
+          {/* Grand Total Bar */}
+          <Card className="border-primary/30">
             <CardContent className="py-4">
               <div className="flex flex-wrap items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
@@ -403,9 +738,9 @@ export default function DailyReport({ user }: DailyReportProps) {
                     <div className="text-center">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Banknote className="h-3 w-3 text-green-500" />
-                        {language === "ar" ? "نقداً" : "Cash"}
+                        نقداً
                       </p>
-                      <p className="font-semibold text-green-600">{fmt(data.summary.grandTotalCash)}</p>
+                      <p className="font-semibold text-green-600">{fmtNum(data.summary.grandTotalCash)}</p>
                     </div>
                   )}
                   {data.summary.grandTotalZain > 0 && (
@@ -414,7 +749,7 @@ export default function DailyReport({ user }: DailyReportProps) {
                         <CreditCard className="h-3 w-3 text-blue-500" />
                         ZainCash
                       </p>
-                      <p className="font-semibold text-blue-600">{fmt(data.summary.grandTotalZain)}</p>
+                      <p className="font-semibold text-blue-600">{fmtNum(data.summary.grandTotalZain)}</p>
                     </div>
                   )}
                   {data.summary.grandTotalQi > 0 && (
@@ -423,35 +758,29 @@ export default function DailyReport({ user }: DailyReportProps) {
                         <CreditCard className="h-3 w-3 text-purple-500" />
                         QiCard
                       </p>
-                      <p className="font-semibold text-purple-600">{fmt(data.summary.grandTotalQi)}</p>
+                      <p className="font-semibold text-purple-600">{fmtNum(data.summary.grandTotalQi)}</p>
                     </div>
                   )}
                   {data.summary.inStoreTotalDeferred > 0 && (
                     <div className="text-center">
                       <p className="text-xs text-muted-foreground flex items-center gap-1">
                         <Clock className="h-3 w-3 text-orange-500" />
-                        {language === "ar" ? "آجل" : "Deferred"}
+                        آجل
                       </p>
-                      <p className="font-semibold text-orange-600">{fmt(data.summary.inStoreTotalDeferred)}</p>
+                      <p className="font-semibold text-orange-600">{fmtNum(data.summary.inStoreTotalDeferred)}</p>
                     </div>
                   )}
                   <Separator orientation="vertical" className="h-10" />
                   <div className="text-center">
-                    <p className="text-xs text-muted-foreground">{language === "ar" ? "الكلي" : "Total"}</p>
+                    <p className="text-xs text-muted-foreground">{language === "ar" ? "الكلي المحصّل" : "Total Collected"}</p>
                     <p className="font-bold text-2xl text-primary" data-testid="text-bottom-grand-total">
-                      {fmt(data.summary.grandTotal)}
+                      {fmtNum(data.summary.grandTotal)}
                     </p>
                   </div>
                 </div>
               </div>
             </CardContent>
           </Card>
-
-          {/* Print footer */}
-          <div className="hidden print:block text-center mt-6 pt-4 border-t text-xs text-muted-foreground">
-            <p>تم طباعة هذا التقرير بتاريخ {format(new Date(), "dd/MM/yyyy HH:mm")}</p>
-            <p>العين لتجارة الحاسبات - نظام إدارة المبيعات</p>
-          </div>
         </div>
       )}
     </div>
