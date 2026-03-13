@@ -657,7 +657,12 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.priority.high': 'عالية',
     'repair.priority.urgent': 'عاجلة',
     'repair.priority.vip': 'VIP - عميل مميز',
-    
+
+    'repair.payment.unpaid': 'غير مدفوع',
+    'repair.payment.paid': 'مدفوع',
+    'repair.payment.deferred': 'آجل',
+    'repair.ticket.paymentStatus': 'حالة الدفع',
+
     'repair.deviceType.laptop': 'لابتوب',
     'repair.deviceType.desktop': 'جهاز مكتبي',
     'repair.deviceType.monitor': 'شاشة',
@@ -1465,7 +1470,12 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.priority.high': 'High',
     'repair.priority.urgent': 'Urgent',
     'repair.priority.vip': 'VIP',
-    
+
+    'repair.payment.unpaid': 'Unpaid',
+    'repair.payment.paid': 'Paid',
+    'repair.payment.deferred': 'Deferred',
+    'repair.ticket.paymentStatus': 'Payment Status',
+
     'repair.deviceType.laptop': 'Laptop',
     'repair.deviceType.desktop': 'Desktop',
     'repair.deviceType.monitor': 'Monitor',
