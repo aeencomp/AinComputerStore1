@@ -390,8 +390,9 @@ export default function TechnicianDashboard() {
           </Card>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          <div className="relative flex-1">
+        <div className="space-y-3 mb-6">
+          {/* Search bar — full width, prominent */}
+          <div className="relative">
             <Search className="absolute start-4 top-1/2 -translate-y-1/2 h-6 w-6 text-muted-foreground" />
             <Input
               type="text"
@@ -403,6 +404,8 @@ export default function TechnicianDashboard() {
             />
           </div>
 
+          {/* Filters row */}
+          <div className="flex flex-col md:flex-row gap-3 flex-wrap">
           <div className="flex items-center gap-2">
             <div className="relative">
               <UserSearch className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -482,6 +485,7 @@ export default function TechnicianDashboard() {
               {language === 'ar' ? `أرشفة المسلمة (${deliveredUnarchived})` : `Archive Delivered (${deliveredUnarchived})`}
             </Button>
           )}
+          </div>
         </div>
 
         {isTicketsLoading ? (
