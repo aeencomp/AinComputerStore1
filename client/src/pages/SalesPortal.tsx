@@ -25,6 +25,7 @@ import {
   Languages,
   FileText
 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -279,6 +280,8 @@ export default function SalesPortal() {
 
             {/* User Menu & Actions */}
             <div className="flex items-center gap-2">
+              {/* Theme Toggle */}
+              <ThemeToggle />
               {/* Language Switcher */}
               <Button 
                 variant="ghost" 

@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Dialog,
   DialogContent,
@@ -292,24 +293,25 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-      <header className="border-b border-slate-200 bg-white sticky top-0 z-50 px-4 h-16 flex items-center">
+    <div className="min-h-screen bg-background text-foreground" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+      <header className="border-b bg-card sticky top-0 z-50 px-4 h-16 flex items-center">
         <div className="max-w-7xl mx-auto w-full flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-primary/5 rounded-lg">
               <Battery className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900">
+              <h1 className="text-xl font-bold tracking-tight">
                 {language === 'ar' ? 'نظام البطاريات' : 'Battery Center'}
               </h1>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                 <span className="h-1.5 w-1.5 rounded-full bg-green-500" />
                 {currentUser.name}
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button
               variant="default"
               size="sm"

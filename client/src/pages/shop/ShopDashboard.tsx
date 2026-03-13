@@ -13,6 +13,7 @@ import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { SaasRepairTicket } from '@shared/schema';
 import ShopTicketDialog from '@/components/ShopTicketDialog';
 import { LogOut, Wrench, Search, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, AlertTriangle, UserSearch } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { format, differenceInDays } from 'date-fns';
 
 interface SaasShop {
@@ -158,6 +159,7 @@ export default function ShopDashboard() {
           </div>
           
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Link href="/shop/new-request">
               <Button size="sm" data-testid="button-new-repair">
                 <Plus className="h-4 w-4 me-2" />

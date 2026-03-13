@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useState, useEffect } from "react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import {
   Sheet,
   SheetContent,
@@ -133,6 +134,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           </form>
 
           <div className="flex items-center gap-2">
+            <ThemeToggle />
             <Button
               size="icon"
               variant="ghost"

@@ -1,6 +1,7 @@
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { 
   LayoutDashboard, 
   Package, 
@@ -192,6 +193,8 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
               <Languages className="w-4 h-4" />
               <span className="hidden sm:inline">{language === 'ar' ? 'EN' : 'عربي'}</span>
             </Button>
+
+            <ThemeToggle />
 
             {/* Notification Bell */}
             <Popover>

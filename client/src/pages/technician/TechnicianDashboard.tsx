@@ -11,6 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch } from 'lucide-react';
+import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 
@@ -302,6 +303,7 @@ export default function TechnicianDashboard() {
           </div>
           
           <div className="flex items-center gap-2 flex-wrap">
+            <ThemeToggle />
             <Link href="/technician/new-request">
               <Button data-testid="button-new-repair-request">
                 <Plus className="h-4 w-4 me-2" />
