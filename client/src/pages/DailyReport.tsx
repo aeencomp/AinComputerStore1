@@ -12,6 +12,7 @@ import {
   Wrench,
   Loader2,
   TrendingUp,
+  TrendingDown,
   Banknote,
   CreditCard,
   Clock,
@@ -65,12 +66,24 @@ interface DailyReportSummary {
   grandTotalCash: number;
   grandTotalZain: number;
   grandTotalQi: number;
+  totalWithdrawals: number;
+  withdrawalCount: number;
+  netTotal: number;
+}
+
+interface Withdrawal {
+  id: number;
+  amount: string;
+  reason: string | null;
+  employeeName: string;
+  createdAt: string;
 }
 
 interface DailyReportData {
   date: string;
   inStoreSales: InStoreOrder[];
   repairSales: RepairSale[];
+  withdrawals: Withdrawal[];
   summary: DailyReportSummary;
 }
 
@@ -99,7 +112,7 @@ function paymentBadge(method: string | undefined, status: string | undefined) {
 }
 
 function buildPrintHTML(data: DailyReportData, displayDate: string): string {
-  const { inStoreSales, repairSales, summary } = data;
+  const { inStoreSales, repairSales, withdrawals = [], summary } = data;
 
   const inStoreRows = inStoreSales.map((o, i) => {
     const pay = paymentLabel(o.paymentMethod, o.paymentStatus);
@@ -162,11 +175,21 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
       </tr>`;
   }).join("");
 
+  const withdrawalRows = withdrawals.map((w, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${w.employeeName}</td>
+      <td>${w.reason || "—"}</td>
+      <td style="color:#666">${format(new Date(w.createdAt), "HH:mm")}</td>
+      <td style="text-align:end;font-weight:600;color:#c2410c">${fmtNum(parseFloat(w.amount))}</td>
+    </tr>`).join("");
+
   const payBreakdown = [
     summary.grandTotalCash > 0 ? `<div class="breakdown-item"><span class="dot green"></span><span>نقداً</span><strong>${fmtNum(summary.grandTotalCash)}</strong></div>` : "",
     summary.grandTotalZain > 0 ? `<div class="breakdown-item"><span class="dot blue"></span><span>ZainCash</span><strong>${fmtNum(summary.grandTotalZain)}</strong></div>` : "",
     summary.grandTotalQi > 0 ? `<div class="breakdown-item"><span class="dot purple"></span><span>QiCard</span><strong>${fmtNum(summary.grandTotalQi)}</strong></div>` : "",
     summary.inStoreTotalDeferred > 0 ? `<div class="breakdown-item"><span class="dot orange"></span><span>آجل (غير محصّل)</span><strong style="color:#c2410c">${fmtNum(summary.inStoreTotalDeferred)}</strong></div>` : "",
+    (summary.totalWithdrawals ?? 0) > 0 ? `<div class="breakdown-item"><span class="dot red"></span><span>السحوبات</span><strong style="color:#c2410c">- ${fmtNum(summary.totalWithdrawals)}</strong></div>` : "",
   ].join("");
 
   return `<!DOCTYPE html>
@@ -360,6 +383,17 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
       <div class="value primary">${fmtNum(summary.grandTotal)}</div>
       <div class="sub">&nbsp;</div>
     </div>
+    ${(summary.totalWithdrawals ?? 0) > 0 ? `
+    <div class="summary-box">
+      <div class="label">السحوبات اليومية</div>
+      <div class="value" style="color:#c2410c">- ${fmtNum(summary.totalWithdrawals)}</div>
+      <div class="sub">${summary.withdrawalCount} عملية</div>
+    </div>
+    <div class="summary-box" style="border-color:#111;grid-column:span 2">
+      <div class="label">صافي الإيراد</div>
+      <div class="value" style="color:#111;font-size:20px">${fmtNum(summary.netTotal)}</div>
+      <div class="sub">بعد خصم السحوبات</div>
+    </div>` : ""}
   </div>
 
   <!-- In-Store Sales -->
@@ -424,6 +458,32 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
       </tfoot>
     </table>`}
 
+  ${withdrawals.length > 0 ? `
+  <!-- Withdrawals -->
+  <div class="section-title">
+    <span class="icon-dot" style="background:#c2410c"></span>
+    السحوبات اليومية
+    <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${withdrawals.length} سجل</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th>
+        <th>الموظف</th>
+        <th>السبب</th>
+        <th>الوقت</th>
+        <th>المبلغ</th>
+      </tr>
+    </thead>
+    <tbody>${withdrawalRows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4">إجمالي السحوبات</td>
+        <td style="color:#c2410c">${fmtNum(summary.totalWithdrawals)}</td>
+      </tr>
+    </tfoot>
+  </table>` : ""}
+
   <!-- Grand Total -->
   <div class="grand-total-bar">
     <div class="title">الإجمالي الكلي ليوم ${displayDate}</div>
@@ -434,6 +494,12 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
         <div class="lbl">الكلي المحصّل</div>
         <div class="amt">${fmtNum(summary.grandTotal)}</div>
       </div>
+      ${(summary.totalWithdrawals ?? 0) > 0 ? `
+      <div class="divider"></div>
+      <div class="total-big">
+        <div class="lbl" style="color:#c2410c">صافي الإيراد</div>
+        <div class="amt" style="color:#c2410c">${fmtNum(summary.netTotal)}</div>
+      </div>` : ""}
     </div>
   </div>
 
@@ -566,7 +632,7 @@ export default function DailyReport({ user }: DailyReportProps) {
               </CardContent>
             </Card>
 
-            <Card className="col-span-2">
+            <Card className={(data.summary.totalWithdrawals ?? 0) > 0 ? "" : "col-span-2"}>
               <CardContent className="pt-4 pb-3">
                 <p className="text-xs text-muted-foreground mb-1">
                   {language === "ar" ? "الإجمالي المحصّل" : "Grand Total"}
@@ -596,6 +662,38 @@ export default function DailyReport({ user }: DailyReportProps) {
                 </div>
               </CardContent>
             </Card>
+
+            {(data.summary.totalWithdrawals ?? 0) > 0 && (
+              <Card>
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {language === "ar" ? "السحوبات اليومية" : "Withdrawals"}
+                  </p>
+                  <p className="text-lg font-bold text-orange-600 dark:text-orange-400" data-testid="text-withdrawals-total">
+                    - {fmtNum(data.summary.totalWithdrawals)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {data.summary.withdrawalCount} {language === "ar" ? "عملية" : "entries"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+
+            {(data.summary.totalWithdrawals ?? 0) > 0 && (
+              <Card className="col-span-2 border-primary/40">
+                <CardContent className="pt-4 pb-3">
+                  <p className="text-xs text-muted-foreground mb-1">
+                    {language === "ar" ? "صافي الإيراد" : "Net Revenue"}
+                  </p>
+                  <p className="text-2xl font-bold text-primary" data-testid="text-net-total">
+                    {fmtNum(data.summary.netTotal)}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {language === "ar" ? "بعد خصم السحوبات" : "After withdrawals"}
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* In-Store Sales */}
@@ -794,6 +892,57 @@ export default function DailyReport({ user }: DailyReportProps) {
               )}
             </CardContent>
           </Card>
+
+          {/* Daily Withdrawals */}
+          {(data.withdrawals?.length ?? 0) > 0 && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <TrendingDown className="h-5 w-5 text-orange-500" />
+                  {language === "ar" ? "السحوبات اليومية" : "Daily Withdrawals"}
+                  <Badge variant="secondary" className="ms-auto">{data.withdrawals.length}</Badge>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/30 text-xs font-semibold text-muted-foreground">
+                        <th className="py-2 px-4 text-start">#</th>
+                        <th className="py-2 px-4 text-start">{language === "ar" ? "الموظف" : "Employee"}</th>
+                        <th className="py-2 px-4 text-start">{language === "ar" ? "السبب" : "Reason"}</th>
+                        <th className="py-2 px-4 text-start">{language === "ar" ? "الوقت" : "Time"}</th>
+                        <th className="py-2 px-4 text-end">{language === "ar" ? "المبلغ" : "Amount"}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.withdrawals.map((w, i) => (
+                        <tr key={w.id} className="border-b last:border-0 hover:bg-muted/10">
+                          <td className="py-2 px-4 text-muted-foreground">{i + 1}</td>
+                          <td className="py-2 px-4 font-medium">{w.employeeName}</td>
+                          <td className="py-2 px-4 text-muted-foreground">{w.reason || "—"}</td>
+                          <td className="py-2 px-4 text-muted-foreground text-xs">
+                            {format(new Date(w.createdAt), "HH:mm")}
+                          </td>
+                          <td className="py-2 px-4 text-end font-semibold text-orange-600 dark:text-orange-400">
+                            {fmtNum(parseFloat(w.amount))}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr className="bg-muted/30 border-t-2 font-semibold">
+                        <td colSpan={4} className="py-2 px-4">{language === "ar" ? "إجمالي السحوبات" : "Total Withdrawals"}</td>
+                        <td className="py-2 px-4 text-end text-orange-600 dark:text-orange-400">
+                          {fmtNum(data.summary.totalWithdrawals)}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Grand Total Bar */}
           <Card className="border-primary/30">

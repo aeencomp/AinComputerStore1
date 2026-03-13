@@ -5895,6 +5895,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Daily Report API - combines in-store sales + repair ticket payments for a given date
+  // ─── Cash Withdrawals ────────────────────────────────────────────────────────
+  app.get("/api/instore/withdrawals", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const { db } = await import("./db");
+      const { cashWithdrawals } = await import("../shared/schema");
+      const { gte, lte, and, desc } = await import("drizzle-orm");
+
+      const dateParam = req.query.date as string;
+      const targetDate = dateParam ? new Date(dateParam) : new Date();
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      const rows = await db.select().from(cashWithdrawals)
+        .where(and(gte(cashWithdrawals.createdAt, startOfDay), lte(cashWithdrawals.createdAt, endOfDay)))
+        .orderBy(desc(cashWithdrawals.createdAt));
+      res.json(rows);
+    } catch (err) {
+      console.error("Withdrawals fetch error:", err);
+      res.status(500).json({ error: "خطأ في جلب السحوبات" });
+    }
+  });
+
+  app.post("/api/instore/withdrawals", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const { db } = await import("./db");
+      const { cashWithdrawals, insertCashWithdrawalSchema } = await import("../shared/schema");
+      const parsed = insertCashWithdrawalSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error });
+
+      const [row] = await db.insert(cashWithdrawals).values(parsed.data).returning();
+      res.json(row);
+    } catch (err) {
+      console.error("Withdrawal create error:", err);
+      res.status(500).json({ error: "خطأ في إضافة السحب" });
+    }
+  });
+
+  app.delete("/api/instore/withdrawals/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const { db } = await import("./db");
+      const { cashWithdrawals } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+      await db.delete(cashWithdrawals).where(eq(cashWithdrawals.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Withdrawal delete error:", err);
+      res.status(500).json({ error: "خطأ في حذف السحب" });
+    }
+  });
+
   app.get("/api/daily-report", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
@@ -5912,8 +5976,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // In-store sales (walk-in and in-store order types)
       const { db } = await import("./db");
-      const { orders, repairTickets } = await import("../shared/schema");
-      const { and, or, gte, lte, inArray, eq, isNotNull } = await import("drizzle-orm");
+      const { orders, repairTickets, cashWithdrawals } = await import("../shared/schema");
+      const { and, or, gte, lte, inArray, eq, isNotNull, desc } = await import("drizzle-orm");
 
       const inStoreOrders = await db.select().from(orders).where(
         and(
@@ -5958,6 +6022,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(o => o.paymentStatus !== 'deferred')
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
 
+      // Withdrawals for the day
+      const dailyWithdrawals = await db.select().from(cashWithdrawals)
+        .where(and(gte(cashWithdrawals.createdAt, startOfDay), lte(cashWithdrawals.createdAt, endOfDay)))
+        .orderBy(desc(cashWithdrawals.createdAt));
+      const totalWithdrawals = dailyWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
+
       // Repair totals — deferred (آجل) are excluded from revenue just like in-store deferred
       const repairTotalDeferred = paidRepairTickets
         .filter(t => t.paymentStatus === 'deferred')
@@ -5973,6 +6043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         date: targetDate.toISOString(),
         inStoreSales: inStoreOrders,
         repairSales: paidRepairTickets,
+        withdrawals: dailyWithdrawals,
         summary: {
           inStoreCount: inStoreOrders.length,
           inStoreTotal,
@@ -5986,10 +6057,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
           repairTotalCash,
           repairTotalZain,
           repairTotalQi,
+          totalWithdrawals,
+          withdrawalCount: dailyWithdrawals.length,
           grandTotal: inStoreTotal + repairTotal,
           grandTotalCash: inStoreTotalCash + repairTotalCash,
           grandTotalZain: inStoreTotalZain + repairTotalZain,
           grandTotalQi: inStoreTotalQi + repairTotalQi,
+          netTotal: (inStoreTotal + repairTotal) - totalWithdrawals,
         }
       });
     } catch (err) {

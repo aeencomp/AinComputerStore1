@@ -23,7 +23,8 @@ import {
   Bell,
   ChevronDown,
   Languages,
-  FileText
+  FileText,
+  TrendingDown
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -44,6 +45,7 @@ import SalesDashboard from "./SalesDashboard";
 import SalesPOS from "./SalesPOS";
 import SalesInventory from "./SalesInventory";
 import SalesInStoreInventory from "./SalesInStoreInventory";
+import SalesWithdrawals from "./SalesWithdrawals";
 import SalesUsers from "./SalesUsers";
 import SalesReports from "./SalesReports";
 import DailyReport from "./DailyReport";
@@ -183,6 +185,13 @@ export default function SalesPortal() {
       icon: Warehouse,
       permission: currentUser.permissions.canInventory,
       color: 'text-violet-400',
+    },
+    { 
+      path: "/sales/withdrawals", 
+      label: language === 'ar' ? 'السحوبات اليومية' : 'Withdrawals', 
+      icon: TrendingDown,
+      permission: currentUser.permissions.canPos,
+      color: 'text-orange-500',
     },
     { 
       path: "/sales/inventory", 
@@ -461,6 +470,7 @@ export default function SalesPortal() {
         {location === "/sales/pos" && <SalesPOS user={currentUser} orderType="walk-in" />}
         {location === "/sales/instore-pos" && <SalesPOS user={currentUser} orderType="in-store" />}
         {location === "/sales/instore-inventory" && <SalesInStoreInventory user={currentUser} />}
+        {location === "/sales/withdrawals" && <SalesWithdrawals user={currentUser} />}
         {location === "/sales/inventory" && <SalesInventory user={currentUser} />}
         {location === "/sales/daily-report" && <DailyReport user={currentUser} />}
         {location === "/sales/reports" && <SalesReports user={currentUser} />}

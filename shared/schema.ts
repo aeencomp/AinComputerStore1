@@ -985,6 +985,23 @@ export const insertInStoreProductSchema = createInsertSchema(inStoreProducts).om
 export type InsertInStoreProduct = z.infer<typeof insertInStoreProductSchema>;
 export type InStoreProduct = typeof inStoreProducts.$inferSelect;
 
+// ─── Cash Withdrawals — Daily cash withdrawals by employees ───────────────────
+export const cashWithdrawals = pgTable("cash_withdrawals", {
+  id: serial("id").primaryKey(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  reason: text("reason"),
+  employeeName: text("employee_name").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertCashWithdrawalSchema = createInsertSchema(cashWithdrawals).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertCashWithdrawal = z.infer<typeof insertCashWithdrawalSchema>;
+export type CashWithdrawal = typeof cashWithdrawals.$inferSelect;
+
 // ==================== Recycle Bin ====================
 
 export const recycleBin = pgTable("recycle_bin", {
