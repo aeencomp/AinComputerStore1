@@ -22,7 +22,8 @@ import {
   Settings,
   Bell,
   ChevronDown,
-  Languages
+  Languages,
+  FileText
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -44,6 +45,7 @@ import SalesInventory from "./SalesInventory";
 import SalesInStoreInventory from "./SalesInStoreInventory";
 import SalesUsers from "./SalesUsers";
 import SalesReports from "./SalesReports";
+import DailyReport from "./DailyReport";
 
 interface SalesUser {
   id: string;
@@ -187,6 +189,13 @@ export default function SalesPortal() {
       icon: Package,
       permission: currentUser.permissions.canInventory,
       color: 'text-blue-500',
+    },
+    { 
+      path: "/sales/daily-report", 
+      label: language === 'ar' ? 'التقرير اليومي' : 'Daily Report', 
+      icon: FileText,
+      permission: currentUser.permissions.canViewReports,
+      color: 'text-emerald-500',
     },
     { 
       path: "/sales/reports", 
@@ -450,6 +459,7 @@ export default function SalesPortal() {
         {location === "/sales/instore-pos" && <SalesPOS user={currentUser} orderType="in-store" />}
         {location === "/sales/instore-inventory" && <SalesInStoreInventory user={currentUser} />}
         {location === "/sales/inventory" && <SalesInventory user={currentUser} />}
+        {location === "/sales/daily-report" && <DailyReport user={currentUser} />}
         {location === "/sales/reports" && <SalesReports user={currentUser} />}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}
       </main>

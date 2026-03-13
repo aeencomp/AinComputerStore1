@@ -628,6 +628,12 @@
   #receipt-content * {
     visibility: visible !important;
   }
+
+  /* Show daily report content */
+  #daily-report-content,
+  #daily-report-content * {
+    visibility: visible !important;
+  }
   
   #receipt-content {
     position: absolute !important;
@@ -680,10 +686,30 @@
     print-color-adjust: exact !important;
   }
   
+  #daily-report-content {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 10mm !important;
+    background: white !important;
+    color: black !important;
+    font-size: 10pt !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Override page size when daily report is present */
+  body:has(#daily-report-content) {
+    size: A4 !important;
+  }
+
   /* Hide print buttons and dialog headers */
   .print\\:hidden,
   [data-testid="button-print-receipt"],
-  [data-testid="button-new-sale"] {
+  [data-testid="button-new-sale"],
+  [data-testid="button-print-report"] {
     display: none !important;
     visibility: hidden !important;
   }
@@ -691,5 +717,10 @@
   @page {
     size: 80mm auto;
     margin: 2mm;
+  }
+
+  @page:has(#daily-report-content) {
+    size: A4;
+    margin: 10mm;
   }
 }

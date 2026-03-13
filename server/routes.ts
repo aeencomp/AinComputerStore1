@@ -5891,5 +5891,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Daily Report API - combines in-store sales + repair ticket payments for a given date
+  app.get("/api/daily-report", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const dateParam = req.query.date as string;
+      const targetDate = dateParam ? new Date(dateParam) : new Date();
+      const startOfDay = new Date(targetDate);
+      startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(targetDate);
+      endOfDay.setHours(23, 59, 59, 999);
+
+      // In-store sales (walk-in and in-store order types)
+      const { db } = await import("./db");
+      const { orders, repairTickets } = await import("../shared/schema");
+      const { and, gte, lte, inArray, eq } = await import("drizzle-orm");
+
+      const inStoreOrders = await db.select().from(orders).where(
+        and(
+          inArray(orders.orderType, ['walk-in', 'in-store']),
+          gte(orders.createdAt, startOfDay),
+          lte(orders.createdAt, endOfDay)
+        )
+      );
+
+      // Repair ticket payments for the day (paid tickets updated on this date)
+      const paidRepairTickets = await db.select().from(repairTickets).where(
+        and(
+          eq(repairTickets.paymentStatus, 'paid'),
+          gte(repairTickets.updatedAt, startOfDay),
+          lte(repairTickets.updatedAt, endOfDay)
+        )
+      );
+
+      const inStoreTotalCash = inStoreOrders
+        .filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const inStoreTotalZain = inStoreOrders
+        .filter(o => o.paymentMethod === 'zaincash' && o.paymentStatus !== 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const inStoreTotalQi = inStoreOrders
+        .filter(o => o.paymentMethod === 'qicard' && o.paymentStatus !== 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const inStoreTotalDeferred = inStoreOrders
+        .filter(o => o.paymentStatus === 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const inStoreTotal = inStoreOrders
+        .filter(o => o.paymentStatus !== 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total), 0);
+
+      // Repair tickets don't have paymentMethod field, treat all paid as cash
+      const repairTotal = paidRepairTickets
+        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+      const repairTotalCash = repairTotal;
+      const repairTotalZain = 0;
+      const repairTotalQi = 0;
+
+      res.json({
+        date: targetDate.toISOString(),
+        inStoreSales: inStoreOrders,
+        repairSales: paidRepairTickets,
+        summary: {
+          inStoreCount: inStoreOrders.length,
+          inStoreTotal,
+          inStoreTotalCash,
+          inStoreTotalZain,
+          inStoreTotalQi,
+          inStoreTotalDeferred,
+          repairCount: paidRepairTickets.length,
+          repairTotal,
+          repairTotalCash,
+          repairTotalZain,
+          repairTotalQi,
+          grandTotal: inStoreTotal + repairTotal,
+          grandTotalCash: inStoreTotalCash + repairTotalCash,
+          grandTotalZain: inStoreTotalZain + repairTotalZain,
+          grandTotalQi: inStoreTotalQi + repairTotalQi,
+        }
+      });
+    } catch (err) {
+      console.error('Daily report error:', err);
+      res.status(500).json({ error: "خطأ في جلب التقرير اليومي" });
+    }
+  });
+
   return httpServer;
 }
