@@ -10,7 +10,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
@@ -30,6 +30,7 @@ export default function TechnicianDashboard() {
   const { toast } = useToast();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
+  const [filterPayment, setFilterPayment] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedTicketId, setSelectedTicketId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -182,13 +183,16 @@ export default function TechnicianDashboard() {
   });
 
   const stats = useMemo(() => {
-    if (!tickets) return { totalRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0 };
+    if (!tickets) return { totalRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0, deferredCount: 0 };
     let totalRevenue = 0;
     let completedCount = 0;
     let completedRevenue = 0;
     let pendingCount = 0;
     let deliveredCount = 0;
+    let deferredCount = 0;
     for (const ticket of tickets) {
+      if (ticket.isArchived === 1) continue;
+      if (ticket.paymentStatus === 'deferred') deferredCount++;
       if (ticket.status === 'completed') {
         completedCount++;
         const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
@@ -202,7 +206,7 @@ export default function TechnicianDashboard() {
         pendingCount++;
       }
     }
-    return { totalRevenue, completedCount, completedRevenue, pendingCount, deliveredCount };
+    return { totalRevenue, completedCount, completedRevenue, pendingCount, deliveredCount, deferredCount };
   }, [tickets]);
 
   const archivedCount = useMemo(() => {
@@ -244,6 +248,7 @@ export default function TechnicianDashboard() {
     if (showArchived && ticket.isArchived !== 1) return false;
     if (filterStatus !== 'all' && ticket.status !== filterStatus) return false;
     if (filterPriority !== 'all' && ticket.priority !== filterPriority) return false;
+    if (filterPayment !== 'all' && (ticket.paymentStatus || 'unpaid') !== filterPayment) return false;
     if (searchQuery) {
       const query = searchQuery.toLowerCase().trim();
       const normalizedQuery = query.replace(/[\s\-\+]/g, '');
@@ -327,7 +332,7 @@ export default function TechnicianDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-4' : 'grid-cols-2'}`}>
+        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2'}`}>
           {canViewRevenue && (
             <Card
               className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
@@ -411,6 +416,24 @@ export default function TechnicianDashboard() {
               </div>
             </CardContent>
           </Card>
+
+          <Card
+            className={`cursor-pointer hover-elevate ${filterPayment === 'deferred' ? 'ring-2 ring-orange-500' : ''}`}
+            onClick={() => setFilterPayment(filterPayment === 'deferred' ? 'all' : 'deferred')}
+            data-testid="card-deferred-count"
+          >
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
+                  <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'آجل (غير محصّل)' : 'Deferred'}</p>
+                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="text-deferred-count">{stats.deferredCount}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
 
         <div className="space-y-3 mb-6">
@@ -474,6 +497,18 @@ export default function TechnicianDashboard() {
               <SelectItem value="normal">{t('repair.priority.normal')}</SelectItem>
               <SelectItem value="low">{t('repair.priority.low')}</SelectItem>
               <SelectItem value="vip">{t('repair.priority.vip')}</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={filterPayment} onValueChange={setFilterPayment}>
+            <SelectTrigger className="w-full md:w-[200px]" data-testid="select-filter-payment">
+              <SelectValue placeholder={language === 'ar' ? 'حالة الدفع' : 'Payment Status'} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{language === 'ar' ? 'كل الفواتير' : 'All Payments'}</SelectItem>
+              <SelectItem value="unpaid">{t('repair.payment.unpaid')}</SelectItem>
+              <SelectItem value="paid">{t('repair.payment.paid')}</SelectItem>
+              <SelectItem value="deferred">{t('repair.payment.deferred')}</SelectItem>
             </SelectContent>
           </Select>
 
@@ -632,45 +667,22 @@ export default function TechnicianDashboard() {
                     </span>
                   </div>
 
-                  <div
-                    className="pt-1"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <Select
-                      value={ticket.paymentStatus || 'unpaid'}
-                      onValueChange={(newPaymentStatus) => {
-                        paymentStatusMutation.mutate({ id: ticket.id, paymentStatus: newPaymentStatus });
-                      }}
-                    >
-                      <SelectTrigger
-                        className="w-full"
-                        data-testid={`select-payment-status-${ticket.id}`}
-                      >
-                        <div className="flex items-center gap-2">
-                          {(ticket.paymentStatus === 'deferred') && (
-                            <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
-                              {t('repair.payment.deferred')}
-                            </Badge>
-                          )}
-                          {(ticket.paymentStatus === 'paid') && (
-                            <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
-                              {t('repair.payment.paid')}
-                            </Badge>
-                          )}
-                          {(!ticket.paymentStatus || ticket.paymentStatus === 'unpaid') && (
-                            <Badge variant="outline" className="text-muted-foreground text-xs">
-                              {t('repair.payment.unpaid')}
-                            </Badge>
-                          )}
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unpaid">{t('repair.payment.unpaid')}</SelectItem>
-                        <SelectItem value="paid">{t('repair.payment.paid')}</SelectItem>
-                        <SelectItem value="deferred">{t('repair.payment.deferred')}</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <div className="pt-1 flex items-center gap-2" data-testid={`text-payment-status-${ticket.id}`}>
+                    {ticket.paymentStatus === 'deferred' && (
+                      <Badge className="bg-orange-100 text-orange-700 border border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700 text-xs">
+                        {t('repair.payment.deferred')}
+                      </Badge>
+                    )}
+                    {ticket.paymentStatus === 'paid' && (
+                      <Badge className="bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs">
+                        {t('repair.payment.paid')}
+                      </Badge>
+                    )}
+                    {(!ticket.paymentStatus || ticket.paymentStatus === 'unpaid') && (
+                      <Badge variant="outline" className="text-muted-foreground text-xs">
+                        {t('repair.payment.unpaid')}
+                      </Badge>
+                    )}
                   </div>
 
                   <div className="flex justify-between items-center pt-1">
