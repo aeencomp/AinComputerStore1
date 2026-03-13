@@ -133,6 +133,27 @@ export default function TechnicianDashboard() {
     },
   });
 
+  const paymentStatusMutation = useMutation({
+    mutationFn: async ({ id, paymentStatus }: { id: string; paymentStatus: string }) => {
+      const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${id}`, { paymentStatus });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      toast({
+        title: language === 'ar' ? 'تم التحديث' : 'Updated',
+        description: language === 'ar' ? 'تم تحديث حالة الدفع' : 'Payment status updated',
+      });
+    },
+    onError: () => {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: language === 'ar' ? 'فشل تحديث حالة الدفع' : 'Failed to update payment status',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const archiveTicketMutation = useMutation({
     mutationFn: async ({ id, archived }: { id: string; archived: boolean }) => {
       return await apiRequest('PATCH', `/api/admin/repair-tickets/${id}/archive`, { archived });
@@ -609,14 +630,46 @@ export default function TechnicianDashboard() {
                     </span>
                   </div>
 
-                  {ticket.paymentStatus === 'deferred' && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{language === 'ar' ? 'الدفع:' : 'Payment:'}</span>
-                      <Badge variant="outline" className="text-orange-600 border-orange-400 text-xs" data-testid={`badge-payment-${ticket.id}`}>
-                        {language === 'ar' ? 'آجل' : 'Deferred'}
-                      </Badge>
-                    </div>
-                  )}
+                  <div
+                    className="pt-1"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <Select
+                      value={ticket.paymentStatus || 'unpaid'}
+                      onValueChange={(newPaymentStatus) => {
+                        paymentStatusMutation.mutate({ id: ticket.id, paymentStatus: newPaymentStatus });
+                      }}
+                    >
+                      <SelectTrigger
+                        className="w-full"
+                        data-testid={`select-payment-status-${ticket.id}`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {(ticket.paymentStatus === 'deferred') && (
+                            <Badge className="bg-orange-100 text-orange-700 border-orange-300 text-xs">
+                              {t('repair.payment.deferred')}
+                            </Badge>
+                          )}
+                          {(ticket.paymentStatus === 'paid') && (
+                            <Badge className="bg-green-100 text-green-700 border-green-300 text-xs">
+                              {t('repair.payment.paid')}
+                            </Badge>
+                          )}
+                          {(!ticket.paymentStatus || ticket.paymentStatus === 'unpaid') && (
+                            <Badge variant="outline" className="text-muted-foreground text-xs">
+                              {t('repair.payment.unpaid')}
+                            </Badge>
+                          )}
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="unpaid">{t('repair.payment.unpaid')}</SelectItem>
+                        <SelectItem value="paid">{t('repair.payment.paid')}</SelectItem>
+                        <SelectItem value="deferred">{t('repair.payment.deferred')}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
                   <div className="flex justify-between items-center pt-1">
                     {showArchived ? (
