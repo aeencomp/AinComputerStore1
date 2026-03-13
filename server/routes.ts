@@ -2402,6 +2402,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (req.body.status !== undefined) {
         updateData.status = req.body.status;
+        // Auto-set completedAt when status changes to "completed"
+        if (req.body.status === 'completed') {
+          const existingTicket = await storage.getRepairTicket(id);
+          if (existingTicket && !existingTicket.completedAt) {
+            updateData.completedAt = new Date();
+          }
+        }
         // Auto-set deliveredAt when status changes to "delivered"
         if (req.body.status === 'delivered') {
           const existingTicket = await storage.getRepairTicket(id);

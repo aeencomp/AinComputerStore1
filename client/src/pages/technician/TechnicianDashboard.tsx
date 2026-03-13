@@ -594,6 +594,14 @@ export default function TechnicianDashboard() {
                       {format(new Date(ticket.createdAt), 'dd/MM/yyyy')}
                     </span>
                   </div>
+                  {ticket.completedAt && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{language === 'ar' ? 'تاريخ الإكمال:' : 'Completed:'}</span>
+                      <span className="text-sm font-medium text-blue-600 dark:text-blue-400" data-testid={`text-completed-date-${ticket.id}`}>
+                        {format(new Date(ticket.completedAt), 'dd/MM/yyyy')}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     <span className="text-sm text-muted-foreground">{language === 'ar' ? 'تاريخ التسليم:' : 'Delivery Date:'}</span>
                     <span className={`text-sm font-medium ${ticket.deliveredAt ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`} data-testid={`text-delivery-date-${ticket.id}`}>

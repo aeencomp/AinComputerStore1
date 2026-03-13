@@ -382,6 +382,7 @@ export const repairTickets = pgTable("repair_tickets", {
   paymentStatus: text("payment_status").default("unpaid"), // unpaid, paid, deferred
   userId: varchar("user_id"), // optional - if customer has account
   isArchived: integer("is_archived").notNull().default(0),
+  completedAt: timestamp("completed_at"),
   deliveredAt: timestamp("delivered_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
