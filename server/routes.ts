@@ -6231,11 +6231,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { gte, lte, and, desc } = await import("drizzle-orm");
 
       const dateParam = req.query.date as string;
-      const targetDate = dateParam ? new Date(dateParam) : new Date();
-      const startOfDay = new Date(targetDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(targetDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Parse as Baghdad timezone (UTC+3)
+      const baghdadDateStr2 = dateParam || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+      const startOfDay = new Date(`${baghdadDateStr2}T00:00:00+03:00`);
+      const endOfDay = new Date(`${baghdadDateStr2}T23:59:59.999+03:00`);
 
       const rows = await db.select().from(cashWithdrawals)
         .where(and(gte(cashWithdrawals.createdAt, startOfDay), lte(cashWithdrawals.createdAt, endOfDay)))
@@ -6292,11 +6291,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const dateParam = req.query.date as string;
-      const targetDate = dateParam ? new Date(dateParam) : new Date();
-      const startOfDay = new Date(targetDate);
-      startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(targetDate);
-      endOfDay.setHours(23, 59, 59, 999);
+      // Parse as Baghdad timezone (UTC+3) so dates match the Iraq calendar day
+      const baghdadDateStr = dateParam || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+      const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
+      const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
 
       // In-store sales (walk-in and in-store order types)
       const { db } = await import("./db");

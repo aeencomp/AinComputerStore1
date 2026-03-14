@@ -28,7 +28,7 @@ interface SalesWithdrawalsProps {
 export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   const { language, isRTL } = useLanguage();
   const { toast } = useToast();
-  const today = format(new Date(), "yyyy-MM-dd");
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
   const [selectedDate, setSelectedDate] = useState(today);
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");

@@ -561,7 +561,8 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
 
 export default function DailyReport({ user }: DailyReportProps) {
   const { language } = useLanguage();
-  const today = format(new Date(), "yyyy-MM-dd");
+  // Use Baghdad timezone (UTC+3) so "today" matches the Iraq calendar day
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
   const [selectedDate, setSelectedDate] = useState(today);
 
   const { data, isLoading, isFetching, refetch } = useQuery<DailyReportData>({
