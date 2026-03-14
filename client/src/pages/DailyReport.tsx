@@ -43,7 +43,9 @@ interface RepairSale {
   customerPhone?: string;
   deviceType: string;
   deviceBrand?: string;
+  deviceModel?: string;
   issueDescriptionAr: string;
+  technicianNotes?: string;
   finalCost?: string;
   costEstimate?: string;
   paymentStatus: string;
@@ -166,6 +168,19 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
     const badgeCls = isDeferred ? 'badge-orange' : isDelivered ? 'badge-delivered' : 'badge-green';
     const badgeTxt = isDeferred ? 'آجل' : isDelivered ? 'مُسلَّم ✓' : 'مدفوع';
     const methodTxt = !isDeferred ? (t.paymentMethod === 'card' ? ' — بطاقة' : ' — نقداً') : '';
+    const deviceStr = [t.deviceBrand, t.deviceModel, t.deviceType].filter(Boolean).join(" ");
+    const detailParts = [
+      t.issueDescriptionAr ? `<strong>المشكلة:</strong> ${t.issueDescriptionAr}` : "",
+      t.technicianNotes ? `<strong>ملاحظات الفني:</strong> ${t.technicianNotes}` : "",
+    ].filter(Boolean);
+    const detailRow = detailParts.length > 0
+      ? `<tr style="background:#f8fafc">
+          <td></td>
+          <td colspan="5" style="padding:4px 8px 6px;font-size:11px;color:#555;border-bottom:1px dashed #e2e8f0">
+            ${detailParts.join(" &nbsp;|&nbsp; ")}
+          </td>
+        </tr>`
+      : "";
     return `
       <tr style="${isDeferred ? "color:#c2410c" : ""}">
         <td>${i + 1}</td>
@@ -174,10 +189,10 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
           ${t.customerName}
           ${t.customerPhone ? `<br><span style="font-size:11px;color:#666">${t.customerPhone}</span>` : ""}
         </td>
-        <td style="color:#666">${t.deviceBrand ? t.deviceBrand + " " : ""}${t.deviceType}</td>
+        <td style="color:#666">${deviceStr}</td>
         <td><span class="badge ${badgeCls}">${badgeTxt}${methodTxt}</span></td>
         <td style="text-align:end;font-weight:600${isDeferred ? ";color:#c2410c" : ""}">${fmtNum(amount)}</td>
-      </tr>`;
+      </tr>${detailRow}`;
   }).join("");
 
   const withdrawalRows = withdrawals.map((w, i) => `
@@ -857,38 +872,61 @@ export default function DailyReport({ user }: DailyReportProps) {
                     <tbody>
                       {data.repairSales.map((ticket, idx) => {
                         const amount = parseFloat(ticket.finalCost || ticket.costEstimate || "0");
+                        const deviceStr = [ticket.deviceBrand, ticket.deviceModel, ticket.deviceType].filter(Boolean).join(" ");
+                        const hasDetails = ticket.issueDescriptionAr || ticket.technicianNotes;
                         return (
-                          <tr key={ticket.id} className="border-b last:border-0" data-testid={`row-repair-${ticket.id}`}>
-                            <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
-                            <td className="py-2 px-4 font-mono text-xs">{ticket.ticketNumber}</td>
-                            <td className="py-2 px-4">
-                              <div>{ticket.customerName}</div>
-                              {ticket.customerPhone && (
-                                <div className="text-xs text-muted-foreground">{ticket.customerPhone}</div>
-                              )}
-                            </td>
-                            <td className="py-2 px-4 text-muted-foreground">
-                              {ticket.deviceBrand ? `${ticket.deviceBrand} ` : ""}{ticket.deviceType}
-                            </td>
-                            <td className="py-2 px-4">
-                              <div className="flex flex-wrap gap-1">
-                                {ticket.paymentStatus === 'deferred'
-                                  ? <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>
-                                  : ticket.status === 'delivered'
-                                    ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم ✓</Badge>
-                                    : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
-                                }
-                                {ticket.paymentStatus !== 'deferred' && (
-                                  <Badge variant="outline" className="text-xs">
-                                    {ticket.paymentMethod === 'card' ? 'بطاقة' : 'نقداً'}
-                                  </Badge>
+                          <>
+                            <tr key={ticket.id} className="border-b" data-testid={`row-repair-${ticket.id}`}>
+                              <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
+                              <td className="py-2 px-4 font-mono text-xs">{ticket.ticketNumber}</td>
+                              <td className="py-2 px-4">
+                                <div>{ticket.customerName}</div>
+                                {ticket.customerPhone && (
+                                  <div className="text-xs text-muted-foreground">{ticket.customerPhone}</div>
                                 )}
-                              </div>
-                            </td>
-                            <td className={`py-2 px-4 text-end font-semibold ${ticket.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
-                              {fmtNum(amount)}
-                            </td>
-                          </tr>
+                              </td>
+                              <td className="py-2 px-4 text-muted-foreground">{deviceStr}</td>
+                              <td className="py-2 px-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {ticket.paymentStatus === 'deferred'
+                                    ? <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>
+                                    : ticket.status === 'delivered'
+                                      ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم ✓</Badge>
+                                      : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
+                                  }
+                                  {ticket.paymentStatus !== 'deferred' && (
+                                    <Badge variant="outline" className="text-xs">
+                                      {ticket.paymentMethod === 'card' ? 'بطاقة' : 'نقداً'}
+                                    </Badge>
+                                  )}
+                                </div>
+                              </td>
+                              <td className={`py-2 px-4 text-end font-semibold ${ticket.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
+                                {fmtNum(amount)}
+                              </td>
+                            </tr>
+                            {hasDetails && (
+                              <tr key={`${ticket.id}-detail`} className="border-b last:border-0 bg-muted/20">
+                                <td />
+                                <td colSpan={5} className="py-1 px-4 pb-2">
+                                  <div className="flex flex-wrap gap-x-6 gap-y-0.5">
+                                    {ticket.issueDescriptionAr && (
+                                      <span className="text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground/70">{language === "ar" ? "المشكلة:" : "Issue:"}</span>{" "}
+                                        {ticket.issueDescriptionAr}
+                                      </span>
+                                    )}
+                                    {ticket.technicianNotes && (
+                                      <span className="text-xs text-muted-foreground">
+                                        <span className="font-medium text-foreground/70">{language === "ar" ? "ملاحظات الفني:" : "Tech notes:"}</span>{" "}
+                                        {ticket.technicianNotes}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </>
                         );
                       })}
                     </tbody>
