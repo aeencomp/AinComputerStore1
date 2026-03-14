@@ -18,7 +18,10 @@ import {
   Trash2,
   CheckCheck,
   Clock,
-  Truck
+  Truck,
+  Wrench,
+  Banknote,
+  CreditCard
 } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns";
 
@@ -35,6 +38,22 @@ interface Order {
   status: string;
   createdAt: string;
   items: any[];
+}
+
+interface RepairTicket {
+  id: string;
+  ticketNumber: string;
+  customerName: string;
+  customerPhone?: string;
+  deviceType: string;
+  deviceBrand?: string;
+  finalCost?: string;
+  costEstimate?: string;
+  paymentStatus: string;
+  paymentMethod?: string;
+  status: string;
+  updatedAt: string;
+  deliveredAt?: string;
 }
 
 interface SalesUser {
@@ -56,6 +75,10 @@ export default function SalesReports({ user }: SalesReportsProps) {
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders'],
+  });
+
+  const { data: allRepairTickets = [] } = useQuery<RepairTicket[]>({
+    queryKey: ['/api/repair-tickets'],
   });
 
   const deleteOrderMutation = useMutation({
@@ -135,6 +158,25 @@ export default function SalesReports({ user }: SalesReportsProps) {
   const walkInOrders = filteredOrders.filter(o => o.orderType === 'walk-in').length;
   const inStoreOrders = filteredOrders.filter(o => o.orderType === 'in-store').length;
   const onlineOrders = filteredOrders.filter(o => o.orderType === 'online').length;
+
+  const filteredRepairTickets = allRepairTickets.filter(t => {
+    if (t.paymentStatus !== 'paid' && t.paymentStatus !== 'deferred' && t.status !== 'delivered') return false;
+    const ticketDate = new Date(t.deliveredAt || t.updatedAt);
+    const rangeStart = getDateRangeStart();
+    if (dateRange !== 'all' && !isAfter(ticketDate, rangeStart)) return false;
+    return true;
+  });
+
+  const repairTotalCash = filteredRepairTickets
+    .filter(t => t.paymentStatus !== 'deferred' && (!t.paymentMethod || t.paymentMethod === 'cash'))
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+  const repairTotalCard = filteredRepairTickets
+    .filter(t => t.paymentStatus !== 'deferred' && t.paymentMethod === 'card')
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+  const repairTotalDeferred = filteredRepairTickets
+    .filter(t => t.paymentStatus === 'deferred')
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+  const repairTotal = repairTotalCash + repairTotalCard;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ar-IQ').format(price);
@@ -338,7 +380,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -410,6 +452,40 @@ export default function SalesReports({ user }: SalesReportsProps) {
                   {language === 'ar' ? 'أونلاين' : 'Online'}
                 </p>
                 <p className="text-xl font-bold">{onlineOrders}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-blue-500/10 rounded-lg">
+                <Wrench className="h-5 w-5 text-blue-500" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">
+                  {language === 'ar' ? 'إيراد الصيانة' : 'Repair Revenue'}
+                </p>
+                <p className="text-xl font-bold">{formatPrice(repairTotal)} IQD</p>
+                <div className="flex gap-2 mt-1 flex-wrap">
+                  {repairTotalCash > 0 && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <Banknote className="h-3 w-3 text-green-500" />
+                      {formatPrice(repairTotalCash)}
+                    </span>
+                  )}
+                  {repairTotalCard > 0 && (
+                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                      <CreditCard className="h-3 w-3 text-teal-500" />
+                      {formatPrice(repairTotalCard)}
+                    </span>
+                  )}
+                  {repairTotalDeferred > 0 && (
+                    <span className="text-xs text-orange-500">
+                      آجل: {formatPrice(repairTotalDeferred)}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
           </CardContent>
@@ -552,6 +628,133 @@ export default function SalesReports({ user }: SalesReportsProps) {
                     : `Showing first 50 of ${filteredOrders.length} orders`}
                 </p>
               )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Repair Tickets Section */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <Wrench className="h-5 w-5 text-blue-500" />
+            {language === 'ar' ? 'مدفوعات الصيانة' : 'Repair Payments'}
+            <Badge variant="secondary" className="ms-auto">{filteredRepairTickets.length}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-0">
+          {filteredRepairTickets.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">
+              {language === 'ar' ? 'لا توجد مدفوعات صيانة في هذه الفترة' : 'No repair payments in this period'}
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th className="text-start py-2 px-4 font-medium text-muted-foreground">#</th>
+                    <th className="text-start py-2 px-4 font-medium text-muted-foreground">
+                      {language === 'ar' ? 'رقم التذكرة' : 'Ticket #'}
+                    </th>
+                    <th className="text-start py-2 px-4 font-medium text-muted-foreground">
+                      {language === 'ar' ? 'العميل' : 'Customer'}
+                    </th>
+                    <th className="text-start py-2 px-4 font-medium text-muted-foreground">
+                      {language === 'ar' ? 'الجهاز' : 'Device'}
+                    </th>
+                    <th className="text-start py-2 px-4 font-medium text-muted-foreground">
+                      {language === 'ar' ? 'طريقة الدفع' : 'Payment'}
+                    </th>
+                    <th className="text-start py-2 px-4 font-medium text-muted-foreground">
+                      {language === 'ar' ? 'التاريخ' : 'Date'}
+                    </th>
+                    <th className="text-end py-2 px-4 font-medium text-muted-foreground">
+                      {language === 'ar' ? 'المبلغ' : 'Amount'}
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRepairTickets.map((ticket, idx) => {
+                    const amount = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
+                    const isDeferred = ticket.paymentStatus === 'deferred';
+                    const ticketDate = new Date(ticket.deliveredAt || ticket.updatedAt);
+                    return (
+                      <tr key={ticket.id} className="border-b last:border-0" data-testid={`row-repair-full-${ticket.id}`}>
+                        <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
+                        <td className="py-2 px-4 font-mono text-xs">{ticket.ticketNumber}</td>
+                        <td className="py-2 px-4">
+                          <div>{ticket.customerName}</div>
+                          {ticket.customerPhone && (
+                            <div className="text-xs text-muted-foreground">{ticket.customerPhone}</div>
+                          )}
+                        </td>
+                        <td className="py-2 px-4 text-muted-foreground">
+                          {ticket.deviceBrand ? `${ticket.deviceBrand} ` : ''}{ticket.deviceType}
+                        </td>
+                        <td className="py-2 px-4">
+                          <div className="flex flex-wrap gap-1">
+                            {isDeferred ? (
+                              <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>
+                            ) : (
+                              <>
+                                <Badge variant="outline" className="text-emerald-700 border-emerald-400">
+                                  {language === 'ar' ? 'مدفوع' : 'Paid'}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  {ticket.paymentMethod === 'card'
+                                    ? (language === 'ar' ? 'بطاقة' : 'Card')
+                                    : (language === 'ar' ? 'نقداً' : 'Cash')}
+                                </Badge>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                        <td className="py-2 px-4 text-muted-foreground text-xs">
+                          {ticketDate.toLocaleDateString('ar-IQ')}
+                        </td>
+                        <td className={`py-2 px-4 text-end font-semibold ${isDeferred ? 'text-orange-600' : ''}`}>
+                          {formatPrice(amount)} IQD
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="bg-muted/30 border-t-2 font-semibold">
+                    <td colSpan={6} className="py-2 px-4">
+                      {language === 'ar' ? 'المجموع' : 'Total'}
+                      {repairTotalDeferred > 0 && (
+                        <span className="text-xs text-orange-500 font-normal ms-2">
+                          ({language === 'ar' ? 'آجل غير محسوب' : 'deferred excluded'}: {formatPrice(repairTotalDeferred)})
+                        </span>
+                      )}
+                    </td>
+                    <td className="py-2 px-4 text-end text-blue-600 dark:text-blue-400">
+                      {formatPrice(repairTotal)} IQD
+                    </td>
+                  </tr>
+                  {repairTotal > 0 && (
+                    <tr className="bg-muted/10">
+                      <td colSpan={7} className="py-2 px-4">
+                        <div className="flex flex-wrap gap-4 text-xs text-muted-foreground">
+                          {repairTotalCash > 0 && (
+                            <span className="flex items-center gap-1">
+                              <Banknote className="h-3 w-3 text-green-500" />
+                              {language === 'ar' ? 'نقداً:' : 'Cash:'} <strong className="text-foreground">{formatPrice(repairTotalCash)}</strong>
+                            </span>
+                          )}
+                          {repairTotalCard > 0 && (
+                            <span className="flex items-center gap-1">
+                              <CreditCard className="h-3 w-3 text-teal-500" />
+                              {language === 'ar' ? 'بطاقة:' : 'Card:'} <strong className="text-foreground">{formatPrice(repairTotalCard)}</strong>
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </tfoot>
+              </table>
             </div>
           )}
         </CardContent>
