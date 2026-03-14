@@ -6368,7 +6368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.set('Cache-Control', 'no-store');
       res.json({
-        date: targetDate.toISOString(),
+        date: startOfDay.toISOString(),
         inStoreSales: inStoreOrders,
         repairSales: paidRepairTickets,
         withdrawals: dailyWithdrawals,
