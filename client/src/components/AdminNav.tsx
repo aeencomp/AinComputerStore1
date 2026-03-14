@@ -26,7 +26,8 @@ import {
   CheckCheck,
   ShoppingBag,
   Trash2,
-  MessageCircle
+  MessageCircle,
+  UserCog
 } from "lucide-react";
 import {
   Popover,
@@ -110,6 +111,7 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
     { href: "/admin/analytics", icon: Activity, labelAr: "تحليلات الزوار", labelEn: "Analytics", permission: "reports" },
     { href: "/admin/whatsapp", icon: MessageCircle, labelAr: "تسويق واتساب", labelEn: "WhatsApp", permission: "settings" },
     { href: "/admin/platform", icon: Store, labelAr: "المتاجر", labelEn: "Shops", permission: "settings" },
+    { href: "/admin/users", icon: UserCog, labelAr: "مستخدمو البوابات", labelEn: "Portal Users", permission: "settings" },
     { href: "/admin/recycle-bin", icon: Trash2, labelAr: "سلة المحذوفات", labelEn: "Recycle Bin", permission: "orders" },
     { href: "/admin/settings", icon: Settings, labelAr: "الإعدادات", labelEn: "Settings", permission: "settings" },
   ];

@@ -892,6 +892,7 @@ export const saasUsers = pgTable("saas_users", {
   username: text("username").notNull(),
   password: text("password").notNull(),
   displayName: text("display_name").notNull(),
+  email: text("email"),
   isOwner: integer("is_owner").notNull().default(0),
   isActive: integer("is_active").notNull().default(1),
   permissions: jsonb("permissions").notNull().default([]),

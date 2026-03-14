@@ -458,12 +458,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       return res.json({
-        admins: admins.map(u => ({ id: u.id, username: u.username, displayName: u.name, email: (u as any).email || null, portal: 'admin', role: u.role })),
+        admins: admins.map(u => ({ id: u.id, username: u.username, displayName: u.name, email: u.email || null, portal: 'admin', role: u.role })),
         salesUsers: salesUsers.map(u => ({ id: u.id, username: u.username, displayName: u.name, email: u.email || null, portal: 'sales', role: u.role })),
         technicians: technicians.map(u => ({ id: u.id, username: u.username, displayName: u.displayName, email: u.email || null, portal: 'technician', isAdmin: u.isAdmin })),
         batteryUsers: batteryUsers.map(u => ({ id: u.id, username: u.username, displayName: u.username, email: u.email || null, portal: 'battery' })),
         saasUsers: saasUsersAll,
-        saasShops: saasShops.map(s => ({ id: String(s.id), username: s.ownerUsername, displayName: s.shopName, email: (s as any).email || null, portal: 'saasShop' })),
+        saasShops: saasShops.map(s => ({ id: String(s.id), username: s.username, displayName: s.shopName, email: s.email || null, portal: 'saasShop' })),
       });
     } catch (error) {
       console.error("Error fetching portal users:", error);
