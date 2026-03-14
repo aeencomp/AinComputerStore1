@@ -121,6 +121,7 @@ export default function TicketDetail() {
   }, [ticket, form]);
 
   const watchedPriority = form.watch('priority');
+  const watchedPaymentStatus = form.watch('paymentStatus');
   useEffect(() => {
     const prev = prevStatusRef.current;
     const current = watchedPriority;
@@ -600,7 +601,7 @@ export default function TicketDetail() {
                       </FormItem>
                     )}
                   />
-                  {form.watch('paymentStatus') === 'paid' && (
+                  {watchedPaymentStatus === 'paid' && (
                     <FormField
                       control={form.control}
                       name="paymentMethod"
