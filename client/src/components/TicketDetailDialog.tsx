@@ -82,6 +82,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     status: z.string(),
     priority: z.string(),
     paymentStatus: z.string(),
+    paymentMethod: z.string().optional(),
     technicianNotes: z.string().optional(),
     estimatedCompletion: z.string().optional(),
     costEstimate: z.string().optional(),
@@ -105,6 +106,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       status: 'pending',
       priority: 'normal',
       paymentStatus: 'unpaid',
+      paymentMethod: 'cash',
       technicianNotes: '',
       estimatedCompletion: '',
       costEstimate: '',
@@ -142,6 +144,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         status: resolveStatusField(ticket.status, ticket.paymentStatus || 'unpaid'),
         priority: ticket.priority,
         paymentStatus: ticket.paymentStatus || 'unpaid',
+        paymentMethod: (ticket as any).paymentMethod || 'cash',
         technicianNotes: ticket.technicianNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
         costEstimate: cleanPrice(ticket.costEstimate),
@@ -943,6 +946,27 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                         )}
                       />
                     )}
+                    <FormField
+                      control={form.control}
+                      name="paymentMethod"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || 'cash'}>
+                            <FormControl>
+                              <SelectTrigger data-testid="dialog-select-payment-method">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="cash">{isRTL ? 'نقداً' : 'Cash'}</SelectItem>
+                              <SelectItem value="card">{isRTL ? 'بطاقة' : 'Card'}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   </div>
 
                   <FormField
