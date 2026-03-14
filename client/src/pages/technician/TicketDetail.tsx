@@ -601,29 +601,27 @@ export default function TicketDetail() {
                       </FormItem>
                     )}
                   />
-                  {watchedPaymentStatus === 'paid' && (
-                    <FormField
-                      control={form.control}
-                      name="paymentMethod"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || 'cash'}>
-                            <FormControl>
-                              <SelectTrigger data-testid="select-payment-method">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="cash">{isRTL ? 'نقداً' : 'Cash'}</SelectItem>
-                              <SelectItem value="card">{isRTL ? 'بطاقة' : 'Card'}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
+                  <FormField
+                    control={form.control}
+                    name="paymentMethod"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || 'cash'}>
+                          <FormControl>
+                            <SelectTrigger data-testid="select-payment-method">
+                              <SelectValue />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="cash">{isRTL ? 'نقداً' : 'Cash'}</SelectItem>
+                            <SelectItem value="card">{isRTL ? 'بطاقة' : 'Card'}</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 </div>
 
                 <FormField
