@@ -8,6 +8,8 @@ import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage } from "./whatsapp";
 import bcrypt from "bcrypt";
+import { generateOTP, storeOTP, verifyOTP } from "./otp";
+import { sendOTPEmail } from "./resend-client";
 import { adminNotifications } from "./admin-notifications";
 import { zaincash } from "./zaincash";
 import { qicard } from "./qicard";
@@ -145,27 +147,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
       }
       
-      // Check if user is active
       if (admin.isActive === 0) {
         return res.status(403).json({ error: "هذا الحساب غير مفعّل" });
       }
+
+      if (admin.email) {
+        const otp = generateOTP();
+        storeOTP(`admin:${username}`, otp);
+        try {
+          await sendOTPEmail(admin.email, otp, "لوحة تحكم الإدارة");
+        } catch (emailErr) {
+          console.error("Failed to send admin OTP email:", emailErr);
+          return res.status(500).json({ error: "فشل إرسال رمز التحقق. تحقق من إعدادات البريد الإلكتروني." });
+        }
+        return res.json({ step: "otp", maskedEmail: admin.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
+      }
       
-      // Set admin session
+      // No email configured — log in directly
       (req.session as any).adminId = admin.id;
       (req.session as any).adminUsername = admin.username;
       
       return res.json({ 
         success: true, 
-        admin: { 
-          id: admin.id, 
-          username: admin.username, 
-          name: admin.name, 
-          role: admin.role 
-        } 
+        admin: { id: admin.id, username: admin.username, name: admin.name, role: admin.role } 
       });
     } catch (error) {
       console.error("Admin login error:", error);
       return res.status(500).json({ error: "فشل تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/admin/auth/verify-otp", async (req, res) => {
+    try {
+      const { username, otp } = req.body;
+      if (!username || !otp) return res.status(400).json({ error: "البيانات غير مكتملة" });
+
+      if (!verifyOTP(`admin:${username}`, otp)) {
+        return res.status(401).json({ error: "رمز التحقق غير صحيح أو منتهي الصلاحية" });
+      }
+
+      const admin = await storage.getAdminUserByUsername(username);
+      if (!admin || admin.isActive === 0) return res.status(401).json({ error: "الحساب غير موجود" });
+
+      (req.session as any).adminId = admin.id;
+      (req.session as any).adminUsername = admin.username;
+
+      return res.json({ 
+        success: true, 
+        admin: { id: admin.id, username: admin.username, name: admin.name, role: admin.role } 
+      });
+    } catch (error) {
+      console.error("Admin OTP verify error:", error);
+      return res.status(500).json({ error: "فشل التحقق" });
     }
   });
 
@@ -452,23 +485,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validPassword) {
         return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
       }
+
+      if (salesUser.email) {
+        const otp = generateOTP();
+        storeOTP(`sales:${username}`, otp);
+        try {
+          await sendOTPEmail(salesUser.email, otp, "بوابة المبيعات");
+        } catch (emailErr) {
+          console.error("Failed to send sales OTP email:", emailErr);
+          return res.status(500).json({ error: "فشل إرسال رمز التحقق" });
+        }
+        return res.json({ step: "otp", maskedEmail: salesUser.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
+      }
       
-      // Set sales session
+      // No email — log in directly
       (req.session as any).salesUserId = salesUser.id;
       (req.session as any).salesUsername = salesUser.username;
       
       return res.json({ 
         success: true, 
         user: { 
-          id: salesUser.id, 
-          username: salesUser.username, 
-          name: salesUser.name, 
-          role: salesUser.role,
+          id: salesUser.id, username: salesUser.username, name: salesUser.name, role: salesUser.role,
           permissions: {
-            canPos: salesUser.canPos,
-            canInventory: salesUser.canInventory,
-            canManageUsers: salesUser.canManageUsers,
-            canViewReports: salesUser.canViewReports,
+            canPos: salesUser.canPos, canInventory: salesUser.canInventory,
+            canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
             canApplyDiscount: salesUser.canApplyDiscount,
           }
         } 
@@ -476,6 +516,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Sales login error:", error);
       return res.status(500).json({ error: "فشل تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/sales/auth/verify-otp", async (req, res) => {
+    try {
+      const { username, otp } = req.body;
+      if (!username || !otp) return res.status(400).json({ error: "البيانات غير مكتملة" });
+
+      if (!verifyOTP(`sales:${username}`, otp)) {
+        return res.status(401).json({ error: "رمز التحقق غير صحيح أو منتهي الصلاحية" });
+      }
+
+      const salesUser = await storage.getSalesUserByUsername(username);
+      if (!salesUser || !salesUser.isActive) return res.status(401).json({ error: "الحساب غير موجود" });
+
+      (req.session as any).salesUserId = salesUser.id;
+      (req.session as any).salesUsername = salesUser.username;
+
+      return res.json({ 
+        success: true, 
+        user: { 
+          id: salesUser.id, username: salesUser.username, name: salesUser.name, role: salesUser.role,
+          permissions: {
+            canPos: salesUser.canPos, canInventory: salesUser.canInventory,
+            canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
+            canApplyDiscount: salesUser.canApplyDiscount,
+          }
+        }
+      });
+    } catch (error) {
+      console.error("Sales OTP verify error:", error);
+      return res.status(500).json({ error: "فشل التحقق" });
     }
   });
 
@@ -568,7 +640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
       }
       
-      const { username, password, name, role, canPos, canInventory, canManageUsers, canViewReports, canApplyDiscount, isActive } = req.body;
+      const { username, password, name, email, role, canPos, canInventory, canManageUsers, canViewReports, canApplyDiscount, isActive } = req.body;
       
       if (!username || !password || !name) {
         return res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم مطلوبين" });
@@ -584,6 +656,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username,
         password,
         name,
+        email: email || null,
         role: role || 'sales',
         canPos: canPos ?? 1,
         canInventory: canInventory ?? 0,
@@ -1389,23 +1462,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
       }
 
-      req.session.userId = user.id;
-      
-      return new Promise((resolve) => {
-        req.session.save((err) => {
-          if (err) {
-            console.error("Session save error:", err);
-          }
-          const { password: _, ...userWithoutPassword } = user;
-          resolve(res.json(userWithoutPassword));
-        });
-      });
+      // Customers always have email — send OTP
+      const otp = generateOTP();
+      storeOTP(`customer:${validatedData.email}`, otp);
+      try {
+        await sendOTPEmail(validatedData.email, otp, "بوابة العملاء");
+      } catch (emailErr) {
+        console.error("Failed to send customer OTP email:", emailErr);
+        return res.status(500).json({ error: "فشل إرسال رمز التحقق" });
+      }
+      return res.json({ step: "otp", maskedEmail: validatedData.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
       }
       console.error("Error logging in:", error);
       return res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const { email, otp } = req.body;
+      if (!email || !otp) return res.status(400).json({ error: "البيانات غير مكتملة" });
+
+      if (!verifyOTP(`customer:${email}`, otp)) {
+        return res.status(401).json({ error: "رمز التحقق غير صحيح أو منتهي الصلاحية" });
+      }
+
+      const user = await storage.getUserByEmail(email);
+      if (!user) return res.status(401).json({ error: "المستخدم غير موجود" });
+
+      req.session.userId = user.id;
+      return new Promise((resolve) => {
+        req.session.save((err) => {
+          if (err) console.error("Session save error:", err);
+          const { password: _, ...userWithoutPassword } = user;
+          resolve(res.json(userWithoutPassword));
+        });
+      });
+    } catch (error) {
+      console.error("Customer OTP verify error:", error);
+      return res.status(500).json({ error: "فشل التحقق" });
     }
   });
 
@@ -2637,7 +2735,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
       }
 
-      // Store technician session
+      if (technician.email) {
+        const otp = generateOTP();
+        storeOTP(`technician:${validatedData.username}`, otp);
+        try {
+          await sendOTPEmail(technician.email, otp, "بوابة الفنيين");
+        } catch (emailErr) {
+          console.error("Failed to send technician OTP email:", emailErr);
+          return res.status(500).json({ error: "فشل إرسال رمز التحقق" });
+        }
+        return res.json({ step: "otp", maskedEmail: technician.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
+      }
+
+      // No email — log in directly
       (req.session as any).technicianId = technician.id;
       (req.session as any).technicianUsername = technician.username;
       (req.session as any).technicianIsAdmin = technician.isAdmin;
@@ -2645,9 +2755,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return new Promise((resolve) => {
         req.session.save((err) => {
-          if (err) {
-            console.error("Session save error:", err);
-          }
+          if (err) console.error("Session save error:", err);
           const { password: _, ...technicianWithoutPassword } = technician;
           resolve(res.json(technicianWithoutPassword));
         });
@@ -2658,6 +2766,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error logging in technician:", error);
       return res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/technician/auth/verify-otp", async (req, res) => {
+    try {
+      const { username, otp } = req.body;
+      if (!username || !otp) return res.status(400).json({ error: "البيانات غير مكتملة" });
+
+      if (!verifyOTP(`technician:${username}`, otp)) {
+        return res.status(401).json({ error: "رمز التحقق غير صحيح أو منتهي الصلاحية" });
+      }
+
+      const technician = await storage.getTechnicianByUsername(username);
+      if (!technician || !technician.isActive) return res.status(401).json({ error: "الحساب غير موجود" });
+
+      (req.session as any).technicianId = technician.id;
+      (req.session as any).technicianUsername = technician.username;
+      (req.session as any).technicianIsAdmin = technician.isAdmin;
+      (req.session as any).technicianPermissions = technician.permissions;
+
+      return new Promise((resolve) => {
+        req.session.save((err) => {
+          if (err) console.error("Session save error:", err);
+          const { password: _, ...technicianWithoutPassword } = technician;
+          resolve(res.json(technicianWithoutPassword));
+        });
+      });
+    } catch (error) {
+      console.error("Technician OTP verify error:", error);
+      return res.status(500).json({ error: "فشل التحقق" });
     }
   });
 
@@ -2739,6 +2877,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: z.string().min(3, "اسم المستخدم يجب أن يكون 3 أحرف على الأقل"),
         password: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
         displayName: z.string().min(2, "الاسم يجب أن يكون حرفين على الأقل"),
+        email: z.string().email().optional().nullable(),
         isAdmin: z.boolean().optional().default(false),
         permissions: z.array(z.string()).optional().default([]),
       });
@@ -2777,6 +2916,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: z.string().min(3).optional(),
         password: z.string().min(6).optional(),
         displayName: z.string().min(2).optional(),
+        email: z.string().email().optional().nullable(),
         isAdmin: z.boolean().optional(),
         isActive: z.boolean().optional(),
         permissions: z.array(z.string()).optional(),
@@ -3587,23 +3727,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!validPassword) {
         return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
       }
+
+      if (user.email) {
+        const otp = generateOTP();
+        storeOTP(`battery:${username}`, otp);
+        try {
+          await sendOTPEmail(user.email, otp, "بوابة البطاريات");
+        } catch (emailErr) {
+          console.error("Failed to send battery OTP email:", emailErr);
+          return res.status(500).json({ error: "فشل إرسال رمز التحقق" });
+        }
+        return res.json({ step: "otp", maskedEmail: user.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
+      }
       
-      // Set battery session
+      // No email — log in directly
       (req.session as any).batteryUserId = user.id;
       (req.session as any).batteryUsername = user.username;
       
       return res.json({ 
         success: true, 
-        user: { 
-          id: user.id, 
-          username: user.username, 
-          name: user.name, 
-          role: user.role 
-        } 
+        user: { id: user.id, username: user.username, name: user.name, role: user.role } 
       });
     } catch (error) {
       console.error("Battery login error:", error);
       return res.status(500).json({ error: "خطأ في تسجيل الدخول" });
+    }
+  });
+
+  app.post("/api/battery/auth/verify-otp", async (req, res) => {
+    try {
+      const { username, otp } = req.body;
+      if (!username || !otp) return res.status(400).json({ error: "البيانات غير مكتملة" });
+
+      if (!verifyOTP(`battery:${username}`, otp)) {
+        return res.status(401).json({ error: "رمز التحقق غير صحيح أو منتهي الصلاحية" });
+      }
+
+      const user = await storage.getBatteryUserByUsername(username);
+      if (!user || user.isActive !== 1) return res.status(401).json({ error: "الحساب غير موجود" });
+
+      (req.session as any).batteryUserId = user.id;
+      (req.session as any).batteryUsername = user.username;
+
+      return res.json({ 
+        success: true, 
+        user: { id: user.id, username: user.username, name: user.name, role: user.role }
+      });
+    } catch (error) {
+      console.error("Battery OTP verify error:", error);
+      return res.status(500).json({ error: "فشل التحقق" });
     }
   });
   
@@ -5453,6 +5625,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
           messageEn: shop.subscriptionStatus === 'suspended' ? 'Your shop account has been suspended. Contact support.' : 'Your shop subscription has expired. Contact support to renew.',
         });
       }
+
+      if (shop.email) {
+        const otp = generateOTP();
+        storeOTP(`saas:${username}`, otp);
+        try {
+          await sendOTPEmail(shop.email, otp, "بوابة المتجر");
+        } catch (emailErr) {
+          console.error("Failed to send saas OTP email:", emailErr);
+          return res.status(500).json({ error: "فشل إرسال رمز التحقق" });
+        }
+        return res.json({ step: "otp", maskedEmail: shop.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
+      }
+
+      req.session.saasShopId = shop.id;
+      req.session.saasShopName = shop.shopName;
+      req.session.saasUsername = shop.username;
+      req.session.saasIsOwner = true;
+      await req.session.save();
+      const { password: _pw, ...safeShop } = shop;
+      return res.json({ shop: safeShop });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post('/api/saas/auth/verify-otp', async (req: any, res: any) => {
+    try {
+      const { username, otp } = req.body;
+      if (!username || !otp) return res.status(400).json({ error: 'البيانات غير مكتملة' });
+
+      if (!verifyOTP(`saas:${username}`, otp)) {
+        return res.status(401).json({ error: 'رمز التحقق غير صحيح أو منتهي الصلاحية' });
+      }
+
+      const shop = await storage.getSaasShopByUsername(username);
+      if (!shop) return res.status(401).json({ error: 'الحساب غير موجود' });
+
       req.session.saasShopId = shop.id;
       req.session.saasShopName = shop.shopName;
       req.session.saasUsername = shop.username;

@@ -17,7 +17,7 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
 -   **Frontend**: React 18 with TypeScript and Vite, using Wouter for client-side routing. TanStack Query manages server state and caching.
 -   **Backend**: Express.js with TypeScript, providing a RESTful API for products, categories, cart, and orders.
 -   **Database**: PostgreSQL (Neon serverless) with Drizzle ORM for schema definition and operations.
--   **Authentication**: Session-based authentication for customers and administrators, using bcrypt for password hashing and PostgreSQL for session storage.
+-   **Authentication**: Session-based authentication for customers and administrators, using bcrypt for password hashing and PostgreSQL for session storage. All 6 portals support optional OTP (one-time password) two-factor authentication via email using Resend. If a user account has an `email` field set, after successful credential verification an OTP is generated, emailed, and must be entered to complete login. Users without emails bypass OTP. The OTP logic is in `server/otp.ts` (in-memory Map, 10-minute expiry, single-use). Email is sent via `server/resend-client.ts` using the Replit Resend connector.
 -   **Real-time Notifications**: WebSocket-based system for new order notifications to the admin dashboard.
 -   **Email Notifications**: Automated, Arabic-formatted order confirmation emails via Gmail SMTP.
 -   **Internationalization (i18n)**: `LanguageContext` for UI text translation, supporting Arabic and English with dynamic RTL/LTR adjustment. Language switcher button available on all pages including admin portal (via AdminNav), battery portal (dashboard, manage, POS, reports), and sales portal.
@@ -97,6 +97,6 @@ The design prioritizes an RTL-first layout with Arabic-first content and Arabic 
 -   **Form Management**: react-hook-form, zod.
 -   **Routing**: wouter.
 -   **Session Management**: express-session, connect-pg-simple.
--   **Email**: nodemailer.
+-   **Email**: nodemailer, Resend (via Replit connector — for OTP delivery).
 -   **Payment Gateways**: ZainCash, QiCard.
 -   **Replit-Specific Integrations**: @replit/vite-plugin-runtime-error-modal, @replit/vite-plugin-cartographer, @replit/vite-plugin-dev-banner.

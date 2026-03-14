@@ -25,6 +25,7 @@ export const adminUsers = pgTable("admin_users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  email: text("email"),
   role: text("role").notNull().default("admin"), // admin, manager, editor
   // Permissions (1 = allowed, 0 = not allowed)
   canOrders: integer("can_orders").notNull().default(1), // View/manage orders
@@ -55,6 +56,7 @@ export const salesUsers = pgTable("sales_users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  email: text("email"),
   role: text("role").notNull().default("sales"), // sales, sales_admin
   // Permissions
   canPos: integer("can_pos").notNull().default(1), // Access to POS
@@ -404,6 +406,7 @@ export const technicians = pgTable("technicians", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   displayName: text("display_name").notNull(),
+  email: text("email"),
   isAdmin: integer("is_admin").notNull().default(0),
   isActive: integer("is_active").notNull().default(1),
   permissions: jsonb("permissions").notNull().default([]),
@@ -572,6 +575,7 @@ export const batteryUsers = pgTable("battery_users", {
   username: text("username").notNull().unique(),
   password: text("password").notNull(),
   name: text("name").notNull(),
+  email: text("email"),
   role: text("role").notNull().default("staff"), // staff, admin
   isActive: integer("is_active").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -860,6 +864,7 @@ export const saasShops = pgTable("saas_shops", {
   shopName: text("shop_name").notNull(),
   ownerName: text("owner_name").notNull(),
   phone: text("phone").notNull(),
+  email: text("email"),
   city: text("city").notNull().default(""),
   username: text("username").notNull().unique(),
   password: text("password").notNull(),

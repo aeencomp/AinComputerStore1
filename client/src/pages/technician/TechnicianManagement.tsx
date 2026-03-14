@@ -19,6 +19,7 @@ interface Technician {
   id: string;
   username: string;
   displayName: string;
+  email?: string;
   isAdmin: number;
   isActive: number;
   permissions: string[];
@@ -44,6 +45,7 @@ export default function TechnicianManagement() {
     username: '',
     password: '',
     displayName: '',
+    email: '',
     isAdmin: false,
     permissions: [] as string[],
   });
@@ -145,6 +147,7 @@ export default function TechnicianManagement() {
       username: '',
       password: '',
       displayName: '',
+      email: '',
       isAdmin: false,
       permissions: [],
     });
@@ -161,6 +164,7 @@ export default function TechnicianManagement() {
       username: technician.username,
       password: '',
       displayName: technician.displayName,
+      email: technician.email || '',
       isAdmin: technician.isAdmin === 1,
       permissions: technician.permissions || [],
     });
@@ -173,6 +177,7 @@ export default function TechnicianManagement() {
       const updateData: any = {
         username: formData.username,
         displayName: formData.displayName,
+        email: formData.email || null,
         isAdmin: formData.isAdmin,
         permissions: formData.permissions,
       };
@@ -241,6 +246,18 @@ export default function TechnicianManagement() {
           required
           minLength={2}
           data-testid="input-technician-form-displayname"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="email">{language === 'ar' ? 'البريد الإلكتروني (للتحقق بكلمة مرور OTP)' : 'Email (for OTP verification)'}</Label>
+        <Input
+          id="email"
+          type="email"
+          value={formData.email}
+          onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+          placeholder={language === 'ar' ? 'اختياري' : 'Optional'}
+          data-testid="input-technician-form-email"
         />
       </div>
       

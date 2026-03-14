@@ -28,6 +28,7 @@ interface SalesUser {
   id: string;
   username: string;
   name: string;
+  email?: string;
   role: string;
   canPos: number;
   canInventory: number;
@@ -59,6 +60,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     username: "",
     password: "",
     name: "",
+    email: "",
     role: "sales",
     canPos: 1,
     canInventory: 0,
@@ -124,6 +126,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       username: "",
       password: "",
       name: "",
+      email: "",
       role: "sales",
       canPos: 1,
       canInventory: 0,
@@ -140,6 +143,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       username: u.username,
       password: "",
       name: u.name,
+      email: u.email || "",
       role: u.role,
       canPos: u.canPos,
       canInventory: u.canInventory,
@@ -233,6 +237,16 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                     data-testid="input-new-password"
                   />
                 </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'البريد الإلكتروني (للتحقق بكلمة مرور OTP)' : 'Email (for OTP verification)'}</Label>
+                <Input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder={language === 'ar' ? 'اختياري' : 'Optional'}
+                  data-testid="input-new-email"
+                />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

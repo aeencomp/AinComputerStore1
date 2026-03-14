@@ -8,15 +8,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { ShoppingCart, User, Lock, Loader2 } from "lucide-react";
+import { ShoppingCart, User, Lock, Loader2, Mail, ShieldCheck } from "lucide-react";
 
 export default function SalesLogin() {
   const { language } = useLanguage();
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const [step, setStep] = useState<"credentials" | "otp">("credentials");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [otp, setOtp] = useState("");
+  const [maskedEmail, setMaskedEmail] = useState("");
 
   const { data: currentUser, isLoading: authLoading } = useQuery({
     queryKey: ['/api/sales/auth/me'],
@@ -28,28 +31,39 @@ export default function SalesLogin() {
       const res = await apiRequest('POST', '/api/sales/auth/login', data);
       return res.json();
     },
+    onSuccess: (data) => {
+      if (data.step === "otp") {
+        setMaskedEmail(data.maskedEmail || "");
+        setStep("otp");
+        toast({ title: language === 'ar' ? 'تم إرسال رمز التحقق' : 'OTP Sent', description: `${data.maskedEmail}` });
+      } else {
+        queryClient.invalidateQueries({ queryKey: ['/api/sales/auth/me'] });
+        toast({ title: language === 'ar' ? 'تم تسجيل الدخول بنجاح' : 'Login successful' });
+        setLocation("/sales");
+      }
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const verifyOtpMutation = useMutation({
+    mutationFn: async (data: { username: string; otp: string }) => {
+      const res = await apiRequest('POST', '/api/sales/auth/verify-otp', data);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/sales/auth/me'] });
-      toast({
-        title: language === 'ar' ? 'تم تسجيل الدخول بنجاح' : 'Login successful',
-      });
+      toast({ title: language === 'ar' ? 'تم تسجيل الدخول بنجاح' : 'Login successful' });
       setLocation("/sales");
     },
     onError: (error: any) => {
-      toast({
-        title: language === 'ar' ? 'فشل تسجيل الدخول' : 'Login failed',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: language === 'ar' ? 'رمز التحقق غير صحيح' : 'Invalid OTP', description: error.message, variant: 'destructive' });
     },
   });
 
   if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
+    return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   if (currentUser) {
@@ -57,78 +71,52 @@ export default function SalesLogin() {
     return null;
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    loginMutation.mutate({ username, password });
-  };
-
   return (
     <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <Card className="w-full max-w-md">
         <CardHeader className="text-center space-y-4">
           <div className="mx-auto w-16 h-16 bg-primary rounded-full flex items-center justify-center">
-            <ShoppingCart className="h-8 w-8 text-primary-foreground" />
+            {step === "otp" ? <ShieldCheck className="h-8 w-8 text-primary-foreground" /> : <ShoppingCart className="h-8 w-8 text-primary-foreground" />}
           </div>
-          <CardTitle className="text-2xl">
-            {language === 'ar' ? 'بوابة المبيعات' : 'Sales Portal'}
-          </CardTitle>
+          <CardTitle className="text-2xl">{language === 'ar' ? 'بوابة المبيعات' : 'Sales Portal'}</CardTitle>
           <p className="text-muted-foreground text-sm">
-            {language === 'ar' ? 'تسجيل الدخول للوصول إلى نقطة البيع' : 'Login to access Point of Sale'}
+            {step === "otp"
+              ? (language === 'ar' ? `أدخل رمز التحقق المرسل إلى ${maskedEmail}` : `Enter OTP sent to ${maskedEmail}`)
+              : (language === 'ar' ? 'تسجيل الدخول للوصول إلى نقطة البيع' : 'Login to access Point of Sale')}
           </p>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="username" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                {language === 'ar' ? 'اسم المستخدم' : 'Username'}
-              </Label>
-              <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder={language === 'ar' ? 'أدخل اسم المستخدم' : 'Enter username'}
-                required
-                data-testid="input-sales-username"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                {language === 'ar' ? 'كلمة المرور' : 'Password'}
-              </Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={language === 'ar' ? 'أدخل كلمة المرور' : 'Enter password'}
-                required
-                data-testid="input-sales-password"
-              />
-            </div>
-            <Button 
-              type="submit" 
-              className="w-full" 
-              disabled={loginMutation.isPending}
-              data-testid="button-sales-login"
-            >
-              {loginMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                language === 'ar' ? 'تسجيل الدخول' : 'Login'
-              )}
-            </Button>
-          </form>
+          {step === "credentials" ? (
+            <form onSubmit={(e) => { e.preventDefault(); loginMutation.mutate({ username, password }); }} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="username" className="flex items-center gap-2"><User className="h-4 w-4" />{language === 'ar' ? 'اسم المستخدم' : 'Username'}</Label>
+                <Input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder={language === 'ar' ? 'أدخل اسم المستخدم' : 'Enter username'} required data-testid="input-sales-username" disabled={loginMutation.isPending} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password" className="flex items-center gap-2"><Lock className="h-4 w-4" />{language === 'ar' ? 'كلمة المرور' : 'Password'}</Label>
+                <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder={language === 'ar' ? 'أدخل كلمة المرور' : 'Enter password'} required data-testid="input-sales-password" disabled={loginMutation.isPending} />
+              </div>
+              <Button type="submit" className="w-full" disabled={loginMutation.isPending} data-testid="button-sales-login">
+                {loginMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (language === 'ar' ? 'تسجيل الدخول' : 'Login')}
+              </Button>
+            </form>
+          ) : (
+            <form onSubmit={(e) => { e.preventDefault(); verifyOtpMutation.mutate({ username, otp }); }} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="otp" className="flex items-center gap-2"><Mail className="h-4 w-4" />{language === 'ar' ? 'رمز التحقق' : 'OTP Code'}</Label>
+                <Input id="otp" type="text" inputMode="numeric" value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder={language === 'ar' ? 'أدخل الرمز المكون من 6 أرقام' : 'Enter 6-digit code'} maxLength={6} className="text-center text-xl tracking-widest" autoFocus data-testid="input-sales-otp" disabled={verifyOtpMutation.isPending} />
+              </div>
+              <Button type="submit" className="w-full" disabled={verifyOtpMutation.isPending} data-testid="button-sales-verify-otp">
+                {verifyOtpMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : (language === 'ar' ? 'تأكيد الرمز' : 'Verify Code')}
+              </Button>
+              <Button type="button" variant="ghost" className="w-full" onClick={() => { setStep("credentials"); setOtp(""); }} data-testid="button-sales-back">
+                {language === 'ar' ? 'العودة' : 'Back'}
+              </Button>
+            </form>
+          )}
           <div className="mt-4 text-center text-sm text-muted-foreground">
-            {language === 'ar' 
-              ? 'للوصول إلى لوحة الإدارة الرئيسية، استخدم' 
-              : 'For main admin dashboard, use'}
-            {' '}
-            <a href="/admin/login" className="text-primary hover:underline">
-              {language === 'ar' ? 'تسجيل دخول المدير' : 'Admin Login'}
-            </a>
+            {language === 'ar' ? 'للوصول إلى لوحة الإدارة الرئيسية، استخدم' : 'For main admin dashboard, use'}{' '}
+            <a href="/admin/login" className="text-primary hover:underline">{language === 'ar' ? 'تسجيل دخول المدير' : 'Admin Login'}</a>
           </div>
         </CardContent>
       </Card>
