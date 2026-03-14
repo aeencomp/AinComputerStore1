@@ -16,6 +16,7 @@ import {
   Banknote,
   CreditCard,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -563,11 +564,12 @@ export default function DailyReport({ user }: DailyReportProps) {
   const today = format(new Date(), "yyyy-MM-dd");
   const [selectedDate, setSelectedDate] = useState(today);
 
-  const { data, isLoading } = useQuery<DailyReportData>({
+  const { data, isLoading, isFetching, refetch } = useQuery<DailyReportData>({
     queryKey: ["/api/daily-report", selectedDate],
     queryFn: () =>
       fetch(`/api/daily-report?date=${selectedDate}`, { credentials: "include" })
         .then((r) => r.json()),
+    staleTime: 0,
   });
 
   const displayDate = selectedDate
@@ -609,6 +611,16 @@ export default function DailyReport({ user }: DailyReportProps) {
               className="ps-9 pe-3 py-2 text-sm border rounded-md bg-background focus:outline-none focus:ring-2 focus:ring-primary"
             />
           </div>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => refetch()}
+            disabled={isFetching}
+            data-testid="button-refresh-report"
+            title={language === "ar" ? "تحديث" : "Refresh"}
+          >
+            <RefreshCw className={`h-4 w-4 ${isFetching ? "animate-spin" : ""}`} />
+          </Button>
           <Button
             onClick={handlePrint}
             disabled={!data || isLoading}
