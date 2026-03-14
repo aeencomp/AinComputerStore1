@@ -2057,6 +2057,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
           data: order,
           deletedBy: 'admin',
         });
+
+        // Restore inventory for completed in-store / walk-in orders
+        const isPosOrder = order.orderType === 'walk-in' || order.orderType === 'in-store';
+        if (isPosOrder && order.items && order.items.length > 0) {
+          for (const rawItem of order.items) {
+            try {
+              const item = typeof rawItem === 'string' ? JSON.parse(rawItem) : rawItem;
+              const qty = parseInt(item.quantity) || 1;
+              if (item.productSource === 'battery' && item.batteryId) {
+                await db.update(laptopBatteries)
+                  .set({ stockQuantity: sql`stock_quantity + ${qty}` })
+                  .where(eq(laptopBatteries.id, item.batteryId));
+              } else if (item.productSource === 'adapter' && item.adapterId) {
+                await db.update(acAdapters)
+                  .set({ stockQuantity: sql`stock_quantity + ${qty}` })
+                  .where(eq(acAdapters.id, item.adapterId));
+              } else if (item.productSource === 'instore' && item.productId) {
+                await storage.adjustInStoreProductStock(parseInt(item.productId), qty);
+              } else if (item.productId && isNaN(parseInt(item.productId))) {
+                // UUID productId = regular product stock
+                await storage.adjustProductStock(item.productId, qty, undefined, `Void order ${order.orderNumber}`, order.orderNumber);
+              }
+            } catch (itemErr) {
+              console.error(`Failed to restore stock for item in order ${order.orderNumber}:`, itemErr);
+            }
+          }
+        }
       }
       await storage.deleteOrder(id);
       return res.json({ success: true });
