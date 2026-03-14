@@ -676,37 +676,26 @@ export default function DailyReport({ user }: DailyReportProps) {
 
             <Card className="col-span-2 border-primary/30">
               <CardContent className="pt-4 pb-3">
-                {(data.summary.totalWithdrawals ?? 0) > 0 ? (
-                  <>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      {language === "ar" ? "صافي الإيراد اليومي" : "Net Daily Revenue"}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mb-1">
-                      <span className="text-sm text-muted-foreground line-through" data-testid="text-grand-total">
-                        {fmtNum(data.summary.grandTotal)}
-                      </span>
-                      <span className="text-sm font-medium text-orange-600 dark:text-orange-400 flex items-center gap-1">
-                        <TrendingDown className="h-3.5 w-3.5" />
-                        - {fmtNum(data.summary.totalWithdrawals)}
-                        <span className="font-normal text-xs text-muted-foreground">
-                          ({data.summary.withdrawalCount} {language === "ar" ? "سحب" : "withdrawal"})
-                        </span>
-                      </span>
-                    </div>
-                    <p className="text-2xl font-bold text-primary" data-testid="text-net-total">
-                      {fmtNum(data.summary.netTotal)}
-                    </p>
-                  </>
-                ) : (
-                  <>
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {language === "ar" ? "الإجمالي المحصّل" : "Grand Total"}
-                    </p>
-                    <p className="text-2xl font-bold text-primary" data-testid="text-grand-total">
+                <p className="text-xs text-muted-foreground mb-1">
+                  {language === "ar" ? "صافي الإيراد اليومي" : "Net Daily Revenue"}
+                </p>
+                {data.summary.totalWithdrawals > 0 && (
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mb-1">
+                    <span className="text-sm text-muted-foreground line-through" data-testid="text-grand-total">
                       {fmtNum(data.summary.grandTotal)}
-                    </p>
-                  </>
+                    </span>
+                    <span className="text-sm font-medium text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                      <TrendingDown className="h-3.5 w-3.5" />
+                      - {fmtNum(data.summary.totalWithdrawals)}
+                      <span className="font-normal text-xs text-muted-foreground">
+                        ({data.summary.withdrawalCount} {language === "ar" ? "سحب" : "withdrawal"})
+                      </span>
+                    </span>
+                  </div>
                 )}
+                <p className="text-2xl font-bold text-primary" data-testid="text-net-total">
+                  {fmtNum(data.summary.grandTotal - (data.summary.totalWithdrawals ?? 0))}
+                </p>
                 <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
                   {data.summary.grandTotalCash > 0 && (
                     <span className="flex items-center gap-1">

@@ -6368,6 +6368,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const repairTotalZain = 0;
       const repairTotalQi = 0;
 
+      res.set('Cache-Control', 'no-store');
       res.json({
         date: targetDate.toISOString(),
         inStoreSales: inStoreOrders,
