@@ -428,6 +428,91 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Centralized portal user management — GET all users from all portals
+  app.get("/api/admin/portal-users", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) return res.status(401).json({ error: "غير مصرح" });
+      const caller = await storage.getAdminUser(adminId);
+      if (!caller) return res.status(401).json({ error: "غير مصرح" });
+
+      const [admins, salesUsers, technicians, batteryUsers, saasShops] = await Promise.all([
+        storage.getAdminUsers(),
+        storage.getSalesUsers(),
+        storage.getTechnicians(),
+        storage.getBatteryUsers(),
+        storage.getSaasShops(),
+      ]);
+
+      // Fetch saas users for each shop
+      const saasUsersAll: any[] = [];
+      for (const shop of saasShops) {
+        const users = await storage.getSaasUsersByShop(shop.id);
+        for (const u of users) {
+          saasUsersAll.push({
+            id: String(u.id), username: u.username, displayName: u.username,
+            email: (u as any).email || null, portal: 'saas',
+            portalLabel: shop.shopName, shopId: shop.id,
+          });
+        }
+      }
+
+      return res.json({
+        admins: admins.map(u => ({ id: u.id, username: u.username, displayName: u.name, email: (u as any).email || null, portal: 'admin', role: u.role })),
+        salesUsers: salesUsers.map(u => ({ id: u.id, username: u.username, displayName: u.name, email: u.email || null, portal: 'sales', role: u.role })),
+        technicians: technicians.map(u => ({ id: u.id, username: u.username, displayName: u.displayName, email: u.email || null, portal: 'technician', isAdmin: u.isAdmin })),
+        batteryUsers: batteryUsers.map(u => ({ id: u.id, username: u.username, displayName: u.username, email: u.email || null, portal: 'battery' })),
+        saasUsers: saasUsersAll,
+        saasShops: saasShops.map(s => ({ id: String(s.id), username: s.ownerUsername, displayName: s.shopName, email: (s as any).email || null, portal: 'saasShop' })),
+      });
+    } catch (error) {
+      console.error("Error fetching portal users:", error);
+      return res.status(500).json({ error: "فشل جلب المستخدمين" });
+    }
+  });
+
+  // Centralized portal user management — PATCH email/password for a specific portal user
+  app.patch("/api/admin/portal-users/:portal/:id", async (req, res) => {
+    try {
+      const adminId = (req.session as any).adminId;
+      if (!adminId) return res.status(401).json({ error: "غير مصرح" });
+      const caller = await storage.getAdminUser(adminId);
+      if (!caller) return res.status(401).json({ error: "غير مصرح" });
+
+      const { portal, id } = req.params;
+      const { email, password } = req.body;
+      const emailVal = email === '' ? null : (email || null);
+
+      const updateData: any = { email: emailVal };
+      if (password && password.length >= 6) {
+        updateData.password = await bcrypt.hash(password, 10);
+      }
+
+      let updated: any;
+      if (portal === 'admin') {
+        updated = await storage.updateAdminUser(id, updateData);
+      } else if (portal === 'sales') {
+        updated = await storage.updateSalesUser(id, updateData);
+      } else if (portal === 'technician') {
+        updated = await storage.updateTechnician(id, updateData);
+      } else if (portal === 'battery') {
+        updated = await storage.updateBatteryUser(id, updateData);
+      } else if (portal === 'saasShop') {
+        updated = await storage.updateSaasShop(parseInt(id), updateData);
+      } else if (portal === 'saas') {
+        updated = await storage.updateSaasUser(parseInt(id), updateData);
+      } else {
+        return res.status(400).json({ error: "نوع البوابة غير معروف" });
+      }
+
+      if (!updated) return res.status(404).json({ error: "المستخدم غير موجود" });
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error updating portal user:", error);
+      return res.status(500).json({ error: "فشل تحديث المستخدم" });
+    }
+  });
+
   app.put("/api/admin/auth/change-password", async (req, res) => {
     try {
       const adminId = (req.session as any).adminId;
