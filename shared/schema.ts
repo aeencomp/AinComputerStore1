@@ -382,6 +382,7 @@ export const repairTickets = pgTable("repair_tickets", {
   costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
   finalCost: decimal("final_cost", { precision: 10, scale: 2 }),
   paymentStatus: text("payment_status").default("unpaid"), // unpaid, paid, deferred
+  paymentMethod: text("payment_method").default("cash"), // cash, card
   userId: varchar("user_id"), // optional - if customer has account
   isArchived: integer("is_archived").notNull().default(0),
   completedAt: timestamp("completed_at"),
@@ -948,6 +949,7 @@ export const saasRepairTickets = pgTable("saas_repair_tickets", {
   costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
   finalCost: decimal("final_cost", { precision: 10, scale: 2 }),
   paymentStatus: text("payment_status").default("unpaid"),
+  paymentMethod: text("payment_method").default("cash"), // cash, card
   isArchived: integer("is_archived").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

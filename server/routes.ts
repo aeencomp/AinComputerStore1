@@ -2643,6 +2643,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.paymentStatus !== undefined) {
         updateData.paymentStatus = req.body.paymentStatus;
       }
+      if (req.body.paymentMethod !== undefined) {
+        updateData.paymentMethod = req.body.paymentMethod;
+      }
       
       const ticket = await storage.updateRepairTicket(id, updateData);
       
@@ -6329,7 +6332,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const repairTotal = paidRepairTickets
         .filter(t => t.paymentStatus !== 'deferred')
         .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
-      const repairTotalCash = repairTotal;
+      const repairTotalCash = paidRepairTickets
+        .filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod))
+        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+      const repairTotalCard = paidRepairTickets
+        .filter(t => t.paymentStatus !== 'deferred' && t.paymentMethod === 'card')
+        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
       const repairTotalZain = 0;
       const repairTotalQi = 0;
 
@@ -6349,12 +6357,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           repairTotal,
           repairTotalDeferred,
           repairTotalCash,
+          repairTotalCard,
           repairTotalZain,
           repairTotalQi,
           totalWithdrawals,
           withdrawalCount: dailyWithdrawals.length,
           grandTotal: inStoreTotal + repairTotal,
           grandTotalCash: inStoreTotalCash + repairTotalCash,
+          grandTotalCard: repairTotalCard,
           grandTotalZain: inStoreTotalZain + repairTotalZain,
           grandTotalQi: inStoreTotalQi + repairTotalQi,
           netTotal: (inStoreTotal + repairTotal) - totalWithdrawals,

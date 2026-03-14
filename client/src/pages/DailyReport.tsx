@@ -47,6 +47,7 @@ interface RepairSale {
   finalCost?: string;
   costEstimate?: string;
   paymentStatus: string;
+  paymentMethod?: string;
   status: string;
   deliveredAt?: string;
   updatedAt: string;
@@ -62,8 +63,11 @@ interface DailyReportSummary {
   repairCount: number;
   repairTotal: number;
   repairTotalDeferred: number;
+  repairTotalCash: number;
+  repairTotalCard: number;
   grandTotal: number;
   grandTotalCash: number;
+  grandTotalCard: number;
   grandTotalZain: number;
   grandTotalQi: number;
   totalWithdrawals: number;
@@ -161,6 +165,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
     const isDelivered = t.status === 'delivered';
     const badgeCls = isDeferred ? 'badge-orange' : isDelivered ? 'badge-delivered' : 'badge-green';
     const badgeTxt = isDeferred ? 'آجل' : isDelivered ? 'مُسلَّم ✓' : 'مدفوع';
+    const methodTxt = !isDeferred ? (t.paymentMethod === 'card' ? ' — بطاقة' : ' — نقداً') : '';
     return `
       <tr style="${isDeferred ? "color:#c2410c" : ""}">
         <td>${i + 1}</td>
@@ -170,7 +175,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
           ${t.customerPhone ? `<br><span style="font-size:11px;color:#666">${t.customerPhone}</span>` : ""}
         </td>
         <td style="color:#666">${t.deviceBrand ? t.deviceBrand + " " : ""}${t.deviceType}</td>
-        <td><span class="badge ${badgeCls}">${badgeTxt}</span></td>
+        <td><span class="badge ${badgeCls}">${badgeTxt}${methodTxt}</span></td>
         <td style="text-align:end;font-weight:600${isDeferred ? ";color:#c2410c" : ""}">${fmtNum(amount)}</td>
       </tr>`;
   }).join("");
@@ -186,6 +191,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
 
   const payBreakdown = [
     summary.grandTotalCash > 0 ? `<div class="breakdown-item"><span class="dot green"></span><span>نقداً</span><strong>${fmtNum(summary.grandTotalCash)}</strong></div>` : "",
+    (summary.grandTotalCard ?? 0) > 0 ? `<div class="breakdown-item"><span class="dot teal"></span><span>بطاقة (صيانة)</span><strong>${fmtNum(summary.grandTotalCard)}</strong></div>` : "",
     summary.grandTotalZain > 0 ? `<div class="breakdown-item"><span class="dot blue"></span><span>ZainCash</span><strong>${fmtNum(summary.grandTotalZain)}</strong></div>` : "",
     summary.grandTotalQi > 0 ? `<div class="breakdown-item"><span class="dot purple"></span><span>QiCard</span><strong>${fmtNum(summary.grandTotalQi)}</strong></div>` : "",
     summary.inStoreTotalDeferred > 0 ? `<div class="breakdown-item"><span class="dot orange"></span><span>آجل (غير محصّل)</span><strong style="color:#c2410c">${fmtNum(summary.inStoreTotalDeferred)}</strong></div>` : "",
@@ -326,6 +332,7 @@ function buildPrintHTML(data: DailyReportData, displayDate: string): string {
     .breakdown-item strong { font-size: 12px; }
     .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
     .dot.green  { background: #16a34a; }
+    .dot.teal   { background: #0d9488; }
     .dot.blue   { background: #2563eb; }
     .dot.purple { background: #7c3aed; }
     .dot.orange { background: #ea580c; }
@@ -647,6 +654,12 @@ export default function DailyReport({ user }: DailyReportProps) {
                       {fmtNum(data.summary.grandTotalCash)} نقداً
                     </span>
                   )}
+                  {(data.summary.grandTotalCard ?? 0) > 0 && (
+                    <span className="flex items-center gap-1">
+                      <CreditCard className="h-3 w-3 text-teal-500" />
+                      {fmtNum(data.summary.grandTotalCard)} {language === "ar" ? "بطاقة" : "Card"}
+                    </span>
+                  )}
                   {data.summary.grandTotalZain > 0 && (
                     <span className="flex items-center gap-1">
                       <CreditCard className="h-3 w-3 text-blue-500" />
@@ -858,12 +871,19 @@ export default function DailyReport({ user }: DailyReportProps) {
                               {ticket.deviceBrand ? `${ticket.deviceBrand} ` : ""}{ticket.deviceType}
                             </td>
                             <td className="py-2 px-4">
-                              {ticket.paymentStatus === 'deferred'
-                                ? <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>
-                                : ticket.status === 'delivered'
-                                  ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم ✓</Badge>
-                                  : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
-                              }
+                              <div className="flex flex-wrap gap-1">
+                                {ticket.paymentStatus === 'deferred'
+                                  ? <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>
+                                  : ticket.status === 'delivered'
+                                    ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم ✓</Badge>
+                                    : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
+                                }
+                                {ticket.paymentStatus !== 'deferred' && (
+                                  <Badge variant="outline" className="text-xs">
+                                    {ticket.paymentMethod === 'card' ? 'بطاقة' : 'نقداً'}
+                                  </Badge>
+                                )}
+                              </div>
                             </td>
                             <td className={`py-2 px-4 text-end font-semibold ${ticket.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
                               {fmtNum(amount)}
@@ -962,6 +982,15 @@ export default function DailyReport({ user }: DailyReportProps) {
                         نقداً
                       </p>
                       <p className="font-semibold text-green-600">{fmtNum(data.summary.grandTotalCash)}</p>
+                    </div>
+                  )}
+                  {(data.summary.grandTotalCard ?? 0) > 0 && (
+                    <div className="text-center">
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        <CreditCard className="h-3 w-3 text-teal-500" />
+                        {language === "ar" ? "بطاقة" : "Card"}
+                      </p>
+                      <p className="font-semibold text-teal-600">{fmtNum(data.summary.grandTotalCard)}</p>
                     </div>
                   )}
                   {data.summary.grandTotalZain > 0 && (

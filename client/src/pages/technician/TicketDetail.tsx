@@ -85,6 +85,7 @@ export default function TicketDetail() {
     costEstimate: z.string().optional(),
     finalCost: z.string().optional(),
     paymentStatus: z.string().optional(),
+    paymentMethod: z.string().optional(),
   }), []);
 
   const cleanPrice = (v: string | null | undefined) => v ? String(parseFloat(v)) : '';
@@ -99,6 +100,7 @@ export default function TicketDetail() {
       costEstimate: cleanPrice(ticket?.costEstimate),
       finalCost: cleanPrice(ticket?.finalCost),
       paymentStatus: ticket?.paymentStatus || 'unpaid',
+      paymentMethod: (ticket as any)?.paymentMethod || 'cash',
     },
   });
 
@@ -113,6 +115,7 @@ export default function TicketDetail() {
         costEstimate: cleanPrice(ticket.costEstimate),
         finalCost: cleanPrice(ticket.finalCost),
         paymentStatus: ticket.paymentStatus || 'unpaid',
+        paymentMethod: (ticket as any).paymentMethod || 'cash',
       });
     }
   }, [ticket, form]);
@@ -280,6 +283,11 @@ export default function TicketDetail() {
       paid: isRTL ? 'مدفوع' : 'Paid',
       deferred: isRTL ? 'أجل' : 'Deferred',
     };
+    const paymentMethodMap: Record<string, string> = {
+      cash: isRTL ? 'نقداً' : 'Cash',
+      card: isRTL ? 'بطاقة' : 'Card',
+    };
+    const ticketPaymentMethod = (ticket as any).paymentMethod || 'cash';
     const intakeDate = format(new Date(ticket.createdAt), 'dd/MM/yyyy');
     const deliveryDate = ticket.deliveredAt
       ? format(new Date(ticket.deliveredAt), 'dd/MM/yyyy')
@@ -318,7 +326,7 @@ export default function TicketDetail() {
           <div class="row"><span class="lbl">${isRTL ? 'المشكلة:' : 'Issue:'}</span><span style="max-width:60%;text-align:end;">${ticket.issueDescriptionAr || ticket.issueDescriptionEn || ''}</span></div>
           <div class="row"><span class="lbl">${isRTL ? 'الحالة:' : 'Status:'}</span><span style="font-weight:900;">${statusMap[ticket.status] || ticket.status}</span></div>
           <div class="row"><span class="lbl">${isRTL ? 'الأولوية:' : 'Priority:'}</span><span>${priorityMap[ticket.priority] || ticket.priority}</span></div>
-          <div class="row"><span class="lbl">${isRTL ? 'الدفع:' : 'Payment:'}</span><span>${paymentMap[ticket.paymentStatus || 'unpaid'] || ticket.paymentStatus}</span></div>
+          <div class="row"><span class="lbl">${isRTL ? 'الدفع:' : 'Payment:'}</span><span>${paymentMap[ticket.paymentStatus || 'unpaid'] || ticket.paymentStatus}${ticket.paymentStatus === 'paid' ? ` — ${paymentMethodMap[ticketPaymentMethod] || ticketPaymentMethod}` : ''}</span></div>
         </div>
         <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ الاستلام:' : 'Intake Date:'}</span><span>${intakeDate}</span></div>
         <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ التسليم:' : 'Delivery Date:'}</span><span>${deliveryDate}</span></div>
@@ -400,6 +408,16 @@ export default function TicketDetail() {
                   }
                 </p>
               </div>
+              {ticket.paymentStatus === 'paid' && (
+                <div>
+                  <Label className="text-muted-foreground">{isRTL ? 'طريقة الدفع' : 'Payment Method'}</Label>
+                  <p className="font-medium" data-testid="text-payment-method">
+                    {(ticket as any).paymentMethod === 'card'
+                      ? (isRTL ? 'بطاقة' : 'Card')
+                      : (isRTL ? 'نقداً' : 'Cash')}
+                  </p>
+                </div>
+              )}
               <div>
                 <Label className="text-muted-foreground">{t('repair.ticket.deviceType')}</Label>
                 <p className="font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</p>
@@ -582,6 +600,29 @@ export default function TicketDetail() {
                       </FormItem>
                     )}
                   />
+                  {form.watch('paymentStatus') === 'paid' && (
+                    <FormField
+                      control={form.control}
+                      name="paymentMethod"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || 'cash'}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-payment-method">
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="cash">{isRTL ? 'نقداً' : 'Cash'}</SelectItem>
+                              <SelectItem value="card">{isRTL ? 'بطاقة' : 'Card'}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
 
                 <FormField

@@ -674,9 +674,16 @@ export default function TechnicianDashboard() {
                       </Badge>
                     )}
                     {ticket.paymentStatus === 'paid' && (
-                      <Badge className="bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs">
-                        {t('repair.payment.paid')}
-                      </Badge>
+                      <>
+                        <Badge className="bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs">
+                          {t('repair.payment.paid')}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {(ticket as any).paymentMethod === 'card'
+                            ? (language === 'ar' ? 'بطاقة' : 'Card')
+                            : (language === 'ar' ? 'نقداً' : 'Cash')}
+                        </Badge>
+                      </>
                     )}
                     {(!ticket.paymentStatus || ticket.paymentStatus === 'unpaid') && (
                       <Badge variant="outline" className="text-muted-foreground text-xs">
