@@ -59,6 +59,11 @@ export function useIntercom() {
       localStreamRef.current.getTracks().forEach(t => t.stop());
       localStreamRef.current = null;
     }
+    if (remoteAudioRef.current) {
+      remoteAudioRef.current.pause();
+      remoteAudioRef.current.srcObject = null;
+      remoteAudioRef.current = null;
+    }
     activePeerRef.current = null;
     setCallStateSync('idle');
     setCaller(null);
@@ -82,12 +87,16 @@ export function useIntercom() {
       }
     };
 
+    const remoteStream = new MediaStream();
     pc.ontrack = (e) => {
+      if (e.track) {
+        remoteStream.addTrack(e.track);
+      }
       if (!remoteAudioRef.current) {
         remoteAudioRef.current = new Audio();
-        remoteAudioRef.current.autoplay = true;
+        remoteAudioRef.current.srcObject = remoteStream;
       }
-      remoteAudioRef.current.srcObject = e.streams[0];
+      remoteAudioRef.current.play().catch(() => {});
     };
 
     pc.onconnectionstatechange = () => {

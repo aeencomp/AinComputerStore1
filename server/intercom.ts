@@ -7,6 +7,7 @@ import type { Duplex } from 'stream';
 interface IntercomClient {
   ws: WebSocket;
   peerId: string;
+  userId: string;
   displayName: string;
   portal: 'admin' | 'sales' | 'technician';
 }
@@ -45,12 +46,13 @@ class IntercomService {
     this.wss = new WebSocketServer({ noServer: true });
 
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
-      const userInfo = (req as any)._intercomUser as { displayName: string; portal: 'admin' | 'sales' | 'technician' };
+      const userInfo = (req as any)._intercomUser as { displayName: string; portal: 'admin' | 'sales' | 'technician'; userId: string };
       const peerId = randomUUID();
 
       const client: IntercomClient = {
         ws,
         peerId,
+        userId: userInfo.userId,
         displayName: userInfo.displayName,
         portal: userInfo.portal,
       };
@@ -125,7 +127,21 @@ class IntercomService {
         type === 'offer' || type === 'answer' || type === 'ice-candidate' || type === 'call-end') {
       const target = this.clients.get(targetId);
       const sender = this.clients.get(fromPeerId);
-      if (target && sender && target.ws.readyState === WebSocket.OPEN) {
+      if (!target || !sender) return;
+
+      if (type === 'call-request') {
+        for (const c of this.clients.values()) {
+          if (c.userId === target.userId && c.portal === target.portal && c.ws.readyState === WebSocket.OPEN) {
+            c.ws.send(JSON.stringify({
+              type,
+              fromPeerId,
+              fromName: sender.displayName,
+              fromPortal: sender.portal,
+              ...payload,
+            }));
+          }
+        }
+      } else if (target.ws.readyState === WebSocket.OPEN) {
         target.ws.send(JSON.stringify({
           type,
           fromPeerId,
@@ -138,11 +154,15 @@ class IntercomService {
   }
 
   private broadcastPresence() {
-    const users = Array.from(this.clients.values()).map(c => ({
-      peerId: c.peerId,
-      displayName: c.displayName,
-      portal: c.portal,
-    }));
+    const seen = new Set<string>();
+    const users: { peerId: string; displayName: string; portal: string }[] = [];
+    for (const c of this.clients.values()) {
+      const key = `${c.userId}:${c.portal}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        users.push({ peerId: c.peerId, displayName: c.displayName, portal: c.portal });
+      }
+    }
 
     const message = JSON.stringify({ type: 'presence', users });
     this.clients.forEach(client => {
@@ -152,7 +172,7 @@ class IntercomService {
     });
   }
 
-  private async resolveSession(sessionId: string): Promise<{ displayName: string; portal: 'admin' | 'sales' | 'technician' } | null> {
+  private async resolveSession(sessionId: string): Promise<{ displayName: string; portal: 'admin' | 'sales' | 'technician'; userId: string } | null> {
     try {
       if (!this.sql) return null;
       const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
@@ -161,17 +181,17 @@ class IntercomService {
 
       if (session?.adminId) {
         const admins = await this.sql`SELECT name FROM admin_users WHERE id = ${session.adminId}`;
-        return { displayName: admins[0]?.name || 'Admin', portal: 'admin' };
+        return { displayName: admins[0]?.name || 'Admin', portal: 'admin', userId: session.adminId };
       }
 
       if (session?.salesUserId) {
         const users = await this.sql`SELECT name FROM sales_users WHERE id = ${session.salesUserId}`;
-        return { displayName: users[0]?.name || 'Sales', portal: 'sales' };
+        return { displayName: users[0]?.name || 'Sales', portal: 'sales', userId: session.salesUserId };
       }
 
       if (session?.technicianId) {
         const techs = await this.sql`SELECT display_name FROM technicians WHERE id = ${session.technicianId}`;
-        return { displayName: techs[0]?.display_name || 'Technician', portal: 'technician' };
+        return { displayName: techs[0]?.display_name || 'Technician', portal: 'technician', userId: session.technicianId };
       }
 
       return null;
