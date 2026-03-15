@@ -749,7 +749,7 @@ export default function TechnicianDashboard() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
-      <IntercomWidget />
+      <IntercomWidget portal="technician" />
     </div>
   );
 }

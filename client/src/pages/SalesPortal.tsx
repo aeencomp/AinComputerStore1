@@ -477,7 +477,7 @@ export default function SalesPortal() {
         {location === "/sales/reports" && <SalesReports user={currentUser} />}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}
       </main>
-      <IntercomWidget />
+      <IntercomWidget portal="sales" />
     </div>
   );
 }

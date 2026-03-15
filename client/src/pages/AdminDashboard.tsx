@@ -1657,7 +1657,7 @@ export default function AdminDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      <IntercomWidget />
+      <IntercomWidget portal="admin" />
     </div>
   );
 }

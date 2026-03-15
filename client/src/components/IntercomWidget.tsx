@@ -30,7 +30,11 @@ function portalColor(portal: string): string {
   }
 }
 
-export function IntercomWidget() {
+interface IntercomWidgetProps {
+  portal: 'admin' | 'sales' | 'technician';
+}
+
+export function IntercomWidget({ portal }: IntercomWidgetProps) {
   const { language } = useLanguage();
   const {
     onlineUsers,
@@ -44,7 +48,7 @@ export function IntercomWidget() {
     declineCall,
     endCall,
     toggleMute,
-  } = useIntercom();
+  } = useIntercom(portal);
   const [expanded, setExpanded] = useState(false);
 
   const otherUsers = onlineUsers;

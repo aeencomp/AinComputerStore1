@@ -91,6 +91,13 @@ class IntercomService {
   async handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
     console.log('Intercom: WS upgrade attempt from', req.socket.remoteAddress);
     try {
+      const urlParams = new URLSearchParams((req.url || '').split('?')[1] || '');
+      const portalParam = urlParams.get('portal') as 'admin' | 'sales' | 'technician' | null;
+      if (!portalParam || !['admin', 'sales', 'technician'].includes(portalParam)) {
+        console.log('Intercom upgrade rejected: missing or invalid portal param');
+        socket.destroy();
+        return;
+      }
       const cookies = parseCookies(req.headers.cookie);
       const sessionCookie = cookies['connect.sid'];
       if (!sessionCookie) {
@@ -104,7 +111,7 @@ class IntercomService {
         socket.destroy();
         return;
       }
-      const userInfo = await this.resolveSession(sessionId);
+      const userInfo = await this.resolveSession(sessionId, portalParam);
       if (!userInfo) {
         console.log('Intercom upgrade rejected: unrecognized portal session');
         socket.destroy();
@@ -173,31 +180,32 @@ class IntercomService {
     });
   }
 
-  private async resolveSession(sessionId: string): Promise<{ displayName: string; portal: 'admin' | 'sales' | 'technician'; userId: string } | null> {
+  private async resolveSession(sessionId: string, portal: 'admin' | 'sales' | 'technician'): Promise<{ displayName: string; portal: 'admin' | 'sales' | 'technician'; userId: string } | null> {
     try {
       if (!this.sql) { console.log('Intercom resolveSession: no sql client'); return null; }
       const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
-      console.log(`Intercom resolveSession: sid=${sessionId.slice(0,8)}... rows=${(result as any[]).length}`);
+      console.log(`Intercom resolveSession: portal=${portal}, sid=${sessionId.slice(0,8)}... rows=${(result as any[]).length}`);
       if ((result as any[]).length === 0) { console.log('Intercom resolveSession: no session row found'); return null; }
       const session = (result as any[])[0].sess as any;
-      console.log(`Intercom resolveSession: sessionKeys=${Object.keys(session || {}).join(',')}`);
 
-      if (session?.adminId) {
+      if (portal === 'admin') {
+        if (!session?.adminId) { console.log('Intercom resolveSession: no adminId in session'); return null; }
         const admins = await this.sql`SELECT name FROM admin_users WHERE id = ${session.adminId}`;
         return { displayName: (admins as any[])[0]?.name || 'Admin', portal: 'admin', userId: session.adminId };
       }
 
-      if (session?.salesUserId) {
+      if (portal === 'sales') {
+        if (!session?.salesUserId) { console.log('Intercom resolveSession: no salesUserId in session'); return null; }
         const users = await this.sql`SELECT name FROM sales_users WHERE id = ${session.salesUserId}`;
         return { displayName: (users as any[])[0]?.name || 'Sales', portal: 'sales', userId: session.salesUserId };
       }
 
-      if (session?.technicianId) {
+      if (portal === 'technician') {
+        if (!session?.technicianId) { console.log('Intercom resolveSession: no technicianId in session'); return null; }
         const techs = await this.sql`SELECT display_name FROM technicians WHERE id = ${session.technicianId}`;
         return { displayName: (techs as any[])[0]?.display_name || 'Technician', portal: 'technician', userId: session.technicianId };
       }
 
-      console.log('Intercom resolveSession: no portal key found in session');
       return null;
     } catch (error) {
       console.error('Intercom: session resolve error:', error);

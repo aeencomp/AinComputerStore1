@@ -57,7 +57,7 @@ const ICE_SERVERS: RTCConfiguration = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
 };
 
-export function useIntercom() {
+export function useIntercom(portal: 'admin' | 'sales' | 'technician') {
   const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
   const [callState, setCallState] = useState<CallState>('idle');
   const [caller, setCaller] = useState<{ peerId: string; displayName: string; portal: string } | null>(null);
@@ -245,7 +245,7 @@ export function useIntercom() {
     const connect = () => {
       if (!mounted) return;
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/intercom`;
+      const wsUrl = `${protocol}//${window.location.host}/ws/intercom?portal=${portal}`;
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
