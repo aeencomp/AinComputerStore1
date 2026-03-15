@@ -87,6 +87,7 @@ class IntercomService {
   }
 
   async handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+    console.log('Intercom: upgrade request received on /ws/intercom');
     try {
       const cookies = parseCookies(req.headers.cookie);
       const sessionCookie = cookies['connect.sid'];

@@ -234,6 +234,10 @@ export function IntercomWidget() {
         data-testid="button-intercom-toggle"
       >
         <Phone className="h-5 w-5" />
+        <span
+          className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${wsConnected ? 'bg-green-500' : 'bg-gray-400'}`}
+          data-testid="indicator-intercom-status"
+        />
         {onlineCount > 0 && (
           <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center">
             {onlineCount}
