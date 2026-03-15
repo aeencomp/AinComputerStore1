@@ -641,7 +641,7 @@ export default function DailyReport({ user }: DailyReportProps) {
       ) : !data ? null : (
         <div className="space-y-6">
           {/* Summary Cards */}
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3">
             {/* In-Store Total */}
             <Card>
               <CardContent className="pt-4 pb-3">
@@ -677,77 +677,55 @@ export default function DailyReport({ user }: DailyReportProps) {
               </CardContent>
             </Card>
 
-            {/* Grand Total (always visible) */}
-            <Card>
-              <CardContent className="pt-4 pb-3">
-                <p className="text-xs text-muted-foreground mb-1">
-                  {language === "ar" ? "الإجمالي" : "Grand Total"}
-                </p>
-                <p className="text-lg font-bold" data-testid="text-grand-total">
-                  {fmtNum(data.summary.grandTotal)}
-                </p>
-                <div className="flex flex-wrap gap-2 mt-0.5 text-xs text-muted-foreground">
+            {/* Net Revenue — full width, shows grand total and deducts withdrawals clearly */}
+            <Card className="col-span-2 border-primary/30">
+              <CardContent className="pt-4 pb-4">
+                {/* Top rows: breakdown lines */}
+                <div className="space-y-1.5 mb-3">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">
+                      {language === "ar" ? "الإجمالي (متجر + تصليح)" : "Subtotal (store + repair)"}
+                    </span>
+                    <span className="font-medium" data-testid="text-grand-total">
+                      {fmtNum(data.summary.grandTotal)}
+                    </span>
+                  </div>
+                  {data.summary.totalWithdrawals > 0 && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                        <TrendingDown className="h-3.5 w-3.5" />
+                        {language === "ar"
+                          ? `السحوبات اليومية (${data.summary.withdrawalCount} سحب)`
+                          : `Cash Withdrawals (${data.summary.withdrawalCount})`}
+                      </span>
+                      <span className="font-medium text-orange-600 dark:text-orange-400" data-testid="text-withdrawals-total">
+                        − {fmtNum(data.summary.totalWithdrawals)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="border-t border-border pt-1.5 flex items-center justify-between">
+                    <span className="text-sm font-semibold">
+                      {language === "ar" ? "صافي الإيراد اليومي" : "Net Daily Revenue"}
+                    </span>
+                    <span className="text-2xl font-bold text-primary" data-testid="text-net-total">
+                      {fmtNum(data.summary.grandTotal - (data.summary.totalWithdrawals ?? 0))}
+                    </span>
+                  </div>
+                </div>
+                {/* Payment breakdown */}
+                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
                   {data.summary.grandTotalCash > 0 && (
                     <span className="flex items-center gap-1">
                       <Banknote className="h-3 w-3 text-green-500" />
-                      {fmtNum(data.summary.grandTotalCash)}
+                      {fmtNum(data.summary.grandTotalCash)} {language === "ar" ? "نقداً" : "Cash"}
                     </span>
                   )}
                   {(data.summary.grandTotalCard ?? 0) > 0 && (
                     <span className="flex items-center gap-1">
                       <CreditCard className="h-3 w-3 text-teal-500" />
-                      {fmtNum(data.summary.grandTotalCard)}
+                      {fmtNum(data.summary.grandTotalCard)} {language === "ar" ? "بطاقة" : "Card"}
                     </span>
                   )}
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Withdrawals card (always shown — shows 0 when none) OR Net Total */}
-            {data.summary.totalWithdrawals > 0 ? (
-              <Card className="border-orange-300 dark:border-orange-700">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground mb-1 flex items-center gap-1">
-                    <TrendingDown className="h-3 w-3 text-orange-500" />
-                    {language === "ar" ? "السحوبات اليومية" : "Cash Withdrawals"}
-                  </p>
-                  <p className="text-lg font-bold text-orange-600 dark:text-orange-400" data-testid="text-withdrawals-total">
-                    - {fmtNum(data.summary.totalWithdrawals)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {data.summary.withdrawalCount} {language === "ar" ? "سحب" : "withdrawal"}
-                  </p>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card className="border-primary/30">
-                <CardContent className="pt-4 pb-3">
-                  <p className="text-xs text-muted-foreground mb-1">
-                    {language === "ar" ? "السحوبات اليومية" : "Cash Withdrawals"}
-                  </p>
-                  <p className="text-lg font-bold text-muted-foreground" data-testid="text-withdrawals-total">
-                    {fmtNum(0)}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">—</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Net Total (col-span-2, full width row) */}
-            <Card className="col-span-2 border-primary/30">
-              <CardContent className="pt-4 pb-3">
-                <p className="text-xs text-muted-foreground mb-1">
-                  {language === "ar" ? "صافي الإيراد اليومي" : "Net Daily Revenue"}
-                  {data.summary.totalWithdrawals > 0 && (
-                    <span className="ms-2 text-orange-600 dark:text-orange-400">
-                      ({fmtNum(data.summary.grandTotal)} − {fmtNum(data.summary.totalWithdrawals)})
-                    </span>
-                  )}
-                </p>
-                <p className="text-2xl font-bold text-primary" data-testid="text-net-total">
-                  {fmtNum(data.summary.grandTotal - (data.summary.totalWithdrawals ?? 0))}
-                </p>
-                <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-muted-foreground">
                   {data.summary.grandTotalZain > 0 && (
                     <span className="flex items-center gap-1">
                       <CreditCard className="h-3 w-3 text-blue-500" />
