@@ -191,19 +191,22 @@ export default function TechnicianDashboard() {
     let deliveredCount = 0;
     let deferredCount = 0;
     for (const ticket of tickets) {
-      if (ticket.isArchived === 1) continue;
-      if (ticket.paymentStatus === 'deferred') deferredCount++;
+      const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
       if (ticket.status === 'completed') {
-        completedCount++;
-        const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
-        completedRevenue += cost;
         totalRevenue += cost;
+        if (ticket.isArchived !== 1) {
+          completedCount++;
+          completedRevenue += cost;
+        }
       } else if (ticket.status === 'delivered') {
-        deliveredCount++;
-        const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
         totalRevenue += cost;
-      } else if (ticket.status === 'pending') {
-        pendingCount++;
+        if (ticket.isArchived !== 1) {
+          deliveredCount++;
+        }
+      }
+      if (ticket.isArchived !== 1) {
+        if (ticket.paymentStatus === 'deferred') deferredCount++;
+        if (ticket.status === 'pending') pendingCount++;
       }
     }
     return { totalRevenue, completedCount, completedRevenue, pendingCount, deliveredCount, deferredCount };
