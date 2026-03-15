@@ -65,7 +65,7 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
 
   const editMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: { amount: string; reason: string; employeeName: string } }) =>
-      apiRequest("PATCH", `/api/instore/withdrawals/${id}`, data).then(r => r.json()),
+      apiRequest("PATCH", `/api/instore/withdrawals/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });

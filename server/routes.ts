@@ -6279,8 +6279,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (amount !== undefined) updates.amount = amount;
       if (reason !== undefined) updates.reason = reason;
       if (employeeName !== undefined) updates.employeeName = employeeName;
-      const [row] = await db.update(cashWithdrawals).set(updates).where(eq(cashWithdrawals.id, parseInt(req.params.id))).returning();
-      res.json(row);
+      await db.update(cashWithdrawals).set(updates).where(eq(cashWithdrawals.id, parseInt(req.params.id)));
+      res.json({ success: true });
     } catch (err) {
       console.error("Withdrawal update error:", err);
       res.status(500).json({ error: "خطأ في تعديل السحب" });
