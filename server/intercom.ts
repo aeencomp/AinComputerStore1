@@ -87,27 +87,20 @@ class IntercomService {
   }
 
   async handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
-    console.log('Intercom: upgrade request received on /ws/intercom');
     try {
       const cookies = parseCookies(req.headers.cookie);
       const sessionCookie = cookies['connect.sid'];
       if (!sessionCookie) {
-        console.log('Intercom: upgrade rejected - no session cookie');
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
       }
       const sessionId = parseSessionId(sessionCookie);
       if (!sessionId) {
-        console.log('Intercom: upgrade rejected - invalid session format');
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
         socket.destroy();
         return;
       }
       const userInfo = await this.resolveSession(sessionId);
       if (!userInfo) {
-        console.log('Intercom: upgrade rejected - session not recognized as portal user');
-        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
         socket.destroy();
         return;
       }
@@ -117,7 +110,6 @@ class IntercomService {
       });
     } catch (error) {
       console.error('Intercom: upgrade error:', error);
-      socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
       socket.destroy();
     }
   }

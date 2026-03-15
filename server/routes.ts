@@ -57,12 +57,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   httpServer.on('upgrade', (req, socket, head) => {
     const pathname = req.url ? req.url.split('?')[0] : '';
-    if (pathname === '/ws/admin') {
-      adminNotifications.handleAdminUpgrade(req, socket, head);
-    } else if (pathname === '/ws/sales') {
-      adminNotifications.handleSalesUpgrade(req, socket, head);
-    } else if (pathname === '/ws/intercom') {
-      intercomService.handleUpgrade(req, socket, head);
+    switch (pathname) {
+      case '/ws/admin':
+        adminNotifications.handleAdminUpgrade(req, socket, head);
+        break;
+      case '/ws/sales':
+        adminNotifications.handleSalesUpgrade(req, socket, head);
+        break;
+      case '/ws/intercom':
+        intercomService.handleUpgrade(req, socket, head);
+        break;
     }
   });
   
