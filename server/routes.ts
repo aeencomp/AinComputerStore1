@@ -6265,6 +6265,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/instore/withdrawals/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const { db } = await import("./db");
+      const { cashWithdrawals } = await import("../shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const { amount, reason, employeeName } = req.body;
+      const updates: Record<string, unknown> = {};
+      if (amount !== undefined) updates.amount = amount;
+      if (reason !== undefined) updates.reason = reason;
+      if (employeeName !== undefined) updates.employeeName = employeeName;
+      const [row] = await db.update(cashWithdrawals).set(updates).where(eq(cashWithdrawals.id, parseInt(req.params.id))).returning();
+      res.json(row);
+    } catch (err) {
+      console.error("Withdrawal update error:", err);
+      res.status(500).json({ error: "خطأ في تعديل السحب" });
+    }
+  });
+
   app.delete("/api/instore/withdrawals/:id", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;

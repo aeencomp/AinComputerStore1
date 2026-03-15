@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Trash2, TrendingDown, Plus, User, Clock } from "lucide-react";
+import { Trash2, TrendingDown, Plus, User, Clock, Pencil, Check, X } from "lucide-react";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
 
@@ -34,6 +34,11 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   const [reason, setReason] = useState("");
   const [employeeName, setEmployeeName] = useState(user.name);
 
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editAmount, setEditAmount] = useState("");
+  const [editReason, setEditReason] = useState("");
+  const [editEmployee, setEditEmployee] = useState("");
+
   const { data: withdrawals = [], isLoading } = useQuery<CashWithdrawal[]>({
     queryKey: ["/api/instore/withdrawals", selectedDate],
     queryFn: () =>
@@ -51,6 +56,23 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
       toast({
         title: language === "ar" ? "تم تسجيل السحب" : "Withdrawal Recorded",
         description: language === "ar" ? "تم إضافة السحب بنجاح" : "Withdrawal added successfully",
+      });
+    },
+    onError: () => {
+      toast({ title: language === "ar" ? "خطأ" : "Error", variant: "destructive" });
+    },
+  });
+
+  const editMutation = useMutation({
+    mutationFn: ({ id, data }: { id: number; data: { amount: string; reason: string; employeeName: string } }) =>
+      apiRequest("PATCH", `/api/instore/withdrawals/${id}`, data).then(r => r.json()),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      setEditingId(null);
+      toast({
+        title: language === "ar" ? "تم التعديل" : "Updated",
+        description: language === "ar" ? "تم تعديل السحب بنجاح" : "Withdrawal updated successfully",
       });
     },
     onError: () => {
@@ -85,6 +107,23 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
       return;
     }
     addMutation.mutate({ amount, reason, employeeName });
+  };
+
+  const startEdit = (w: CashWithdrawal) => {
+    setEditingId(w.id);
+    setEditAmount(Math.round(parseFloat(w.amount)).toString());
+    setEditReason(w.reason || "");
+    setEditEmployee(w.employeeName);
+  };
+
+  const cancelEdit = () => setEditingId(null);
+
+  const saveEdit = (id: number) => {
+    if (!editAmount || parseFloat(editAmount) <= 0) {
+      toast({ title: language === "ar" ? "أدخل المبلغ" : "Enter amount", variant: "destructive" });
+      return;
+    }
+    editMutation.mutate({ id, data: { amount: editAmount, reason: editReason, employeeName: editEmployee } });
   };
 
   const totalWithdrawn = withdrawals.reduce((s, w) => s + parseFloat(w.amount), 0);
@@ -221,43 +260,108 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
               {withdrawals.map(w => (
                 <Card key={w.id} data-testid={`card-withdrawal-${w.id}`}>
                   <CardContent className="py-3 px-4">
-                    <div className="flex items-center justify-between gap-3 flex-wrap">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="h-9 w-9 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0">
-                          <TrendingDown className="h-4 w-4 text-orange-500" />
+                    {editingId === w.id ? (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">{language === "ar" ? "المبلغ" : "Amount"}</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              step="250"
+                              value={editAmount}
+                              onChange={e => setEditAmount(e.target.value)}
+                              data-testid={`input-edit-amount-${w.id}`}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">{language === "ar" ? "الموظف" : "Employee"}</Label>
+                            <Input
+                              value={editEmployee}
+                              onChange={e => setEditEmployee(e.target.value)}
+                              data-testid={`input-edit-employee-${w.id}`}
+                            />
+                          </div>
                         </div>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-orange-500">
-                              {fmt(parseFloat(w.amount))} IQD
-                            </span>
-                            <Badge variant="outline" className="text-xs flex items-center gap-1">
-                              <User className="h-3 w-3" />
-                              {w.employeeName}
-                            </Badge>
-                          </div>
-                          {w.reason && (
-                            <p className="text-sm text-muted-foreground truncate mt-0.5">{w.reason}</p>
-                          )}
-                          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
-                            <Clock className="h-3 w-3" />
-                            {format(new Date(w.createdAt), "hh:mm a", {
-                              locale: language === "ar" ? arSA : undefined,
-                            })}
-                          </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">{language === "ar" ? "السبب" : "Reason"}</Label>
+                          <Input
+                            value={editReason}
+                            onChange={e => setEditReason(e.target.value)}
+                            placeholder={language === "ar" ? "السبب (اختياري)" : "Reason (optional)"}
+                            data-testid={`input-edit-reason-${w.id}`}
+                          />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={cancelEdit}
+                            data-testid={`button-cancel-edit-${w.id}`}
+                          >
+                            <X className="h-3 w-3 me-1" />
+                            {language === "ar" ? "إلغاء" : "Cancel"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => saveEdit(w.id)}
+                            disabled={editMutation.isPending}
+                            data-testid={`button-save-edit-${w.id}`}
+                          >
+                            <Check className="h-3 w-3 me-1" />
+                            {language === "ar" ? "حفظ" : "Save"}
+                          </Button>
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => deleteMutation.mutate(w.id)}
-                        disabled={deleteMutation.isPending}
-                        data-testid={`button-delete-withdrawal-${w.id}`}
-                        className="text-destructive shrink-0"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-3 flex-wrap">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="h-9 w-9 rounded-full bg-orange-500/10 flex items-center justify-center shrink-0">
+                            <TrendingDown className="h-4 w-4 text-orange-500" />
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-semibold text-orange-500">
+                                {fmt(parseFloat(w.amount))} IQD
+                              </span>
+                              <Badge variant="outline" className="text-xs flex items-center gap-1">
+                                <User className="h-3 w-3" />
+                                {w.employeeName}
+                              </Badge>
+                            </div>
+                            {w.reason && (
+                              <p className="text-sm text-muted-foreground truncate mt-0.5">{w.reason}</p>
+                            )}
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground mt-0.5">
+                              <Clock className="h-3 w-3" />
+                              {format(new Date(w.createdAt), "hh:mm a", {
+                                locale: language === "ar" ? arSA : undefined,
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => startEdit(w)}
+                            data-testid={`button-edit-withdrawal-${w.id}`}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => deleteMutation.mutate(w.id)}
+                            disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-withdrawal-${w.id}`}
+                            className="text-destructive"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               ))}
