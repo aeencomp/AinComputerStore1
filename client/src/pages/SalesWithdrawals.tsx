@@ -89,8 +89,7 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
 
   const totalWithdrawn = withdrawals.reduce((s, w) => s + parseFloat(w.amount), 0);
 
-  const fmt = (n: number) =>
-    new Intl.NumberFormat(language === "ar" ? "ar-IQ" : "en-US").format(n);
+  const fmt = (n: number) => Math.round(n).toString();
 
   return (
     <div className="p-4 md:p-6 space-y-6" dir={isRTL ? "rtl" : "ltr"}>
