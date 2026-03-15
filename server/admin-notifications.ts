@@ -1,6 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { neon } from '@neondatabase/serverless';
+import type { Duplex } from 'stream';
 
 interface AdminNotification {
   type: 'new_order' | 'order_update';
@@ -29,7 +30,7 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
   return cookies;
 }
 
-function parseSessionId(signedCookie: string, secret: string): string | null {
+function parseSessionId(signedCookie: string): string | null {
   if (!signedCookie.startsWith('s:')) {
     return null;
   }
@@ -48,58 +49,20 @@ class AdminNotificationService {
   private salesWss: WebSocketServer | null = null;
   private clients: Set<WebSocket> = new Set();
   private salesClients: Set<WebSocket> = new Set();
-  private sessionSecret: string = process.env.SESSION_SECRET || 'default-secret-please-change-in-production';
   private sql: ReturnType<typeof neon> | null = null;
 
-  initialize(server: Server) {
+  initialize(_server: Server) {
     if (process.env.DATABASE_URL) {
       this.sql = neon(process.env.DATABASE_URL);
     }
 
-    // --- Admin WebSocket ---
-    this.wss = new WebSocketServer({ 
-      server, 
-      path: '/ws/admin',
-      verifyClient: async (info, callback) => {
-        try {
-          const cookies = parseCookies(info.req.headers.cookie);
-          const sessionCookie = cookies['connect.sid'];
-          
-          if (!sessionCookie) {
-            console.log('WebSocket connection rejected: No session cookie');
-            callback(false, 401, 'Unauthorized');
-            return;
-          }
-
-          const sessionId = parseSessionId(sessionCookie, this.sessionSecret);
-          if (!sessionId) {
-            console.log('WebSocket connection rejected: Invalid session cookie');
-            callback(false, 401, 'Unauthorized');
-            return;
-          }
-
-          const isAdmin = await this.verifyAdminSession(sessionId);
-          if (!isAdmin) {
-            console.log('WebSocket connection rejected: Not an admin session');
-            callback(false, 403, 'Forbidden');
-            return;
-          }
-
-          console.log('WebSocket connection authorized for admin');
-          callback(true);
-        } catch (error) {
-          console.error('WebSocket auth error:', error);
-          callback(false, 500, 'Internal Server Error');
-        }
-      }
-    });
+    this.wss = new WebSocketServer({ noServer: true });
+    this.salesWss = new WebSocketServer({ noServer: true });
 
     this.wss.on('connection', (ws: WebSocket) => {
-      console.log('Admin WebSocket client connected (authenticated)');
       this.clients.add(ws);
 
       ws.on('close', () => {
-        console.log('Admin WebSocket client disconnected');
         this.clients.delete(ws);
       });
 
@@ -111,49 +74,10 @@ class AdminNotificationService {
       ws.send(JSON.stringify({ type: 'connected', message: 'Connected to admin notifications' }));
     });
 
-    console.log('Admin WebSocket server initialized on /ws/admin (with authentication)');
-
-    // --- Sales WebSocket ---
-    this.salesWss = new WebSocketServer({
-      server,
-      path: '/ws/sales',
-      verifyClient: async (info, callback) => {
-        try {
-          const cookies = parseCookies(info.req.headers.cookie);
-          const sessionCookie = cookies['connect.sid'];
-
-          if (!sessionCookie) {
-            callback(false, 401, 'Unauthorized');
-            return;
-          }
-
-          const sessionId = parseSessionId(sessionCookie, this.sessionSecret);
-          if (!sessionId) {
-            callback(false, 401, 'Unauthorized');
-            return;
-          }
-
-          const isSales = await this.verifySalesSession(sessionId);
-          if (!isSales) {
-            callback(false, 403, 'Forbidden');
-            return;
-          }
-
-          console.log('WebSocket connection authorized for sales');
-          callback(true);
-        } catch (error) {
-          console.error('Sales WebSocket auth error:', error);
-          callback(false, 500, 'Internal Server Error');
-        }
-      }
-    });
-
     this.salesWss.on('connection', (ws: WebSocket) => {
-      console.log('Sales WebSocket client connected (authenticated)');
       this.salesClients.add(ws);
 
       ws.on('close', () => {
-        console.log('Sales WebSocket client disconnected');
         this.salesClients.delete(ws);
       });
 
@@ -165,7 +89,63 @@ class AdminNotificationService {
       ws.send(JSON.stringify({ type: 'connected', message: 'Connected to sales notifications' }));
     });
 
-    console.log('Sales WebSocket server initialized on /ws/sales (with authentication)');
+    console.log('Admin/Sales WebSocket servers initialized (noServer mode)');
+  }
+
+  async handleAdminUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+    try {
+      const cookies = parseCookies(req.headers.cookie);
+      const sessionCookie = cookies['connect.sid'];
+      if (!sessionCookie) {
+        socket.destroy();
+        return;
+      }
+      const sessionId = parseSessionId(sessionCookie);
+      if (!sessionId) {
+        socket.destroy();
+        return;
+      }
+      const isAdmin = await this.verifyAdminSession(sessionId);
+      if (!isAdmin) {
+        socket.destroy();
+        return;
+      }
+      console.log('WebSocket connection authorized for admin');
+      this.wss!.handleUpgrade(req, socket, head, (ws) => {
+        this.wss!.emit('connection', ws, req);
+      });
+    } catch (error) {
+      console.error('WebSocket auth error:', error);
+      socket.destroy();
+    }
+  }
+
+  async handleSalesUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+    try {
+      const cookies = parseCookies(req.headers.cookie);
+      const sessionCookie = cookies['connect.sid'];
+      if (!sessionCookie) {
+        socket.destroy();
+        return;
+      }
+      const sessionId = parseSessionId(sessionCookie);
+      if (!sessionId) {
+        socket.destroy();
+        return;
+      }
+      const isSales = await this.verifySalesSession(sessionId);
+      if (!isSales) {
+        socket.destroy();
+        return;
+      }
+      console.log('WebSocket connection authorized for sales');
+      this.salesWss!.handleUpgrade(req, socket, head, (ws) => {
+        this.salesWss!.emit('connection', ws, req);
+      });
+    } catch (error) {
+      console.error('Sales WebSocket auth error:', error);
+      socket.destroy();
+    }
   }
 
   private async verifyAdminSession(sessionId: string): Promise<boolean> {

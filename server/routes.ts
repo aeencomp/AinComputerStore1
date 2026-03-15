@@ -50,12 +50,21 @@ const imageUpload = multer({
 });
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Create HTTP server
   const httpServer = createServer(app);
   
-  // Initialize WebSocket servers
   adminNotifications.initialize(httpServer);
   intercomService.initialize(httpServer);
+
+  httpServer.on('upgrade', (req, socket, head) => {
+    const pathname = req.url ? req.url.split('?')[0] : '';
+    if (pathname === '/ws/admin') {
+      adminNotifications.handleAdminUpgrade(req, socket, head);
+    } else if (pathname === '/ws/sales') {
+      adminNotifications.handleSalesUpgrade(req, socket, head);
+    } else if (pathname === '/ws/intercom') {
+      intercomService.handleUpgrade(req, socket, head);
+    }
+  });
   
   // Initialize default admin technician, admin user, and sales admin
   await storage.initializeDefaultTechnician();

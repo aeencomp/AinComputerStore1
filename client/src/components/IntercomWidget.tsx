@@ -39,6 +39,7 @@ export function IntercomWidget() {
     isMuted,
     myPeerId,
     callDuration,
+    wsConnected,
     initiateCall,
     acceptCall,
     declineCall,
@@ -185,7 +186,11 @@ export function IntercomWidget() {
             </Button>
           </CardHeader>
           <CardContent className="px-4 pb-3">
-            {otherUsers.length === 0 ? (
+            {!wsConnected ? (
+              <p className="text-sm text-muted-foreground py-4 text-center" data-testid="text-intercom-connecting">
+                {language === 'ar' ? 'جاري الاتصال...' : 'Connecting...'}
+              </p>
+            ) : otherUsers.length === 0 ? (
               <p className="text-sm text-muted-foreground py-4 text-center">
                 {language === 'ar' ? 'لا يوجد مستخدمون متصلون' : 'No other users online'}
               </p>

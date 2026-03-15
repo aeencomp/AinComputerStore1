@@ -2,6 +2,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'crypto';
+import type { Duplex } from 'stream';
 
 interface IntercomClient {
   ws: WebSocket;
@@ -36,40 +37,12 @@ class IntercomService {
   private clients: Map<string, IntercomClient> = new Map();
   private sql: ReturnType<typeof neon> | null = null;
 
-  initialize(server: Server) {
+  initialize(_server: Server) {
     if (process.env.DATABASE_URL) {
       this.sql = neon(process.env.DATABASE_URL);
     }
 
-    this.wss = new WebSocketServer({
-      server,
-      path: '/ws/intercom',
-      verifyClient: async (info, callback) => {
-        try {
-          const cookies = parseCookies(info.req.headers.cookie);
-          const sessionCookie = cookies['connect.sid'];
-          if (!sessionCookie) {
-            callback(false, 401, 'Unauthorized');
-            return;
-          }
-          const sessionId = parseSessionId(sessionCookie);
-          if (!sessionId) {
-            callback(false, 401, 'Unauthorized');
-            return;
-          }
-          const userInfo = await this.resolveSession(sessionId);
-          if (!userInfo) {
-            callback(false, 403, 'Forbidden');
-            return;
-          }
-          (info.req as any)._intercomUser = userInfo;
-          callback(true);
-        } catch (error) {
-          console.error('Intercom WebSocket auth error:', error);
-          callback(false, 500, 'Internal Server Error');
-        }
-      }
-    });
+    this.wss = new WebSocketServer({ noServer: true });
 
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       const userInfo = (req as any)._intercomUser as { displayName: string; portal: 'admin' | 'sales' | 'technician' };
@@ -110,7 +83,42 @@ class IntercomService {
       });
     });
 
-    console.log('Intercom WebSocket server initialized on /ws/intercom');
+    console.log('Intercom WebSocket server initialized on /ws/intercom (noServer mode)');
+  }
+
+  async handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer) {
+    try {
+      const cookies = parseCookies(req.headers.cookie);
+      const sessionCookie = cookies['connect.sid'];
+      if (!sessionCookie) {
+        console.log('Intercom: upgrade rejected - no session cookie');
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+      const sessionId = parseSessionId(sessionCookie);
+      if (!sessionId) {
+        console.log('Intercom: upgrade rejected - invalid session format');
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+      const userInfo = await this.resolveSession(sessionId);
+      if (!userInfo) {
+        console.log('Intercom: upgrade rejected - session not recognized as portal user');
+        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n');
+        socket.destroy();
+        return;
+      }
+      (req as any)._intercomUser = userInfo;
+      this.wss!.handleUpgrade(req, socket, head, (ws) => {
+        this.wss!.emit('connection', ws, req);
+      });
+    } catch (error) {
+      console.error('Intercom: upgrade error:', error);
+      socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+      socket.destroy();
+    }
   }
 
   private handleMessage(fromPeerId: string, msg: any) {

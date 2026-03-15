@@ -19,6 +19,7 @@ export function useIntercom() {
   const [isMuted, setIsMuted] = useState(false);
   const [myPeerId, setMyPeerId] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
+  const [wsConnected, setWsConnected] = useState(false);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -174,7 +175,8 @@ export function useIntercom() {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('Intercom connected');
+        console.log('Intercom WS connected');
+        setWsConnected(true);
       };
 
       ws.onmessage = async (event) => {
@@ -259,8 +261,9 @@ export function useIntercom() {
         }
       };
 
-      ws.onclose = () => {
-        console.log('Intercom disconnected');
+      ws.onclose = (e) => {
+        console.log('Intercom WS disconnected, code:', e.code, 'reason:', e.reason);
+        setWsConnected(false);
         setOnlineUsers([]);
         setMyPeerId(null);
         if (mounted) {
@@ -268,7 +271,9 @@ export function useIntercom() {
         }
       };
 
-      ws.onerror = () => {};
+      ws.onerror = (err) => {
+        console.error('Intercom WS error:', err);
+      };
     };
 
     connect();
@@ -288,6 +293,7 @@ export function useIntercom() {
     isMuted,
     myPeerId,
     callDuration,
+    wsConnected,
     initiateCall,
     acceptCall,
     declineCall,
