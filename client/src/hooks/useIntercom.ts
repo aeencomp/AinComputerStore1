@@ -1,5 +1,50 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+function createRingtone() {
+  let ctx: AudioContext | null = null;
+  let stopFn: (() => void) | null = null;
+  let intervalId: ReturnType<typeof setInterval> | null = null;
+
+  function playRingCycle() {
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = 480;
+
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.4, t + 0.02);
+    gain.gain.setValueAtTime(0.4, t + 0.4);
+    gain.gain.linearRampToValueAtTime(0, t + 0.42);
+    gain.gain.setValueAtTime(0.4, t + 0.55);
+    gain.gain.linearRampToValueAtTime(0, t + 0.97);
+
+    osc.start(t);
+    osc.stop(t + 1);
+  }
+
+  function start() {
+    ctx = new AudioContext();
+    playRingCycle();
+    intervalId = setInterval(playRingCycle, 2000);
+    stopFn = () => {
+      if (intervalId) clearInterval(intervalId);
+      ctx?.close();
+      ctx = null;
+    };
+  }
+
+  function stop() {
+    stopFn?.();
+    stopFn = null;
+  }
+
+  return { start, stop };
+}
+
 export interface OnlineUser {
   peerId: string;
   displayName: string;
@@ -30,6 +75,7 @@ export function useIntercom() {
   const activePeerRef = useRef<string | null>(null);
   const callStateRef = useRef<CallState>('idle');
   const ringingTimeoutRef = useRef<number | null>(null);
+  const ringtoneRef = useRef<ReturnType<typeof createRingtone> | null>(null);
 
   const send = useCallback((msg: any) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -172,6 +218,17 @@ export function useIntercom() {
       }
     }
   }, []);
+
+  useEffect(() => {
+    if (callState === 'ringing-in') {
+      const ringtone = createRingtone();
+      ringtoneRef.current = ringtone;
+      ringtone.start();
+    } else {
+      ringtoneRef.current?.stop();
+      ringtoneRef.current = null;
+    }
+  }, [callState]);
 
   useEffect(() => {
     let mounted = true;
