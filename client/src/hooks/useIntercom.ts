@@ -65,6 +65,7 @@ export function useIntercom() {
   const [myPeerId, setMyPeerId] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
   const [wsConnected, setWsConnected] = useState(false);
+  const callerRef = useRef<{ peerId: string; displayName: string; portal: string } | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -86,6 +87,11 @@ export function useIntercom() {
   const setCallStateSync = useCallback((state: CallState) => {
     callStateRef.current = state;
     setCallState(state);
+  }, []);
+
+  const setCallerSync = useCallback((c: { peerId: string; displayName: string; portal: string } | null) => {
+    callerRef.current = c;
+    setCaller(c);
   }, []);
 
   const cleanup = useCallback(() => {
@@ -112,10 +118,10 @@ export function useIntercom() {
     }
     activePeerRef.current = null;
     setCallStateSync('idle');
-    setCaller(null);
+    setCallerSync(null);
     setIsMuted(false);
     setCallDuration(0);
-  }, [setCallStateSync]);
+  }, [setCallStateSync, setCallerSync]);
 
   const startCallTimer = useCallback(() => {
     setCallDuration(0);
@@ -167,7 +173,7 @@ export function useIntercom() {
     if (callStateRef.current !== 'idle') return;
     activePeerRef.current = targetId;
     const targetUser = onlineUsers.find(u => u.peerId === targetId);
-    setCaller(targetUser || null);
+    setCallerSync(targetUser || null);
     setCallStateSync('ringing-out');
     send({ type: 'call-request', targetId });
     ringingTimeoutRef.current = window.setTimeout(() => {
@@ -176,12 +182,14 @@ export function useIntercom() {
         cleanup();
       }
     }, 30000);
-  }, [onlineUsers, send, setCallStateSync, cleanup]);
+  }, [onlineUsers, send, setCallStateSync, setCallerSync, cleanup]);
 
   const acceptCall = useCallback(async () => {
-    if (callStateRef.current !== 'ringing-in' || !caller) return;
-    const targetId = caller.peerId;
+    const currentCaller = callerRef.current;
+    if (callStateRef.current !== 'ringing-in' || !currentCaller) return;
+    const targetId = currentCaller.peerId;
     activePeerRef.current = targetId;
+    setCallStateSync('in-call');
 
     try {
       const stream = await getLocalStream();
@@ -193,14 +201,15 @@ export function useIntercom() {
       send({ type: 'call-decline', targetId });
       cleanup();
     }
-  }, [caller, send, getLocalStream, createPeerConnection, cleanup]);
+  }, [send, getLocalStream, createPeerConnection, cleanup, setCallStateSync]);
 
   const declineCall = useCallback(() => {
-    if (caller) {
-      send({ type: 'call-decline', targetId: caller.peerId });
+    const currentCaller = callerRef.current;
+    if (currentCaller) {
+      send({ type: 'call-decline', targetId: currentCaller.peerId });
     }
     cleanup();
-  }, [caller, send, cleanup]);
+  }, [send, cleanup]);
 
   const endCall = useCallback(() => {
     if (activePeerRef.current) {
@@ -260,7 +269,7 @@ export function useIntercom() {
 
             case 'call-request':
               if (callStateRef.current === 'idle') {
-                setCaller({ peerId: msg.fromPeerId, displayName: msg.fromName, portal: msg.fromPortal });
+                setCallerSync({ peerId: msg.fromPeerId, displayName: msg.fromName, portal: msg.fromPortal });
                 setCallStateSync('ringing-in');
               } else {
                 send({ type: 'call-decline', targetId: msg.fromPeerId });
@@ -296,8 +305,9 @@ export function useIntercom() {
               const answer = await pc.createAnswer();
               await pc.setLocalDescription(answer);
               send({ type: 'answer', targetId: msg.fromPeerId, sdp: answer });
-              setCallStateSync('in-call');
-              startCallTimer();
+              if (callStateRef.current === 'in-call') {
+                startCallTimer();
+              }
               break;
             }
 

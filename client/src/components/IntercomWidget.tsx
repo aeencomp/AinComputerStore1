@@ -37,7 +37,6 @@ export function IntercomWidget() {
     callState,
     caller,
     isMuted,
-    myPeerId,
     callDuration,
     wsConnected,
     initiateCall,
@@ -48,7 +47,7 @@ export function IntercomWidget() {
   } = useIntercom();
   const [expanded, setExpanded] = useState(false);
 
-  const otherUsers = onlineUsers.filter(u => u.peerId !== myPeerId);
+  const otherUsers = onlineUsers;
   const onlineCount = otherUsers.length;
 
   if (callState === 'ringing-in' && caller) {

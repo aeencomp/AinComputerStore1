@@ -60,7 +60,7 @@ class IntercomService {
       this.clients.set(peerId, client);
       console.log(`Intercom: ${userInfo.portal}/${userInfo.displayName} connected (${peerId})`);
 
-      ws.send(JSON.stringify({ type: 'welcome', peerId }));
+      ws.send(JSON.stringify({ type: 'welcome', peerId, userId: userInfo.userId, portal: userInfo.portal }));
       this.broadcastPresence();
 
       ws.on('message', (raw) => {
@@ -130,7 +130,7 @@ class IntercomService {
       if (!target || !sender) return;
 
       if (type === 'call-request') {
-        for (const c of this.clients.values()) {
+        Array.from(this.clients.values()).forEach(c => {
           if (c.userId === target.userId && c.portal === target.portal && c.ws.readyState === WebSocket.OPEN) {
             c.ws.send(JSON.stringify({
               type,
@@ -140,7 +140,7 @@ class IntercomService {
               ...payload,
             }));
           }
-        }
+        });
       } else if (target.ws.readyState === WebSocket.OPEN) {
         target.ws.send(JSON.stringify({
           type,
@@ -155,20 +155,19 @@ class IntercomService {
 
   private broadcastPresence() {
     const seen = new Set<string>();
-    const users: { peerId: string; displayName: string; portal: string }[] = [];
-    for (const c of this.clients.values()) {
+    const allUsers: { peerId: string; displayName: string; portal: string; userId: string }[] = [];
+    Array.from(this.clients.values()).forEach(c => {
       const key = `${c.userId}:${c.portal}`;
       if (!seen.has(key)) {
         seen.add(key);
-        users.push({ peerId: c.peerId, displayName: c.displayName, portal: c.portal });
+        allUsers.push({ peerId: c.peerId, displayName: c.displayName, portal: c.portal, userId: c.userId });
       }
-    }
+    });
 
-    const message = JSON.stringify({ type: 'presence', users });
     this.clients.forEach(client => {
-      if (client.ws.readyState === WebSocket.OPEN) {
-        client.ws.send(message);
-      }
+      if (client.ws.readyState !== WebSocket.OPEN) return;
+      const users = allUsers.filter(u => !(u.userId === client.userId && u.portal === client.portal));
+      client.ws.send(JSON.stringify({ type: 'presence', users }));
     });
   }
 
