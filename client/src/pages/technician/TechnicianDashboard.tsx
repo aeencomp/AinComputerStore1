@@ -26,7 +26,7 @@ interface Technician {
 
 export default function TechnicianDashboard() {
   const [, navigate] = useLocation();
-  const { t, language } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
   const { toast } = useToast();
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterPriority, setFilterPriority] = useState<string>('all');
@@ -312,6 +312,14 @@ export default function TechnicianDashboard() {
           
           <div className="flex items-center gap-2 flex-wrap">
             <ThemeToggle />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+              data-testid="button-language-toggle"
+            >
+              {language === 'ar' ? 'EN' : 'AR'}
+            </Button>
             <Link href="/technician/new-request">
               <Button data-testid="button-new-repair-request">
                 <Plus className="h-4 w-4 me-2" />
