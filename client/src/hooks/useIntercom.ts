@@ -51,6 +51,16 @@ export interface OnlineUser {
   portal: 'admin' | 'sales' | 'technician';
 }
 
+export interface ChatMessage {
+  id: string;
+  fromPeerId: string;
+  fromName: string;
+  fromPortal: string;
+  text: string;
+  timestamp: number;
+  isMine: boolean;
+}
+
 export type CallState = 'idle' | 'ringing-out' | 'ringing-in' | 'in-call';
 
 const ICE_SERVERS: RTCConfiguration = {
@@ -65,7 +75,9 @@ export function useIntercom(portal: 'admin' | 'sales' | 'technician') {
   const [myPeerId, setMyPeerId] = useState<string | null>(null);
   const [callDuration, setCallDuration] = useState(0);
   const [wsConnected, setWsConnected] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const callerRef = useRef<{ peerId: string; displayName: string; portal: string } | null>(null);
+  const myPeerIdRef = useRef<string | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const pcRef = useRef<RTCPeerConnection | null>(null);
@@ -228,6 +240,11 @@ export function useIntercom(portal: 'admin' | 'sales' | 'technician') {
     }
   }, []);
 
+  const sendChatMessage = useCallback((text: string) => {
+    if (!text.trim()) return;
+    send({ type: 'chat-message', text: text.trim() });
+  }, [send]);
+
   useEffect(() => {
     if (callState === 'ringing-in') {
       const ringtone = createRingtone();
@@ -261,6 +278,7 @@ export function useIntercom(portal: 'admin' | 'sales' | 'technician') {
           switch (msg.type) {
             case 'welcome':
               setMyPeerId(msg.peerId);
+              myPeerIdRef.current = msg.peerId;
               break;
 
             case 'presence':
@@ -331,6 +349,20 @@ export function useIntercom(portal: 'admin' | 'sales' | 'technician') {
             case 'call-end':
               cleanup();
               break;
+
+            case 'chat-message': {
+              const isMine = msg.fromPeerId === myPeerIdRef.current;
+              setChatMessages(prev => [...prev, {
+                id: `${msg.timestamp}-${msg.fromPeerId}`,
+                fromPeerId: msg.fromPeerId,
+                fromName: msg.fromName,
+                fromPortal: msg.fromPortal,
+                text: msg.text,
+                timestamp: msg.timestamp,
+                isMine,
+              }]);
+              break;
+            }
           }
         } catch (err) {
           console.error('Intercom: message parse error', err);
@@ -370,10 +402,12 @@ export function useIntercom(portal: 'admin' | 'sales' | 'technician') {
     myPeerId,
     callDuration,
     wsConnected,
+    chatMessages,
     initiateCall,
     acceptCall,
     declineCall,
     endCall,
     toggleMute,
+    sendChatMessage,
   };
 }

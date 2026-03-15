@@ -1,15 +1,19 @@
-import { useState } from 'react';
-import { useIntercom, type OnlineUser } from '@/hooks/useIntercom';
+import { useState, useRef, useEffect } from 'react';
+import { useIntercom, type OnlineUser, type ChatMessage } from '@/hooks/useIntercom';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Phone, PhoneOff, PhoneIncoming, PhoneCall, Mic, MicOff, X, Users } from 'lucide-react';
+import { Phone, PhoneOff, PhoneIncoming, PhoneCall, Mic, MicOff, X, Users, MessageSquare, Send } from 'lucide-react';
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function formatTime(ts: number): string {
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
 function portalLabel(portal: string, lang: string): string {
@@ -43,16 +47,55 @@ export function IntercomWidget({ portal }: IntercomWidgetProps) {
     isMuted,
     callDuration,
     wsConnected,
+    chatMessages,
     initiateCall,
     acceptCall,
     declineCall,
     endCall,
     toggleMute,
+    sendChatMessage,
   } = useIntercom(portal);
+
   const [expanded, setExpanded] = useState(false);
+  const [activeTab, setActiveTab] = useState<'users' | 'chat'>('users');
+  const [chatInput, setChatInput] = useState('');
+  const [unreadCount, setUnreadCount] = useState(0);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const prevMsgCount = useRef(0);
 
   const otherUsers = onlineUsers;
   const onlineCount = otherUsers.length;
+
+  useEffect(() => {
+    if (chatMessages.length > prevMsgCount.current) {
+      const newMsgs = chatMessages.slice(prevMsgCount.current);
+      const hasOtherMsg = newMsgs.some(m => !m.isMine);
+      if (hasOtherMsg && (!expanded || activeTab !== 'chat')) {
+        setUnreadCount(prev => prev + newMsgs.filter(m => !m.isMine).length);
+      }
+    }
+    prevMsgCount.current = chatMessages.length;
+  }, [chatMessages, expanded, activeTab]);
+
+  useEffect(() => {
+    if (expanded && activeTab === 'chat') {
+      setUnreadCount(0);
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [expanded, activeTab, chatMessages]);
+
+  const handleSend = () => {
+    if (!chatInput.trim()) return;
+    sendChatMessage(chatInput);
+    setChatInput('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
+    }
+  };
 
   if (callState === 'ringing-in' && caller) {
     return (
@@ -172,59 +215,151 @@ export function IntercomWidget({ portal }: IntercomWidgetProps) {
   return (
     <div className="fixed bottom-6 right-6 z-[9999]" data-testid="intercom-widget">
       {expanded && (
-        <Card className="w-72 mb-3">
-          <CardHeader className="pb-2 pt-3 px-4 flex flex-row items-center justify-between gap-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Users className="h-4 w-4" />
-              {language === 'ar' ? 'الاتصال الداخلي' : 'Intercom'}
-            </CardTitle>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={() => setExpanded(false)}
-              data-testid="button-close-intercom"
-            >
-              <X className="h-3.5 w-3.5" />
-            </Button>
+        <Card className="w-80 mb-3 flex flex-col" style={{ maxHeight: '420px' }}>
+          <CardHeader className="pb-0 pt-3 px-4 shrink-0">
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${wsConnected ? 'bg-green-500' : 'bg-gray-400'}`} />
+                {language === 'ar' ? 'الاتصال الداخلي' : 'Intercom'}
+              </CardTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => setExpanded(false)}
+                data-testid="button-close-intercom"
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+
+            <div className="flex gap-1 mt-2 border-b">
+              <button
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors ${activeTab === 'users' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'}`}
+                onClick={() => setActiveTab('users')}
+                data-testid="tab-intercom-users"
+              >
+                <Users className="h-3.5 w-3.5" />
+                {language === 'ar' ? 'المتصلون' : 'Online'}
+                {onlineCount > 0 && (
+                  <span className="bg-muted text-muted-foreground rounded-full px-1.5 py-0 text-[10px] font-bold">
+                    {onlineCount}
+                  </span>
+                )}
+              </button>
+              <button
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border-b-2 -mb-px transition-colors ${activeTab === 'chat' ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground'}`}
+                onClick={() => { setActiveTab('chat'); setUnreadCount(0); }}
+                data-testid="tab-intercom-chat"
+              >
+                <MessageSquare className="h-3.5 w-3.5" />
+                {language === 'ar' ? 'دردشة' : 'Chat'}
+                {unreadCount > 0 && (
+                  <span className="bg-green-500 text-white rounded-full px-1.5 py-0 text-[10px] font-bold">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
+            </div>
           </CardHeader>
-          <CardContent className="px-4 pb-3">
-            {!wsConnected ? (
-              <p className="text-sm text-muted-foreground py-4 text-center" data-testid="text-intercom-connecting">
-                {language === 'ar' ? 'جاري الاتصال...' : 'Connecting...'}
-              </p>
-            ) : otherUsers.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                {language === 'ar' ? 'لا يوجد مستخدمون متصلون' : 'No other users online'}
-              </p>
-            ) : (
-              <div className="space-y-1.5">
-                {otherUsers.map((user: OnlineUser) => (
-                  <div
-                    key={user.peerId}
-                    className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate"
-                    data-testid={`intercom-user-${user.peerId}`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">{user.displayName}</p>
-                        <Badge variant="outline" className={`text-[10px] ${portalColor(user.portal)}`}>
-                          {portalLabel(user.portal, language)}
-                        </Badge>
+
+          <CardContent className="px-4 pb-3 flex-1 overflow-hidden flex flex-col min-h-0">
+            {activeTab === 'users' && (
+              <div className="flex-1 overflow-y-auto pt-2">
+                {!wsConnected ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center" data-testid="text-intercom-connecting">
+                    {language === 'ar' ? 'جاري الاتصال...' : 'Connecting...'}
+                  </p>
+                ) : otherUsers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground py-4 text-center">
+                    {language === 'ar' ? 'لا يوجد مستخدمون متصلون' : 'No other users online'}
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {otherUsers.map((user: OnlineUser) => (
+                      <div
+                        key={user.peerId}
+                        className="flex items-center justify-between gap-2 p-2 rounded-md hover-elevate"
+                        data-testid={`intercom-user-${user.peerId}`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-2 h-2 rounded-full bg-green-500 shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{user.displayName}</p>
+                            <Badge variant="outline" className={`text-[10px] ${portalColor(user.portal)}`}>
+                              {portalLabel(user.portal, language)}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => { initiateCall(user.peerId); setExpanded(false); }}
+                          data-testid={`button-call-${user.peerId}`}
+                        >
+                          <Phone className="h-4 w-4 text-green-600" />
+                        </Button>
                       </div>
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => { initiateCall(user.peerId); setExpanded(false); }}
-                      data-testid={`button-call-${user.peerId}`}
-                    >
-                      <Phone className="h-4 w-4 text-green-600" />
-                    </Button>
+                    ))}
                   </div>
-                ))}
+                )}
               </div>
+            )}
+
+            {activeTab === 'chat' && (
+              <>
+                <div className="flex-1 overflow-y-auto py-2 space-y-2 min-h-0">
+                  {chatMessages.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      {language === 'ar' ? 'لا توجد رسائل بعد' : 'No messages yet'}
+                    </p>
+                  ) : (
+                    chatMessages.map((msg: ChatMessage) => (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col gap-0.5 ${msg.isMine ? 'items-end' : 'items-start'}`}
+                        data-testid={`chat-msg-${msg.id}`}
+                      >
+                        {!msg.isMine && (
+                          <div className="flex items-center gap-1.5 px-1">
+                            <span className="text-[11px] font-medium text-foreground">{msg.fromName}</span>
+                            <Badge variant="outline" className={`text-[9px] ${portalColor(msg.fromPortal)}`}>
+                              {portalLabel(msg.fromPortal, language)}
+                            </Badge>
+                          </div>
+                        )}
+                        <div className={`max-w-[85%] px-3 py-1.5 rounded-lg text-sm ${msg.isMine ? 'bg-primary text-primary-foreground' : 'bg-muted text-foreground'}`}>
+                          {msg.text}
+                        </div>
+                        <span className="text-[10px] text-muted-foreground px-1">
+                          {formatTime(msg.timestamp)}
+                        </span>
+                      </div>
+                    ))
+                  )}
+                  <div ref={messagesEndRef} />
+                </div>
+                <div className="flex gap-2 pt-2 shrink-0 border-t">
+                  <input
+                    type="text"
+                    value={chatInput}
+                    onChange={e => setChatInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={language === 'ar' ? 'اكتب رسالة...' : 'Type a message...'}
+                    className="flex-1 text-sm bg-muted rounded-md px-3 py-1.5 outline-none focus:ring-1 focus:ring-ring border-0"
+                    data-testid="input-chat-message"
+                    disabled={!wsConnected}
+                  />
+                  <Button
+                    size="icon"
+                    onClick={handleSend}
+                    disabled={!chatInput.trim() || !wsConnected}
+                    data-testid="button-send-chat"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+              </>
             )}
           </CardContent>
         </Card>
@@ -241,9 +376,9 @@ export function IntercomWidget({ portal }: IntercomWidgetProps) {
           className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-background ${wsConnected ? 'bg-green-500' : 'bg-gray-400'}`}
           data-testid="indicator-intercom-status"
         />
-        {onlineCount > 0 && (
-          <span className="absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full bg-green-500 text-white text-[10px] font-bold flex items-center justify-center">
-            {onlineCount}
+        {(onlineCount > 0 || unreadCount > 0) && (
+          <span className={`absolute -top-1 -right-1 h-5 min-w-5 px-1 rounded-full text-white text-[10px] font-bold flex items-center justify-center ${unreadCount > 0 ? 'bg-red-500' : 'bg-green-500'}`}>
+            {unreadCount > 0 ? unreadCount : onlineCount}
           </span>
         )}
       </Button>

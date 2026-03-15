@@ -130,6 +130,25 @@ class IntercomService {
   private handleMessage(fromPeerId: string, msg: any) {
     const { type, targetId, ...payload } = msg;
 
+    if (type === 'chat-message') {
+      const sender = this.clients.get(fromPeerId);
+      if (!sender) return;
+      const outgoing = {
+        type: 'chat-message',
+        fromPeerId,
+        fromName: sender.displayName,
+        fromPortal: sender.portal,
+        text: msg.text,
+        timestamp: Date.now(),
+      };
+      this.clients.forEach(c => {
+        if (c.ws.readyState === WebSocket.OPEN) {
+          c.ws.send(JSON.stringify(outgoing));
+        }
+      });
+      return;
+    }
+
     if (type === 'call-request' || type === 'call-accept' || type === 'call-decline' ||
         type === 'offer' || type === 'answer' || type === 'ice-candidate' || type === 'call-end') {
       const target = this.clients.get(targetId);
