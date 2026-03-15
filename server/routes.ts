@@ -11,6 +11,7 @@ import bcrypt from "bcrypt";
 import { generateOTP, storeOTP, verifyOTP } from "./otp";
 import { sendOTPEmail } from "./resend-client";
 import { adminNotifications } from "./admin-notifications";
+import { intercomService } from "./intercom";
 import { zaincash } from "./zaincash";
 import { qicard } from "./qicard";
 import Papa from "papaparse";
@@ -52,8 +53,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create HTTP server
   const httpServer = createServer(app);
   
-  // Initialize WebSocket server for admin notifications
+  // Initialize WebSocket servers
   adminNotifications.initialize(httpServer);
+  intercomService.initialize(httpServer);
   
   // Initialize default admin technician, admin user, and sales admin
   await storage.initializeDefaultTechnician();

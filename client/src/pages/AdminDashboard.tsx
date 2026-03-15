@@ -33,6 +33,7 @@ import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Ke
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AdminNav } from "@/components/AdminNav";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
+import { IntercomWidget } from "@/components/IntercomWidget";
 import {
   Popover,
   PopoverContent,
@@ -1656,6 +1657,7 @@ export default function AdminDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      <IntercomWidget />
     </div>
   );
 }

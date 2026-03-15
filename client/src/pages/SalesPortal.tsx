@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminNotifications } from "@/hooks/useAdminNotifications";
+import { IntercomWidget } from "@/components/IntercomWidget";
 import { 
   ShoppingCart, 
   Package, 
@@ -476,6 +477,7 @@ export default function SalesPortal() {
         {location === "/sales/reports" && <SalesReports user={currentUser} />}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}
       </main>
+      <IntercomWidget />
     </div>
   );
 }

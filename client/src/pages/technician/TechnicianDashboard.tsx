@@ -14,6 +14,7 @@ import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle,
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
+import { IntercomWidget } from '@/components/IntercomWidget';
 
 interface Technician {
   id: string;
@@ -748,6 +749,7 @@ export default function TechnicianDashboard() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
       />
+      <IntercomWidget />
     </div>
   );
 }
