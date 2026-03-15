@@ -164,35 +164,40 @@ class IntercomService {
       }
     });
 
+    console.log(`Intercom broadcastPresence: allUsers=[${allUsers.map(u => `${u.portal}/${u.displayName}`).join(', ')}]`);
     this.clients.forEach(client => {
       if (client.ws.readyState !== WebSocket.OPEN) return;
       const users = allUsers.filter(u => !(u.userId === client.userId && u.portal === client.portal));
+      console.log(`Intercom broadcastPresence: sending to ${client.portal}/${client.displayName}: [${users.map(u => `${u.portal}/${u.displayName}`).join(', ')}]`);
       client.ws.send(JSON.stringify({ type: 'presence', users }));
     });
   }
 
   private async resolveSession(sessionId: string): Promise<{ displayName: string; portal: 'admin' | 'sales' | 'technician'; userId: string } | null> {
     try {
-      if (!this.sql) return null;
+      if (!this.sql) { console.log('Intercom resolveSession: no sql client'); return null; }
       const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
-      if (result.length === 0) return null;
-      const session = result[0].sess as any;
+      console.log(`Intercom resolveSession: sid=${sessionId.slice(0,8)}... rows=${(result as any[]).length}`);
+      if ((result as any[]).length === 0) { console.log('Intercom resolveSession: no session row found'); return null; }
+      const session = (result as any[])[0].sess as any;
+      console.log(`Intercom resolveSession: sessionKeys=${Object.keys(session || {}).join(',')}`);
 
       if (session?.adminId) {
         const admins = await this.sql`SELECT name FROM admin_users WHERE id = ${session.adminId}`;
-        return { displayName: admins[0]?.name || 'Admin', portal: 'admin', userId: session.adminId };
+        return { displayName: (admins as any[])[0]?.name || 'Admin', portal: 'admin', userId: session.adminId };
       }
 
       if (session?.salesUserId) {
         const users = await this.sql`SELECT name FROM sales_users WHERE id = ${session.salesUserId}`;
-        return { displayName: users[0]?.name || 'Sales', portal: 'sales', userId: session.salesUserId };
+        return { displayName: (users as any[])[0]?.name || 'Sales', portal: 'sales', userId: session.salesUserId };
       }
 
       if (session?.technicianId) {
         const techs = await this.sql`SELECT display_name FROM technicians WHERE id = ${session.technicianId}`;
-        return { displayName: techs[0]?.display_name || 'Technician', portal: 'technician', userId: session.technicianId };
+        return { displayName: (techs as any[])[0]?.display_name || 'Technician', portal: 'technician', userId: session.technicianId };
       }
 
+      console.log('Intercom resolveSession: no portal key found in session');
       return null;
     } catch (error) {
       console.error('Intercom: session resolve error:', error);
