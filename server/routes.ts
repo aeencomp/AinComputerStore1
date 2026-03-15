@@ -67,6 +67,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       case '/ws/intercom':
         intercomService.handleUpgrade(req, socket, head);
         break;
+      default:
+        break;
     }
   });
   

@@ -91,16 +91,19 @@ class IntercomService {
       const cookies = parseCookies(req.headers.cookie);
       const sessionCookie = cookies['connect.sid'];
       if (!sessionCookie) {
+        console.log('Intercom upgrade rejected: no session cookie');
         socket.destroy();
         return;
       }
       const sessionId = parseSessionId(sessionCookie);
       if (!sessionId) {
+        console.log('Intercom upgrade rejected: invalid session format');
         socket.destroy();
         return;
       }
       const userInfo = await this.resolveSession(sessionId);
       if (!userInfo) {
+        console.log('Intercom upgrade rejected: unrecognized portal session');
         socket.destroy();
         return;
       }
