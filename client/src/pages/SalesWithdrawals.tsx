@@ -167,7 +167,7 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="withdrawal-employee">
                   {language === "ar" ? "اسم الموظف" : "Employee Name"}
