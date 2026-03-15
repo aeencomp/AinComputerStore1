@@ -1,7 +1,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
 import { neon } from '@neondatabase/serverless';
-import { randomUUID, createHmac } from 'crypto';
+import { randomUUID } from 'crypto';
 
 interface IntercomClient {
   ws: WebSocket;
@@ -23,22 +23,17 @@ function parseCookies(cookieHeader: string | undefined): Record<string, string> 
   return cookies;
 }
 
-function unsignCookie(signedValue: string, secret: string): string | false {
-  if (!signedValue.startsWith('s:')) return false;
-  const value = signedValue.slice(2);
+function parseSessionId(signedCookie: string): string | null {
+  if (!signedCookie.startsWith('s:')) return null;
+  const value = signedCookie.slice(2);
   const dotIndex = value.lastIndexOf('.');
-  if (dotIndex === -1) return false;
-  const sid = value.slice(0, dotIndex);
-  const sig = value.slice(dotIndex + 1);
-  const expected = createHmac('sha256', secret).update(sid).digest('base64').replace(/=+$/, '');
-  if (expected !== sig) return false;
-  return sid;
+  if (dotIndex === -1) return null;
+  return value.slice(0, dotIndex);
 }
 
 class IntercomService {
   private wss: WebSocketServer | null = null;
   private clients: Map<string, IntercomClient> = new Map();
-  private sessionSecret: string = process.env.SESSION_SECRET || 'default-secret-please-change-in-production';
   private sql: ReturnType<typeof neon> | null = null;
 
   initialize(server: Server) {
@@ -57,7 +52,7 @@ class IntercomService {
             callback(false, 401, 'Unauthorized');
             return;
           }
-          const sessionId = unsignCookie(sessionCookie, this.sessionSecret);
+          const sessionId = parseSessionId(sessionCookie);
           if (!sessionId) {
             callback(false, 401, 'Unauthorized');
             return;
