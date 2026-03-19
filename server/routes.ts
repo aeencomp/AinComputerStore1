@@ -1,9 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, sql, count, between, isNull, or, lte } from "drizzle-orm";
+import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage } from "./whatsapp";
@@ -1165,28 +1165,65 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { closingCash, notes } = req.body;
+      const endTime = new Date();
       
-      // Calculate expected cash (opening + sales during shift)
+      // Calculate all in-store orders during this shift (all payment methods)
       const shiftOrders = await db.select().from(orders)
         .where(and(
+          inArray(orders.orderType, ['walk-in', 'in-store']),
           eq(orders.salespersonId, salesUserId),
-          eq(orders.paymentMethod, 'cash'),
-          gte(orders.createdAt, activeShift.startTime)
+          gte(orders.createdAt, activeShift.startTime),
+          lte(orders.createdAt, endTime)
         ));
-      
-      const cashSales = shiftOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
-      const expectedCash = parseFloat(activeShift.openingCash || '0') + cashSales;
+
+      // Repair tickets paid/delivered during this shift
+      const shiftRepairs = await db.select().from(repairTickets)
+        .where(
+          or(
+            and(
+              eq(repairTickets.paymentStatus, 'paid'),
+              gte(repairTickets.updatedAt, activeShift.startTime),
+              lte(repairTickets.updatedAt, endTime)
+            ),
+            and(
+              eq(repairTickets.status, 'delivered'),
+              isNotNull(repairTickets.deliveredAt),
+              gte(repairTickets.deliveredAt, activeShift.startTime),
+              lte(repairTickets.deliveredAt, endTime)
+            )
+          )
+        );
+
+      // Cash-only amounts for expected cash calculation
+      const cashSalesOrders = shiftOrders
+        .filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
+      const cashRepairs = shiftRepairs
+        .filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod))
+        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+      const totalCash = cashSalesOrders + cashRepairs;
+
+      // Total sales across all payment methods (excluding deferred)
+      const totalOrderSales = shiftOrders
+        .filter(o => o.paymentStatus !== 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
+      const totalRepairSales = shiftRepairs
+        .filter(t => t.paymentStatus !== 'deferred')
+        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+      const totalAllSales = totalOrderSales + totalRepairSales;
+
+      const expectedCash = parseFloat(activeShift.openingCash || '0') + totalCash;
       const closingCashNum = parseFloat(closingCash || '0');
       const cashDifference = closingCashNum - expectedCash;
       
       const [updatedShift] = await db.update(salesShifts)
         .set({
-          endTime: new Date(),
+          endTime,
           closingCash: closingCash?.toString() || null,
           expectedCash: expectedCash.toString(),
           cashDifference: cashDifference.toString(),
-          totalSales: cashSales.toString(),
-          totalTransactions: shiftOrders.length,
+          totalSales: totalAllSales.toString(),
+          totalTransactions: shiftOrders.length + shiftRepairs.filter(t => t.paymentStatus !== 'deferred').length,
           notes: notes || activeShift.notes,
           status: 'closed',
         })
@@ -1197,6 +1234,153 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error ending shift:", error);
       return res.status(500).json({ error: "فشل إنهاء الوردية" });
+    }
+  });
+
+  // ─── Shift List & Shift Report ───────────────────────────────────────────────
+
+  // Helper: compute report data for an arbitrary time range
+  async function computeShiftReport(startTime: Date, endTime: Date) {
+    const inStoreOrders = await db.select().from(orders).where(
+      and(
+        inArray(orders.orderType, ['walk-in', 'in-store']),
+        gte(orders.createdAt, startTime),
+        lte(orders.createdAt, endTime)
+      )
+    );
+
+    const paidRepairTickets = await db.select().from(repairTickets).where(
+      or(
+        and(
+          eq(repairTickets.paymentStatus, 'paid'),
+          gte(repairTickets.updatedAt, startTime),
+          lte(repairTickets.updatedAt, endTime)
+        ),
+        and(
+          eq(repairTickets.status, 'delivered'),
+          isNotNull(repairTickets.deliveredAt),
+          gte(repairTickets.deliveredAt, startTime),
+          lte(repairTickets.deliveredAt, endTime)
+        )
+      )
+    );
+
+    const dailyWithdrawals = await db.select().from(cashWithdrawals)
+      .where(and(gte(cashWithdrawals.createdAt, startTime), lte(cashWithdrawals.createdAt, endTime)))
+      .orderBy(desc(cashWithdrawals.createdAt));
+
+    const inStoreTotalCash = inStoreOrders.filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalZain = inStoreOrders.filter(o => o.paymentMethod === 'zaincash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalQi = inStoreOrders.filter(o => o.paymentMethod === 'qicard' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalDeferred = inStoreOrders.filter(o => o.paymentStatus === 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotal = inStoreOrders.filter(o => o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const totalWithdrawals = dailyWithdrawals.reduce((s, w) => s + parseFloat(w.amount), 0);
+    const repairTotalDeferred = paidRepairTickets.filter(t => t.paymentStatus === 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+    const repairTotal = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+    const repairTotalCash = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod)).reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+    const repairTotalCard = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred' && t.paymentMethod === 'card').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+
+    return {
+      inStoreSales: inStoreOrders,
+      repairSales: paidRepairTickets,
+      withdrawals: dailyWithdrawals,
+      summary: {
+        inStoreCount: inStoreOrders.length,
+        inStoreTotal,
+        inStoreTotalCash,
+        inStoreTotalZain,
+        inStoreTotalQi,
+        inStoreTotalDeferred,
+        repairCount: paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').length,
+        repairTotal,
+        repairTotalDeferred,
+        repairTotalCash,
+        repairTotalCard,
+        repairTotalZain: 0,
+        repairTotalQi: 0,
+        totalWithdrawals,
+        withdrawalCount: dailyWithdrawals.length,
+        grandTotal: inStoreTotal + repairTotal,
+        grandTotalCash: inStoreTotalCash + repairTotalCash,
+        grandTotalCard: repairTotalCard,
+        grandTotalZain: inStoreTotalZain,
+        grandTotalQi: inStoreTotalQi,
+        netTotal: (inStoreTotal + repairTotal) - totalWithdrawals,
+      }
+    };
+  }
+
+  // GET /api/sales/shifts — list closed shifts (own for sales, all for admin)
+  app.get("/api/sales/shifts", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      let query = db.select().from(salesShifts).$dynamic();
+      if (salesUserId && !adminId) {
+        query = query.where(eq(salesShifts.salesUserId, salesUserId));
+      }
+      const shifts = await query.orderBy(desc(salesShifts.startTime));
+      return res.json(shifts);
+    } catch (error) {
+      console.error("Error fetching shifts list:", error);
+      return res.status(500).json({ error: "فشل جلب الورديات" });
+    }
+  });
+
+  // GET /api/sales/shifts/active-snapshot — live summary for current open shift
+  app.get("/api/sales/shifts/active-snapshot", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      // Find active shift (own for sales, any for admin)
+      let activeShift;
+      if (salesUserId) {
+        [activeShift] = await db.select().from(salesShifts)
+          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
+          .orderBy(desc(salesShifts.startTime)).limit(1);
+      } else {
+        [activeShift] = await db.select().from(salesShifts)
+          .where(eq(salesShifts.status, 'active'))
+          .orderBy(desc(salesShifts.startTime)).limit(1);
+      }
+
+      if (!activeShift) return res.json(null);
+
+      const now = new Date();
+      const reportData = await computeShiftReport(activeShift.startTime, now);
+      return res.json({ shift: activeShift, ...reportData });
+    } catch (error) {
+      console.error("Error fetching active snapshot:", error);
+      return res.status(500).json({ error: "فشل جلب بيانات الوردية النشطة" });
+    }
+  });
+
+  // GET /api/sales/shifts/:id/report — full report for a closed (or open) shift
+  app.get("/api/sales/shifts/:id/report", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, req.params.id));
+      if (!shift) return res.status(404).json({ error: "الوردية غير موجودة" });
+
+      // Sales users can only view their own shifts
+      if (salesUserId && !adminId && shift.salesUserId !== salesUserId) {
+        return res.status(403).json({ error: "غير مصرح" });
+      }
+
+      const endTime = shift.endTime || new Date();
+      const reportData = await computeShiftReport(shift.startTime, endTime);
+      res.set('Cache-Control', 'no-store');
+      return res.json({ shift, ...reportData });
+    } catch (error) {
+      console.error("Error fetching shift report:", error);
+      return res.status(500).json({ error: "فشل جلب تقرير الوردية" });
     }
   });
 

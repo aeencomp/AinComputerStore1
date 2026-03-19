@@ -66,6 +66,13 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
     queryKey: ['/api/sales/shifts/current'],
   });
 
+  // Fetch live snapshot for close dialog preview
+  const { data: activeSnapshot } = useQuery<{ summary: { grandTotal: number; grandTotalCash: number; grandTotalZain: number; grandTotalQi: number; grandTotalCard: number; inStoreCount: number; repairCount: number } } | null>({
+    queryKey: ['/api/sales/shifts/active-snapshot'],
+    enabled: !!currentShift,
+    staleTime: 30000,
+  });
+
   const startShiftMutation = useMutation({
     mutationFn: async (data: { openingCash: string; notes: string }) => {
       const res = await apiRequest('POST', '/api/sales/shifts/start', data);
@@ -628,7 +635,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
                   />
                 </div>
                 {currentShift && (
-                  <div className="p-3 rounded-lg bg-muted text-sm space-y-1">
+                  <div className="p-3 rounded-lg bg-muted text-sm space-y-1.5">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{language === 'ar' ? 'بدأت:' : 'Started:'}</span>
                       <span>{new Date(currentShift.startTime).toLocaleTimeString(language === 'ar' ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -637,6 +644,41 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
                       <span className="text-muted-foreground">{language === 'ar' ? 'النقد الافتتاحي:' : 'Opening Cash:'}</span>
                       <span>{formatPrice(parseFloat(currentShift.openingCash || '0'))} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
                     </div>
+                    {activeSnapshot?.summary && (
+                      <>
+                        <div className="border-t border-border/60 my-1" />
+                        <div className="flex justify-between font-medium">
+                          <span className="text-muted-foreground">{language === 'ar' ? 'إجمالي مبيعات الوردية:' : 'Shift total sales:'}</span>
+                          <span className="text-primary">{formatPrice(activeSnapshot.summary.grandTotal)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                        </div>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">{language === 'ar' ? 'نقداً:' : 'Cash:'}</span>
+                          <span>{formatPrice(activeSnapshot.summary.grandTotalCash)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                        </div>
+                        {activeSnapshot.summary.grandTotalZain > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">ZainCash:</span>
+                            <span>{formatPrice(activeSnapshot.summary.grandTotalZain)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                          </div>
+                        )}
+                        {activeSnapshot.summary.grandTotalQi > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">QiCard:</span>
+                            <span>{formatPrice(activeSnapshot.summary.grandTotalQi)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                          </div>
+                        )}
+                        {activeSnapshot.summary.grandTotalCard > 0 && (
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">{language === 'ar' ? 'بطاقة:' : 'Card:'}</span>
+                            <span>{formatPrice(activeSnapshot.summary.grandTotalCard)} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-xs text-muted-foreground">
+                          <span>{language === 'ar' ? 'فواتير + تذاكر:' : 'Orders + tickets:'}</span>
+                          <span>{activeSnapshot.summary.inStoreCount + activeSnapshot.summary.repairCount}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </>
