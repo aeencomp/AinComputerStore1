@@ -1240,14 +1240,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ─── Shift List & Shift Report ───────────────────────────────────────────────
 
   // Helper: compute report data for an arbitrary time range
-  async function computeShiftReport(startTime: Date, endTime: Date) {
-    const inStoreOrders = await db.select().from(orders).where(
-      and(
-        inArray(orders.orderType, ['walk-in', 'in-store']),
-        gte(orders.createdAt, startTime),
-        lte(orders.createdAt, endTime)
-      )
-    );
+  // Compute shift report scoped to the shift owner's orders.
+  // salesUserId: when provided, in-store orders are filtered to that employee.
+  // For admin views (salesUserId = null) all orders in the time range are returned.
+  async function computeShiftReport(startTime: Date, endTime: Date, salesUserId: string | null = null) {
+    const orderConditions: any[] = [
+      inArray(orders.orderType, ['walk-in', 'in-store']),
+      gte(orders.createdAt, startTime),
+      lte(orders.createdAt, endTime),
+    ];
+    if (salesUserId) {
+      orderConditions.push(eq(orders.salespersonId, salesUserId));
+    }
+
+    const inStoreOrders = await db.select().from(orders).where(and(...orderConditions));
 
     const paidRepairTickets = await db.select().from(repairTickets).where(
       or(
@@ -1310,18 +1316,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // GET /api/sales/shifts — list closed shifts (own for sales, all for admin)
+  // GET /api/sales/shifts — list CLOSED shifts (own for sales, all for admin)
   app.get("/api/sales/shifts", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      let query = db.select().from(salesShifts).$dynamic();
+      // Only return closed shifts; active shift is handled by /current
+      const conditions: any[] = [eq(salesShifts.status, 'closed')];
       if (salesUserId && !adminId) {
-        query = query.where(eq(salesShifts.salesUserId, salesUserId));
+        conditions.push(eq(salesShifts.salesUserId, salesUserId));
       }
-      const shifts = await query.orderBy(desc(salesShifts.startTime));
+      const shifts = await db.select().from(salesShifts)
+        .where(and(...conditions))
+        .orderBy(desc(salesShifts.startTime));
       return res.json(shifts);
     } catch (error) {
       console.error("Error fetching shifts list:", error);
@@ -1336,13 +1345,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Find active shift (own for sales, any for admin)
+      // Find active shift — for sales users always their own shift
       let activeShift;
       if (salesUserId) {
         [activeShift] = await db.select().from(salesShifts)
           .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
           .orderBy(desc(salesShifts.startTime)).limit(1);
       } else {
+        // Admin: pick the most recent active shift across all users
         [activeShift] = await db.select().from(salesShifts)
           .where(eq(salesShifts.status, 'active'))
           .orderBy(desc(salesShifts.startTime)).limit(1);
@@ -1350,8 +1360,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!activeShift) return res.json(null);
 
+      // Scope orders to the shift owner for accurate per-employee totals
       const now = new Date();
-      const reportData = await computeShiftReport(activeShift.startTime, now);
+      const reportData = await computeShiftReport(activeShift.startTime, now, activeShift.salesUserId);
       return res.json({ shift: activeShift, ...reportData });
     } catch (error) {
       console.error("Error fetching active snapshot:", error);
@@ -1359,7 +1370,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // GET /api/sales/shifts/:id/report — full report for a closed (or open) shift
+  // GET /api/sales/shifts/:id/report — full report for a specific shift
   app.get("/api/sales/shifts/:id/report", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
@@ -1375,7 +1386,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const endTime = shift.endTime || new Date();
-      const reportData = await computeShiftReport(shift.startTime, endTime);
+      // Always scope in-store orders to the shift owner so concurrent shifts don't bleed into each other
+      const scopeUserId = adminId && !salesUserId ? null : shift.salesUserId;
+      const reportData = await computeShiftReport(shift.startTime, endTime, scopeUserId);
       res.set('Cache-Control', 'no-store');
       return res.json({ shift, ...reportData });
     } catch (error) {
