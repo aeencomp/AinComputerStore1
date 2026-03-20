@@ -1273,6 +1273,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       )
     );
 
+    // Note: cashWithdrawals table has no salesUserId column so withdrawals are scoped
+    // by time range only. If multiple employees work concurrently and all record withdrawals,
+    // those withdrawals appear in every overlapping shift report. Adding per-employee
+    // withdrawal attribution would require a schema migration.
     const dailyWithdrawals = await db.select().from(cashWithdrawals)
       .where(and(gte(cashWithdrawals.createdAt, startTime), lte(cashWithdrawals.createdAt, endTime)))
       .orderBy(desc(cashWithdrawals.createdAt));
@@ -1371,7 +1375,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!activeShift) return res.json(null);
 
-      // Always scope orders to the shift owner so totals match the specific employee's shift
+      // Note: when supervisors/admin view the snapshot, only the most-recent active shift
+      // is returned. If multiple employees have concurrent open shifts, the others are not
+      // included in this endpoint. For a full view, supervisors can navigate to each
+      // individual shift via GET /api/sales/shifts/:id/report.
+      // Orders are always scoped to the shift owner so totals are per-employee accurate.
       const now = new Date();
       const reportData = await computeShiftReport(activeShift.startTime, now, activeShift.salesUserId);
       return res.json({ shift: activeShift, ...reportData });

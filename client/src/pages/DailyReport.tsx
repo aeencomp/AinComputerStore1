@@ -522,9 +522,11 @@ export default function DailyReport({ user }: DailyReportProps) {
   // Full report for selected shift
   const { data: shiftReport, isLoading: reportLoading, isFetching: reportFetching, refetch: refetchReport } = useQuery<ShiftReportData>({
     queryKey: ["/api/sales/shifts", selectedShiftId, "report"],
-    queryFn: () =>
-      fetch(`/api/sales/shifts/${selectedShiftId}/report`, { credentials: "include" })
-        .then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`/api/sales/shifts/${selectedShiftId}/report`, { credentials: "include" });
+      if (!r.ok) throw new Error(`Failed to load shift report: ${r.status}`);
+      return r.json();
+    },
     enabled: !!selectedShiftId,
     staleTime: 0,
   });
