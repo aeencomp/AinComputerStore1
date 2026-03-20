@@ -144,11 +144,20 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
     }
   };
 
-  // Fetch staff advances for today
+  // Fetch staff advances scoped to the active shift window
   interface StaffAdvance { id: number; amount: string; staffName: string; reason: string | null; createdAt: string; }
-  const { data: advances = [], isLoading: advancesLoading } = useQuery<StaffAdvance[]>({
-    queryKey: ['/api/instore/staff-advances'],
+  const shiftStartDate = currentShift?.startTime
+    ? new Date(currentShift.startTime).toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' })
+    : new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+  const { data: allAdvances = [], isLoading: advancesLoading } = useQuery<StaffAdvance[]>({
+    queryKey: ['/api/instore/staff-advances', shiftStartDate],
+    queryFn: () =>
+      fetch(`/api/instore/staff-advances?date=${shiftStartDate}`, { credentials: 'include' }).then(r => r.json()),
   });
+  // Filter to only advances at or after shift start
+  const advances = currentShift?.startTime
+    ? allAdvances.filter(a => new Date(a.createdAt) >= new Date(currentShift.startTime))
+    : allAdvances;
 
   const addAdvanceMutation = useMutation({
     mutationFn: async (data: { amount: string; staffName: string; reason: string }) => {
@@ -162,7 +171,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       setAdvanceAmount("");
       setAdvanceStaffName("");
       setAdvanceReason("");
-      queryClient.invalidateQueries({ queryKey: ['/api/instore/staff-advances'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/instore/staff-advances', shiftStartDate] });
     },
     onError: (err: Error) => {
       toast({ title: err.message, variant: 'destructive' });
@@ -177,7 +186,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
     },
     onSuccess: () => {
       toast({ title: language === 'ar' ? 'تم حذف السلفة' : 'Advance deleted' });
-      queryClient.invalidateQueries({ queryKey: ['/api/instore/staff-advances'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/instore/staff-advances', shiftStartDate] });
     },
     onError: (err: Error) => {
       toast({ title: err.message, variant: 'destructive' });

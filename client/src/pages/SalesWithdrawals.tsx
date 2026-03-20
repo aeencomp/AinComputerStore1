@@ -25,6 +25,13 @@ interface SalesWithdrawalsProps {
   user: { name: string; username: string };
 }
 
+interface SalesShift {
+  id: number;
+  status: string;
+  startTime: string;
+  endTime: string | null;
+}
+
 export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   const { language, isRTL } = useLanguage();
   const { toast } = useToast();
@@ -38,6 +45,12 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   const [editAmount, setEditAmount] = useState("");
   const [editReason, setEditReason] = useState("");
   const [editEmployee, setEditEmployee] = useState("");
+
+  const { data: currentShift } = useQuery<SalesShift | null>({
+    queryKey: ['/api/sales/shifts/current'],
+  });
+
+  const hasActiveShift = currentShift?.status === 'active';
 
   const { data: withdrawals = [], isLoading } = useQuery<CashWithdrawal[]>({
     queryKey: ["/api/instore/withdrawals", selectedDate],
@@ -167,7 +180,11 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            {!hasActiveShift ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                {language === "ar" ? "ابدأ وردية لإضافة سحوبات" : "Start a shift to add withdrawals"}
+              </p>
+            ) : (<form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="withdrawal-employee">
                   {language === "ar" ? "اسم الموظف" : "Employee Name"}
@@ -222,6 +239,7 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
                   : (language === "ar" ? "تسجيل السحب" : "Record Withdrawal")}
               </Button>
             </form>
+            )}
           </CardContent>
         </Card>
 
