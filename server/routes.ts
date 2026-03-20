@@ -6536,15 +6536,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      const { db } = await import("./db");
-      const { cashWithdrawals } = await import("../shared/schema");
-      const { eq } = await import("drizzle-orm");
+      const recordId = parseInt(req.params.id);
+      const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
+      if (!record) return res.status(404).json({ error: "السجل غير موجود" });
+
+      // Check if record belongs to a closed shift window (applies to everyone including admin)
+      const recordTime = new Date(record.createdAt);
+      const [containingShift] = await db.select().from(salesShifts)
+        .where(and(
+          lte(salesShifts.startTime, recordTime),
+          or(isNull(salesShifts.endTime), gte(salesShifts.endTime, recordTime))
+        ))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+      if (containingShift && containingShift.status === 'closed') {
+        return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
+      }
+
       const { amount, reason, employeeName } = req.body;
       const updates: Record<string, unknown> = {};
       if (amount !== undefined) updates.amount = amount;
       if (reason !== undefined) updates.reason = reason;
       if (employeeName !== undefined) updates.employeeName = employeeName;
-      await db.update(cashWithdrawals).set(updates).where(eq(cashWithdrawals.id, parseInt(req.params.id)));
+      await db.update(cashWithdrawals).set(updates).where(eq(cashWithdrawals.id, recordId));
       res.json({ success: true });
     } catch (err) {
       console.error("Withdrawal update error:", err);
@@ -6558,15 +6572,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Shift lock: reject if no active shift (skip check for admin users)
-      if (!adminId && salesUserId) {
-        const [activeShift] = await db.select().from(salesShifts)
-          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
-          .limit(1);
-        if (!activeShift) return res.status(400).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
+      const recordId = parseInt(req.params.id);
+      // Fetch record to get its timestamp
+      const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
+      if (!record) return res.status(404).json({ error: "السجل غير موجود" });
+
+      // Check if record belongs to a closed shift window (applies to everyone including admin)
+      const recordTime = new Date(record.createdAt);
+      const [containingShift] = await db.select().from(salesShifts)
+        .where(and(
+          lte(salesShifts.startTime, recordTime),
+          or(isNull(salesShifts.endTime), gte(salesShifts.endTime, recordTime))
+        ))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+      if (containingShift && containingShift.status === 'closed') {
+        return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
 
-      await db.delete(cashWithdrawals).where(eq(cashWithdrawals.id, parseInt(req.params.id)));
+      await db.delete(cashWithdrawals).where(eq(cashWithdrawals.id, recordId));
       res.json({ success: true });
     } catch (err) {
       console.error("Withdrawal delete error:", err);
@@ -6627,15 +6651,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Shift lock: reject if no active shift (skip check for admin users)
-      if (!adminId && salesUserId) {
-        const [activeShift] = await db.select().from(salesShifts)
-          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
-          .limit(1);
-        if (!activeShift) return res.status(400).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
+      const recordId = parseInt(req.params.id);
+      // Fetch record to get its timestamp
+      const [record] = await db.select().from(staffAdvances).where(eq(staffAdvances.id, recordId)).limit(1);
+      if (!record) return res.status(404).json({ error: "السجل غير موجود" });
+
+      // Check if record belongs to a closed shift window (applies to everyone including admin)
+      const recordTime = new Date(record.createdAt);
+      const [containingShift] = await db.select().from(salesShifts)
+        .where(and(
+          lte(salesShifts.startTime, recordTime),
+          or(isNull(salesShifts.endTime), gte(salesShifts.endTime, recordTime))
+        ))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+      if (containingShift && containingShift.status === 'closed') {
+        return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
 
-      await db.delete(staffAdvances).where(eq(staffAdvances.id, parseInt(req.params.id)));
+      await db.delete(staffAdvances).where(eq(staffAdvances.id, recordId));
       res.json({ success: true });
     } catch (err) {
       console.error("Staff advance delete error:", err);
