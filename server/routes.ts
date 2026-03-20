@@ -6510,11 +6510,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Require an active shift for everyone (admin and sales users alike)
+      // Require an active shift scoped to the session user (any active shift for admin)
+      const shiftWhere = salesUserId
+        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
+        : eq(salesShifts.status, 'active');
       const [activeShift] = await db.select().from(salesShifts)
-        .where(eq(salesShifts.status, 'active'))
-        .orderBy(desc(salesShifts.startTime))
-        .limit(1);
+        .where(shiftWhere).orderBy(desc(salesShifts.startTime)).limit(1);
       if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       const { cashWithdrawals, insertCashWithdrawalSchema } = await import("../shared/schema");
@@ -6552,10 +6553,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
 
-      // Also require an active shift
-      const [activeShift] = await db.select().from(salesShifts)
-        .where(eq(salesShifts.status, 'active')).limit(1);
-      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      // Also require an active shift scoped to the session user (any active shift for admin)
+      const patchShiftWhere = salesUserId
+        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
+        : eq(salesShifts.status, 'active');
+      const [patchActiveShift] = await db.select().from(salesShifts).where(patchShiftWhere).limit(1);
+      if (!patchActiveShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       const { amount, reason, employeeName } = req.body;
       const updates: Record<string, unknown> = {};
@@ -6594,10 +6597,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
 
-      // Also require an active shift (no dangling deletes when no shift is open at all)
-      const [activeShift] = await db.select().from(salesShifts)
-        .where(eq(salesShifts.status, 'active')).limit(1);
-      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      // Also require an active shift scoped to the session user (any active shift for admin)
+      const delWhWhere = salesUserId
+        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
+        : eq(salesShifts.status, 'active');
+      const [delWhActive] = await db.select().from(salesShifts).where(delWhWhere).limit(1);
+      if (!delWhActive) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       await db.delete(cashWithdrawals).where(eq(cashWithdrawals.id, recordId));
       res.json({ success: true });
@@ -6635,12 +6640,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Require an active shift for everyone (admin and sales users alike)
-      const [activeShift] = await db.select().from(salesShifts)
-        .where(eq(salesShifts.status, 'active'))
-        .orderBy(desc(salesShifts.startTime))
-        .limit(1);
-      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      // Require an active shift scoped to the session user (any active shift for admin)
+      const advPostWhere = salesUserId
+        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
+        : eq(salesShifts.status, 'active');
+      const [advPostShift] = await db.select().from(salesShifts)
+        .where(advPostWhere).orderBy(desc(salesShifts.startTime)).limit(1);
+      if (!advPostShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       const parsed = insertStaffAdvanceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error });
@@ -6677,10 +6683,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
 
-      // Also require an active shift (no dangling deletes when no shift is open at all)
-      const [activeShift] = await db.select().from(salesShifts)
-        .where(eq(salesShifts.status, 'active')).limit(1);
-      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      // Also require an active shift scoped to the session user (any active shift for admin)
+      const delAdvWhere = salesUserId
+        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
+        : eq(salesShifts.status, 'active');
+      const [delAdvActive] = await db.select().from(salesShifts).where(delAdvWhere).limit(1);
+      if (!delAdvActive) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       await db.delete(staffAdvances).where(eq(staffAdvances.id, recordId));
       res.json({ success: true });
