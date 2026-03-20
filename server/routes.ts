@@ -603,6 +603,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // No email — log in directly
       (req.session as any).salesUserId = salesUser.id;
       (req.session as any).salesUsername = salesUser.username;
+      (req.session as any).salesUserRole = salesUser.role;
       
       return res.json({ 
         success: true, 
@@ -635,6 +636,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       (req.session as any).salesUserId = salesUser.id;
       (req.session as any).salesUsername = salesUser.username;
+      (req.session as any).salesUserRole = salesUser.role;
 
       return res.json({ 
         success: true, 
@@ -1316,16 +1318,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // GET /api/sales/shifts — list CLOSED shifts (own for sales, all for admin)
+  // GET /api/sales/shifts — list CLOSED shifts
+  // - Regular sales user: own shifts only
+  // - sales_admin role or main adminId: all employees' shifts
   app.get("/api/sales/shifts", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
+      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Only return closed shifts; active shift is handled by /current
+      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
+
+      // Only return closed shifts; active shift is served via /active-snapshot
       const conditions: any[] = [eq(salesShifts.status, 'closed')];
-      if (salesUserId && !adminId) {
+      if (!isSupervisor && salesUserId) {
         conditions.push(eq(salesShifts.salesUserId, salesUserId));
       }
       const shifts = await db.select().from(salesShifts)
@@ -1339,20 +1346,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/sales/shifts/active-snapshot — live summary for current open shift
+  // - Regular sales user: their own active shift
+  // - sales_admin or main admin: most recent active shift across all users
+  //   (orders always scoped to the shift owner for accurate per-employee totals)
   app.get("/api/sales/shifts/active-snapshot", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
+      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Find active shift — for sales users always their own shift
+      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
+
       let activeShift;
-      if (salesUserId) {
+      if (!isSupervisor && salesUserId) {
         [activeShift] = await db.select().from(salesShifts)
           .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
           .orderBy(desc(salesShifts.startTime)).limit(1);
       } else {
-        // Admin: pick the most recent active shift across all users
         [activeShift] = await db.select().from(salesShifts)
           .where(eq(salesShifts.status, 'active'))
           .orderBy(desc(salesShifts.startTime)).limit(1);
@@ -1360,7 +1371,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (!activeShift) return res.json(null);
 
-      // Scope orders to the shift owner for accurate per-employee totals
+      // Always scope orders to the shift owner so totals match the specific employee's shift
       const now = new Date();
       const reportData = await computeShiftReport(activeShift.startTime, now, activeShift.salesUserId);
       return res.json({ shift: activeShift, ...reportData });
@@ -1371,24 +1382,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // GET /api/sales/shifts/:id/report — full report for a specific shift
+  // - Regular sales user: own shifts only (403 for others')
+  // - sales_admin or main admin: any shift
+  // Orders are always scoped to the shift owner to keep totals consistent with shift-close
   app.get("/api/sales/shifts/:id/report", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
+      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
 
       const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, req.params.id));
       if (!shift) return res.status(404).json({ error: "الوردية غير موجودة" });
 
-      // Sales users can only view their own shifts
-      if (salesUserId && !adminId && shift.salesUserId !== salesUserId) {
+      // Regular sales users can only view their own shifts
+      if (!isSupervisor && salesUserId && shift.salesUserId !== salesUserId) {
         return res.status(403).json({ error: "غير مصرح" });
       }
 
       const endTime = shift.endTime || new Date();
-      // Always scope in-store orders to the shift owner so concurrent shifts don't bleed into each other
-      const scopeUserId = adminId && !salesUserId ? null : shift.salesUserId;
-      const reportData = await computeShiftReport(shift.startTime, endTime, scopeUserId);
+      // Always scope orders to the shift owner — this keeps active-snapshot, shift-close totals,
+      // and the printed report all consistent. Supervisors see the owner-scoped view too.
+      const reportData = await computeShiftReport(shift.startTime, endTime, shift.salesUserId);
       res.set('Cache-Control', 'no-store');
       return res.json({ shift, ...reportData });
     } catch (error) {
