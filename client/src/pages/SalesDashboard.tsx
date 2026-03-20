@@ -28,7 +28,10 @@ import {
   Loader2,
   PlayCircle,
   StopCircle,
-  Timer
+  Timer,
+  HandCoins,
+  Trash2,
+  Plus
 } from "lucide-react";
 import { Link } from "wouter";
 import type { Order, Product, SalesShift } from "@shared/schema";
@@ -60,6 +63,12 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
   const [openingCash, setOpeningCash] = useState("");
   const [closingCash, setClosingCash] = useState("");
   const [shiftNotes, setShiftNotes] = useState("");
+
+  // Staff advances state
+  const [showAdvanceForm, setShowAdvanceForm] = useState(false);
+  const [advanceAmount, setAdvanceAmount] = useState("");
+  const [advanceStaffName, setAdvanceStaffName] = useState("");
+  const [advanceReason, setAdvanceReason] = useState("");
 
   // Fetch current shift
   const { data: currentShift } = useQuery<SalesShift | null>({
@@ -134,6 +143,46 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       });
     }
   };
+
+  // Fetch staff advances for today
+  interface StaffAdvance { id: number; amount: string; staffName: string; reason: string | null; createdAt: string; }
+  const { data: advances = [], isLoading: advancesLoading } = useQuery<StaffAdvance[]>({
+    queryKey: ['/api/instore/staff-advances'],
+  });
+
+  const addAdvanceMutation = useMutation({
+    mutationFn: async (data: { amount: string; staffName: string; reason: string }) => {
+      const res = await apiRequest('POST', '/api/instore/staff-advances', data);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error'); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: language === 'ar' ? 'تمت إضافة السلفة' : 'Advance added' });
+      setShowAdvanceForm(false);
+      setAdvanceAmount("");
+      setAdvanceStaffName("");
+      setAdvanceReason("");
+      queryClient.invalidateQueries({ queryKey: ['/api/instore/staff-advances'] });
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteAdvanceMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest('DELETE', `/api/instore/staff-advances/${id}`);
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Error'); }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: language === 'ar' ? 'تم حذف السلفة' : 'Advance deleted' });
+      queryClient.invalidateQueries({ queryKey: ['/api/instore/staff-advances'] });
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: 'destructive' });
+    },
+  });
 
   // Fetch today's orders
   const { data: orders = [], isLoading: ordersLoading } = useQuery<Order[]>({
@@ -549,6 +598,136 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
           </CardContent>
         </Card>
       </div>
+
+      {/* Staff Advances (دفع من الجيب) */}
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between gap-1 pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <HandCoins className="h-5 w-5 text-emerald-600" />
+            {language === 'ar' ? 'دفع من الجيب (سلف الموظفين)' : 'Staff Advances'}
+            {advances.length > 0 && (
+              <Badge variant="outline" className="text-emerald-600 border-emerald-400">
+                {advances.length}
+              </Badge>
+            )}
+          </CardTitle>
+          {currentShift && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-emerald-700 border-emerald-300"
+              onClick={() => setShowAdvanceForm(v => !v)}
+              data-testid="button-toggle-advance-form"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              {language === 'ar' ? 'إضافة' : 'Add'}
+            </Button>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!currentShift && (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              {language === 'ar' ? 'ابدأ وردية لإضافة سلف' : 'Start a shift to add advances'}
+            </p>
+          )}
+          {showAdvanceForm && currentShift && (
+            <div className="p-3 rounded-lg border border-emerald-200 bg-emerald-50/40 dark:bg-emerald-900/10 space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">{language === 'ar' ? 'اسم الموظف' : 'Staff Name'}</Label>
+                  <Input
+                    value={advanceStaffName}
+                    onChange={e => setAdvanceStaffName(e.target.value)}
+                    placeholder={language === 'ar' ? 'الاسم' : 'Name'}
+                    data-testid="input-advance-staff-name"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{language === 'ar' ? 'المبلغ (د.ع)' : 'Amount (IQD)'}</Label>
+                  <Input
+                    type="number"
+                    value={advanceAmount}
+                    onChange={e => setAdvanceAmount(e.target.value)}
+                    placeholder="0"
+                    data-testid="input-advance-amount"
+                  />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{language === 'ar' ? 'السبب (اختياري)' : 'Reason (optional)'}</Label>
+                <Input
+                  value={advanceReason}
+                  onChange={e => setAdvanceReason(e.target.value)}
+                  placeholder={language === 'ar' ? 'سبب السلفة...' : 'Reason...'}
+                  data-testid="input-advance-reason"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <Button size="sm" variant="outline" onClick={() => setShowAdvanceForm(false)}>
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </Button>
+                <Button
+                  size="sm"
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  disabled={!advanceAmount || !advanceStaffName || addAdvanceMutation.isPending}
+                  onClick={() => addAdvanceMutation.mutate({ amount: advanceAmount, staffName: advanceStaffName, reason: advanceReason })}
+                  data-testid="button-submit-advance"
+                >
+                  {addAdvanceMutation.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin me-1" /> : null}
+                  {language === 'ar' ? 'حفظ' : 'Save'}
+                </Button>
+              </div>
+            </div>
+          )}
+          {advancesLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin" />
+            </div>
+          ) : advances.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-2">
+              {language === 'ar' ? 'لا توجد سلف اليوم' : 'No advances today'}
+            </p>
+          ) : (
+            <div className="space-y-2">
+              {advances.map(adv => (
+                <div key={adv.id} className="flex items-center justify-between p-2.5 rounded-lg bg-emerald-50/60 dark:bg-emerald-900/10 border border-emerald-100 dark:border-emerald-900/30" data-testid={`row-advance-${adv.id}`}>
+                  <div className="flex items-center gap-2.5">
+                    <HandCoins className="h-4 w-4 text-emerald-600 flex-shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium">{adv.staffName}</p>
+                      {adv.reason && <p className="text-xs text-muted-foreground">{adv.reason}</p>}
+                      <p className="text-xs text-muted-foreground">
+                        {new Date(adv.createdAt).toLocaleTimeString(language === 'ar' ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold text-emerald-700 text-sm">{formatPrice(parseFloat(adv.amount))} {language === 'ar' ? 'د.ع' : 'IQD'}</span>
+                    {currentShift && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                        disabled={deleteAdvanceMutation.isPending}
+                        onClick={() => deleteAdvanceMutation.mutate(adv.id)}
+                        data-testid={`button-delete-advance-${adv.id}`}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+              <div className="flex justify-between items-center pt-1 border-t border-emerald-200 dark:border-emerald-900/30">
+                <span className="text-sm text-muted-foreground">{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
+                <span className="font-bold text-emerald-700">
+                  {formatPrice(advances.reduce((s, a) => s + parseFloat(a.amount), 0))} {language === 'ar' ? 'د.ع' : 'IQD'}
+                </span>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Payment Methods Summary */}
       <Card>

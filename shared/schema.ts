@@ -1010,6 +1010,24 @@ export const insertCashWithdrawalSchema = createInsertSchema(cashWithdrawals).om
 export type InsertCashWithdrawal = z.infer<typeof insertCashWithdrawalSchema>;
 export type CashWithdrawal = typeof cashWithdrawals.$inferSelect;
 
+// ==================== Staff Advances ====================
+
+export const staffAdvances = pgTable("staff_advances", {
+  id: serial("id").primaryKey(),
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
+  staffName: text("staff_name").notNull(),
+  reason: text("reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertStaffAdvanceSchema = createInsertSchema(staffAdvances).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertStaffAdvance = z.infer<typeof insertStaffAdvanceSchema>;
+export type StaffAdvance = typeof staffAdvances.$inferSelect;
+
 // ==================== Recycle Bin ====================
 
 export const recycleBin = pgTable("recycle_bin", {

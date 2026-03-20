@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -1281,21 +1281,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(and(gte(cashWithdrawals.createdAt, startTime), lte(cashWithdrawals.createdAt, endTime)))
       .orderBy(desc(cashWithdrawals.createdAt));
 
+    // Staff advances in the same time window (no salesUserId column, scoped by time only)
+    const dailyAdvances = await db.select().from(staffAdvances)
+      .where(and(gte(staffAdvances.createdAt, startTime), lte(staffAdvances.createdAt, endTime)))
+      .orderBy(desc(staffAdvances.createdAt));
+
     const inStoreTotalCash = inStoreOrders.filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalZain = inStoreOrders.filter(o => o.paymentMethod === 'zaincash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalQi = inStoreOrders.filter(o => o.paymentMethod === 'qicard' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalDeferred = inStoreOrders.filter(o => o.paymentStatus === 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotal = inStoreOrders.filter(o => o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const totalWithdrawals = dailyWithdrawals.reduce((s, w) => s + parseFloat(w.amount), 0);
+    const totalAdvances = dailyAdvances.reduce((s, a) => s + parseFloat(a.amount), 0);
     const repairTotalDeferred = paidRepairTickets.filter(t => t.paymentStatus === 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
     const repairTotal = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
     const repairTotalCash = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod)).reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
     const repairTotalCard = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred' && t.paymentMethod === 'card').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
 
+    const baseGrandTotal = inStoreTotal + repairTotal;
+    const grandTotal = baseGrandTotal + totalAdvances;
+
     return {
       inStoreSales: inStoreOrders,
       repairSales: paidRepairTickets,
       withdrawals: dailyWithdrawals,
+      advances: dailyAdvances,
       summary: {
         inStoreCount: inStoreOrders.length,
         inStoreTotal,
@@ -1312,12 +1322,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         repairTotalQi: 0,
         totalWithdrawals,
         withdrawalCount: dailyWithdrawals.length,
-        grandTotal: inStoreTotal + repairTotal,
+        advancesTotal: totalAdvances,
+        advancesCount: dailyAdvances.length,
+        grandTotal,
         grandTotalCash: inStoreTotalCash + repairTotalCash,
         grandTotalCard: repairTotalCard,
         grandTotalZain: inStoreTotalZain,
         grandTotalQi: inStoreTotalQi,
-        netTotal: (inStoreTotal + repairTotal) - totalWithdrawals,
+        netTotal: grandTotal - totalWithdrawals,
       }
     };
   }
@@ -6498,7 +6510,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      const { db } = await import("./db");
+      // Shift lock: reject if no active shift (skip check for admin users)
+      if (!adminId && salesUserId) {
+        const [activeShift] = await db.select().from(salesShifts)
+          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
+          .limit(1);
+        if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      }
+
       const { cashWithdrawals, insertCashWithdrawalSchema } = await import("../shared/schema");
       const parsed = insertCashWithdrawalSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error });
@@ -6539,14 +6558,88 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      const { db } = await import("./db");
-      const { cashWithdrawals } = await import("../shared/schema");
-      const { eq } = await import("drizzle-orm");
+      // Shift lock: reject if no active shift (skip check for admin users)
+      if (!adminId && salesUserId) {
+        const [activeShift] = await db.select().from(salesShifts)
+          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
+          .limit(1);
+        if (!activeShift) return res.status(400).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
+      }
+
       await db.delete(cashWithdrawals).where(eq(cashWithdrawals.id, parseInt(req.params.id)));
       res.json({ success: true });
     } catch (err) {
       console.error("Withdrawal delete error:", err);
       res.status(500).json({ error: "خطأ في حذف السحب" });
+    }
+  });
+
+  // ─── Staff Advances ──────────────────────────────────────────────────────────
+  app.get("/api/instore/staff-advances", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const dateParam = req.query.date as string;
+      const baghdadDateStr = dateParam || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+      const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
+      const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
+
+      const rows = await db.select().from(staffAdvances)
+        .where(and(gte(staffAdvances.createdAt, startOfDay), lte(staffAdvances.createdAt, endOfDay)))
+        .orderBy(desc(staffAdvances.createdAt));
+      res.json(rows);
+    } catch (err) {
+      console.error("Staff advances fetch error:", err);
+      res.status(500).json({ error: "خطأ في جلب السلف" });
+    }
+  });
+
+  app.post("/api/instore/staff-advances", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      // Shift lock: reject if no active shift (skip check for admin users)
+      if (!adminId && salesUserId) {
+        const [activeShift] = await db.select().from(salesShifts)
+          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
+          .limit(1);
+        if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      }
+
+      const parsed = insertStaffAdvanceSchema.safeParse(req.body);
+      if (!parsed.success) return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error });
+
+      const [row] = await db.insert(staffAdvances).values(parsed.data).returning();
+      res.json(row);
+    } catch (err) {
+      console.error("Staff advance create error:", err);
+      res.status(500).json({ error: "خطأ في إضافة السلفة" });
+    }
+  });
+
+  app.delete("/api/instore/staff-advances/:id", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      // Shift lock: reject if no active shift (skip check for admin users)
+      if (!adminId && salesUserId) {
+        const [activeShift] = await db.select().from(salesShifts)
+          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
+          .limit(1);
+        if (!activeShift) return res.status(400).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
+      }
+
+      await db.delete(staffAdvances).where(eq(staffAdvances.id, parseInt(req.params.id)));
+      res.json({ success: true });
+    } catch (err) {
+      console.error("Staff advance delete error:", err);
+      res.status(500).json({ error: "خطأ في حذف السلفة" });
     }
   });
 

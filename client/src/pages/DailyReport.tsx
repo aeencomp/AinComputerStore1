@@ -19,6 +19,7 @@ import {
   User,
   CheckCircle2,
   Radio,
+  HandCoins,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -78,6 +79,8 @@ interface DailyReportSummary {
   grandTotalQi: number;
   totalWithdrawals: number;
   withdrawalCount: number;
+  advancesTotal: number;
+  advancesCount: number;
   netTotal: number;
 }
 
@@ -89,11 +92,20 @@ interface Withdrawal {
   createdAt: string;
 }
 
+interface StaffAdvance {
+  id: number;
+  amount: string;
+  staffName: string;
+  reason: string | null;
+  createdAt: string;
+}
+
 interface ShiftReportData {
   shift: SalesShift;
   inStoreSales: InStoreOrder[];
   repairSales: RepairSale[];
   withdrawals: Withdrawal[];
+  advances: StaffAdvance[];
   summary: DailyReportSummary;
 }
 
@@ -128,7 +140,7 @@ function formatShiftRange(shift: SalesShift): string {
 }
 
 function buildPrintHTML(data: ShiftReportData): string {
-  const { shift, inStoreSales, repairSales, withdrawals = [], summary } = data;
+  const { shift, inStoreSales, repairSales, withdrawals = [], advances = [], summary } = data;
   const displayRange = formatShiftRange(shift);
 
   const inStoreRows = inStoreSales.map((o, i) => {
@@ -215,11 +227,23 @@ function buildPrintHTML(data: ShiftReportData): string {
       <td style="text-align:end;font-weight:600;color:#c2410c">${fmtNum(parseFloat(w.amount))}</td>
     </tr>`).join("");
 
+  const advanceRows = advances.map((a, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${a.staffName}</td>
+      <td>${a.reason || "—"}</td>
+      <td style="color:#666">${format(new Date(a.createdAt), "HH:mm")}</td>
+      <td style="text-align:end;font-weight:600;color:#059669">${fmtNum(parseFloat(a.amount))}</td>
+    </tr>`).join("");
+
+  const advancesTotal = (summary.advancesTotal ?? 0);
+
   const payBreakdown = [
     summary.grandTotalCash > 0 ? `<div class="breakdown-item"><span class="dot green"></span><span>نقداً</span><strong>${fmtNum(summary.grandTotalCash)}</strong></div>` : "",
     (summary.grandTotalCard ?? 0) > 0 ? `<div class="breakdown-item"><span class="dot teal"></span><span>بطاقة (صيانة)</span><strong>${fmtNum(summary.grandTotalCard)}</strong></div>` : "",
     summary.grandTotalZain > 0 ? `<div class="breakdown-item"><span class="dot blue"></span><span>ZainCash</span><strong>${fmtNum(summary.grandTotalZain)}</strong></div>` : "",
     summary.grandTotalQi > 0 ? `<div class="breakdown-item"><span class="dot purple"></span><span>QiCard</span><strong>${fmtNum(summary.grandTotalQi)}</strong></div>` : "",
+    advancesTotal > 0 ? `<div class="breakdown-item"><span class="dot emerald"></span><span>دفع من الجيب</span><strong style="color:#059669">+ ${fmtNum(advancesTotal)}</strong></div>` : "",
     summary.inStoreTotalDeferred > 0 ? `<div class="breakdown-item"><span class="dot orange"></span><span>آجل (غير محصّل)</span><strong style="color:#c2410c">${fmtNum(summary.inStoreTotalDeferred)}</strong></div>` : "",
     (summary.totalWithdrawals ?? 0) > 0 ? `<div class="breakdown-item"><span class="dot red"></span><span>السحوبات</span><strong style="color:#c2410c">- ${fmtNum(summary.totalWithdrawals)}</strong></div>` : "",
   ].join("");
@@ -340,11 +364,12 @@ function buildPrintHTML(data: ShiftReportData): string {
     .breakdown-item span { font-size: 10px; color: #555; display: flex; align-items: center; gap: 3px; }
     .breakdown-item strong { font-size: 12px; }
     .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-    .dot.green  { background: #16a34a; }
-    .dot.teal   { background: #0d9488; }
-    .dot.blue   { background: #2563eb; }
-    .dot.purple { background: #7c3aed; }
-    .dot.orange { background: #ea580c; }
+    .dot.green   { background: #16a34a; }
+    .dot.teal    { background: #0d9488; }
+    .dot.blue    { background: #2563eb; }
+    .dot.purple  { background: #7c3aed; }
+    .dot.orange  { background: #ea580c; }
+    .dot.emerald { background: #059669; }
     .divider { width: 1px; height: 40px; background: #d1d5db; }
     .total-big { text-align: center; }
     .total-big .lbl { font-size: 10px; color: #666; }
@@ -393,16 +418,23 @@ function buildPrintHTML(data: ShiftReportData): string {
       <div class="value primary">${fmtNum(summary.grandTotal)}</div>
       <div class="sub">&nbsp;</div>
     </div>
+    ${advancesTotal > 0 ? `
+    <div class="summary-box">
+      <div class="label">دفع من الجيب (سلف)</div>
+      <div class="value" style="color:#059669">+ ${fmtNum(advancesTotal)}</div>
+      <div class="sub">${summary.advancesCount ?? 0} سلفة</div>
+    </div>` : ""}
     ${(summary.totalWithdrawals ?? 0) > 0 ? `
     <div class="summary-box">
       <div class="label">السحوبات</div>
       <div class="value" style="color:#c2410c">- ${fmtNum(summary.totalWithdrawals)}</div>
       <div class="sub">${summary.withdrawalCount} عملية</div>
-    </div>
-    <div class="summary-box" style="border-color:#111;grid-column:span 2">
+    </div>` : ""}
+    ${(advancesTotal > 0 || (summary.totalWithdrawals ?? 0) > 0) ? `
+    <div class="summary-box" style="border-color:#111;grid-column:span ${advancesTotal > 0 && (summary.totalWithdrawals ?? 0) > 0 ? 1 : 2}">
       <div class="label">صافي الإيراد</div>
       <div class="value" style="color:#111;font-size:20px">${fmtNum(summary.netTotal)}</div>
-      <div class="sub">بعد خصم السحوبات</div>
+      <div class="sub">بعد احتساب السلف والسحوبات</div>
     </div>` : ""}
   </div>
 
@@ -460,6 +492,18 @@ function buildPrintHTML(data: ShiftReportData): string {
     <thead><tr><th>#</th><th>الموظف</th><th>السبب</th><th>الوقت</th><th>المبلغ</th></tr></thead>
     <tbody>${withdrawalRows}</tbody>
     <tfoot><tr><td colspan="4">إجمالي السحوبات</td><td style="color:#c2410c">${fmtNum(summary.totalWithdrawals)}</td></tr></tfoot>
+  </table>` : ""}
+
+  ${advances.length > 0 ? `
+  <div class="section-title">
+    <span class="icon-dot" style="background:#059669"></span>
+    دفع من الجيب (سلف الموظفين)
+    <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${advances.length} سجل</span>
+  </div>
+  <table>
+    <thead><tr><th>#</th><th>الموظف</th><th>السبب</th><th>الوقت</th><th>المبلغ</th></tr></thead>
+    <tbody>${advanceRows}</tbody>
+    <tfoot><tr><td colspan="4">إجمالي السلف</td><td style="color:#059669">+ ${fmtNum(advancesTotal)}</td></tr></tfoot>
   </table>` : ""}
 
   <div class="grand-total-bar">
@@ -760,9 +804,30 @@ export default function DailyReport({ user }: DailyReportProps) {
                     <div className="space-y-1.5 mb-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">
-                          {language === "ar" ? "الإجمالي (متجر + تصليح)" : "Subtotal (store + repair)"}
+                          {language === "ar" ? "متجر + تصليح" : "Store + Repair"}
                         </span>
-                        <span className="font-medium" data-testid="text-grand-total">
+                        <span className="font-medium">
+                          {fmtNum((data.summary.inStoreTotal ?? 0) + (data.summary.repairTotal ?? 0))}
+                        </span>
+                      </div>
+                      {(data.summary.advancesTotal ?? 0) > 0 && (
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                            <HandCoins className="h-3.5 w-3.5" />
+                            {language === "ar"
+                              ? `دفع من الجيب (${data.summary.advancesCount} سلفة)`
+                              : `Staff Advances (${data.summary.advancesCount})`}
+                          </span>
+                          <span className="font-medium text-emerald-600 dark:text-emerald-400" data-testid="text-advances-total">
+                            + {fmtNum(data.summary.advancesTotal)}
+                          </span>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between text-sm font-medium border-t border-border pt-1.5">
+                        <span className="text-muted-foreground">
+                          {language === "ar" ? "الإجمالي الكلي" : "Grand Total"}
+                        </span>
+                        <span data-testid="text-grand-total">
                           {fmtNum(data.summary.grandTotal)}
                         </span>
                       </div>
@@ -784,7 +849,7 @@ export default function DailyReport({ user }: DailyReportProps) {
                           {language === "ar" ? "صافي الإيراد" : "Net Revenue"}
                         </span>
                         <span className="text-2xl font-bold text-primary" data-testid="text-net-total">
-                          {fmtNum(data.summary.grandTotal - (data.summary.totalWithdrawals ?? 0))}
+                          {fmtNum(data.summary.netTotal)}
                         </span>
                       </div>
                     </div>
@@ -1096,6 +1161,57 @@ export default function DailyReport({ user }: DailyReportProps) {
                 </Card>
               )}
 
+              {/* Staff Advances */}
+              {(data.advances?.length ?? 0) > 0 && (
+                <Card className="border-emerald-200 dark:border-emerald-900/40">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <HandCoins className="h-5 w-5 text-emerald-600" />
+                      {language === "ar" ? "دفع من الجيب (سلف الموظفين)" : "Staff Advances"}
+                      <Badge variant="secondary" className="ms-auto">{data.advances.length}</Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr className="border-b bg-emerald-50/50 dark:bg-emerald-900/10 text-xs font-semibold text-muted-foreground">
+                            <th className="py-2 px-4 text-start">#</th>
+                            <th className="py-2 px-4 text-start">{language === "ar" ? "الموظف" : "Staff"}</th>
+                            <th className="py-2 px-4 text-start">{language === "ar" ? "السبب" : "Reason"}</th>
+                            <th className="py-2 px-4 text-start">{language === "ar" ? "الوقت" : "Time"}</th>
+                            <th className="py-2 px-4 text-end">{language === "ar" ? "المبلغ" : "Amount"}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.advances.map((a, i) => (
+                            <tr key={a.id} className="border-b last:border-0 hover:bg-muted/10" data-testid={`row-advance-report-${a.id}`}>
+                              <td className="py-2 px-4 text-muted-foreground">{i + 1}</td>
+                              <td className="py-2 px-4 font-medium">{a.staffName}</td>
+                              <td className="py-2 px-4 text-muted-foreground">{a.reason || "—"}</td>
+                              <td className="py-2 px-4 text-muted-foreground text-xs">
+                                {format(new Date(a.createdAt), "HH:mm")}
+                              </td>
+                              <td className="py-2 px-4 text-end font-semibold text-emerald-600 dark:text-emerald-400">
+                                + {fmtNum(parseFloat(a.amount))}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-emerald-50/50 dark:bg-emerald-900/10 border-t-2 font-semibold">
+                            <td colSpan={4} className="py-2 px-4">{language === "ar" ? "إجمالي السلف" : "Total Advances"}</td>
+                            <td className="py-2 px-4 text-end text-emerald-600 dark:text-emerald-400">
+                              + {fmtNum(data.summary.advancesTotal ?? 0)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Grand Total Bar */}
               <Card className="border-primary/30">
                 <CardContent className="py-4">
@@ -1150,6 +1266,15 @@ export default function DailyReport({ user }: DailyReportProps) {
                             آجل
                           </p>
                           <p className="font-semibold text-orange-600">{fmtNum(data.summary.inStoreTotalDeferred)}</p>
+                        </div>
+                      )}
+                      {(data.summary.advancesTotal ?? 0) > 0 && (
+                        <div className="text-center">
+                          <p className="text-xs text-muted-foreground flex items-center gap-1">
+                            <HandCoins className="h-3 w-3 text-emerald-500" />
+                            {language === "ar" ? "دفع من الجيب" : "Advances"}
+                          </p>
+                          <p className="font-semibold text-emerald-600">+ {fmtNum(data.summary.advancesTotal)}</p>
                         </div>
                       )}
                       <Separator orientation="vertical" className="h-10" />
