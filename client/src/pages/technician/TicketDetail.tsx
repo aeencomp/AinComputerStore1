@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { ArrowLeft, Trash2, Printer } from 'lucide-react';
+import { ArrowLeft, Trash2, Printer, Lock } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -119,6 +119,11 @@ export default function TicketDetail() {
       });
     }
   }, [ticket, form]);
+
+  // Ticket is immutable once delivered with a final payment (paid or deferred)
+  const isLocked = !!ticket &&
+    ticket.status === 'delivered' &&
+    (ticket.paymentStatus === 'paid' || ticket.paymentStatus === 'deferred');
 
   const watchedPriority = form.watch('priority');
   const watchedPaymentStatus = form.watch('paymentStatus');
@@ -479,9 +484,30 @@ export default function TicketDetail() {
           </CardContent>
         </Card>
 
+        {isLocked && (
+          <Card className="border-orange-300 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-700">
+            <CardContent className="py-3 px-4 flex items-center gap-3">
+              <Lock className="h-5 w-5 text-orange-600 dark:text-orange-400 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-semibold text-orange-800 dark:text-orange-300">
+                  {isRTL ? 'التذكرة مقفلة — تم التسليم النهائي' : 'Ticket locked — final delivery recorded'}
+                </p>
+                <p className="text-xs text-orange-700 dark:text-orange-400">
+                  {isRTL
+                    ? 'لا يمكن تعديل هذه التذكرة بعد تعيين الحالة إلى مُسلَّم مع الدفع أو التأجيل.'
+                    : 'This ticket cannot be edited after being set to Delivered + Paid or Delivered + Deferred.'}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardHeader>
-            <CardTitle>{t('repair.edit.title')}</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              {t('repair.edit.title')}
+              {isLocked && <Lock className="h-4 w-4 text-orange-500" />}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <Form {...form}>
@@ -493,9 +519,9 @@ export default function TicketDetail() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t('repair.ticket.status')}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isLocked}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-status">
+                            <SelectTrigger data-testid="select-status" disabled={isLocked}>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -520,9 +546,9 @@ export default function TicketDetail() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t('repair.ticket.priority')}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isLocked}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-priority">
+                            <SelectTrigger data-testid="select-priority" disabled={isLocked}>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -546,7 +572,7 @@ export default function TicketDetail() {
                       <FormItem>
                         <FormLabel>{t('repair.ticket.estimatedCompletion')}</FormLabel>
                         <FormControl>
-                          <Input type="date" {...field} data-testid="input-estimated-completion" />
+                          <Input type="date" {...field} disabled={isLocked} data-testid="input-estimated-completion" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -560,7 +586,7 @@ export default function TicketDetail() {
                       <FormItem>
                         <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-cost-estimate" />
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} disabled={isLocked} data-testid="input-cost-estimate" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -573,7 +599,7 @@ export default function TicketDetail() {
                       <FormItem>
                         <FormLabel>{t('repair.ticket.finalCost')}</FormLabel>
                         <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="input-final-cost" />
+                          <Input type="number" step="0.01" placeholder="0.00" {...field} disabled={isLocked} data-testid="input-final-cost" />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -585,9 +611,9 @@ export default function TicketDetail() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t('repair.ticket.paymentStatus') || 'حالة الدفع'}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isLocked}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-payment-status">
+                            <SelectTrigger data-testid="select-payment-status" disabled={isLocked}>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -607,9 +633,9 @@ export default function TicketDetail() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value || 'cash'}>
+                        <Select onValueChange={field.onChange} value={field.value || 'cash'} disabled={isLocked}>
                           <FormControl>
-                            <SelectTrigger data-testid="select-payment-method">
+                            <SelectTrigger data-testid="select-payment-method" disabled={isLocked}>
                               <SelectValue />
                             </SelectTrigger>
                           </FormControl>
@@ -635,6 +661,7 @@ export default function TicketDetail() {
                           placeholder={t('repair.edit.addNotes') || 'Add notes...'}
                           rows={4}
                           {...field}
+                          disabled={isLocked}
                           data-testid="textarea-technician-notes"
                         />
                       </FormControl>
@@ -644,7 +671,7 @@ export default function TicketDetail() {
                 />
 
                 <div className="flex items-center gap-4 justify-between">
-                  <Button type="submit" disabled={updateMutation.isPending} data-testid="button-save-ticket">
+                  <Button type="submit" disabled={updateMutation.isPending || isLocked} data-testid="button-save-ticket">
                     {updateMutation.isPending ? t('repair.edit.saving') : t('repair.edit.save')}
                   </Button>
                   

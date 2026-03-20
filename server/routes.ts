@@ -2808,6 +2808,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { id } = req.params;
 
+      // Locked states: once delivered+paid or delivered+deferred, ticket is immutable
+      const existing = await storage.getRepairTicket(id);
+      if (existing && existing.status === 'delivered' &&
+          (existing.paymentStatus === 'paid' || existing.paymentStatus === 'deferred')) {
+        return res.status(403).json({ error: "لا يمكن تعديل التذكرة بعد التسليم النهائي" });
+      }
+
       // Build update object with all fields including prices (all technicians can edit prices)
       const updateData: Record<string, any> = {};
       
