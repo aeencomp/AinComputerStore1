@@ -6510,13 +6510,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Shift lock: reject if no active shift (skip check for admin users)
-      if (!adminId && salesUserId) {
-        const [activeShift] = await db.select().from(salesShifts)
-          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
-          .limit(1);
-        if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
-      }
+      // Require an active shift for everyone (admin and sales users alike)
+      const [activeShift] = await db.select().from(salesShifts)
+        .where(eq(salesShifts.status, 'active'))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       const { cashWithdrawals, insertCashWithdrawalSchema } = await import("../shared/schema");
       const parsed = insertCashWithdrawalSchema.safeParse(req.body);
@@ -6552,6 +6551,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (containingShift && containingShift.status === 'closed') {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
+
+      // Also require an active shift
+      const [activeShift] = await db.select().from(salesShifts)
+        .where(eq(salesShifts.status, 'active')).limit(1);
+      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       const { amount, reason, employeeName } = req.body;
       const updates: Record<string, unknown> = {};
@@ -6590,6 +6594,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
 
+      // Also require an active shift (no dangling deletes when no shift is open at all)
+      const [activeShift] = await db.select().from(salesShifts)
+        .where(eq(salesShifts.status, 'active')).limit(1);
+      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+
       await db.delete(cashWithdrawals).where(eq(cashWithdrawals.id, recordId));
       res.json({ success: true });
     } catch (err) {
@@ -6626,13 +6635,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Shift lock: reject if no active shift (skip check for admin users)
-      if (!adminId && salesUserId) {
-        const [activeShift] = await db.select().from(salesShifts)
-          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
-          .limit(1);
-        if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
-      }
+      // Require an active shift for everyone (admin and sales users alike)
+      const [activeShift] = await db.select().from(salesShifts)
+        .where(eq(salesShifts.status, 'active'))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       const parsed = insertStaffAdvanceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error });
@@ -6668,6 +6676,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (containingShift && containingShift.status === 'closed') {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
+
+      // Also require an active shift (no dangling deletes when no shift is open at all)
+      const [activeShift] = await db.select().from(salesShifts)
+        .where(eq(salesShifts.status, 'active')).limit(1);
+      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       await db.delete(staffAdvances).where(eq(staffAdvances.id, recordId));
       res.json({ success: true });
