@@ -151,8 +151,13 @@ export default function TicketDetail() {
       return res.json();
     },
     onSuccess: (response: any) => {
+      // Immediately push the fresh ticket into the cache so isLocked re-evaluates
+      // right now instead of waiting for a background refetch to complete.
+      if (response && params?.id) {
+        const { _whatsappStatus, ...freshTicket } = response;
+        queryClient.setQueryData(['/api/repair-tickets', params.id], freshTicket);
+      }
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets', params?.id] });
       toast({
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
