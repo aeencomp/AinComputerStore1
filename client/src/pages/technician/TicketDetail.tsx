@@ -247,15 +247,15 @@ export default function TicketDetail() {
           <head>
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
-              @page { size: 50mm 25mm; margin: 0; }
+              @page { size: 50mm 30mm; margin: 0; }
               * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1.5mm 2mm; }
+              body { width: 50mm; min-height: 30mm; height: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, sans-serif; background: #fff; padding: 1.5mm 2mm; }
               .store-name { font-size: 8pt; font-weight: 900; text-align: center; letter-spacing: 0.3px; }
               .barcode-container { text-align: center; margin: 1mm 0; }
               .barcode-container svg { max-width: 44mm; height: 10mm; }
               .serial { font-size: 9pt; font-weight: 800; text-align: center; letter-spacing: 0.5px; }
-              .customer-info { font-size: 7pt; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; max-width: 48mm; margin-top: 0.2mm; }
-              .phone-info { font-size: 7pt; font-weight: 800; text-align: center; direction: ltr; margin-top: 0.2mm; letter-spacing: 0.3px; }
+              .customer-info { font-size: 7pt; font-weight: 700; text-align: center; word-break: break-all; max-width: 46mm; margin-top: 0.5mm; line-height: 1.2; }
+              .phone-info { font-size: 7pt; font-weight: 800; text-align: center; direction: ltr; margin-top: 0.5mm; letter-spacing: 0.3px; }
             </style>
           </head>
           <body>${printContents}</body>
@@ -482,7 +482,7 @@ export default function TicketDetail() {
                   {ticket.ticketNumber}
                 </div>
                 {ticketCustomer && (
-                  <div className="customer-info" style={{ textAlign: 'center', fontWeight: 700, fontSize: '8px', letterSpacing: '0.2px', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+                  <div className="customer-info" style={{ textAlign: 'center', fontWeight: 700, fontSize: '8px', letterSpacing: '0.2px', marginTop: '1px', wordBreak: 'break-all' }}>
                     {ticketCustomer.customerId} — {ticket.customerName}
                   </div>
                 )}

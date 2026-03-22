@@ -155,15 +155,15 @@ export default function ShopNewRepair() {
           <head>
             <title>${isRTL ? 'بطاقة الصيانة' : 'Repair Label'}</title>
             <style>
-              @page { size: 50mm 25mm; margin: 0; }
+              @page { size: 50mm 30mm; margin: 0; }
               * { margin: 0; padding: 0; box-sizing: border-box; }
-              body { width: 50mm; height: 25mm; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, Helvetica, sans-serif; background: #fff; padding: 0.8mm 1mm; }
-              .store-name { font-size: 7pt; font-weight: 900; text-align: center; letter-spacing: 0.2px; line-height: 1.1; white-space: nowrap; overflow: hidden; max-width: 48mm; }
+              body { width: 50mm; min-height: 30mm; height: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; font-family: Arial, Helvetica, sans-serif; background: #fff; padding: 0.8mm 1mm; }
+              .store-name { font-size: 7pt; font-weight: 900; text-align: center; letter-spacing: 0.2px; line-height: 1.1; max-width: 48mm; }
               .barcode-container { text-align: center; width: 100%; margin: 0.5mm 0; }
               .barcode-container svg { width: 48mm; height: 13mm; display: block; margin: 0 auto; }
               .serial { font-size: 9pt; font-weight: 900; text-align: center; letter-spacing: 1.5px; font-family: 'Courier New', Courier, monospace; }
-              .customer-info { font-size: 6pt; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; max-width: 48mm; margin-top: 0.2mm; }
-              .phone-info { font-size: 6.5pt; font-weight: 800; text-align: center; direction: ltr; margin-top: 0.2mm; letter-spacing: 0.3px; }
+              .customer-info { font-size: 6pt; font-weight: 700; text-align: center; word-break: break-all; max-width: 46mm; margin-top: 0.5mm; line-height: 1.2; }
+              .phone-info { font-size: 6.5pt; font-weight: 800; text-align: center; direction: ltr; margin-top: 0.5mm; letter-spacing: 0.3px; }
             </style>
           </head>
           <body>${printContents}</body>
