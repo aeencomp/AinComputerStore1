@@ -633,21 +633,9 @@ export default function TechnicianDashboard() {
                     onKeyDown={(e) => e.stopPropagation()}
                   >
                     <Select
-                      value={
-                        ticket.status === 'delivered' && ticket.paymentStatus === 'paid'
-                          ? 'delivered-paid'
-                          : ticket.status === 'delivered' && ticket.paymentStatus === 'deferred'
-                          ? 'delivered-deferred'
-                          : ticket.status
-                      }
+                      value={ticket.status}
                       onValueChange={(val) => {
-                        if (val === 'delivered-paid') {
-                          statusUpdateMutation.mutate({ id: ticket.id, status: 'delivered', paymentStatus: 'paid' });
-                        } else if (val === 'delivered-deferred') {
-                          statusUpdateMutation.mutate({ id: ticket.id, status: 'delivered', paymentStatus: 'deferred' });
-                        } else {
-                          statusUpdateMutation.mutate({ id: ticket.id, status: val });
-                        }
+                        statusUpdateMutation.mutate({ id: ticket.id, status: val });
                       }}
                       disabled={
                         ticket.status === 'delivered' &&
@@ -660,11 +648,7 @@ export default function TechnicianDashboard() {
                       >
                         <div className="flex items-center gap-2">
                           <Badge className={getStatusColor(ticket.status) + ' text-xs'}>
-                            {ticket.status === 'delivered' && ticket.paymentStatus === 'paid'
-                              ? (language === 'ar' ? 'مُسلَّم - مدفوع' : 'Delivered - Paid')
-                              : ticket.status === 'delivered' && ticket.paymentStatus === 'deferred'
-                              ? (language === 'ar' ? 'مُسلَّم - آجل' : 'Delivered - Deferred')
-                              : t(`repair.status.${ticket.status}`)}
+                            {t(`repair.status.${ticket.status}`)}
                           </Badge>
                         </div>
                       </SelectTrigger>
@@ -674,8 +658,6 @@ export default function TechnicianDashboard() {
                         <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                         <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                         <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
-                        <SelectItem value="delivered-paid">{language === 'ar' ? 'مُسلَّم - مدفوع' : 'Delivered - Paid'}</SelectItem>
-                        <SelectItem value="delivered-deferred">{language === 'ar' ? 'مُسلَّم - آجل' : 'Delivered - Deferred'}</SelectItem>
                         <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                         <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
                       </SelectContent>
@@ -703,51 +685,25 @@ export default function TechnicianDashboard() {
                     </span>
                   </div>
 
-                  <div
-                    className="pt-1 space-y-1"
-                    onClick={(e) => e.stopPropagation()}
-                    onKeyDown={(e) => e.stopPropagation()}
-                    data-testid={`text-payment-status-${ticket.id}`}
-                  >
-                    <Select
-                      value={ticket.paymentStatus || 'unpaid'}
-                      onValueChange={(val) => {
-                        paymentStatusMutation.mutate({ id: ticket.id, paymentStatus: val });
-                      }}
-                      disabled={
-                        paymentStatusMutation.isPending ||
-                        (ticket.status === 'delivered' &&
-                          (ticket.paymentStatus === 'paid' || ticket.paymentStatus === 'deferred'))
-                      }
-                    >
-                      <SelectTrigger className="w-full" data-testid={`select-payment-status-${ticket.id}`}>
-                        <div className="flex items-center gap-2">
-                          {ticket.paymentStatus === 'paid' ? (
-                            <Badge className="bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs">
-                              {t('repair.payment.paid')}
-                            </Badge>
-                          ) : ticket.paymentStatus === 'deferred' ? (
-                            <Badge className="bg-orange-100 text-orange-700 border border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700 text-xs">
-                              {t('repair.payment.deferred')}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-muted-foreground text-xs">
-                              {t('repair.payment.unpaid')}
-                            </Badge>
-                          )}
-                        </div>
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="unpaid">{t('repair.payment.unpaid')}</SelectItem>
-                        <SelectItem value="paid">{t('repair.payment.paid')}</SelectItem>
-                        <SelectItem value="deferred">{t('repair.payment.deferred')}</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {ticket.paymentStatus === 'paid' && (
-                      <Badge variant="outline" className="text-xs">
-                        {(ticket as any).paymentMethod === 'card'
-                          ? (language === 'ar' ? 'بطاقة' : 'Card')
-                          : (language === 'ar' ? 'نقداً' : 'Cash')}
+                  <div className="pt-1 flex items-center gap-2" data-testid={`text-payment-status-${ticket.id}`}>
+                    {ticket.paymentStatus === 'paid' ? (
+                      <>
+                        <Badge className="bg-green-100 text-green-700 border border-green-300 dark:bg-green-900/30 dark:text-green-300 dark:border-green-700 text-xs">
+                          {t('repair.payment.paid')}
+                        </Badge>
+                        <Badge variant="outline" className="text-xs">
+                          {(ticket as any).paymentMethod === 'card'
+                            ? (language === 'ar' ? 'بطاقة' : 'Card')
+                            : (language === 'ar' ? 'نقداً' : 'Cash')}
+                        </Badge>
+                      </>
+                    ) : ticket.paymentStatus === 'deferred' ? (
+                      <Badge className="bg-orange-100 text-orange-700 border border-orange-300 dark:bg-orange-900/30 dark:text-orange-300 dark:border-orange-700 text-xs">
+                        {t('repair.payment.deferred')}
+                      </Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-muted-foreground text-xs">
+                        {t('repair.payment.unpaid')}
                       </Badge>
                     )}
                   </div>
