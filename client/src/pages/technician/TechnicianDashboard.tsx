@@ -100,8 +100,10 @@ export default function TechnicianDashboard() {
   };
 
   const statusUpdateMutation = useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: string }) => {
-      const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${id}`, { status });
+    mutationFn: async ({ id, status, paymentStatus }: { id: string; status: string; paymentStatus?: string }) => {
+      const body: Record<string, string> = { status };
+      if (paymentStatus !== undefined) body.paymentStatus = paymentStatus;
+      const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${id}`, body);
       return res.json();
     },
     onSuccess: (response: any) => {
@@ -631,10 +633,26 @@ export default function TechnicianDashboard() {
                     onKeyDown={(e) => e.stopPropagation()}
                   >
                     <Select
-                      value={ticket.status}
-                      onValueChange={(newStatus) => {
-                        statusUpdateMutation.mutate({ id: ticket.id, status: newStatus });
+                      value={
+                        ticket.status === 'delivered' && ticket.paymentStatus === 'paid'
+                          ? 'delivered-paid'
+                          : ticket.status === 'delivered' && ticket.paymentStatus === 'deferred'
+                          ? 'delivered-deferred'
+                          : ticket.status
+                      }
+                      onValueChange={(val) => {
+                        if (val === 'delivered-paid') {
+                          statusUpdateMutation.mutate({ id: ticket.id, status: 'delivered', paymentStatus: 'paid' });
+                        } else if (val === 'delivered-deferred') {
+                          statusUpdateMutation.mutate({ id: ticket.id, status: 'delivered', paymentStatus: 'deferred' });
+                        } else {
+                          statusUpdateMutation.mutate({ id: ticket.id, status: val });
+                        }
                       }}
+                      disabled={
+                        ticket.status === 'delivered' &&
+                        (ticket.paymentStatus === 'paid' || ticket.paymentStatus === 'deferred')
+                      }
                     >
                       <SelectTrigger
                         className="w-full"
@@ -642,7 +660,11 @@ export default function TechnicianDashboard() {
                       >
                         <div className="flex items-center gap-2">
                           <Badge className={getStatusColor(ticket.status) + ' text-xs'}>
-                            {t(`repair.status.${ticket.status}`)}
+                            {ticket.status === 'delivered' && ticket.paymentStatus === 'paid'
+                              ? (language === 'ar' ? 'مُسلَّم - مدفوع' : 'Delivered - Paid')
+                              : ticket.status === 'delivered' && ticket.paymentStatus === 'deferred'
+                              ? (language === 'ar' ? 'مُسلَّم - آجل' : 'Delivered - Deferred')
+                              : t(`repair.status.${ticket.status}`)}
                           </Badge>
                         </div>
                       </SelectTrigger>
@@ -652,6 +674,8 @@ export default function TechnicianDashboard() {
                         <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                         <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                         <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+                        <SelectItem value="delivered-paid">{language === 'ar' ? 'مُسلَّم - مدفوع' : 'Delivered - Paid'}</SelectItem>
+                        <SelectItem value="delivered-deferred">{language === 'ar' ? 'مُسلَّم - آجل' : 'Delivered - Deferred'}</SelectItem>
                         <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                         <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
                       </SelectContent>
