@@ -7,6 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -44,7 +45,8 @@ import {
   UserSearch,
   Store,
   Battery,
-  Plug
+  Plug,
+  FileText
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { InStoreProduct, LaptopBattery, AcAdapter } from "@shared/schema";
@@ -122,6 +124,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
   const [holdNote, setHoldNote] = useState("");
   const [showCustomerLookup, setShowCustomerLookup] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [receiptNote, setReceiptNote] = useState("");
 
   const { data: mainProducts = [], isLoading: mainLoading } = useQuery<any[]>({
     queryKey: ['/api/products'],
@@ -346,6 +349,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         discount: calculatedDiscount.toString(),
         total: total.toString(),
         paymentMethod: paymentMethod,
+        notes: receiptNote || null,
       };
       
       setLastOrder(receiptOrder);
@@ -467,6 +471,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     setCustomerPhone("");
     setDiscount("0");
     setDiscountReason("");
+    setReceiptNote("");
   };
 
   const subtotal = cart.reduce((sum, item) =>
@@ -510,6 +515,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       paymentStatus: paymentMethod === 'deferred' ? 'deferred' : 'success',
       discount: calculatedDiscount.toString(),
       discountReason,
+      notes: receiptNote || null,
       orderType,
     };
 
@@ -638,6 +644,8 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     <span style="font-weight:700;">\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639: </span>
     <span style="font-weight:800;">${payLabel}</span>
   </div>
+
+  ${lastOrder.notes ? `<div style="padding:8px 12px;border-bottom:1px solid #d1d5db;font-size:11px;"><span style="font-weight:700;">\u0645\u0644\u0627\u062d\u0638\u0629: </span><span style="font-weight:800;">${lastOrder.notes}</span></div>` : ''}
 
   <div style="text-align:center;padding:10px 12px;border-top:2px dashed #000;margin-top:4px;">
     <div style="font-weight:800;font-size:13px;">\u0634\u0643\u0631\u0627\u064b \u0644\u062a\u0633\u0648\u0642\u0643\u0645 \u0645\u0639\u0646\u0627</div>
@@ -1248,6 +1256,21 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                       )}
                     </div>
                   ) : null}
+
+                  {/* Receipt Note */}
+                  <div className="space-y-1.5">
+                    <Label className="text-xs flex items-center gap-1">
+                      <FileText className="h-3 w-3" />
+                      {language === 'ar' ? 'ملاحظة على الوصل' : 'Receipt Note'}
+                    </Label>
+                    <Textarea
+                      value={receiptNote}
+                      onChange={(e) => setReceiptNote(e.target.value)}
+                      placeholder={language === 'ar' ? 'ملاحظة اختيارية تظهر على الوصل...' : 'Optional note on receipt...'}
+                      className="text-xs min-h-[52px] resize-none"
+                      data-testid="textarea-receipt-note"
+                    />
+                  </div>
                 </div>
 
                 {/* Totals & Checkout */}
@@ -1432,6 +1455,14 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                     : 'عند الاستلام'}
                 </span>
               </div>
+
+              {/* Note */}
+              {lastOrder.notes && (
+                <div className="text-sm py-2 border-y border-gray-300 mb-3">
+                  <span className="font-bold">ملاحظة: </span>
+                  <span className="font-extrabold">{lastOrder.notes}</span>
+                </div>
+              )}
 
               {/* Footer */}
               <div className="text-center pt-2 border-t-2 border-dashed border-black">

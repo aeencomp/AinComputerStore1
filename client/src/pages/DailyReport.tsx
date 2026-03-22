@@ -64,6 +64,7 @@ interface DailyReportSummary {
   inStoreCount: number;
   inStoreTotal: number;
   inStoreTotalCash: number;
+  inStoreTotalCard: number;
   inStoreTotalZain: number;
   inStoreTotalQi: number;
   inStoreTotalDeferred: number;
@@ -240,7 +241,7 @@ function buildPrintHTML(data: ShiftReportData): string {
 
   const payBreakdown = [
     summary.grandTotalCash > 0 ? `<div class="breakdown-item"><span class="dot green"></span><span>نقداً</span><strong>${fmtNum(summary.grandTotalCash)}</strong></div>` : "",
-    (summary.grandTotalCard ?? 0) > 0 ? `<div class="breakdown-item"><span class="dot teal"></span><span>بطاقة (صيانة)</span><strong>${fmtNum(summary.grandTotalCard)}</strong></div>` : "",
+    (summary.grandTotalCard ?? 0) > 0 ? `<div class="breakdown-item"><span class="dot teal"></span><span>بطاقة</span><strong>${fmtNum(summary.grandTotalCard)}</strong></div>` : "",
     summary.grandTotalZain > 0 ? `<div class="breakdown-item"><span class="dot blue"></span><span>ZainCash</span><strong>${fmtNum(summary.grandTotalZain)}</strong></div>` : "",
     summary.grandTotalQi > 0 ? `<div class="breakdown-item"><span class="dot purple"></span><span>QiCard</span><strong>${fmtNum(summary.grandTotalQi)}</strong></div>` : "",
     advancesTotal > 0 ? `<div class="breakdown-item"><span class="dot emerald"></span><span>دفع من الجيب</span><strong style="color:#059669">+ ${fmtNum(advancesTotal)}</strong></div>` : "",
@@ -406,7 +407,7 @@ function buildPrintHTML(data: ShiftReportData): string {
     <div class="summary-box">
       <div class="label">مبيعات المتجر</div>
       <div class="value violet">${fmtNum(summary.inStoreTotal)}</div>
-      <div class="sub">${summary.inStoreCount} فاتورة${summary.inStoreTotalDeferred > 0 ? ` · آجل: ${fmtNum(summary.inStoreTotalDeferred)}` : ""}</div>
+      <div class="sub">${summary.inStoreCount} فاتورة${summary.inStoreTotalCash > 0 ? ` · نقداً: ${fmtNum(summary.inStoreTotalCash)}` : ""}${(summary.inStoreTotalCard ?? 0) > 0 ? ` · بطاقة: ${fmtNum(summary.inStoreTotalCard)}` : ""}${summary.inStoreTotalDeferred > 0 ? ` · آجل: ${fmtNum(summary.inStoreTotalDeferred)}` : ""}</div>
     </div>
     <div class="summary-box">
       <div class="label">مدفوعات التصليح</div>
@@ -774,14 +775,24 @@ export default function DailyReport({ user }: DailyReportProps) {
                     <p className="text-lg font-bold text-violet-600 dark:text-violet-400" data-testid="text-instore-total">
                       {fmtNum(data.summary.inStoreTotal)}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {data.summary.inStoreCount} {language === "ar" ? "فاتورة" : "txn"}
-                      {data.summary.inStoreTotalDeferred > 0 && (
-                        <span className="text-orange-500 ms-1">
-                          · آجل: {fmtNum(data.summary.inStoreTotalDeferred)}
-                        </span>
+                    <div className="text-xs text-muted-foreground mt-0.5 space-y-0.5">
+                      <p>{data.summary.inStoreCount} {language === "ar" ? "فاتورة" : "txn"}</p>
+                      {data.summary.inStoreTotalCash > 0 && (
+                        <p className="text-green-600 dark:text-green-400">
+                          {language === "ar" ? "نقداً:" : "Cash:"} {fmtNum(data.summary.inStoreTotalCash)}
+                        </p>
                       )}
-                    </p>
+                      {(data.summary.inStoreTotalCard ?? 0) > 0 && (
+                        <p className="text-teal-600 dark:text-teal-400">
+                          {language === "ar" ? "بطاقة:" : "Card:"} {fmtNum(data.summary.inStoreTotalCard)}
+                        </p>
+                      )}
+                      {data.summary.inStoreTotalDeferred > 0 && (
+                        <p className="text-orange-500">
+                          {language === "ar" ? "آجل:" : "Deferred:"} {fmtNum(data.summary.inStoreTotalDeferred)}
+                        </p>
+                      )}
+                    </div>
                   </CardContent>
                 </Card>
 

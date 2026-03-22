@@ -952,6 +952,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           orderType: resolvedOrderType,
           discount,
           discountReason,
+          notes: notes || null,
         }
       });
     } catch (error) {
@@ -1287,6 +1288,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .orderBy(desc(staffAdvances.createdAt));
 
     const inStoreTotalCash = inStoreOrders.filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalCard = inStoreOrders.filter(o => o.paymentMethod === 'card' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalZain = inStoreOrders.filter(o => o.paymentMethod === 'zaincash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalQi = inStoreOrders.filter(o => o.paymentMethod === 'qicard' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalDeferred = inStoreOrders.filter(o => o.paymentStatus === 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
@@ -1310,6 +1312,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         inStoreCount: inStoreOrders.length,
         inStoreTotal,
         inStoreTotalCash,
+        inStoreTotalCard,
         inStoreTotalZain,
         inStoreTotalQi,
         inStoreTotalDeferred,
@@ -1326,7 +1329,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         advancesCount: dailyAdvances.length,
         grandTotal,
         grandTotalCash: inStoreTotalCash + repairTotalCash,
-        grandTotalCard: repairTotalCard,
+        grandTotalCard: inStoreTotalCard + repairTotalCard,
         grandTotalZain: inStoreTotalZain,
         grandTotalQi: inStoreTotalQi,
         netTotal: grandTotal - totalWithdrawals,
@@ -6747,6 +6750,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const inStoreTotalCash = inStoreOrders
         .filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred')
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
+      const inStoreTotalCard = inStoreOrders
+        .filter(o => o.paymentMethod === 'card' && o.paymentStatus !== 'deferred')
+        .reduce((sum, o) => sum + parseFloat(o.total), 0);
       const inStoreTotalZain = inStoreOrders
         .filter(o => o.paymentMethod === 'zaincash' && o.paymentStatus !== 'deferred')
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
@@ -6792,6 +6798,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           inStoreCount: inStoreOrders.length,
           inStoreTotal,
           inStoreTotalCash,
+          inStoreTotalCard,
           inStoreTotalZain,
           inStoreTotalQi,
           inStoreTotalDeferred,
@@ -6806,7 +6813,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           withdrawalCount: dailyWithdrawals.length,
           grandTotal: inStoreTotal + repairTotal,
           grandTotalCash: inStoreTotalCash + repairTotalCash,
-          grandTotalCard: repairTotalCard,
+          grandTotalCard: inStoreTotalCard + repairTotalCard,
           grandTotalZain: inStoreTotalZain + repairTotalZain,
           grandTotalQi: inStoreTotalQi + repairTotalQi,
           netTotal: (inStoreTotal + repairTotal) - totalWithdrawals,
