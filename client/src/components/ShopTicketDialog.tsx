@@ -94,7 +94,8 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
   const resolveStatusField = (status: string, paymentStatus: string) => {
     if (status === 'delivered') {
       if (paymentStatus === 'deferred') return 'delivered-deferred';
-      return 'delivered-paid';
+      if (paymentStatus === 'paid') return 'delivered-paid';
+      return 'delivered';
     }
     return status;
   };
@@ -482,6 +483,7 @@ export default function ShopTicketDialog({ ticketId, open, onOpenChange }: ShopT
                               <SelectItem value="in-progress">{t('repair.status.in-progress')}</SelectItem>
                               <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                               <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
+                              <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
                               <SelectItem value="delivered-paid">{isRTL ? 'مُسلَّم - مدفوع' : 'Delivered - Paid'}</SelectItem>
                               <SelectItem value="delivered-deferred">{isRTL ? 'مُسلَّم - آجل' : 'Delivered - Deferred'}</SelectItem>
                               <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
