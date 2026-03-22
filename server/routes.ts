@@ -6703,9 +6703,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/daily-report", async (req, res) => {
     try {
-      const salesUserId = (req.session as any).salesUserId;
+      const sessionSalesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) {
+      if (!sessionSalesUserId && !adminId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
 
@@ -6715,34 +6715,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
       const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
 
-      // In-store sales (walk-in and in-store order types)
       const { db } = await import("./db");
-      const { orders, repairTickets, cashWithdrawals } = await import("../shared/schema");
-      const { and, or, gte, lte, inArray, eq, isNotNull, desc } = await import("drizzle-orm");
+      const { orders, repairTickets, cashWithdrawals, salesShifts } = await import("../shared/schema");
+      const { and, or, gte, lte, inArray, eq, isNotNull, isNull, desc } = await import("drizzle-orm");
 
-      const inStoreOrders = await db.select().from(orders).where(
-        and(
+      // ── Shift-aware day boundary ──────────────────────────────────────────────
+      // Find all shifts that STARTED on the requested calendar date (Baghdad TZ).
+      // Sales made after midnight but still within a shift that started on this date
+      // should be counted for this date, not the next one.
+      const shiftsOnDate = await db.select().from(salesShifts)
+        .where(and(
+          gte(salesShifts.startTime, startOfDay),
+          lte(salesShifts.startTime, endOfDay),
+        ))
+        .orderBy(desc(salesShifts.startTime));
+
+      // Compute the effective end: extend past midnight if any shift ran past midnight
+      const now = new Date();
+      const effectiveEnd = shiftsOnDate.length > 0
+        ? new Date(Math.max(endOfDay.getTime(), ...shiftsOnDate.map(s => (s.endTime || now).getTime())))
+        : endOfDay;
+
+      // ── In-store orders (shift-scoped) ────────────────────────────────────────
+      // For each shift, collect orders within that shift's actual time window
+      // so post-midnight sales are tied to the shift start date, not the clock date.
+      const allInStoreOrders: any[] = [];
+      const seenOrderIds = new Set<string>();
+
+      if (shiftsOnDate.length > 0) {
+        for (const shift of shiftsOnDate) {
+          const shiftEnd = shift.endTime || now;
+          const shiftOrders = await db.select().from(orders).where(and(
+            inArray(orders.orderType, ['walk-in', 'in-store']),
+            eq(orders.salespersonId, shift.salesUserId),
+            gte(orders.createdAt, shift.startTime),
+            lte(orders.createdAt, shiftEnd),
+          ));
+          for (const o of shiftOrders) {
+            if (!seenOrderIds.has(o.id)) {
+              seenOrderIds.add(o.id);
+              allInStoreOrders.push(o);
+            }
+          }
+        }
+        // Also include orders with no salesperson (direct admin) within calendar day
+        const adminOrders = await db.select().from(orders).where(and(
+          inArray(orders.orderType, ['walk-in', 'in-store']),
+          isNull(orders.salespersonId),
+          gte(orders.createdAt, startOfDay),
+          lte(orders.createdAt, effectiveEnd),
+        ));
+        for (const o of adminOrders) {
+          if (!seenOrderIds.has(o.id)) {
+            seenOrderIds.add(o.id);
+            allInStoreOrders.push(o);
+          }
+        }
+      } else {
+        // No shifts started on this date — fall back to plain calendar day window
+        const calOrders = await db.select().from(orders).where(and(
           inArray(orders.orderType, ['walk-in', 'in-store']),
           gte(orders.createdAt, startOfDay),
-          lte(orders.createdAt, endOfDay)
-        )
-      );
+          lte(orders.createdAt, endOfDay),
+        ));
+        for (const o of calOrders) { allInStoreOrders.push(o); }
+      }
 
-      // Repair ticket payments for the day:
-      // - explicitly marked as 'paid' (filtered by updatedAt)
-      // - OR status = 'delivered' (delivered = customer collected = paid, filtered by deliveredAt)
+      const inStoreOrders = allInStoreOrders;
+
+      // ── Repair ticket payments ────────────────────────────────────────────────
+      // Use the extended end so repairs settled after midnight during an open shift
+      // are also captured for this date.
       const paidRepairTickets = await db.select().from(repairTickets).where(
         or(
           and(
             eq(repairTickets.paymentStatus, 'paid'),
             gte(repairTickets.updatedAt, startOfDay),
-            lte(repairTickets.updatedAt, endOfDay)
+            lte(repairTickets.updatedAt, effectiveEnd)
           ),
           and(
             eq(repairTickets.status, 'delivered'),
             isNotNull(repairTickets.deliveredAt),
             gte(repairTickets.deliveredAt, startOfDay),
-            lte(repairTickets.deliveredAt, endOfDay)
+            lte(repairTickets.deliveredAt, effectiveEnd)
           )
         )
       );
@@ -6766,13 +6821,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(o => o.paymentStatus !== 'deferred')
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
 
-      // Withdrawals for the day
+      // Withdrawals — use the effective (extended) window
       const dailyWithdrawals = await db.select().from(cashWithdrawals)
-        .where(and(gte(cashWithdrawals.createdAt, startOfDay), lte(cashWithdrawals.createdAt, endOfDay)))
+        .where(and(gte(cashWithdrawals.createdAt, startOfDay), lte(cashWithdrawals.createdAt, effectiveEnd)))
         .orderBy(desc(cashWithdrawals.createdAt));
       const totalWithdrawals = dailyWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
 
-      // Repair totals — deferred (آجل) are excluded from revenue just like in-store deferred
+      // Repair totals — deferred (آجل) are excluded from revenue
       const repairTotalDeferred = paidRepairTickets
         .filter(t => t.paymentStatus === 'deferred')
         .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
