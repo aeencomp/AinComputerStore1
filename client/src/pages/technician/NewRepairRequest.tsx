@@ -706,6 +706,9 @@ export default function NewRepairRequest() {
                       {createdCustomer.customerId} — {createdTicket.customerName}
                     </div>
                   )}
+                  <div className="customer-info" style={{ textAlign: 'center', fontWeight: 800, fontSize: '8px', letterSpacing: '0.3px', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden', direction: 'ltr' }}>
+                    {createdTicket.customerPhone}
+                  </div>
                 </div>
               </div>
 

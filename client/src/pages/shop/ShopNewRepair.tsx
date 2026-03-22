@@ -162,6 +162,8 @@ export default function ShopNewRepair() {
               .barcode-container { text-align: center; width: 100%; margin: 0.5mm 0; }
               .barcode-container svg { width: 48mm; height: 13mm; display: block; margin: 0 auto; }
               .serial { font-size: 9pt; font-weight: 900; text-align: center; letter-spacing: 1.5px; font-family: 'Courier New', Courier, monospace; }
+              .customer-info { font-size: 6pt; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; max-width: 48mm; margin-top: 0.2mm; }
+              .phone-info { font-size: 6.5pt; font-weight: 800; text-align: center; direction: ltr; margin-top: 0.2mm; letter-spacing: 0.3px; }
             </style>
           </head>
           <body>${printContents}</body>
@@ -314,6 +316,8 @@ export default function ShopNewRepair() {
                   <svg ref={barcodeRef}></svg>
                 </div>
                 <div className="serial">{createdTicket.ticketNumber}</div>
+                <div className="customer-info">{createdTicket.customerName}</div>
+                <div className="phone-info" style={{ direction: 'ltr' }}>{createdTicket.customerPhone}</div>
               </div>
             </div>
           </CardContent>

@@ -254,6 +254,8 @@ export default function TicketDetail() {
               .barcode-container { text-align: center; margin: 1mm 0; }
               .barcode-container svg { max-width: 44mm; height: 10mm; }
               .serial { font-size: 9pt; font-weight: 800; text-align: center; letter-spacing: 0.5px; }
+              .customer-info { font-size: 7pt; font-weight: 700; text-align: center; white-space: nowrap; overflow: hidden; max-width: 48mm; margin-top: 0.2mm; }
+              .phone-info { font-size: 7pt; font-weight: 800; text-align: center; direction: ltr; margin-top: 0.2mm; letter-spacing: 0.3px; }
             </style>
           </head>
           <body>${printContents}</body>
@@ -480,10 +482,13 @@ export default function TicketDetail() {
                   {ticket.ticketNumber}
                 </div>
                 {ticketCustomer && (
-                  <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '9px', letterSpacing: '0.3px', marginTop: '1px' }}>
+                  <div className="customer-info" style={{ textAlign: 'center', fontWeight: 700, fontSize: '8px', letterSpacing: '0.2px', marginTop: '1px', whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     {ticketCustomer.customerId} — {ticket.customerName}
                   </div>
                 )}
+                <div className="phone-info" style={{ textAlign: 'center', fontWeight: 800, fontSize: '8px', direction: 'ltr', marginTop: '1px', letterSpacing: '0.3px' }}>
+                  {ticket.customerPhone}
+                </div>
               </div>
             </div>
           </CardContent>
