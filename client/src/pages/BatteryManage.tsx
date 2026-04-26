@@ -31,6 +31,7 @@ import {
   Keyboard as KeyboardIcon,
   Monitor,
   Printer,
+  Package,
   Languages
 } from "lucide-react";
 import {
