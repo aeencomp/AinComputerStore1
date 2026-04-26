@@ -465,17 +465,6 @@ export default function SalesReports({ user }: SalesReportsProps) {
     const monthLabel = monthlyCashflow.mode === "range"
       ? `${monthlyCashflow.from} → ${monthlyCashflow.to}`
       : monthlyCashflow.month;
-    const dailyRows = monthlyCashflow.daily.map((d, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${d.date}</td>
-        <td>${d.withdrawalsCount}</td>
-        <td>${formatPrice(d.withdrawalsTotal)}</td>
-        <td>${d.advancesCount}</td>
-        <td>${formatPrice(d.advancesTotal)}</td>
-        <td>${formatPrice(d.net)}</td>
-      </tr>
-    `).join("");
     const detailedRows = detailedCashflowRows.map((row, i) => `
       <tr>
         <td>${i + 1}</td>
@@ -516,11 +505,6 @@ export default function SalesReports({ user }: SalesReportsProps) {
   <div class="card"><div class="lbl">إجمالي الدفع من الجيب</div><div class="val" style="color:#059669">+ ${formatPrice(monthlyCashflow.totals.advancesTotal)}</div></div>
   <div class="card"><div class="lbl">الصافي</div><div class="val">${formatPrice(monthlyCashflow.totals.net)}</div></div>
 </div>
-<h2 style="margin-bottom:6px;font-size:15px;">ملخص يومي للشهر</h2>
-<table>
-  <thead><tr><th>#</th><th>التاريخ</th><th>عدد السحوبات</th><th>مجموع السحوبات</th><th>عدد الدفع من الجيب</th><th>مجموع الدفع من الجيب</th><th>الصافي اليومي</th></tr></thead>
-  <tbody>${dailyRows || '<tr><td colspan="7" style="text-align:center;color:#777">لا توجد بيانات</td></tr>'}</tbody>
-</table>
 <h2 style="margin-bottom:6px;font-size:15px;">التفاصيل اليومية (كل العمليات)</h2>
 <table>
   <thead><tr><th>#</th><th>التاريخ</th><th>الوقت</th><th>النوع</th><th>الموظف</th><th>السبب</th><th>المبلغ</th></tr></thead>
@@ -1057,51 +1041,6 @@ export default function SalesReports({ user }: SalesReportsProps) {
               </CardContent>
             </Card>
           </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
-                {language === 'ar' ? 'ملخص يومي خلال الشهر' : 'Daily Summary For Month'}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {cashflowLoading ? (
-                <div className="flex items-center justify-center h-40"><Loader2 className="h-6 w-6 animate-spin" /></div>
-              ) : !monthlyCashflow || monthlyCashflow.daily.length === 0 ? (
-                <div className="text-center py-10 text-muted-foreground">{language === 'ar' ? 'لا توجد بيانات لهذا الشهر' : 'No data for this month'}</div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-start p-3">#</th>
-                        <th className="text-start p-3">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                        <th className="text-end p-3">{language === 'ar' ? 'عدد السحوبات' : 'Withdrawals Count'}</th>
-                        <th className="text-end p-3">{language === 'ar' ? 'مجموع السحوبات' : 'Withdrawals Total'}</th>
-                        <th className="text-end p-3">{language === 'ar' ? 'عدد الدفع من الجيب' : 'Pay From Pocket Count'}</th>
-                        <th className="text-end p-3">{language === 'ar' ? 'مجموع الدفع من الجيب' : 'Pay From Pocket Total'}</th>
-                        <th className="text-end p-3">{language === 'ar' ? 'الصافي' : 'Net'}</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {monthlyCashflow.daily.map((d, i) => (
-                        <tr key={d.date} className="border-b">
-                          <td className="p-3">{i + 1}</td>
-                          <td className="p-3">{d.date}</td>
-                          <td className="p-3 text-end">{d.withdrawalsCount}</td>
-                          <td className="p-3 text-end text-orange-600">- {formatPrice(d.withdrawalsTotal)} IQD</td>
-                          <td className="p-3 text-end">{d.advancesCount}</td>
-                          <td className="p-3 text-end text-emerald-600">+ {formatPrice(d.advancesTotal)} IQD</td>
-                          <td className="p-3 text-end font-semibold">{formatPrice(d.net)} IQD</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
 
           <Card>
             <CardHeader>
