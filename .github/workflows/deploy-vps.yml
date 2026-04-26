@@ -20,4 +20,5 @@ jobs:
           script_stop: true
           script: |
             cd /home/deploy/AinComputerStore
+            chmod +x ./deploy.sh
             ./deploy.sh
