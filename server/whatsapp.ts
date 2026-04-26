@@ -7,6 +7,8 @@ interface WhatsAppMessageResult {
   success: boolean;
   messageId?: string;
   error?: string;
+  errorCode?: number | string;
+  errorData?: any;
 }
 
 function formatPhoneNumber(phone: string): string {
@@ -31,6 +33,17 @@ function formatPhoneNumber(phone: string): string {
   }
 
   return cleaned;
+}
+
+function sanitizeTemplateParam(value: string, maxLen = 900): string {
+  const v = String(value ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .trim();
+
+  if (!v) return '-';
+  if (v.length <= maxLen) return v;
+  return `${v.slice(0, Math.max(0, maxLen - 1))}…`;
 }
 
 async function getCredentials(): Promise<{ phoneNumberId: string; accessToken: string; wabaId: string }> {
@@ -91,7 +104,7 @@ export async function sendWhatsAppMessage(
     const errData = error.response?.data?.error;
     const errorMessage = errData?.message || error.message;
     console.error('WhatsApp text send error:', JSON.stringify(errData || error.message));
-    return { success: false, error: errorMessage };
+    return { success: false, error: errorMessage, errorCode: errData?.code, errorData: errData };
   }
 }
 
@@ -150,7 +163,7 @@ export async function sendWhatsAppTemplate(
     } else {
       console.error(`WhatsApp template "${templateName}" error for ${formattedPhone}:`, JSON.stringify(errorDetail || error.message));
     }
-    return { success: false, error: errorMessage };
+    return { success: false, error: errorMessage, errorCode: errorDetail?.code, errorData: errorDetail };
   }
 }
 
@@ -204,23 +217,44 @@ export async function sendTicketUpdatedMessage(
   if (costEstimate)   extras.push(`التكلفة المقدرة: ${costEstimate} د.ع`);
   if (finalCost)      extras.push(`التكلفة النهائية: ${finalCost} د.ع`);
   if (technicianNotes) extras.push(`ملاحظات: ${technicianNotes}`);
-  const extraText = extras.length > 0 ? extras.join('\n') : '-';
+  const extraText = sanitizeTemplateParam(extras.length > 0 ? extras.join('\n') : '-');
 
   // Use the repair_status_update template (approved template — works for any number)
+  const primaryParams = [
+    sanitizeTemplateParam(customerName, 80),
+    sanitizeTemplateParam(ticketNumber, 40),
+    sanitizeTemplateParam(statusAr, 60),
+    extraText,
+  ];
+
   const templateResult = await sendWhatsAppTemplate(
     customerPhone,
     'repair_status_update',
     'ar',
-    [customerName, ticketNumber, statusAr, extraText]
+    primaryParams
   );
 
   if (templateResult.success) return templateResult;
 
-  // Fallback: free-form text (only works within 24h window)
-  console.warn(`Template send failed for ticket ${ticketNumber}, falling back to free-form text. Reason: ${templateResult.error}`);
+  // Retry with minimal "extra" parameter. Some payloads fail due to overly long notes, newlines, etc.
+  console.warn(
+    `WhatsApp template send failed for ticket ${ticketNumber} (code=${templateResult.errorCode ?? 'n/a'}). Retrying with minimal params.`
+  );
+  const retryResult = await sendWhatsAppTemplate(
+    customerPhone,
+    'repair_status_update',
+    'ar',
+    [primaryParams[0], primaryParams[1], primaryParams[2], '-']
+  );
+  if (retryResult.success) return retryResult;
+
+  // Last resort fallback (may fail outside 24h window). Keep it, but make the failure visible via logs/result.
+  console.warn(
+    `WhatsApp template retry failed for ticket ${ticketNumber} (code=${retryResult.errorCode ?? 'n/a'}). Falling back to free-form text.`
+  );
   const message =
-    `مرحباً ${customerName}!\n\nتحديث على طلب الإصلاح:\n\nرقم التذكرة: ${ticketNumber}\nالحالة: ${statusAr}` +
-    (extras.length ? '\n' + extras.join('\n') : '') +
+    `مرحباً ${sanitizeTemplateParam(customerName, 80)}!\n\nتحديث على طلب الإصلاح:\n\nرقم التذكرة: ${sanitizeTemplateParam(ticketNumber, 40)}\nالحالة: ${sanitizeTemplateParam(statusAr, 60)}` +
+    (extras.length ? '\n' + sanitizeTemplateParam(extras.join('\n'), 700) : '') +
     `\n\nالعين لتجارة الحاسبات - 07850006977`;
 
   return sendWhatsAppMessage(customerPhone, message);

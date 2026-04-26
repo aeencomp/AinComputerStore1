@@ -3353,6 +3353,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('WhatsApp update notification failed:', err);
         return { success: false, error: err.message };
       });
+
+      if (!whatsappResult.success) {
+        console.warn(
+          `WhatsApp status update not sent for ticket ${ticket.ticketNumber}. ` +
+          `phone="${ticket.customerPhone}" status="${ticket.status}" ` +
+          `errorCode=${(whatsappResult as any).errorCode ?? 'n/a'} error="${whatsappResult.error ?? 'unknown'}"`
+        );
+      }
       
       return res.json({
         ...ticket,
