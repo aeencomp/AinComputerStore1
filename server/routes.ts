@@ -4743,6 +4743,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           barcode: l.barcode,
           brand: l.brand,
           model: l.model,
+          sizeInch: l.sizeInch,
           cpu: l.cpu,
           ram: l.ram,
           storage: l.storage,
@@ -5024,6 +5025,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             barcode: item.barcode || item.serialNumber,
             brand: item.brand,
             model: item.model,
+            sizeInch: item.sizeInch,
             cpu: item.cpu,
             ram: item.ram,
             storage: item.storage,
@@ -6324,7 +6326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rows = await db.select().from(laptops).where(eq(laptops.isActive, 1));
       const terms = q.split(/\s+/).filter(Boolean);
       const filtered = rows.filter(l => {
-        const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.model || ""} ${l.cpu || ""} ${l.ram || ""} ${l.storage || ""} ${l.gpu || ""} ${l.barcode || ""}`.toLowerCase();
+        const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.model || ""} ${l.sizeInch || ""} ${l.cpu || ""} ${l.ram || ""} ${l.storage || ""} ${l.gpu || ""} ${l.barcode || ""}`.toLowerCase();
         return terms.every(t => s.includes(t));
       });
       return res.json(filtered);
@@ -8561,6 +8563,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       console.error("Staff advances fetch error:", err);
       res.status(500).json({ error: "خطأ في جلب السلف" });
+    }
+  });
+
+  app.get("/api/instore/monthly-cashflow", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const monthParam = typeof req.query.month === "string" ? req.query.month.trim() : "";
+      const fromParam = typeof req.query.from === "string" ? req.query.from.trim() : "";
+      const toParam = typeof req.query.to === "string" ? req.query.to.trim() : "";
+      const currentBaghdadMonth = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).slice(0, 7);
+      const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentBaghdadMonth;
+      const hasRange = /^\d{4}-\d{2}-\d{2}$/.test(fromParam) && /^\d{4}-\d{2}-\d{2}$/.test(toParam);
+
+      let startDate = "";
+      let endDate = "";
+      if (hasRange) {
+        if (fromParam <= toParam) {
+          startDate = fromParam;
+          endDate = toParam;
+        } else {
+          startDate = toParam;
+          endDate = fromParam;
+        }
+      } else {
+        const [year, monthNum] = month.split("-").map((v) => parseInt(v, 10));
+        const lastDay = new Date(Date.UTC(year, monthNum, 0)).getUTCDate();
+        startDate = `${month}-01`;
+        endDate = `${month}-${String(lastDay).padStart(2, "0")}`;
+      }
+
+      const withdrawalsRows = await db
+        .select()
+        .from(cashWithdrawals)
+        .where(
+          and(
+            sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${startDate}::date`,
+            sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date <= ${endDate}::date`,
+          ),
+        )
+        .orderBy(desc(cashWithdrawals.createdAt));
+
+      const advancesRows = await db
+        .select()
+        .from(staffAdvances)
+        .where(
+          and(
+            sql`(${staffAdvances.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${startDate}::date`,
+            sql`(${staffAdvances.createdAt} AT TIME ZONE 'Asia/Baghdad')::date <= ${endDate}::date`,
+          ),
+        )
+        .orderBy(desc(staffAdvances.createdAt));
+
+      const dailyMap = new Map<string, {
+        date: string;
+        withdrawalsCount: number;
+        withdrawalsTotal: number;
+        advancesCount: number;
+        advancesTotal: number;
+        net: number;
+      }>();
+
+      const ensureDay = (date: string) => {
+        if (!dailyMap.has(date)) {
+          dailyMap.set(date, {
+            date,
+            withdrawalsCount: 0,
+            withdrawalsTotal: 0,
+            advancesCount: 0,
+            advancesTotal: 0,
+            net: 0,
+          });
+        }
+        return dailyMap.get(date)!;
+      };
+
+      for (const row of withdrawalsRows) {
+        const date = new Date(row.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+        const amount = parseFloat(String(row.amount || "0")) || 0;
+        const day = ensureDay(date);
+        day.withdrawalsCount += 1;
+        day.withdrawalsTotal += amount;
+      }
+
+      for (const row of advancesRows) {
+        const date = new Date(row.createdAt).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+        const amount = parseFloat(String(row.amount || "0")) || 0;
+        const day = ensureDay(date);
+        day.advancesCount += 1;
+        day.advancesTotal += amount;
+      }
+
+      const daily = Array.from(dailyMap.values())
+        .map((d) => ({ ...d, net: d.advancesTotal - d.withdrawalsTotal }))
+        .sort((a, b) => b.date.localeCompare(a.date));
+
+      const totals = {
+        withdrawalsCount: withdrawalsRows.length,
+        withdrawalsTotal: withdrawalsRows.reduce((sum, r) => sum + (parseFloat(String(r.amount || "0")) || 0), 0),
+        advancesCount: advancesRows.length,
+        advancesTotal: advancesRows.reduce((sum, r) => sum + (parseFloat(String(r.amount || "0")) || 0), 0),
+      };
+
+      return res.json({
+        month,
+        from: startDate,
+        to: endDate,
+        mode: hasRange ? "range" : "month",
+        daily,
+        withdrawals: withdrawalsRows,
+        advances: advancesRows,
+        totals: {
+          ...totals,
+          net: totals.advancesTotal - totals.withdrawalsTotal,
+        },
+      });
+    } catch (err) {
+      console.error("Monthly cashflow fetch error:", err);
+      return res.status(500).json({ error: "خطأ في جلب تقرير الشهر" });
     }
   });
 
