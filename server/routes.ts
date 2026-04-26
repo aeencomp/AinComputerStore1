@@ -7780,6 +7780,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     try {
       const body = req.body;
+      console.log('WhatsApp webhook POST received:', {
+        hasBody: !!body,
+        object: body?.object,
+        entryCount: Array.isArray(body?.entry) ? body.entry.length : 0,
+      });
       if (body?.object !== 'whatsapp_business_account') return;
 
       const entries = body.entry || [];
@@ -7797,13 +7802,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const from = msg.from; // phone in international format e.g. 9647850006977
 
             const autoReply =
-              'عذراً، هذا الخط مخصص للرسائل الصادرة فقط.\n' +
-              'للتواصل معنا يرجى الاتصال على: 07850006977\n\n' +
-              'Sorry, this line is for outgoing messages only.\n' +
-              'To contact us please call: 07850006977';
+              'عذراً، هذا الخط مخصص للرسائل الصادرة فقط. للتواصل معنا يرجى الاتصال على: 07850006977. ' +
+              'Sorry, this line is for outgoing messages only. To contact us please call: 07850006977.';
 
-            await sendWhatsAppMessage(from, autoReply);
-            console.log(`WhatsApp auto-reply sent to ${from}`);
+            const sendResult = await sendWhatsAppMessage(from, autoReply);
+            if (sendResult.success) {
+              console.log(`WhatsApp auto-reply sent to ${from} (msgId=${sendResult.messageId || 'n/a'})`);
+            } else {
+              console.warn(
+                `WhatsApp auto-reply failed for ${from} (code=${(sendResult as any).errorCode ?? 'n/a'}): ${sendResult.error || 'unknown'}`
+              );
+            }
           }
         }
       }
