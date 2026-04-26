@@ -36,9 +36,11 @@ function formatPhoneNumber(phone: string): string {
 }
 
 function sanitizeTemplateParam(value: string, maxLen = 900): string {
+  // WhatsApp template params cannot contain newlines/tabs and cannot have >4 consecutive spaces.
+  // See error code 132018.
   const v = String(value ?? '')
-    .replace(/\r\n/g, '\n')
-    .replace(/\r/g, '\n')
+    .replace(/[\r\n\t]+/g, ' ')
+    .replace(/ {5,}/g, '    ')
     .trim();
 
   if (!v) return '-';
@@ -217,7 +219,7 @@ export async function sendTicketUpdatedMessage(
   if (costEstimate)   extras.push(`التكلفة المقدرة: ${costEstimate} د.ع`);
   if (finalCost)      extras.push(`التكلفة النهائية: ${finalCost} د.ع`);
   if (technicianNotes) extras.push(`ملاحظات: ${technicianNotes}`);
-  const extraText = sanitizeTemplateParam(extras.length > 0 ? extras.join('\n') : '-');
+  const extraText = sanitizeTemplateParam(extras.length > 0 ? extras.join(' | ') : '-');
 
   // Use the repair_status_update template (approved template — works for any number)
   const primaryParams = [
