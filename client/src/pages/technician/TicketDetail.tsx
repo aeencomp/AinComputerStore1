@@ -684,7 +684,7 @@ export default function TicketDetail() {
                   <Button type="submit" disabled={updateMutation.isPending || isLocked} data-testid="button-save-ticket">
                     {updateMutation.isPending ? t('repair.edit.saving') : t('repair.edit.save')}
                   </Button>
-                  
+
                   <AlertDialog>
                     <AlertDialogTrigger asChild>
                       <Button 

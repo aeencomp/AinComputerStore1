@@ -12,7 +12,8 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { formatPrice } from "@/lib/formatters";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, customerAuthMeQueryFn, customerAuthMeQueryKey } from "@/lib/queryClient";
+import { resolveAssetUrl } from "@/lib/assetUrl";
 import { useMutation, useQuery as useAuthQuery } from "@tanstack/react-query";
 import type { Product, User, CartItem } from "@shared/schema";
 import { ShoppingCart, ArrowLeft, Check, ChevronLeft, ChevronRight } from "lucide-react";
@@ -64,7 +65,8 @@ export default function ProductDetail() {
     .slice(0, 4);
 
   const { data: currentUser } = useAuthQuery<User | null>({
-    queryKey: ['/api/auth/me'],
+    queryKey: customerAuthMeQueryKey,
+    queryFn: customerAuthMeQueryFn,
   });
 
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useAuthQuery<CartItemWithId[]>({
@@ -147,7 +149,7 @@ export default function ProductDetail() {
   const resolveImagePath = (img: string): string => {
     if (!img) return laptopImage;
     if (img.startsWith('/uploads/') || img.startsWith('/objects/') || img.startsWith('http')) {
-      return img;
+      return resolveAssetUrl(img);
     }
     return imageMap[img] || laptopImage;
   };
@@ -432,7 +434,7 @@ export default function ProductDetail() {
                 const getRelatedImageSrc = () => {
                   if (!relatedProduct.image) return laptopImage;
                   if (relatedProduct.image.startsWith('/uploads/') || relatedProduct.image.startsWith('/objects/') || relatedProduct.image.startsWith('http')) {
-                    return relatedProduct.image;
+                    return resolveAssetUrl(relatedProduct.image);
                   }
                   return imageMap[relatedProduct.image] || laptopImage;
                 };

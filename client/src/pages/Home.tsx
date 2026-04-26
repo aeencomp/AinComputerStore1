@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, customerAuthMeQueryFn, customerAuthMeQueryKey } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useCart } from "@/contexts/CartContext";
 import { Link, useLocation, useSearch } from "wouter";
@@ -55,7 +55,8 @@ export default function Home() {
   });
 
   const { data: currentUser } = useQuery<User | null>({
-    queryKey: ['/api/auth/me'],
+    queryKey: customerAuthMeQueryKey,
+    queryFn: customerAuthMeQueryFn,
   });
 
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({

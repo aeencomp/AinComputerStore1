@@ -1,7 +1,8 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
-import { neon } from '@neondatabase/serverless';
 import type { Duplex } from 'stream';
+import pg from 'pg';
+const { Pool } = pg;
 
 interface AdminNotification {
   type: 'new_order' | 'order_update';
@@ -49,11 +50,15 @@ class AdminNotificationService {
   private salesWss: WebSocketServer | null = null;
   private clients: Set<WebSocket> = new Set();
   private salesClients: Set<WebSocket> = new Set();
-  private sql: ReturnType<typeof neon> | null = null;
+  private pool: InstanceType<typeof Pool> | null = null;
 
   initialize(_server: Server) {
     if (process.env.DATABASE_URL) {
-      this.sql = neon(process.env.DATABASE_URL);
+      const isLocal = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
+      this.pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: isLocal ? false : { rejectUnauthorized: false },
+      });
     }
 
     this.wss = new WebSocketServer({ noServer: true });
@@ -150,10 +155,10 @@ class AdminNotificationService {
 
   private async verifyAdminSession(sessionId: string): Promise<boolean> {
     try {
-      if (!this.sql) return false;
-      const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
-      if (result.length === 0) return false;
-      const session = result[0].sess as any;
+      if (!this.pool) return false;
+      const result = await this.pool.query('SELECT sess FROM "session" WHERE sid = $1', [sessionId]);
+      if (result.rows.length === 0) return false;
+      const session = (result.rows[0] as any).sess as any;
       return session && typeof session.adminId === 'string' && session.adminId.length > 0;
     } catch (error) {
       console.error('Error verifying admin session:', error);
@@ -163,10 +168,10 @@ class AdminNotificationService {
 
   private async verifySalesSession(sessionId: string): Promise<boolean> {
     try {
-      if (!this.sql) return false;
-      const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
-      if (result.length === 0) return false;
-      const session = result[0].sess as any;
+      if (!this.pool) return false;
+      const result = await this.pool.query('SELECT sess FROM "session" WHERE sid = $1', [sessionId]);
+      if (result.rows.length === 0) return false;
+      const session = (result.rows[0] as any).sess as any;
       return session && typeof session.salesUserId === 'string' && session.salesUserId.length > 0;
     } catch (error) {
       console.error('Error verifying sales session:', error);

@@ -24,7 +24,7 @@ import {
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, customerAuthMeQueryFn, customerAuthMeQueryKey } from "@/lib/queryClient";
 import type { StoreSettings, User } from "@shared/schema";
 
 import aeenn from "@assets/aeenn.jpg";
@@ -54,7 +54,8 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
   });
 
   const { data: currentUser } = useQuery<User | null>({
-    queryKey: ['/api/auth/me'],
+    queryKey: customerAuthMeQueryKey,
+    queryFn: customerAuthMeQueryFn,
   });
 
   const logoutMutation = useMutation({
@@ -62,7 +63,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
       return await apiRequest('POST', '/api/auth/logout', {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      queryClient.invalidateQueries({ queryKey: customerAuthMeQueryKey });
       queryClient.invalidateQueries({ queryKey: ['/api/cart'] });
       toast({
         title: t('header.logout'),

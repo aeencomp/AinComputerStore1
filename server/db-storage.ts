@@ -191,15 +191,22 @@ export class DrizzleStorage implements IStorage {
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const hashedPassword = await bcrypt.hash(insertUser.password, 10);
+    const email = insertUser.email.trim().toLowerCase();
     const result = await db.insert(users).values({
       ...insertUser,
+      email,
       password: hashedPassword,
     }).returning();
     return result[0];
   }
 
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    const normalized = email.trim().toLowerCase();
+    const result = await db
+      .select()
+      .from(users)
+      .where(sql`lower(${users.email}) = ${normalized}`)
+      .limit(1);
     return result[0];
   }
 

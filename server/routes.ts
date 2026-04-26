@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, keyboards, lcds, keyboardSaleItems, lcdSaleItems, adminUsers, products } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -18,8 +18,8 @@ import Papa from "papaparse";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { startPriceSync, syncPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
+import { normalizeCustomerEmail } from "./auth-email";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -49,11 +49,133 @@ const imageUpload = multer({
   },
 });
 
+/** Same calendar day as GET /api/instore/withdrawals?date= (Asia/Baghdad). */
+function baghdadCalendarDateString(d: Date): string {
+  return d.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+}
+
+/**
+ * Block edit/delete when the timestamp falls only in a closed shift window.
+ * Withdrawals are listed by Baghdad calendar day, so early-morning rows can
+ * still match a previous closed shift while the store already has a new open
+ * shift — allow those when it's still "today" in Baghdad and any shift is active.
+ */
+async function isCashWithdrawalEditBlocked(recordTime: Date): Promise<boolean> {
+  const [containingShift] = await db
+    .select()
+    .from(salesShifts)
+    .where(
+      and(
+        lte(salesShifts.startTime, recordTime),
+        or(isNull(salesShifts.endTime), gte(salesShifts.endTime, recordTime)),
+      ),
+    )
+    .orderBy(desc(salesShifts.startTime))
+    .limit(1);
+
+  if (!containingShift || containingShift.status !== "closed") {
+    return false;
+  }
+
+  if (
+    baghdadCalendarDateString(recordTime) === baghdadCalendarDateString(new Date())
+  ) {
+    const [anyActive] = await db
+      .select({ id: salesShifts.id })
+      .from(salesShifts)
+      .where(eq(salesShifts.status, "active"))
+      .limit(1);
+    if (anyActive) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   const httpServer = createServer(app);
   
   adminNotifications.initialize(httpServer);
   intercomService.initialize(httpServer);
+
+  async function closeDuplicateActiveShiftsForUser(salesUserId: string) {
+    const actives = await db
+      .select()
+      .from(salesShifts)
+      .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, "active")))
+      .orderBy(desc(salesShifts.startTime));
+
+    if (actives.length <= 1) return actives[0] ?? null;
+
+    const keep = actives[0];
+    const toClose = actives.slice(1);
+    const endTime = new Date();
+
+    await db
+      .update(salesShifts)
+      .set({
+        status: "closed",
+        endTime,
+        notes: sql`COALESCE(${salesShifts.notes}, '') || '\n[auto] closed duplicate active shift on ' || ${endTime.toISOString()}`,
+      })
+      .where(inArray(salesShifts.id, toClose.map((s) => s.id)));
+
+    console.warn(
+      `[shift-fix] Closed ${toClose.length} duplicate active shifts for user ${salesUserId}. Kept ${keep.id}.`,
+    );
+    return keep;
+  }
+
+  async function closeDuplicateActiveShiftsAllUsers() {
+    const actives = await db
+      .select()
+      .from(salesShifts)
+      .where(sql`lower(${salesShifts.status}) = 'active'`)
+      .orderBy(desc(salesShifts.startTime));
+
+    if (actives.length <= 1) return;
+
+    const keepByUser = new Map<string, typeof salesShifts.$inferSelect>();
+    const toCloseIds: string[] = [];
+
+    for (const s of actives) {
+      const key = s.salesUserId;
+      if (!keepByUser.has(key)) {
+        keepByUser.set(key, s);
+      } else {
+        toCloseIds.push(s.id);
+      }
+    }
+
+    if (toCloseIds.length === 0) return;
+
+    const endTime = new Date();
+    await db
+      .update(salesShifts)
+      .set({
+        status: "closed",
+        endTime,
+        notes: sql`COALESCE(${salesShifts.notes}, '') || '\n[auto] closed duplicate active shift on ' || ${endTime.toISOString()}`,
+      })
+      .where(inArray(salesShifts.id, toCloseIds));
+
+    console.warn(`[shift-fix] Closed ${toCloseIds.length} duplicate active shifts (global).`);
+  }
+
+  async function ensureSalesShiftConstraints() {
+    // Enforce at DB level: at most one active shift per sales user.
+    // Use lower(status) in predicate to tolerate legacy values like 'Active'.
+    try {
+      await db.execute(sql`
+        CREATE UNIQUE INDEX IF NOT EXISTS sales_shifts_one_active_per_user
+        ON sales_shifts (sales_user_id)
+        WHERE (lower(status) = 'active')
+      `);
+    } catch (e) {
+      console.error("[shift-fix] failed to create unique index sales_shifts_one_active_per_user:", e);
+    }
+  }
 
   httpServer.on('upgrade', (req, socket, head) => {
     const pathname = req.url ? req.url.split('?')[0] : '';
@@ -77,8 +199,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaultAdmin();
   await storage.initializeDefaultSalesAdmin();
 
-  // Register object storage routes for persistent file uploads
-  registerObjectStorageRoutes(app);
+  // One-time hygiene: ensure there is at most one active shift per sales user.
+  // This prevents duplicate actives from breaking reports/closing logic.
+  try {
+    await closeDuplicateActiveShiftsAllUsers();
+    await ensureSalesShiftConstraints();
+  } catch (e) {
+    console.error("[shift-fix] failed global duplicate cleanup:", e);
+  }
 
   // Serve uploaded images with no-cache headers to ensure fresh images
   app.use("/uploads", (req, res, next) => {
@@ -1085,21 +1213,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Sales Shifts endpoints
+  // Same auth/selection rules as GET /api/sales/shifts/active-snapshot so the withdrawals
+  // UI can show "active shift" for admins/supervisors, not only for salesUserId sessions.
   app.get("/api/sales/shifts/current", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
-      if (!salesUserId) {
+      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
-      
-      const [activeShift] = await db.select().from(salesShifts)
-        .where(and(
-          eq(salesShifts.salesUserId, salesUserId),
-          eq(salesShifts.status, 'active')
-        ))
-        .orderBy(desc(salesShifts.startTime))
-        .limit(1);
-      
+
+      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
+
+      let activeShift;
+      if (!isSupervisor && salesUserId) {
+        // Self-heal: if the DB has multiple active shifts for this user, auto-close the older ones.
+        activeShift = await closeDuplicateActiveShiftsForUser(salesUserId);
+        if (activeShift) return res.json(activeShift);
+        [activeShift] = await db.select().from(salesShifts)
+          .where(and(
+            eq(salesShifts.salesUserId, salesUserId),
+            eq(salesShifts.status, 'active'),
+          ))
+          .orderBy(desc(salesShifts.startTime))
+          .limit(1);
+      } else {
+        [activeShift] = await db.select().from(salesShifts)
+          .where(eq(salesShifts.status, 'active'))
+          .orderBy(desc(salesShifts.startTime))
+          .limit(1);
+      }
+
       return res.json(activeShift || null);
     } catch (error) {
       console.error("Error fetching current shift:", error);
@@ -1119,13 +1264,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "المستخدم غير موجود" });
       }
       
-      // Check if there's already an active shift
-      const [existingShift] = await db.select().from(salesShifts)
-        .where(and(
-          eq(salesShifts.salesUserId, salesUserId),
-          eq(salesShifts.status, 'active')
-        ))
-        .limit(1);
+      // Self-heal duplicates then check if an active shift remains.
+      const existingShift = await closeDuplicateActiveShiftsForUser(salesUserId);
       
       if (existingShift) {
         return res.status(400).json({ error: "لديك وردية نشطة بالفعل", shift: existingShift });
@@ -1154,29 +1294,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
+      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
+      const adminId = (req.session as any).adminId;
+      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
+      const canViewAll =
+        isSupervisor ||
+        (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
       
       // Get active shift
-      const [activeShift] = await db.select().from(salesShifts)
-        .where(and(
-          eq(salesShifts.salesUserId, salesUserId),
-          eq(salesShifts.status, 'active')
-        ))
-        .limit(1);
+      // Regular users can only end their own shift.
+      // Supervisors/report-enabled users may need to end the currently-active register shift
+      // even when it's owned by a different cashier account.
+      let activeShift;
+      if (!canViewAll) {
+        // Self-heal: if the DB has multiple active shifts for this user, auto-close the older ones.
+        activeShift = await closeDuplicateActiveShiftsForUser(salesUserId);
+        if (!activeShift) {
+          return res.status(400).json({ error: "لا توجد وردية نشطة" });
+        }
+        [activeShift] = await db.select().from(salesShifts)
+          .where(and(
+            eq(salesShifts.salesUserId, salesUserId),
+            eq(salesShifts.status, 'active')
+          ))
+          .orderBy(desc(salesShifts.startTime))
+          .limit(1);
+      } else {
+        [activeShift] = await db.select().from(salesShifts)
+          .where(eq(salesShifts.status, 'active'))
+          .orderBy(desc(salesShifts.startTime))
+          .limit(1);
+      }
       
       if (!activeShift) {
         return res.status(400).json({ error: "لا توجد وردية نشطة" });
       }
       
       const { closingCash, notes } = req.body;
-      const endTime = new Date();
+      // Use DB-local Baghdad timestamp (matches timestamp columns).
+      const endTime = sql`timezone('Asia/Baghdad', now())`;
       
-      // Calculate all in-store orders during this shift (all payment methods)
-      const shiftOrders = await db.select().from(orders)
+      // In-store orders during shift window (all users)
+      const shiftOrders = await db
+        .select()
+        .from(orders)
         .where(and(
           inArray(orders.orderType, ['walk-in', 'in-store']),
-          eq(orders.salespersonId, salesUserId),
-          gte(orders.createdAt, activeShift.startTime),
-          lte(orders.createdAt, endTime)
+          sql`${orders.createdAt} >= ${activeShift.startTime}`,
+          sql`${orders.createdAt} <= ${endTime}`,
         ));
 
       // Repair tickets paid/delivered during this shift
@@ -1185,14 +1350,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           or(
             and(
               eq(repairTickets.paymentStatus, 'paid'),
-              gte(repairTickets.updatedAt, activeShift.startTime),
-              lte(repairTickets.updatedAt, endTime)
+              sql`${repairTickets.updatedAt} >= ${activeShift.startTime}`,
+              sql`${repairTickets.updatedAt} <= ${endTime}`
             ),
             and(
               eq(repairTickets.status, 'delivered'),
               isNotNull(repairTickets.deliveredAt),
-              gte(repairTickets.deliveredAt, activeShift.startTime),
-              lte(repairTickets.deliveredAt, endTime)
+              sql`${repairTickets.deliveredAt} >= ${activeShift.startTime}`,
+              sql`${repairTickets.deliveredAt} <= ${endTime}`
             )
           )
         );
@@ -1242,49 +1407,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── Shift List & Shift Report ───────────────────────────────────────────────
 
-  // Helper: compute report data for an arbitrary time range
-  // Compute shift report scoped to the shift owner's orders.
-  // salesUserId: when provided, in-store orders are filtered to that employee.
-  // For admin views (salesUserId = null) all orders in the time range are returned.
-  async function computeShiftReport(startTime: Date, endTime: Date, salesUserId: string | null = null) {
-    const orderConditions: any[] = [
-      inArray(orders.orderType, ['walk-in', 'in-store']),
-      gte(orders.createdAt, startTime),
-      lte(orders.createdAt, endTime),
-    ];
-    if (salesUserId) {
-      orderConditions.push(eq(orders.salespersonId, salesUserId));
-    }
+  // Helper: compute shift report using DB-local timestamps.
+  //
+  // IMPORTANT: This project stores many timestamps as `timestamp` (no timezone).
+  // If we pull them into JS Dates, Node/pg will interpret them as UTC which shifts
+  // Baghdad-local values by +3h and breaks comparisons (end < start).
+  //
+  // So we compute the shift window entirely in SQL:
+  //   start := sales_shifts.start_time
+  //   end   := COALESCE(sales_shifts.end_time, timezone('Asia/Baghdad', now()))
+  async function computeShiftReportForShift(shiftId: string) {
+    const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
+    const shiftEndSql = sql`(select coalesce(end_time, timezone('Asia/Baghdad', now())) from sales_shifts where id = ${shiftId} limit 1)`;
 
-    const inStoreOrders = await db.select().from(orders).where(and(...orderConditions));
+    const inStoreOrders = await db
+      .select()
+      .from(orders)
+      .where(and(
+        inArray(orders.orderType, ['walk-in', 'in-store']),
+        sql`${orders.createdAt} >= ${shiftStartSql}`,
+        sql`${orders.createdAt} <= ${shiftEndSql}`,
+      ));
 
-    const paidRepairTickets = await db.select().from(repairTickets).where(
-      or(
-        and(
-          eq(repairTickets.paymentStatus, 'paid'),
-          gte(repairTickets.updatedAt, startTime),
-          lte(repairTickets.updatedAt, endTime)
+    const paidRepairTickets = await db
+      .select()
+      .from(repairTickets)
+      .where(
+        or(
+          and(
+            eq(repairTickets.paymentStatus, 'paid'),
+            sql`${repairTickets.updatedAt} >= ${shiftStartSql}`,
+            sql`${repairTickets.updatedAt} <= ${shiftEndSql}`,
+          ),
+          and(
+            eq(repairTickets.status, 'delivered'),
+            isNotNull(repairTickets.deliveredAt),
+            sql`${repairTickets.deliveredAt} >= ${shiftStartSql}`,
+            sql`${repairTickets.deliveredAt} <= ${shiftEndSql}`,
+          ),
         ),
-        and(
-          eq(repairTickets.status, 'delivered'),
-          isNotNull(repairTickets.deliveredAt),
-          gte(repairTickets.deliveredAt, startTime),
-          lte(repairTickets.deliveredAt, endTime)
-        )
-      )
-    );
+      );
 
     // Note: cashWithdrawals table has no salesUserId column so withdrawals are scoped
     // by time range only. If multiple employees work concurrently and all record withdrawals,
     // those withdrawals appear in every overlapping shift report. Adding per-employee
     // withdrawal attribution would require a schema migration.
-    const dailyWithdrawals = await db.select().from(cashWithdrawals)
-      .where(and(gte(cashWithdrawals.createdAt, startTime), lte(cashWithdrawals.createdAt, endTime)))
+    const dailyWithdrawals = await db
+      .select()
+      .from(cashWithdrawals)
+      .where(and(
+        sql`${cashWithdrawals.createdAt} >= ${shiftStartSql}`,
+        sql`${cashWithdrawals.createdAt} <= ${shiftEndSql}`,
+      ))
       .orderBy(desc(cashWithdrawals.createdAt));
 
     // Staff advances in the same time window (no salesUserId column, scoped by time only)
-    const dailyAdvances = await db.select().from(staffAdvances)
-      .where(and(gte(staffAdvances.createdAt, startTime), lte(staffAdvances.createdAt, endTime)))
+    const dailyAdvances = await db
+      .select()
+      .from(staffAdvances)
+      .where(and(
+        sql`${staffAdvances.createdAt} >= ${shiftStartSql}`,
+        sql`${staffAdvances.createdAt} <= ${shiftEndSql}`,
+      ))
       .orderBy(desc(staffAdvances.createdAt));
 
     const inStoreTotalCash = inStoreOrders.filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
@@ -1337,9 +1521,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     };
   }
 
-  // GET /api/sales/shifts — list CLOSED shifts
-  // - Regular sales user: own shifts only
-  // - sales_admin role or main adminId: all employees' shifts
+  // GET /api/sales/shifts — list shifts for the report screen
+  // - Regular sales user: own CLOSED shifts only (active handled by /active-snapshot)
+  // - sales_admin role or main adminId: return CLOSED + ACTIVE shifts so they can select
+  //   the correct active cashier shift when multiple shifts run concurrently.
   app.get("/api/sales/shifts", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
@@ -1348,16 +1533,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
+      const canViewAll =
+        isSupervisor ||
+        (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
-      // Only return closed shifts; active shift is served via /active-snapshot
-      const conditions: any[] = [eq(salesShifts.status, 'closed')];
-      if (!isSupervisor && salesUserId) {
-        conditions.push(eq(salesShifts.salesUserId, salesUserId));
+      // Keep list clean even if bad historical data exists.
+      await closeDuplicateActiveShiftsAllUsers();
+
+      const conditions: any[] = [];
+      if (canViewAll) {
+        // show both active+closed for all employees (lets supervisors pick correct active shift)
+        conditions.push(inArray(salesShifts.status, ['active', 'closed']));
+      } else {
+        // regular user: only own closed shifts
+        conditions.push(eq(salesShifts.status, 'closed'));
+        if (salesUserId) conditions.push(eq(salesShifts.salesUserId, salesUserId));
       }
       const shifts = await db.select().from(salesShifts)
         .where(and(...conditions))
         .orderBy(desc(salesShifts.startTime));
-      return res.json(shifts);
+      // Defensive: even if legacy data still has duplicates, only return newest active per user.
+      const newestActiveByUser = new Set<string>();
+      const filtered = shifts.filter((s) => {
+        if (String(s.status).toLowerCase() !== "active") return true;
+        if (newestActiveByUser.has(s.salesUserId)) return false;
+        newestActiveByUser.add(s.salesUserId);
+        return true;
+      });
+      return res.json(filtered);
     } catch (error) {
       console.error("Error fetching shifts list:", error);
       return res.status(500).json({ error: "فشل جلب الورديات" });
@@ -1376,9 +1579,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
+      const canViewAll =
+        isSupervisor ||
+        (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
       let activeShift;
-      if (!isSupervisor && salesUserId) {
+      if (!canViewAll && salesUserId) {
         [activeShift] = await db.select().from(salesShifts)
           .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
           .orderBy(desc(salesShifts.startTime)).limit(1);
@@ -1395,8 +1601,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // included in this endpoint. For a full view, supervisors can navigate to each
       // individual shift via GET /api/sales/shifts/:id/report.
       // Orders are always scoped to the shift owner so totals are per-employee accurate.
-      const now = new Date();
-      const reportData = await computeShiftReport(activeShift.startTime, now, activeShift.salesUserId);
+      const reportData = await computeShiftReportForShift(activeShift.id);
       return res.json({ shift: activeShift, ...reportData });
     } catch (error) {
       console.error("Error fetching active snapshot:", error);
@@ -1416,19 +1621,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
+      const canViewAll =
+        isSupervisor ||
+        (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
       const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, req.params.id));
       if (!shift) return res.status(404).json({ error: "الوردية غير موجودة" });
 
       // Regular sales users can only view their own shifts
-      if (!isSupervisor && salesUserId && shift.salesUserId !== salesUserId) {
+      if (!canViewAll && salesUserId && shift.salesUserId !== salesUserId) {
         return res.status(403).json({ error: "غير مصرح" });
       }
 
-      const endTime = shift.endTime || new Date();
-      // Always scope orders to the shift owner — this keeps active-snapshot, shift-close totals,
-      // and the printed report all consistent. Supervisors see the owner-scoped view too.
-      const reportData = await computeShiftReport(shift.startTime, endTime, shift.salesUserId);
+      const reportData = await computeShiftReportForShift(shift.id);
       res.set('Cache-Control', 'no-store');
       return res.json({ shift, ...reportData });
     } catch (error) {
@@ -1515,12 +1720,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Array.isArray(updates) || updates.length === 0) {
         return res.status(400).json({ error: "لا توجد تحديثات" });
       }
-      const valid = updates.every(
-        (u: any) => typeof u.id === 'number' && typeof u.quantity === 'number' && u.quantity >= 0
-      );
+      const valid = updates.every((u: any) => {
+        const source = u?.source || "instore";
+        const sourceValid = ["instore", "battery", "adapter", "keyboard", "lcd"].includes(source);
+        const idValid = typeof u?.id === "number" || typeof u?.id === "string";
+        return sourceValid && idValid && typeof u?.quantity === "number" && u.quantity >= 0;
+      });
       if (!valid) return res.status(400).json({ error: "بيانات غير صالحة" });
-      const count = await storage.bulkSetInStoreStock(updates);
-      return res.json({ updated: count });
+
+      const inStoreUpdates: Array<{ id: number; quantity: number }> = [];
+      let updated = 0;
+
+      for (const u of updates) {
+        const source = u.source || "instore";
+        if (source === "instore") {
+          if (typeof u.id === "number") inStoreUpdates.push({ id: u.id, quantity: u.quantity });
+          continue;
+        }
+        if (source === "battery") {
+          const row = await storage.updateLaptopBattery(String(u.id), { stockQuantity: u.quantity });
+          if (row) updated++;
+          continue;
+        }
+        if (source === "adapter") {
+          const row = await storage.updateAcAdapter(String(u.id), { stockQuantity: u.quantity });
+          if (row) updated++;
+          continue;
+        }
+        if (source === "keyboard") {
+          const result = await db.update(keyboards).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(keyboards.id, String(u.id))).returning();
+          if (result.length > 0) updated++;
+          continue;
+        }
+        if (source === "lcd") {
+          const result = await db.update(lcds).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(lcds.id, String(u.id))).returning();
+          if (result.length > 0) updated++;
+        }
+      }
+
+      if (inStoreUpdates.length > 0) {
+        updated += await storage.bulkSetInStoreStock(inStoreUpdates);
+      }
+
+      return res.json({ updated });
     } catch (error) {
       console.error("Error applying stock count:", error);
       return res.status(500).json({ error: "فشل تطبيق الجرد" });
@@ -1754,25 +1996,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const validatedData = registerSchema.parse(req.body);
-      
-      const existingUser = await storage.getUserByEmail(validatedData.email);
+      const emailNorm = normalizeCustomerEmail(validatedData.email);
+
+      const existingUser = await storage.getUserByEmail(emailNorm);
       if (existingUser) {
         return res.status(400).json({ error: "البريد الإلكتروني مستخدم بالفعل" });
       }
 
-      const user = await storage.createUser(validatedData);
-      
+      const user = await storage.createUser({ ...validatedData, email: emailNorm });
+
       req.session.userId = user.id;
-      
-      return new Promise((resolve) => {
-        req.session.save((err) => {
-          if (err) {
-            console.error("Session save error:", err);
-          }
-          const { password: _, ...userWithoutPassword } = user;
-          resolve(res.json(userWithoutPassword));
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error("Session save error (register):", err);
+              reject(err);
+            } else resolve();
+          });
         });
-      });
+      } catch {
+        return res.status(503).json({ error: "تعذر حفظ الجلسة. تحقق من قاعدة البيانات وحاول مرة أخرى." });
+      }
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
@@ -1790,8 +2037,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
 
       const validatedData = loginSchema.parse(req.body);
-      
-      const user = await storage.getUserByEmail(validatedData.email);
+      const emailNorm = normalizeCustomerEmail(validatedData.email);
+
+      const user = await storage.getUserByEmail(emailNorm);
       if (!user) {
         return res.status(401).json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
       }
@@ -1801,16 +2049,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "البريد الإلكتروني أو كلمة المرور غير صحيحة" });
       }
 
-      // Customers always have email — send OTP
       const otp = generateOTP();
-      storeOTP(`customer:${validatedData.email}`, otp);
-      try {
-        await sendOTPEmail(validatedData.email, otp, "بوابة العملاء");
-      } catch (emailErr) {
-        console.error("Failed to send customer OTP email:", emailErr);
-        return res.status(500).json({ error: "فشل إرسال رمز التحقق" });
+      storeOTP(`customer:login:${emailNorm}`, otp);
+      if (process.env.NODE_ENV !== "production") {
+        console.log(`[auth] Login OTP for ${emailNorm}: ${otp}`);
       }
-      return res.json({ step: "otp", maskedEmail: validatedData.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
+      try {
+        await sendOTPEmail(emailNorm, otp, "بوابة العملاء", "login");
+      } catch (emailErr) {
+        console.error("Failed to send login OTP email:", emailErr);
+        return res.status(500).json({ error: "فشل إرسال رمز التحقق. تحقق من إعدادات البريد." });
+      }
+      return res.json({
+        step: "otp",
+        maskedEmail: emailNorm.replace(/(.{2}).+(@.+)/, "$1***$2"),
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: error.errors[0].message });
@@ -1820,29 +2073,145 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/auth/verify-otp", async (req, res) => {
+  app.post("/api/auth/verify-login-otp", async (req, res) => {
     try {
-      const { email, otp } = req.body;
-      if (!email || !otp) return res.status(400).json({ error: "البيانات غير مكتملة" });
+      const bodySchema = z.object({
+        email: z.string().email("البريد الإلكتروني غير صحيح"),
+        otp: z.string().min(4, "أدخل رمز التحقق"),
+      });
+      const { email, otp } = bodySchema.parse(req.body);
+      const emailNorm = normalizeCustomerEmail(email);
 
-      if (!verifyOTP(`customer:${email}`, otp)) {
+      if (!verifyOTP(`customer:login:${emailNorm}`, String(otp).trim())) {
         return res.status(401).json({ error: "رمز التحقق غير صحيح أو منتهي الصلاحية" });
       }
 
-      const user = await storage.getUserByEmail(email);
+      const user = await storage.getUserByEmail(emailNorm);
       if (!user) return res.status(401).json({ error: "المستخدم غير موجود" });
 
       req.session.userId = user.id;
-      return new Promise((resolve) => {
-        req.session.save((err) => {
-          if (err) console.error("Session save error:", err);
-          const { password: _, ...userWithoutPassword } = user;
-          resolve(res.json(userWithoutPassword));
+      try {
+        await new Promise<void>((resolve, reject) => {
+          req.session.save((err) => {
+            if (err) {
+              console.error("Session save error (verify-login-otp):", err);
+              reject(err);
+            } else resolve();
+          });
         });
+      } catch {
+        return res.status(503).json({
+          error:
+            "تعذر حفظ جلسة تسجيل الدخول. تحقق من الاتصال بقاعدة البيانات أو أعد تحميل الصفحة والمحاولة مرة أخرى.",
+        });
+      }
+
+      const { password: _, ...userWithoutPassword } = user;
+      return res.json(userWithoutPassword);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("verify-login-otp error:", error);
+      return res.status(500).json({ error: "فشل التحقق" });
+    }
+  });
+
+  app.post("/api/auth/forgot-password", async (req, res) => {
+    try {
+      const bodySchema = z.object({
+        email: z.string().email("البريد الإلكتروني غير صحيح"),
+      });
+      const { email } = bodySchema.parse(req.body);
+      const emailNorm = normalizeCustomerEmail(email);
+
+      const user = await storage.getUserByEmail(emailNorm);
+      if (user) {
+        const otp = generateOTP();
+        storeOTP(`customer:reset:${emailNorm}`, otp);
+        if (process.env.NODE_ENV !== "production") {
+          console.log(`[auth] Password reset OTP for ${emailNorm}: ${otp}`);
+        }
+        try {
+          await sendOTPEmail(emailNorm, otp, "متجر العين", "reset");
+        } catch (emailErr) {
+          console.error("Failed to send reset OTP email:", emailErr);
+          return res.status(500).json({ error: "فشل إرسال رمز التحقق" });
+        }
+      }
+      return res.json({
+        ok: true,
+        message:
+          "إذا كان هذا البريد مسجلاً لدينا، ستصلك رسالة تحتوي على رمز التحقق خلال دقائق.",
       });
     } catch (error) {
-      console.error("Customer OTP verify error:", error);
-      return res.status(500).json({ error: "فشل التحقق" });
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("forgot-password error:", error);
+      return res.status(500).json({ error: "حدث خطأ" });
+    }
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    try {
+      const bodySchema = z.object({
+        email: z.string().email("البريد الإلكتروني غير صحيح"),
+        otp: z.string().min(4, "أدخل رمز التحقق"),
+        newPassword: z.string().min(6, "كلمة المرور يجب أن تكون 6 أحرف على الأقل"),
+      });
+      const { email, otp, newPassword } = bodySchema.parse(req.body);
+      const emailNorm = normalizeCustomerEmail(email);
+
+      if (!verifyOTP(`customer:reset:${emailNorm}`, String(otp).trim())) {
+        return res.status(401).json({ error: "رمز التحقق غير صحيح أو منتهي الصلاحية" });
+      }
+
+      const user = await storage.getUserByEmail(emailNorm);
+      if (!user) {
+        return res.status(404).json({ error: "المستخدم غير موجود" });
+      }
+
+      await storage.updateUser(user.id, { password: newPassword });
+
+      return res.json({ ok: true, message: "تم تغيير كلمة المرور. يمكنك تسجيل الدخول الآن." });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("reset-password error:", error);
+      return res.status(500).json({ error: "فشل إعادة تعيين كلمة المرور" });
+    }
+  });
+
+  app.post("/api/auth/change-password", async (req, res) => {
+    try {
+      const userId = (req.session as any).userId as string | undefined;
+      if (!userId) {
+        return res.status(401).json({ error: "يجب تسجيل الدخول" });
+      }
+      const bodySchema = z.object({
+        currentPassword: z.string().min(1, "كلمة المرور الحالية مطلوبة"),
+        newPassword: z.string().min(6, "كلمة المرور الجديدة 6 أحرف على الأقل"),
+      });
+      const { currentPassword, newPassword } = bodySchema.parse(req.body);
+
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(401).json({ error: "المستخدم غير موجود" });
+
+      const ok = await bcrypt.compare(currentPassword, user.password);
+      if (!ok) {
+        return res.status(401).json({ error: "كلمة المرور الحالية غير صحيحة" });
+      }
+
+      await storage.updateUser(userId, { password: newPassword });
+      return res.json({ ok: true, message: "تم تغيير كلمة المرور" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: error.errors[0].message });
+      }
+      console.error("change-password error:", error);
+      return res.status(500).json({ error: "فشل تغيير كلمة المرور" });
     }
   });
 
@@ -2290,7 +2659,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!updates || !Array.isArray(updates)) {
         return res.status(400).json({ error: "Updates array is required" });
       }
-      const updated = await storage.bulkSetInStoreStock(updates);
+      const inStoreUpdates: Array<{ id: number; quantity: number }> = [];
+      let updated = 0;
+      for (const u of updates) {
+        const source = u?.source || "instore";
+        if (source === "instore") {
+          if (typeof u.id === "number") inStoreUpdates.push({ id: u.id, quantity: u.quantity });
+          continue;
+        }
+        if (source === "battery") {
+          const row = await storage.updateLaptopBattery(String(u.id), { stockQuantity: u.quantity });
+          if (row) updated++;
+          continue;
+        }
+        if (source === "adapter") {
+          const row = await storage.updateAcAdapter(String(u.id), { stockQuantity: u.quantity });
+          if (row) updated++;
+          continue;
+        }
+        if (source === "keyboard") {
+          const result = await db.update(keyboards).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(keyboards.id, String(u.id))).returning();
+          if (result.length > 0) updated++;
+          continue;
+        }
+        if (source === "lcd") {
+          const result = await db.update(lcds).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(lcds.id, String(u.id))).returning();
+          if (result.length > 0) updated++;
+        }
+      }
+      if (inStoreUpdates.length > 0) {
+        updated += await storage.bulkSetInStoreStock(inStoreUpdates);
+      }
       return res.json({ updated });
     } catch (error) {
       console.error("Error applying stock count:", error);
@@ -2965,6 +3364,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       console.error("Error updating repair ticket:", error);
       return res.status(500).json({ error: "Failed to update repair ticket" });
+    }
+  });
+
+  app.post("/api/admin/repair-tickets/bulk-send-completion-whatsapp", async (_req, res) => {
+    try {
+      const all = await storage.getRepairTickets();
+      const targets = all.filter((t) => t.status === "completed" && t.isArchived !== 1);
+      const results: { id: string; ticketNumber: string; _whatsappStatus: string }[] = [];
+      for (const ticket of targets) {
+        const whatsappResult = await sendTicketUpdatedMessage(
+          ticket.customerPhone,
+          ticket.customerName,
+          ticket.ticketNumber,
+          "completed",
+          ticket.technicianNotes,
+          ticket.costEstimate,
+          ticket.finalCost
+        ).catch((err) => {
+          console.error(`WhatsApp bulk completion failed for ${ticket.ticketNumber}:`, err);
+          return { success: false, error: err.message };
+        });
+        results.push({
+          id: ticket.id,
+          ticketNumber: ticket.ticketNumber,
+          _whatsappStatus: whatsappResult.success
+            ? "sent"
+            : `failed: ${whatsappResult.error || "unknown"}`,
+        });
+        await new Promise((r) => setTimeout(r, 350));
+      }
+      const sent = results.filter((r) => r._whatsappStatus === "sent").length;
+      return res.json({
+        total: targets.length,
+        sent,
+        failed: targets.length - sent,
+        results,
+      });
+    } catch (error) {
+      console.error("Error bulk sending completion WhatsApp:", error);
+      return res.status(500).json({ error: "Failed to send bulk WhatsApp notifications" });
     }
   });
 
@@ -4212,7 +4651,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Battery Backup - Export all batteries and adapters as JSON
+  // Battery Backup - Export batteries/adapters/keyboards/LCDs as JSON
   app.get("/api/battery/batteries/backup", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
@@ -4223,11 +4662,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteries = await storage.getLaptopBatteries();
       const adapters = await storage.getAcAdapters();
       
+      const keyboardRows = await db.select().from(keyboards).where(eq(keyboards.isActive, 1));
+      const lcdRows = await db.select().from(lcds).where(eq(lcds.isActive, 1));
+
       const backupData = {
-        schemaVersion: "1.1",
+        schemaVersion: "1.2",
         generatedAt: new Date().toISOString(),
+        backupLabel: "Battery inventory backup (batteries, adapters, keyboards, lcds)",
         batteryCount: batteries.length,
         adapterCount: adapters.length,
+        keyboardCount: keyboardRows.length,
+        lcdCount: lcdRows.length,
         batteries: batteries.map(b => ({
           serialNumber: b.serialNumber,
           partNumber: b.partNumber,
@@ -4270,6 +4715,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
           notes: a.notes,
           isActive: a.isActive,
         })),
+        keyboards: keyboardRows.map(k => ({
+          serialNumber: k.serialNumber,
+          partNumber: k.partNumber,
+          barcode: k.barcode,
+          brand: k.brand,
+          layout: k.layout,
+          keyboardType: k.keyboardType,
+          backlight: k.backlight,
+          stockQuantity: k.stockQuantity,
+          minStockLevel: k.minStockLevel,
+          purchasePrice: k.purchasePrice,
+          sellingPrice: k.sellingPrice,
+          wholesalePrice: k.wholesalePrice,
+          supplier: k.supplier,
+          location: k.location,
+          notes: k.notes,
+          isActive: k.isActive,
+        })),
+        lcds: lcdRows.map(l => ({
+          serialNumber: l.serialNumber,
+          partNumber: l.partNumber,
+          barcode: l.barcode,
+          brand: l.brand,
+          sizeInch: l.sizeInch,
+          brightnessNits: l.brightnessNits,
+          refreshRateHz: l.refreshRateHz,
+          resolution: l.resolution,
+          connectorType: l.connectorType,
+          panelType: l.panelType,
+          stockQuantity: l.stockQuantity,
+          minStockLevel: l.minStockLevel,
+          purchasePrice: l.purchasePrice,
+          sellingPrice: l.sellingPrice,
+          wholesalePrice: l.wholesalePrice,
+          supplier: l.supplier,
+          location: l.location,
+          notes: l.notes,
+          isActive: l.isActive,
+        })),
       };
       
       const filename = `inventory-backup-${new Date().toISOString().split('T')[0]}.json`;
@@ -4282,7 +4766,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Battery Restore - Import batteries and adapters from JSON backup
+  // Battery Restore - Import batteries/adapters/keyboards/LCDs from JSON backup
   app.post("/api/battery/batteries/restore", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
@@ -4290,17 +4774,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { schemaVersion, data, batteries, adapters, mode = 'merge' } = req.body;
+      const { schemaVersion, data, batteries, adapters, keyboards: keyboardDataInput, lcds: lcdDataInput, mode = 'merge' } = req.body;
       
       // Support both old format (data array) and new format (batteries/adapters arrays)
       const batteryData = batteries || data || [];
       const adapterData = adapters || [];
+      const keyboardData = keyboardDataInput || [];
+      const lcdData = lcdDataInput || [];
       
-      if (!schemaVersion || (!Array.isArray(batteryData) && !Array.isArray(adapterData))) {
+      if (!schemaVersion || (!Array.isArray(batteryData) && !Array.isArray(adapterData) && !Array.isArray(keyboardData) && !Array.isArray(lcdData))) {
         return res.status(400).json({ error: "ملف النسخة الاحتياطية غير صالح" });
       }
       
-      if (schemaVersion !== "1.0" && schemaVersion !== "1.1") {
+      if (schemaVersion !== "1.0" && schemaVersion !== "1.1" && schemaVersion !== "1.2") {
         return res.status(400).json({ error: "إصدار النسخة الاحتياطية غير مدعوم" });
       }
       
@@ -4311,6 +4797,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adaptersAdded: 0,
         adaptersUpdated: 0,
         adaptersSkipped: 0,
+        keyboardsAdded: 0,
+        keyboardsUpdated: 0,
+        keyboardsSkipped: 0,
+        lcdsAdded: 0,
+        lcdsUpdated: 0,
+        lcdsSkipped: 0,
         errors: [] as string[],
       };
       
@@ -4420,7 +4912,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await storage.createAcAdapter({
               serialNumber: item.serialNumber,
               partNumber: item.partNumber,
-              barcode: item.barcode || `ADP-${item.serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`,
+              barcode: item.barcode || item.serialNumber,
               brand: item.brand,
               compatibleLaptops: item.compatibleLaptops,
               inputVoltage: item.inputVoltage,
@@ -4447,10 +4939,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
           results.adaptersSkipped++;
         }
       }
+
+      // Process keyboards
+      for (const item of keyboardData) {
+        try {
+          if (!item.serialNumber || !item.brand) {
+            results.errors.push(`بيانات ناقصة للكيبورد: ${item.serialNumber || 'غير معروف'}`);
+            results.keyboardsSkipped++;
+            continue;
+          }
+
+          const existing = await db.select().from(keyboards).where(eq(keyboards.serialNumber, item.serialNumber)).limit(1);
+
+          if (existing.length) {
+            if (mode === 'merge') {
+              await db.update(keyboards).set({
+                partNumber: item.partNumber,
+                barcode: item.barcode || item.serialNumber,
+                brand: item.brand,
+                layout: item.layout,
+                keyboardType: item.keyboardType,
+                backlight: item.backlight ?? 0,
+                stockQuantity: item.stockQuantity,
+                minStockLevel: item.minStockLevel,
+                purchasePrice: item.purchasePrice,
+                sellingPrice: item.sellingPrice,
+                wholesalePrice: item.wholesalePrice,
+                supplier: item.supplier,
+                location: item.location,
+                notes: item.notes,
+                isActive: item.isActive ?? 1,
+                updatedAt: new Date(),
+              }).where(eq(keyboards.id, existing[0].id));
+              results.keyboardsUpdated++;
+            } else {
+              results.keyboardsSkipped++;
+            }
+          } else {
+            await db.insert(keyboards).values({
+              serialNumber: item.serialNumber,
+              partNumber: item.partNumber,
+              barcode: item.barcode || item.serialNumber,
+              brand: item.brand,
+              layout: item.layout,
+              keyboardType: item.keyboardType,
+              backlight: item.backlight ?? 0,
+              stockQuantity: item.stockQuantity || 0,
+              minStockLevel: item.minStockLevel || 2,
+              purchasePrice: item.purchasePrice,
+              sellingPrice: item.sellingPrice,
+              wholesalePrice: item.wholesalePrice,
+              supplier: item.supplier,
+              location: item.location,
+              notes: item.notes,
+              isActive: item.isActive ?? 1,
+            });
+            results.keyboardsAdded++;
+          }
+        } catch (itemError: any) {
+          results.errors.push(`خطأ في الكيبورد ${item.serialNumber}: ${itemError.message}`);
+          results.keyboardsSkipped++;
+        }
+      }
+
+      // Process LCDs
+      for (const item of lcdData) {
+        try {
+          if (!item.serialNumber || !item.brand) {
+            results.errors.push(`بيانات ناقصة لشاشة LCD: ${item.serialNumber || 'غير معروف'}`);
+            results.lcdsSkipped++;
+            continue;
+          }
+
+          const existing = await db.select().from(lcds).where(eq(lcds.serialNumber, item.serialNumber)).limit(1);
+
+          if (existing.length) {
+            if (mode === 'merge') {
+              await db.update(lcds).set({
+                partNumber: item.partNumber,
+                barcode: item.barcode || item.serialNumber,
+                brand: item.brand,
+                sizeInch: item.sizeInch,
+                brightnessNits: item.brightnessNits,
+                refreshRateHz: item.refreshRateHz,
+                resolution: item.resolution,
+                connectorType: item.connectorType,
+                panelType: item.panelType,
+                stockQuantity: item.stockQuantity,
+                minStockLevel: item.minStockLevel,
+                purchasePrice: item.purchasePrice,
+                sellingPrice: item.sellingPrice,
+                wholesalePrice: item.wholesalePrice,
+                supplier: item.supplier,
+                location: item.location,
+                notes: item.notes,
+                isActive: item.isActive ?? 1,
+                updatedAt: new Date(),
+              }).where(eq(lcds.id, existing[0].id));
+              results.lcdsUpdated++;
+            } else {
+              results.lcdsSkipped++;
+            }
+          } else {
+            await db.insert(lcds).values({
+              serialNumber: item.serialNumber,
+              partNumber: item.partNumber,
+              barcode: item.barcode || item.serialNumber,
+              brand: item.brand,
+              sizeInch: item.sizeInch,
+              brightnessNits: item.brightnessNits,
+              refreshRateHz: item.refreshRateHz,
+              resolution: item.resolution,
+              connectorType: item.connectorType,
+              panelType: item.panelType,
+              stockQuantity: item.stockQuantity || 0,
+              minStockLevel: item.minStockLevel || 2,
+              purchasePrice: item.purchasePrice,
+              sellingPrice: item.sellingPrice,
+              wholesalePrice: item.wholesalePrice,
+              supplier: item.supplier,
+              location: item.location,
+              notes: item.notes,
+              isActive: item.isActive ?? 1,
+            });
+            results.lcdsAdded++;
+          }
+        } catch (itemError: any) {
+          results.errors.push(`خطأ في شاشة LCD ${item.serialNumber}: ${itemError.message}`);
+          results.lcdsSkipped++;
+        }
+      }
       
-      const totalAdded = results.batteriesAdded + results.adaptersAdded;
-      const totalUpdated = results.batteriesUpdated + results.adaptersUpdated;
-      const totalSkipped = results.batteriesSkipped + results.adaptersSkipped;
+      const totalAdded = results.batteriesAdded + results.adaptersAdded + results.keyboardsAdded + results.lcdsAdded;
+      const totalUpdated = results.batteriesUpdated + results.adaptersUpdated + results.keyboardsUpdated + results.lcdsUpdated;
+      const totalSkipped = results.batteriesSkipped + results.adaptersSkipped + results.keyboardsSkipped + results.lcdsSkipped;
       
       return res.json({
         success: true,
@@ -4711,21 +5333,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const { serialNumber, brand, compatibleLaptops, ...rest } = req.body;
       
-      if (!serialNumber || !brand || !compatibleLaptops || !Array.isArray(compatibleLaptops)) {
-        return res.status(400).json({ error: "الرقم التسلسلي والعلامة التجارية والأجهزة المتوافقة مطلوبة" });
+      if (!brand || !compatibleLaptops || !Array.isArray(compatibleLaptops)) {
+        return res.status(400).json({ error: "العلامة التجارية والأجهزة المتوافقة مطلوبة" });
       }
-      
-      // Check if serial already exists
-      const existing = await storage.getAcAdapterBySerial(serialNumber);
-      if (existing) {
-        return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+
+      let finalSerial = (serialNumber || "").trim();
+      if (!finalSerial) {
+        const allAdapters = await storage.getAcAdapters();
+        const used = new Set(allAdapters.map(a => (a.serialNumber || "").trim().toUpperCase()));
+        let max = 0;
+        for (const a of allAdapters) {
+          const m = (a.serialNumber || "").match(/^ADP-(\d+)$/i);
+          if (m) max = Math.max(max, parseInt(m[1], 10));
+        }
+        let next = max + 1;
+        do {
+          finalSerial = `ADP-${String(next).padStart(4, "0")}`;
+          next++;
+        } while (used.has(finalSerial.toUpperCase()));
       }
-      
-      // Generate barcode from serial
-      const barcode = `ADP-${serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`;
+
+      const existing = await storage.getAcAdapterBySerial(finalSerial);
+      if (existing) return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+
+      const barcode = rest.barcode || finalSerial;
       
       const adapter = await storage.createAcAdapter({
-        serialNumber,
+        serialNumber: finalSerial,
         brand,
         compatibleLaptops,
         barcode,
@@ -4748,9 +5382,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const updateData = { ...req.body };
       
-      // Auto-regenerate barcode when serial number changes
-      if (updateData.serialNumber) {
-        updateData.barcode = `ADP-${updateData.serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`;
+      // If serial changes and barcode not explicitly provided, keep barcode synced to serial
+      if (updateData.serialNumber && !updateData.barcode) {
+        updateData.barcode = updateData.serialNumber;
       }
       
       const adapter = await storage.updateAcAdapter(req.params.id, updateData);
@@ -4776,6 +5410,603 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error deleting adapter:", error);
       return res.status(500).json({ error: "خطأ في حذف الشاحن" });
+    }
+  });
+
+  // One-time migration: sync adapter/keyboard/LCD barcodes with serial numbers
+  app.post("/api/battery/migrations/sync-barcodes-to-serial", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = await storage.getBatteryUser(batteryUserId);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ error: "غير مسموح" });
+      }
+
+      const adapterRows = await storage.getAcAdapters();
+      const keyboardRows = await db.select().from(keyboards).where(eq(keyboards.isActive, 1));
+      const lcdRows = await db.select().from(lcds).where(eq(lcds.isActive, 1));
+
+      let adaptersUpdated = 0;
+      let adaptersSerialFixed = 0;
+      let adaptersSerialFixSkipped = 0;
+      let keyboardsUpdated = 0;
+      let lcdsUpdated = 0;
+
+      for (const row of adapterRows) {
+        // Legacy fix: old data sometimes stored brand in serialNumber.
+        // If serialNumber equals brand and partNumber exists, promote partNumber as serial.
+        const isLegacySerial = (row.serialNumber || "").trim() === (row.brand || "").trim();
+        const candidateSerial = (row.partNumber || "").trim();
+        if (isLegacySerial && candidateSerial && candidateSerial !== row.serialNumber) {
+          const serialConflict = await storage.getAcAdapterBySerial(candidateSerial);
+          if (!serialConflict || serialConflict.id === row.id) {
+            await storage.updateAcAdapter(row.id, {
+              serialNumber: candidateSerial,
+              barcode: candidateSerial,
+            });
+            adaptersUpdated++;
+            adaptersSerialFixed++;
+            continue;
+          } else {
+            adaptersSerialFixSkipped++;
+          }
+        }
+
+        if ((row.barcode || "") !== row.serialNumber) {
+          await storage.updateAcAdapter(row.id, { barcode: row.serialNumber });
+          adaptersUpdated++;
+        }
+      }
+
+      for (const row of keyboardRows) {
+        if ((row.barcode || "") !== row.serialNumber) {
+          await db
+            .update(keyboards)
+            .set({ barcode: row.serialNumber, updatedAt: new Date() })
+            .where(eq(keyboards.id, row.id));
+          keyboardsUpdated++;
+        }
+      }
+
+      for (const row of lcdRows) {
+        if ((row.barcode || "") !== row.serialNumber) {
+          await db
+            .update(lcds)
+            .set({ barcode: row.serialNumber, updatedAt: new Date() })
+            .where(eq(lcds.id, row.id));
+          lcdsUpdated++;
+        }
+      }
+
+      const totalUpdated = adaptersUpdated + keyboardsUpdated + lcdsUpdated;
+      return res.json({
+        success: true,
+        message: `Barcode sync completed. Updated ${totalUpdated} items.`,
+        adaptersUpdated,
+        adaptersSerialFixed,
+        adaptersSerialFixSkipped,
+        keyboardsUpdated,
+        lcdsUpdated,
+        totalUpdated,
+      });
+    } catch (error) {
+      console.error("Error syncing barcodes to serial:", error);
+      return res.status(500).json({ error: "فشل في مزامنة الباركود مع الرقم التسلسلي" });
+    }
+  });
+
+  // Regenerate barcodes in ordered sequence for all battery system inventory
+  app.post("/api/battery/migrations/regenerate-sequence-barcodes", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = await storage.getBatteryUser(batteryUserId);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ error: "غير مسموح" });
+      }
+
+      const batteriesRows = [...await storage.getLaptopBatteries()].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+      const adapterRows = [...await storage.getAcAdapters()].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+      const keyboardRows = [...await db.select().from(keyboards).where(eq(keyboards.isActive, 1))].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+      const lcdRows = [...await db.select().from(lcds).where(eq(lcds.isActive, 1))].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+      const productRows = await db.select({ id: products.id, sku: products.sku }).from(products);
+
+      const productsBySku = new Map<string, Array<{ id: string; sku: string | null }>>();
+      for (const p of productRows) {
+        const k = (p.sku || "").trim().toLowerCase();
+        if (!k) continue;
+        const arr = productsBySku.get(k) || [];
+        arr.push(p);
+        productsBySku.set(k, arr);
+      }
+
+      const makeCode = (prefix: string, index: number) => `${prefix}-${String(index).padStart(6, "0")}`;
+      const updatedProductIds = new Set<string>();
+
+      const syncInstoreSku = async (newBarcode: string, ...matchKeys: Array<string | null | undefined>) => {
+        const matched = new Map<string, string | null>();
+        for (const key of matchKeys) {
+          const k = (key || "").trim().toLowerCase();
+          if (!k) continue;
+          const rows = productsBySku.get(k) || [];
+          for (const row of rows) {
+            matched.set(row.id, row.sku);
+          }
+        }
+
+        let changed = 0;
+        for (const [productId, currentSku] of matched.entries()) {
+          if (updatedProductIds.has(productId)) continue;
+          if ((currentSku || "") === newBarcode) {
+            updatedProductIds.add(productId);
+            continue;
+          }
+          await db.update(products).set({ sku: newBarcode }).where(eq(products.id, productId));
+          updatedProductIds.add(productId);
+          changed++;
+        }
+        return { matched: matched.size, changed };
+      };
+
+      let batteriesUpdated = 0;
+      let adaptersUpdated = 0;
+      let keyboardsUpdated = 0;
+      let lcdsUpdated = 0;
+      let inStoreSkuUpdated = 0;
+      let inStoreMatched = 0;
+
+      for (let i = 0; i < batteriesRows.length; i++) {
+        const row = batteriesRows[i];
+        const newBarcode = makeCode("BAT", i + 1);
+        if ((row.barcode || "") !== newBarcode) {
+          await storage.updateLaptopBattery(row.id, { barcode: newBarcode });
+          batteriesUpdated++;
+        }
+        const linked = await syncInstoreSku(newBarcode, row.serialNumber, row.partNumber, row.barcode);
+        inStoreSkuUpdated += linked.changed;
+        inStoreMatched += linked.matched;
+      }
+
+      for (let i = 0; i < adapterRows.length; i++) {
+        const row = adapterRows[i];
+        const newBarcode = makeCode("ADP", i + 1);
+        if ((row.barcode || "") !== newBarcode) {
+          await storage.updateAcAdapter(row.id, { barcode: newBarcode });
+          adaptersUpdated++;
+        }
+        const linked = await syncInstoreSku(newBarcode, row.serialNumber, row.partNumber, row.barcode);
+        inStoreSkuUpdated += linked.changed;
+        inStoreMatched += linked.matched;
+      }
+
+      for (let i = 0; i < keyboardRows.length; i++) {
+        const row = keyboardRows[i];
+        const newBarcode = makeCode("KEY", i + 1);
+        if ((row.barcode || "") !== newBarcode) {
+          await db
+            .update(keyboards)
+            .set({ barcode: newBarcode, updatedAt: new Date() })
+            .where(eq(keyboards.id, row.id));
+          keyboardsUpdated++;
+        }
+        const linked = await syncInstoreSku(newBarcode, row.serialNumber, row.partNumber, row.barcode);
+        inStoreSkuUpdated += linked.changed;
+        inStoreMatched += linked.matched;
+      }
+
+      for (let i = 0; i < lcdRows.length; i++) {
+        const row = lcdRows[i];
+        const newBarcode = makeCode("LCD", i + 1);
+        if ((row.barcode || "") !== newBarcode) {
+          await db
+            .update(lcds)
+            .set({ barcode: newBarcode, updatedAt: new Date() })
+            .where(eq(lcds.id, row.id));
+          lcdsUpdated++;
+        }
+        const linked = await syncInstoreSku(newBarcode, row.serialNumber, row.partNumber, row.barcode);
+        inStoreSkuUpdated += linked.changed;
+        inStoreMatched += linked.matched;
+      }
+
+      const totalUpdated = batteriesUpdated + adaptersUpdated + keyboardsUpdated + lcdsUpdated;
+      return res.json({
+        success: true,
+        message: `Sequence barcode regeneration completed. Updated ${totalUpdated} items.`,
+        batteriesUpdated,
+        adaptersUpdated,
+        keyboardsUpdated,
+        lcdsUpdated,
+        inStoreSkuUpdated,
+        inStoreMatched,
+        totalUpdated,
+      });
+    } catch (error) {
+      console.error("Error regenerating sequence barcodes:", error);
+      return res.status(500).json({ error: "فشل في إعادة توليد الباركود التسلسلي" });
+    }
+  });
+
+  // Sync in-store inventory SKU with battery-system barcodes
+  app.post("/api/battery/migrations/sync-barcodes-with-instore", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = await storage.getBatteryUser(batteryUserId);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ error: "غير مسموح" });
+      }
+
+      const productRows = await db
+        .select({ id: products.id, sku: products.sku, nameAr: products.nameAr, nameEn: products.nameEn })
+        .from(products);
+
+      const index = new Map<string, Set<string>>();
+      const addIndex = (value: string | null | undefined, productId: string) => {
+        const key = (value || "").trim().toLowerCase();
+        if (!key) return;
+        const set = index.get(key) ?? new Set<string>();
+        set.add(productId);
+        index.set(key, set);
+      };
+
+      for (const p of productRows) {
+        addIndex(p.sku, p.id);
+        addIndex(p.nameAr, p.id);
+        addIndex(p.nameEn, p.id);
+      }
+
+      const claimedProductIds = new Set<string>();
+      const findProductIds = (...keys: Array<string | null | undefined>) => {
+        const ids = new Set<string>();
+        const normalized = keys.map(k => (k || "").trim()).filter(Boolean);
+
+        for (const key of normalized) {
+          const exact = index.get(key.toLowerCase());
+          if (exact) for (const id of exact) ids.add(id);
+        }
+
+        // Fallback: partial match in product names for meaningful keys (serial/part-like)
+        for (const key of normalized) {
+          if (key.length < 4) continue;
+          const lk = key.toLowerCase();
+          for (const p of productRows) {
+            const n1 = (p.nameAr || "").toLowerCase();
+            const n2 = (p.nameEn || "").toLowerCase();
+            if (n1.includes(lk) || n2.includes(lk)) ids.add(p.id);
+          }
+        }
+
+        const available = [...ids].filter(id => !claimedProductIds.has(id));
+        return available;
+      };
+
+      let batteriesMatched = 0;
+      let adaptersMatched = 0;
+      let keyboardsMatched = 0;
+      let lcdsMatched = 0;
+      let inStoreSkuUpdated = 0;
+      let unmatched = 0;
+
+      const batteriesRows = await storage.getLaptopBatteries();
+      for (const row of batteriesRows) {
+        const targetBarcode = row.barcode || row.serialNumber;
+        const matches = findProductIds(row.serialNumber, row.partNumber, row.barcode);
+        if (matches.length === 0) {
+          unmatched++;
+          continue;
+        }
+        batteriesMatched++;
+        for (const productId of matches) {
+          const product = productRows.find(p => p.id === productId);
+          if (product && (product.sku || "") !== targetBarcode) {
+            await db.update(products).set({ sku: targetBarcode }).where(eq(products.id, productId));
+            inStoreSkuUpdated++;
+          }
+          claimedProductIds.add(productId);
+        }
+      }
+
+      const adaptersRows = await storage.getAcAdapters();
+      for (const row of adaptersRows) {
+        const targetBarcode = row.barcode || row.serialNumber;
+        const matches = findProductIds(row.serialNumber, row.partNumber, row.barcode);
+        if (matches.length === 0) {
+          unmatched++;
+          continue;
+        }
+        adaptersMatched++;
+        for (const productId of matches) {
+          const product = productRows.find(p => p.id === productId);
+          if (product && (product.sku || "") !== targetBarcode) {
+            await db.update(products).set({ sku: targetBarcode }).where(eq(products.id, productId));
+            inStoreSkuUpdated++;
+          }
+          claimedProductIds.add(productId);
+        }
+      }
+
+      const keyboardRows = await db.select().from(keyboards).where(eq(keyboards.isActive, 1));
+      for (const row of keyboardRows) {
+        const targetBarcode = row.barcode || row.serialNumber;
+        const matches = findProductIds(row.serialNumber, row.partNumber, row.barcode);
+        if (matches.length === 0) {
+          unmatched++;
+          continue;
+        }
+        keyboardsMatched++;
+        for (const productId of matches) {
+          const product = productRows.find(p => p.id === productId);
+          if (product && (product.sku || "") !== targetBarcode) {
+            await db.update(products).set({ sku: targetBarcode }).where(eq(products.id, productId));
+            inStoreSkuUpdated++;
+          }
+          claimedProductIds.add(productId);
+        }
+      }
+
+      const lcdRows = await db.select().from(lcds).where(eq(lcds.isActive, 1));
+      for (const row of lcdRows) {
+        const targetBarcode = row.barcode || row.serialNumber;
+        const matches = findProductIds(row.serialNumber, row.partNumber, row.barcode);
+        if (matches.length === 0) {
+          unmatched++;
+          continue;
+        }
+        lcdsMatched++;
+        for (const productId of matches) {
+          const product = productRows.find(p => p.id === productId);
+          if (product && (product.sku || "") !== targetBarcode) {
+            await db.update(products).set({ sku: targetBarcode }).where(eq(products.id, productId));
+            inStoreSkuUpdated++;
+          }
+          claimedProductIds.add(productId);
+        }
+      }
+
+      const totalUpdated = inStoreSkuUpdated;
+      return res.json({
+        success: true,
+        message: `In-store barcode sync completed. Updated ${totalUpdated} SKU values.`,
+        batteriesMatched,
+        adaptersMatched,
+        keyboardsMatched,
+        lcdsMatched,
+        inStoreSkuUpdated,
+        unmatched,
+        totalUpdated,
+      });
+    } catch (error) {
+      console.error("Error syncing barcodes with in-store inventory:", error);
+      return res.status(500).json({ error: "فشل في مزامنة باركود نظام البطاريات مع باركود المخزن" });
+    }
+  });
+
+  // Keyboard Routes
+  app.get("/api/battery/keyboards", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      const salesUserId = (req.session as any).salesUserId;
+      if (!batteryUserId && !salesUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(keyboards).where(eq(keyboards.isActive, 1)).orderBy(desc(keyboards.createdAt));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting keyboards:", error);
+      return res.status(500).json({ error: "خطأ في جلب لوحات المفاتيح" });
+    }
+  });
+
+  app.get("/api/battery/keyboards/low-stock", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(keyboards).where(and(
+        eq(keyboards.isActive, 1),
+        sql`${keyboards.stockQuantity} <= ${keyboards.minStockLevel}`
+      ));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting low stock keyboards:", error);
+      return res.status(500).json({ error: "خطأ في جلب لوحات المفاتيح منخفضة المخزون" });
+    }
+  });
+
+  app.get("/api/battery/keyboards/search", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
+      if (!q) return res.json([]);
+      const rows = await db.select().from(keyboards).where(eq(keyboards.isActive, 1));
+      const terms = q.split(/\s+/).filter(Boolean);
+      const filtered = rows.filter(k => {
+        const s = `${k.serialNumber} ${k.partNumber || ""} ${k.brand} ${k.layout || ""} ${k.keyboardType || ""} ${k.barcode || ""}`.toLowerCase();
+        return terms.every(t => s.includes(t));
+      });
+      return res.json(filtered);
+    } catch (error) {
+      console.error("Error searching keyboards:", error);
+      return res.status(500).json({ error: "خطأ في البحث" });
+    }
+  });
+
+  app.post("/api/battery/keyboards", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const { serialNumber, brand, ...rest } = req.body;
+      if (!brand) return res.status(400).json({ error: "الماركة مطلوبة" });
+      let finalSerial = (serialNumber || "").trim();
+      if (!finalSerial) {
+        const rows = await db.select({ serialNumber: keyboards.serialNumber }).from(keyboards);
+        const used = new Set(rows.map(r => (r.serialNumber || "").trim().toUpperCase()));
+        let max = 0;
+        for (const r of rows) {
+          const m = (r.serialNumber || "").match(/^KBD-(\d+)$/i);
+          if (m) max = Math.max(max, parseInt(m[1], 10));
+        }
+        let next = max + 1;
+        do {
+          finalSerial = `KBD-${String(next).padStart(4, "0")}`;
+          next++;
+        } while (used.has(finalSerial.toUpperCase()));
+      }
+      const existing = await db.select().from(keyboards).where(eq(keyboards.serialNumber, finalSerial)).limit(1);
+      if (existing.length) return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+      const barcode = rest.barcode || finalSerial;
+      const [row] = await db.insert(keyboards).values({ serialNumber: finalSerial, brand, barcode, ...rest }).returning();
+      return res.status(201).json(row);
+    } catch (error) {
+      console.error("Error creating keyboard:", error);
+      return res.status(500).json({ error: "خطأ في إضافة لوحة المفاتيح" });
+    }
+  });
+
+  app.put("/api/battery/keyboards/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const updateData = { ...req.body };
+      if (updateData.serialNumber) {
+        updateData.barcode = updateData.serialNumber;
+      }
+      const [row] = await db.update(keyboards).set({ ...updateData, updatedAt: new Date() }).where(eq(keyboards.id, req.params.id)).returning();
+      if (!row) return res.status(404).json({ error: "لوحة المفاتيح غير موجودة" });
+      return res.json(row);
+    } catch (error) {
+      console.error("Error updating keyboard:", error);
+      return res.status(500).json({ error: "خطأ في تحديث لوحة المفاتيح" });
+    }
+  });
+
+  app.delete("/api/battery/keyboards/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      await db.update(keyboards).set({ isActive: 0, updatedAt: new Date() }).where(eq(keyboards.id, req.params.id));
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting keyboard:", error);
+      return res.status(500).json({ error: "خطأ في حذف لوحة المفاتيح" });
+    }
+  });
+
+  // LCD Routes
+  app.get("/api/battery/lcds", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      const salesUserId = (req.session as any).salesUserId;
+      if (!batteryUserId && !salesUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(lcds).where(eq(lcds.isActive, 1)).orderBy(desc(lcds.createdAt));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting LCDs:", error);
+      return res.status(500).json({ error: "خطأ في جلب شاشات LCD" });
+    }
+  });
+
+  app.get("/api/battery/lcds/low-stock", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(lcds).where(and(
+        eq(lcds.isActive, 1),
+        sql`${lcds.stockQuantity} <= ${lcds.minStockLevel}`
+      ));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting low stock LCDs:", error);
+      return res.status(500).json({ error: "خطأ في جلب شاشات LCD منخفضة المخزون" });
+    }
+  });
+
+  app.get("/api/battery/lcds/search", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
+      if (!q) return res.json([]);
+      const rows = await db.select().from(lcds).where(eq(lcds.isActive, 1));
+      const terms = q.split(/\s+/).filter(Boolean);
+      const filtered = rows.filter(l => {
+        const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.sizeInch || ""} ${l.resolution || ""} ${l.barcode || ""}`.toLowerCase();
+        return terms.every(t => s.includes(t));
+      });
+      return res.json(filtered);
+    } catch (error) {
+      console.error("Error searching LCDs:", error);
+      return res.status(500).json({ error: "خطأ في البحث" });
+    }
+  });
+
+  app.post("/api/battery/lcds", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const { serialNumber, brand, ...rest } = req.body;
+      if (!brand) return res.status(400).json({ error: "الماركة مطلوبة" });
+      let finalSerial = (serialNumber || "").trim();
+      if (!finalSerial) {
+        const rows = await db.select({ serialNumber: lcds.serialNumber }).from(lcds);
+        const used = new Set(rows.map(r => (r.serialNumber || "").trim().toUpperCase()));
+        let max = 0;
+        for (const r of rows) {
+          const m = (r.serialNumber || "").match(/^LCD-(\d+)$/i);
+          if (m) max = Math.max(max, parseInt(m[1], 10));
+        }
+        let next = max + 1;
+        do {
+          finalSerial = `LCD-${String(next).padStart(4, "0")}`;
+          next++;
+        } while (used.has(finalSerial.toUpperCase()));
+      }
+      const existing = await db.select().from(lcds).where(eq(lcds.serialNumber, finalSerial)).limit(1);
+      if (existing.length) return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+      const barcode = rest.barcode || finalSerial;
+      const [row] = await db.insert(lcds).values({ serialNumber: finalSerial, brand, barcode, ...rest }).returning();
+      return res.status(201).json(row);
+    } catch (error) {
+      console.error("Error creating LCD:", error);
+      return res.status(500).json({ error: "خطأ في إضافة شاشة LCD" });
+    }
+  });
+
+  app.put("/api/battery/lcds/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const updateData = { ...req.body };
+      if (updateData.serialNumber) {
+        updateData.barcode = updateData.serialNumber;
+      }
+      const [row] = await db.update(lcds).set({ ...updateData, updatedAt: new Date() }).where(eq(lcds.id, req.params.id)).returning();
+      if (!row) return res.status(404).json({ error: "شاشة LCD غير موجودة" });
+      return res.json(row);
+    } catch (error) {
+      console.error("Error updating LCD:", error);
+      return res.status(500).json({ error: "خطأ في تحديث شاشة LCD" });
+    }
+  });
+
+  app.delete("/api/battery/lcds/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      await db.update(lcds).set({ isActive: 0, updatedAt: new Date() }).where(eq(lcds.id, req.params.id));
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting LCD:", error);
+      return res.status(500).json({ error: "خطأ في حذف شاشة LCD" });
     }
   });
   
@@ -4847,12 +6078,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const sales = await storage.getBatterySales();
-      // Include items for each sale (both batteries and adapters)
+      // Include items for each sale (batteries, adapters, keyboards, LCDs)
       const salesWithItems = await Promise.all(
         sales.map(async (sale) => {
           const items = await storage.getBatterySaleItems(sale.id);
           const adapterItems = await storage.getAdapterSaleItems(sale.id);
-          return { ...sale, items, adapterItems };
+          const keyboardItems = await db.select().from(keyboardSaleItems).where(eq(keyboardSaleItems.saleId, sale.id));
+          const lcdItems = await db.select().from(lcdSaleItems).where(eq(lcdSaleItems.saleId, sale.id));
+          return { ...sale, items, adapterItems, keyboardItems, lcdItems };
         })
       );
       return res.json(salesWithItems);
@@ -4876,7 +6109,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const items = await storage.getBatterySaleItems(sale.id);
       const adapterItems = await storage.getAdapterSaleItems(sale.id);
-      return res.json({ ...sale, items, adapterItems });
+      const keyboardItems = await db.select().from(keyboardSaleItems).where(eq(keyboardSaleItems.saleId, sale.id));
+      const lcdItems = await db.select().from(lcdSaleItems).where(eq(lcdSaleItems.saleId, sale.id));
+      return res.json({ ...sale, items, adapterItems, keyboardItems, lcdItems });
     } catch (error) {
       console.error("Error getting battery sale:", error);
       return res.status(500).json({ error: "خطأ في جلب عملية البيع" });
@@ -4978,10 +6213,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { customerName, customerPhone, items, adapterItems, subtotal, discount, total, paymentMethod, notes } = req.body;
+      const { customerName, customerPhone, items, adapterItems, keyboardItems, lcdItems, subtotal, discount, total, paymentMethod, notes } = req.body;
       
-      // Must have at least one item (battery or adapter)
-      const hasItems = (items && items.length > 0) || (adapterItems && adapterItems.length > 0);
+      // Must have at least one item
+      const hasItems = (items && items.length > 0) || (adapterItems && adapterItems.length > 0) || (keyboardItems && keyboardItems.length > 0) || (lcdItems && lcdItems.length > 0);
       if (!hasItems) {
         return res.status(400).json({ error: "يجب إضافة منتجات للطلب" });
       }
@@ -5011,6 +6246,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (adapter.stockQuantity < item.quantity) {
             return res.status(400).json({ 
               error: `المخزون غير كافي للشاحن ${adapter.serialNumber}. المتاح: ${adapter.stockQuantity}` 
+            });
+          }
+        }
+      }
+
+      // Validate stock for keyboard items
+      if (keyboardItems && keyboardItems.length > 0) {
+        for (const item of keyboardItems) {
+          const [keyboard] = await db.select().from(keyboards).where(eq(keyboards.id, item.keyboardId)).limit(1);
+          if (!keyboard) {
+            return res.status(400).json({ error: `لوحة المفاتيح غير موجودة: ${item.keyboardId}` });
+          }
+          if (keyboard.stockQuantity < item.quantity) {
+            return res.status(400).json({
+              error: `المخزون غير كافي للوحة المفاتيح ${keyboard.serialNumber}. المتاح: ${keyboard.stockQuantity}`
+            });
+          }
+        }
+      }
+
+      // Validate stock for LCD items
+      if (lcdItems && lcdItems.length > 0) {
+        for (const item of lcdItems) {
+          const [lcd] = await db.select().from(lcds).where(eq(lcds.id, item.lcdId)).limit(1);
+          if (!lcd) {
+            return res.status(400).json({ error: `شاشة LCD غير موجودة: ${item.lcdId}` });
+          }
+          if (lcd.stockQuantity < item.quantity) {
+            return res.status(400).json({
+              error: `المخزون غير كافي لشاشة LCD ${lcd.serialNumber}. المتاح: ${lcd.stockQuantity}`
             });
           }
         }
@@ -5066,8 +6331,68 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // Build keyboard sale items
+      const keyboardItemsToInsert: Array<{
+        keyboardId: string;
+        serialNumber: string;
+        brand: string;
+        quantity: number;
+        unitPrice: string;
+        lineTotal: string;
+      }> = [];
+      if (keyboardItems && keyboardItems.length > 0) {
+        for (const item of keyboardItems) {
+          const [keyboard] = await db.select().from(keyboards).where(eq(keyboards.id, item.keyboardId)).limit(1);
+          keyboardItemsToInsert.push({
+            keyboardId: item.keyboardId,
+            serialNumber: keyboard?.serialNumber || 'N/A',
+            brand: keyboard?.brand || 'Unknown',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toString(),
+            lineTotal: (item.unitPrice * item.quantity).toString(),
+          });
+        }
+      }
+
+      // Build LCD sale items
+      const lcdItemsToInsert: Array<{
+        lcdId: string;
+        serialNumber: string;
+        brand: string;
+        quantity: number;
+        unitPrice: string;
+        lineTotal: string;
+      }> = [];
+      if (lcdItems && lcdItems.length > 0) {
+        for (const item of lcdItems) {
+          const [lcd] = await db.select().from(lcds).where(eq(lcds.id, item.lcdId)).limit(1);
+          lcdItemsToInsert.push({
+            lcdId: item.lcdId,
+            serialNumber: lcd?.serialNumber || 'N/A',
+            brand: lcd?.brand || 'Unknown',
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toString(),
+            lineTotal: (item.unitPrice * item.quantity).toString(),
+          });
+        }
+      }
       
       const sale = await storage.createBatterySale(saleData, saleItems, adapterSaleItems);
+
+      // Insert extra item families and decrement stock
+      for (const item of keyboardItemsToInsert) {
+        await db.insert(keyboardSaleItems).values({ ...item, saleId: sale.id });
+        await db.update(keyboards)
+          .set({ stockQuantity: sql`${keyboards.stockQuantity} - ${item.quantity}` })
+          .where(eq(keyboards.id, item.keyboardId));
+      }
+      for (const item of lcdItemsToInsert) {
+        await db.insert(lcdSaleItems).values({ ...item, saleId: sale.id });
+        await db.update(lcds)
+          .set({ stockQuantity: sql`${lcds.stockQuantity} - ${item.quantity}` })
+          .where(eq(lcds.id, item.lcdId));
+      }
       
       return res.json({
         success: true,
@@ -6491,14 +7816,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { cashWithdrawals } = await import("../shared/schema");
       const { gte, lte, and, desc } = await import("drizzle-orm");
 
-      const dateParam = req.query.date as string;
-      // Parse as Baghdad timezone (UTC+3)
-      const baghdadDateStr2 = dateParam || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
-      const startOfDay = new Date(`${baghdadDateStr2}T00:00:00+03:00`);
-      const endOfDay = new Date(`${baghdadDateStr2}T23:59:59.999+03:00`);
+      const rawDate = (req.query.date as string) || "";
+      const baghdadDateStr2 = /^\d{4}-\d{2}-\d{2}$/.test(rawDate)
+        ? rawDate
+        : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
-      const rows = await db.select().from(cashWithdrawals)
-        .where(and(gte(cashWithdrawals.createdAt, startOfDay), lte(cashWithdrawals.createdAt, endOfDay)))
+      // Calendar day in Asia/Baghdad (avoids server-local timestamp mismatch with naive timestamps)
+      const rows = await db
+        .select()
+        .from(cashWithdrawals)
+        .where(
+          sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr2}::date`,
+        )
         .orderBy(desc(cashWithdrawals.createdAt));
       res.json(rows);
     } catch (err) {
@@ -6513,23 +7842,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Require an active shift scoped to the session user (any active shift for admin)
-      const shiftWhere = salesUserId
-        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
-        : eq(salesShifts.status, 'active');
-      const [activeShift] = await db.select().from(salesShifts)
-        .where(shiftWhere).orderBy(desc(salesShifts.startTime)).limit(1);
-      if (!activeShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
+      // Do not require an open shift to save a withdrawal. Shift matching was fragile
+      // (supervisor vs cashier, session role casing, concurrent shifts) and blocked valid saves.
 
       const { cashWithdrawals, insertCashWithdrawalSchema } = await import("../shared/schema");
-      const parsed = insertCashWithdrawalSchema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error });
+      const b = req.body && typeof req.body === "object" ? req.body as Record<string, unknown> : {};
+      const normalized = {
+        amount: b.amount != null && b.amount !== "" ? String(b.amount) : "",
+        employeeName:
+          typeof b.employeeName === "string"
+            ? b.employeeName.trim()
+            : String(b.employeeName ?? "").trim(),
+        reason:
+          b.reason == null || String(b.reason).trim() === ""
+            ? null
+            : String(b.reason).trim(),
+      };
+      const parsed = insertCashWithdrawalSchema.safeParse(normalized);
+      if (!parsed.success) {
+        return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error.flatten() });
+      }
 
-      const [row] = await db.insert(cashWithdrawals).values(parsed.data).returning();
+      const [row] = await db
+        .insert(cashWithdrawals)
+        .values({
+          amount: parsed.data.amount,
+          employeeName: parsed.data.employeeName,
+          reason: parsed.data.reason,
+          createdAt: new Date(),
+        })
+        .returning();
       res.json(row);
-    } catch (err) {
+    } catch (err: any) {
       console.error("Withdrawal create error:", err);
-      res.status(500).json({ error: "خطأ في إضافة السحب" });
+      const hint =
+        typeof err?.message === "string" && /does not exist|relation/i.test(err.message)
+          ? " Run db:push (cash_withdrawals table)."
+          : "";
+      res.status(500).json({
+        error: "خطأ في إضافة السحب",
+        message: (String(err?.message ?? err) + hint).slice(0, 500),
+      });
     }
   });
 
@@ -6543,25 +7896,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
       if (!record) return res.status(404).json({ error: "السجل غير موجود" });
 
-      // Check if record belongs to a closed shift window (applies to everyone including admin)
       const recordTime = new Date(record.createdAt);
-      const [containingShift] = await db.select().from(salesShifts)
-        .where(and(
-          lte(salesShifts.startTime, recordTime),
-          or(isNull(salesShifts.endTime), gte(salesShifts.endTime, recordTime))
-        ))
-        .orderBy(desc(salesShifts.startTime))
-        .limit(1);
-      if (containingShift && containingShift.status === 'closed') {
+      if (await isCashWithdrawalEditBlocked(recordTime)) {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
-
-      // Also require an active shift scoped to the session user (any active shift for admin)
-      const patchShiftWhere = salesUserId
-        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
-        : eq(salesShifts.status, 'active');
-      const [patchActiveShift] = await db.select().from(salesShifts).where(patchShiftWhere).limit(1);
-      if (!patchActiveShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       const { amount, reason, employeeName } = req.body;
       const updates: Record<string, unknown> = {};
@@ -6587,25 +7925,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
       if (!record) return res.status(404).json({ error: "السجل غير موجود" });
 
-      // Check if record belongs to a closed shift window (applies to everyone including admin)
       const recordTime = new Date(record.createdAt);
-      const [containingShift] = await db.select().from(salesShifts)
-        .where(and(
-          lte(salesShifts.startTime, recordTime),
-          or(isNull(salesShifts.endTime), gte(salesShifts.endTime, recordTime))
-        ))
-        .orderBy(desc(salesShifts.startTime))
-        .limit(1);
-      if (containingShift && containingShift.status === 'closed') {
+      if (await isCashWithdrawalEditBlocked(recordTime)) {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
-
-      // Also require an active shift scoped to the session user (any active shift for admin)
-      const delWhWhere = salesUserId
-        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
-        : eq(salesShifts.status, 'active');
-      const [delWhActive] = await db.select().from(salesShifts).where(delWhWhere).limit(1);
-      if (!delWhActive) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       await db.delete(cashWithdrawals).where(eq(cashWithdrawals.id, recordId));
       res.json({ success: true });
@@ -6643,14 +7966,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      // Require an active shift scoped to the session user (any active shift for admin)
-      const advPostWhere = salesUserId
-        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
-        : eq(salesShifts.status, 'active');
-      const [advPostShift] = await db.select().from(salesShifts)
-        .where(advPostWhere).orderBy(desc(salesShifts.startTime)).limit(1);
-      if (!advPostShift) return res.status(400).json({ error: "لا توجد وردية نشطة" });
-
       const parsed = insertStaffAdvanceSchema.safeParse(req.body);
       if (!parsed.success) return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error });
 
@@ -6685,13 +8000,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (containingShift && containingShift.status === 'closed') {
         return res.status(403).json({ error: "الوردية مغلقة، لا يمكن التعديل" });
       }
-
-      // Also require an active shift scoped to the session user (any active shift for admin)
-      const delAdvWhere = salesUserId
-        ? and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active'))
-        : eq(salesShifts.status, 'active');
-      const [delAdvActive] = await db.select().from(salesShifts).where(delAdvWhere).limit(1);
-      if (!delAdvActive) return res.status(400).json({ error: "لا توجد وردية نشطة" });
 
       await db.delete(staffAdvances).where(eq(staffAdvances.id, recordId));
       res.json({ success: true });
@@ -6766,6 +8074,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
           lte(orders.createdAt, effectiveEnd),
         ));
         for (const o of adminOrders) {
+          if (!seenOrderIds.has(o.id)) {
+            seenOrderIds.add(o.id);
+            allInStoreOrders.push(o);
+          }
+        }
+        // Admin POS tags salespersonId with admin_users.id (not sales_users.id) — include once per day
+        const adminTaggedRows = await db
+          .select({ o: orders })
+          .from(orders)
+          .innerJoin(adminUsers, eq(orders.salespersonId, adminUsers.id))
+          .where(and(
+            inArray(orders.orderType, ['walk-in', 'in-store']),
+            gte(orders.createdAt, startOfDay),
+            lte(orders.createdAt, effectiveEnd),
+          ));
+        for (const row of adminTaggedRows) {
+          const o = row.o;
           if (!seenOrderIds.has(o.id)) {
             seenOrderIds.add(o.id);
             allInStoreOrders.push(o);

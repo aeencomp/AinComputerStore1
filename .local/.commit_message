@@ -1,0 +1,23 @@
+Fix repair barcode label: phone and customer number no longer cut off
+
+Root causes:
+1. Label page size was 50mm×25mm but content (store name + barcode + ticket
+   number + customer ID/name + phone) totals ~27mm → bottom rows clipped
+2. CSS had overflow:hidden + white-space:nowrap on customer-info and phone-info,
+   cutting off long names and phone numbers horizontally
+3. JSX inline styles also had whiteSpace:'nowrap', overflow:'hidden' which
+   overrode print CSS
+
+Fixes applied to all 5 barcode label print locations:
+- technician/TicketDetail.tsx
+- components/TicketDetailDialog.tsx
+- components/ShopTicketDialog.tsx
+- technician/NewRepairRequest.tsx
+- shop/ShopNewRepair.tsx
+
+Changes:
+- @page size increased from 50mm×25mm → 50mm×30mm
+- body now uses min-height:30mm, height:auto (not fixed height) so content never overflows
+- Removed white-space:nowrap and overflow:hidden from .customer-info/.phone-info
+- Added word-break:break-all so long Arabic names wrap instead of being clipped
+- Updated margins from 0.2mm → 0.5mm for better vertical spacing

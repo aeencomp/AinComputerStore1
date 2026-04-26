@@ -62,24 +62,30 @@ export function useUpload(options: UseUploadOptions = {}) {
    */
   const requestUploadUrl = useCallback(
     async (file: File): Promise<UploadResponse> => {
-      const response = await fetch("/api/uploads/request-url", {
+      // Local uploads mode: send the file to our Express endpoint.
+      const fd = new FormData();
+      fd.append("image", file);
+
+      const res = await fetch("/api/upload/image", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+        body: fd,
+      });
+
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || "Upload failed");
+      }
+
+      const data = await res.json();
+      return {
+        uploadURL: "",
+        objectPath: data.url,
+        metadata: {
           name: file.name,
           size: file.size,
           contentType: file.type || "application/octet-stream",
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to get upload URL");
-      }
-
-      return response.json();
+        },
+      };
     },
     []
   );
@@ -89,6 +95,7 @@ export function useUpload(options: UseUploadOptions = {}) {
    */
   const uploadToPresignedUrl = useCallback(
     async (file: File, uploadURL: string): Promise<void> => {
+      if (!uploadURL) return;
       const response = await fetch(uploadURL, {
         method: "PUT",
         body: file,
@@ -161,29 +168,9 @@ export function useUpload(options: UseUploadOptions = {}) {
       url: string;
       headers?: Record<string, string>;
     }> => {
-      // Use the actual file properties to request a per-file presigned URL
-      const response = await fetch("/api/uploads/request-url", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type || "application/octet-stream",
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to get upload URL");
-      }
-
-      const data = await response.json();
-      return {
-        method: "PUT",
-        url: data.uploadURL,
-        headers: { "Content-Type": file.type || "application/octet-stream" },
-      };
+      // Not supported for local multipart uploads.
+      // If you need it later, switch this app to S3/R2 style presigned uploads.
+      throw new Error("Presigned uploads are disabled. Use /api/upload/image.");
     },
     []
   );

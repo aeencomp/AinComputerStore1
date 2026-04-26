@@ -1,8 +1,9 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { Server, IncomingMessage } from 'http';
-import { neon } from '@neondatabase/serverless';
 import { randomUUID } from 'crypto';
 import type { Duplex } from 'stream';
+import pg from 'pg';
+const { Pool } = pg;
 
 interface IntercomClient {
   ws: WebSocket;
@@ -36,11 +37,15 @@ function parseSessionId(signedCookie: string): string | null {
 class IntercomService {
   private wss: WebSocketServer | null = null;
   private clients: Map<string, IntercomClient> = new Map();
-  private sql: ReturnType<typeof neon> | null = null;
+  private pool: InstanceType<typeof Pool> | null = null;
 
   initialize(_server: Server) {
     if (process.env.DATABASE_URL) {
-      this.sql = neon(process.env.DATABASE_URL);
+      const isLocal = /localhost|127\.0\.0\.1/.test(process.env.DATABASE_URL);
+      this.pool = new Pool({
+        connectionString: process.env.DATABASE_URL,
+        ssl: isLocal ? false : { rejectUnauthorized: false },
+      });
     }
 
     this.wss = new WebSocketServer({ noServer: true });
@@ -201,28 +206,28 @@ class IntercomService {
 
   private async resolveSession(sessionId: string, portal: 'admin' | 'sales' | 'technician'): Promise<{ displayName: string; portal: 'admin' | 'sales' | 'technician'; userId: string } | null> {
     try {
-      if (!this.sql) { console.log('Intercom resolveSession: no sql client'); return null; }
-      const result = await this.sql`SELECT sess FROM "session" WHERE sid = ${sessionId}`;
-      console.log(`Intercom resolveSession: portal=${portal}, sid=${sessionId.slice(0,8)}... rows=${(result as any[]).length}`);
-      if ((result as any[]).length === 0) { console.log('Intercom resolveSession: no session row found'); return null; }
-      const session = (result as any[])[0].sess as any;
+      if (!this.pool) { console.log('Intercom resolveSession: no db pool'); return null; }
+      const result = await this.pool.query('SELECT sess FROM "session" WHERE sid = $1', [sessionId]);
+      console.log(`Intercom resolveSession: portal=${portal}, sid=${sessionId.slice(0,8)}... rows=${result.rows.length}`);
+      if (result.rows.length === 0) { console.log('Intercom resolveSession: no session row found'); return null; }
+      const session = (result.rows[0] as any).sess as any;
 
       if (portal === 'admin') {
         if (!session?.adminId) { console.log('Intercom resolveSession: no adminId in session'); return null; }
-        const admins = await this.sql`SELECT name FROM admin_users WHERE id = ${session.adminId}`;
-        return { displayName: (admins as any[])[0]?.name || 'Admin', portal: 'admin', userId: session.adminId };
+        const admins = await this.pool.query('SELECT name FROM admin_users WHERE id = $1', [session.adminId]);
+        return { displayName: admins.rows[0]?.name || 'Admin', portal: 'admin', userId: session.adminId };
       }
 
       if (portal === 'sales') {
         if (!session?.salesUserId) { console.log('Intercom resolveSession: no salesUserId in session'); return null; }
-        const users = await this.sql`SELECT name FROM sales_users WHERE id = ${session.salesUserId}`;
-        return { displayName: (users as any[])[0]?.name || 'Sales', portal: 'sales', userId: session.salesUserId };
+        const users = await this.pool.query('SELECT name FROM sales_users WHERE id = $1', [session.salesUserId]);
+        return { displayName: users.rows[0]?.name || 'Sales', portal: 'sales', userId: session.salesUserId };
       }
 
       if (portal === 'technician') {
         if (!session?.technicianId) { console.log('Intercom resolveSession: no technicianId in session'); return null; }
-        const techs = await this.sql`SELECT display_name FROM technicians WHERE id = ${session.technicianId}`;
-        return { displayName: (techs as any[])[0]?.display_name || 'Technician', portal: 'technician', userId: session.technicianId };
+        const techs = await this.pool.query('SELECT display_name FROM technicians WHERE id = $1', [session.technicianId]);
+        return { displayName: techs.rows[0]?.display_name || 'Technician', portal: 'technician', userId: session.technicianId };
       }
 
       return null;

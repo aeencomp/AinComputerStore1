@@ -1,4 +1,5 @@
 import { type Server } from "node:http";
+import os from "node:os";
 
 import express, {
   type Express,
@@ -15,6 +16,20 @@ import { registerRoutes } from "./routes";
 
 const PgStore = connectPgSimple(session);
 
+function pgSslOption():
+  | false
+  | { rejectUnauthorized: boolean } {
+  const url = process.env.DATABASE_URL ?? "";
+  const isLocal =
+    /localhost|127\.0\.0\.1/.test(url) && !url.includes(".neon.tech");
+  if (process.env.NODE_ENV === "production") {
+    return { rejectUnauthorized: false };
+  }
+  // Remote DB (e.g. Neon) in dev still requires TLS; only skip for local Postgres.
+  if (isLocal) return false;
+  return { rejectUnauthorized: false };
+}
+
 // Create a dedicated pg pool for the session store with generous timeouts.
 // Neon serverless databases wake from sleep slowly — without a longer timeout
 // the first connection after inactivity throws "Authentication timed out".
@@ -23,7 +38,7 @@ const sessionPool = new Pool({
   connectionTimeoutMillis: 20000, // wait up to 20s for Neon cold start
   idleTimeoutMillis: 60000,
   max: 5,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ssl: pgSslOption(),
 });
 
 // Log pool errors instead of crashing
@@ -38,12 +53,30 @@ declare module "express-session" {
   }
 }
 
+function logLanAccessUrls(port: number) {
+  if (process.env.NODE_ENV === "production") return;
+  const nets = os.networkInterfaces();
+  for (const addrs of Object.values(nets)) {
+    if (!addrs) continue;
+    for (const net of addrs) {
+      const v4 =
+        typeof net.family === "string"
+          ? net.family === "IPv4"
+          : net.family === 4;
+      if (v4 && !net.internal) {
+        log(`LAN access: http://${net.address}:${port}`, "express");
+      }
+    }
+  }
+}
+
 export function log(message: string, source = "express") {
   const formattedTime = new Date().toLocaleTimeString("en-US", {
     hour: "numeric",
     minute: "2-digit",
     second: "2-digit",
     hour12: true,
+    timeZone: "Asia/Baghdad",
   });
 
   console.log(`${formattedTime} [${source}] ${message}`);
@@ -51,7 +84,7 @@ export function log(message: string, source = "express") {
 
 export const app = express();
 
-// Trust proxy - required for secure cookies behind Replit's reverse proxy
+// Trust first proxy hop (e.g. nginx) when deployed; harmless on localhost
 app.set('trust proxy', 1);
 
 declare module 'http' {
@@ -72,8 +105,11 @@ app.use(session({
   cookie: {
     maxAge: 30 * 24 * 60 * 60 * 1000,
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    path: "/",
+    // Browsers do not store Secure cookies over plain http://. Default is non-secure so localhost/LAN HTTP works.
+    // Set SESSION_COOKIE_SECURE=true when the site is served only over HTTPS.
+    secure: process.env.SESSION_COOKIE_SECURE === "true",
+    sameSite: "lax",
   },
 }));
 
@@ -137,16 +173,18 @@ export default async function runApp(
   // the catch-all route doesn't interfere with the other routes
   await setup(app, server);
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
+  // Single HTTP server for API + client (dev: Vite middleware; prod: static `dist/public`).
   const port = parseInt(process.env.PORT || '5000', 10);
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port}`);
-  });
+  // reusePort is not supported on Windows; omit so local dev works everywhere.
+  server.listen(
+    {
+      port,
+      host: "0.0.0.0",
+      ...(process.platform === "linux" ? { reusePort: true as const } : {}),
+    },
+    () => {
+      log(`serving on port ${port}`);
+      logLanAccessUrls(port);
+    },
+  );
 }

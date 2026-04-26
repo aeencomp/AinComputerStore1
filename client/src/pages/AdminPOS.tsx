@@ -25,7 +25,9 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { playBarcodeScanBeep } from "@/lib/scanBeep";
 import { getCategoryName } from "@/lib/categoryNames";
+import { resolveAssetUrl } from "@/lib/assetUrl";
 import { 
   Loader2, 
   Search,
@@ -130,6 +132,7 @@ export default function AdminPOS() {
           price: String(p.price),
           stockQuantity: p.stockQuantity,
           sku: p.sku,
+          barcode: p.barcode ?? null,
           image: null,
           _isInStore: true,
         }))
@@ -211,6 +214,37 @@ export default function AdminPOS() {
       }
       return [...prev, { product, quantity: 1 }];
     });
+  };
+
+  const handleAdminPosSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const code = searchQuery.trim();
+    if (!code) return;
+    const lc = code.toLowerCase();
+    const product = products.find((p: any) => {
+      const sku = (p.sku || "").toString().toLowerCase();
+      const bc = (p.barcode || "").toString().toLowerCase();
+      return (p.sku && sku === lc) || (!!p.barcode && bc === lc);
+    });
+    if (!product) return;
+
+    const stockQty = (product as any).stockQuantity || 0;
+    const existing = cart.find(item => item.product.id === product.id);
+    const currentQty = existing ? existing.quantity : 0;
+    if (currentQty >= stockQty) {
+      e.preventDefault();
+      toast({
+        title: language === 'ar' ? 'المخزون غير كافٍ' : 'Insufficient Stock',
+        description: language === 'ar' ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    e.preventDefault();
+    playBarcodeScanBeep();
+    addToCart(product as Product);
+    setSearchQuery("");
   };
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -316,9 +350,10 @@ export default function AdminPOS() {
                   <div className="relative flex-1 max-w-sm">
                     <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
-                      placeholder={language === 'ar' ? 'بحث بالاسم أو SKU...' : 'Search by name or SKU...'}
+                      placeholder={language === 'ar' ? 'بحث بالاسم أو SKU أو الباركود...' : 'Search by name, SKU, or barcode...'}
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      onKeyDown={handleAdminPosSearchKeyDown}
                       className="ps-9"
                       data-testid="input-pos-search"
                     />
@@ -337,7 +372,7 @@ export default function AdminPOS() {
                       const stockQty = (product as any).stockQuantity || 0;
                       const isOutOfStock = stockQty === 0;
                       const imageSrc = product.image?.startsWith('/uploads/') || product.image?.startsWith('/objects/') || product.image?.startsWith('http') 
-                        ? product.image 
+                        ? resolveAssetUrl(product.image)
                         : `/placeholder.png`;
                       
                       return (

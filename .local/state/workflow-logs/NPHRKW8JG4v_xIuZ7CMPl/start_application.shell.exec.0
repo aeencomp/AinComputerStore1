@@ -1,0 +1,27 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index-dev.ts
+
+[1G[0K⠙[1G[0KAdmin/Sales WebSocket servers initialized (noServer mode)
+Intercom WebSocket server initialized on /ws/intercom (noServer mode)
+[Price Sync] Scheduling price sync every 6 hours
+[Desktop Sync] Scheduling desktop/AIO price sync every 6 hours
+10:16:59 PM [express] serving on port 5000
+[Price Sync] Starting price sync from globaliraq.iq...
+[Price Sync] Fetched 1101 products from globaliraq.iq
+[Price Sync] Found 75 synced products in our database
+[Price Sync] Complete. Matched: 55, Updated: 0, Errors: 0
+[Desktop Sync] Starting price sync for desktops & AIOs...
+[Desktop Sync] Fetched 1101 products from globaliraq.iq
+[Desktop Sync] Found 36 desktop/AIO products in our database
+[Desktop Sync] Complete. Matched: 34, Updated: 0, Errors: 0
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+10:20:59 PM [express] GET /api/check-blocked 304 in 454ms :: {"blocked":false}
+10:21:18 PM [express] GET /api/check-blocked 304 in 446ms :: {"blocked":false}
+10:21:18 PM [express] POST /api/analytics/session 200 in 633ms :: {"success":true,"country":"Iraq","c…
+10:21:18 PM [express] POST /api/analytics/pageview 200 in 780ms :: {"success":true}
+10:21:18 PM [express] GET /api/auth/me 401 in 109ms :: {"error":"غير مسجل الدخول"}
+10:21:19 PM [express] GET /api/cart 304 in 226ms :: []
+10:21:19 PM [express] GET /api/store-settings 200 in 230ms :: {"id":"3bc2e66a-3b7a-4b8f-99f7-24733d78…
+10:21:19 PM [express] GET /api/products 200 in 667ms :: [{"id":"3a5affe6-ea62-4939-98cf-6f9ad89515d6"…

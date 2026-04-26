@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt, MessageCircle, MessageCircleOff } from 'lucide-react';
+import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt, MessageCircleOff } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
 import { format } from 'date-fns';
@@ -1006,7 +1006,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                     <Button type="submit" disabled={updateMutation.isPending} data-testid="button-dialog-save-ticket">
                       {updateMutation.isPending ? t('repair.edit.saving') : t('repair.edit.save')}
                     </Button>
-                    
+
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button 

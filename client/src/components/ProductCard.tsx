@@ -7,6 +7,7 @@ import { ShoppingCart, ImageOff } from "lucide-react";
 import { Link } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatPrice } from "@/lib/formatters";
+import { resolveAssetUrl } from "@/lib/assetUrl";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -36,7 +37,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   const getImageSrc = () => {
     if (!product.image) return laptopImage;
     if (product.image.startsWith('/uploads/') || product.image.startsWith('/objects/') || product.image.startsWith('http')) {
-      return product.image;
+      return resolveAssetUrl(product.image);
     }
     return imageMap[product.image] || laptopImage;
   };

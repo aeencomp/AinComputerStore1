@@ -1,0 +1,648 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index-dev.ts
+
+[1G[0KAdmin/Sales WebSocket servers initialized (noServer mode)
+Intercom WebSocket server initialized on /ws/intercom (noServer mode)
+[Price Sync] Scheduling price sync every 6 hours
+[Desktop Sync] Scheduling desktop/AIO price sync every 6 hours
+4:02:36 PM [express] serving on port 5000
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+4:02:53 PM [express] GET /api/check-blocked 304 in 401ms :: {"blocked":false}
+4:02:53 PM [express] POST /api/analytics/session 200 in 548ms :: {"success":true,"existing":true}
+4:02:53 PM [express] POST /api/analytics/pageview 200 in 708ms :: {"success":true}
+4:02:53 PM [express] GET /api/auth/me 304 in 203ms :: {"id":"2e06ba29-0d5d-44f4-a203-16fe1c5c2dce","…
+4:02:53 PM [express] GET /api/store-settings 304 in 202ms :: {"id":"3bc2e66a-3b7a-4b8f-99f7-24733d78…
+4:02:53 PM [express] GET /api/cart 304 in 201ms :: []
+4:02:54 PM [express] GET /api/products 304 in 624ms :: [{"id":"3a5affe6-ea62-4939-98cf-6f9ad89515d6"…
+[Price Sync] Starting price sync from globaliraq.iq...
+[Price Sync] Fetched 1105 products from globaliraq.iq
+[Price Sync] Found 75 synced products in our database
+[Price Sync] Complete. Matched: 55, Updated: 0, Errors: 0
+4:03:15 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+[Desktop Sync] Starting price sync for desktops & AIOs...
+[Desktop Sync] Fetched 1105 products from globaliraq.iq
+[Desktop Sync] Found 36 desktop/AIO products in our database
+[Desktop Sync] Complete. Matched: 34, Updated: 0, Errors: 0
+4:03:46 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:04:16 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:04:46 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:05:15 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:05:45 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:06:16 PM [express] POST /api/analytics/heartbeat 200 in 421ms :: {"success":true}
+4:06:46 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:07:15 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:07:46 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:08:16 PM [express] POST /api/analytics/heartbeat 200 in 411ms :: {"success":true}
+4:09:06 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:09:15 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:09:46 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:11:13 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+4:12:12 PM [express] POST /api/analytics/heartbeat 200 in 474ms :: {"success":true}
+4:13:13 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:14:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:15:12 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+4:16:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:17:12 PM [express] POST /api/analytics/heartbeat 200 in 421ms :: {"success":true}
+4:18:12 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:18:49 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:19:15 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+4:19:45 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:20:15 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:20:45 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:21:15 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:21:45 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:05 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/technician/TicketDetail.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:13 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/technician/TicketDetail.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m [33m(x2)[39m
+4:22:16 PM [express] POST /api/analytics/heartbeat 200 in 431ms :: {"success":true}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:26 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/TicketDetailDialog.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:32 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ShopTicketDialog.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:38 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/technician/NewRepairRequest.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:44 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/shop/ShopNewRepair.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+4:22:45 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:22:51 PM [express] GET /api/check-blocked 304 in 400ms :: {"blocked":false}
+4:22:51 PM [express] POST /api/analytics/session 200 in 550ms :: {"success":true,"existing":true}
+4:22:51 PM [express] POST /api/analytics/pageview 200 in 705ms :: {"success":true}
+4:22:51 PM [express] GET /api/store-settings 304 in 205ms :: {"id":"3bc2e66a-3b7a-4b8f-99f7-24733d78…
+4:22:51 PM [express] GET /api/technician/auth/me 304 in 202ms :: {"id":"2ded1d65-d564-4b95-9212-8f00…
+4:22:52 PM [express] GET /api/repair-customers 304 in 410ms :: [{"id":"34735b27-85c8-4671-9cc8-9e0bf…
+Intercom: WS upgrade attempt from 127.0.0.1
+4:22:52 PM [express] GET /api/repair-tickets 200 in 500ms :: [{"id":"fa066f2f-c7d8-41ad-ab0c-5a80cff…
+Intercom resolveSession: portal=technician, sid=GnuWJwLi... rows=1
+Intercom: technician/مدير النظام connected (dfbae55b-b1a8-4bf2-bebd-9ae7f51e2623)
+Intercom broadcastPresence: allUsers=[technician/مدير النظام]
+Intercom broadcastPresence: sending to technician/مدير النظام: []
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:56 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/TicketDetailDialog.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:22:58 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ShopTicketDialog.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:23:01 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/pages/technician/NewRepairRequest.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+[1;1H[0J[2m4:23:07 PM[22m [36m[1m[vite][22m[39m [32mhmr update [39m[2m/src/components/ShopTicketDialog.tsx, /src/index.css?v=MBWmcFaF4uYZjzI9aCH7I[22m
+4:23:15 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:23:21 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+4:23:45 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:23:51 PM [express] POST /api/analytics/heartbeat 200 in 410ms :: {"success":true}
+4:23:57 PM [express] GET /api/repair-tickets/d7c87698-60c6-411e-ab20-ee617c71dc47 304 in 404ms :: {"…
+4:23:58 PM [express] GET /api/repair-customers/031c249e-3143-4dcb-ac07-717019159302 304 in 202ms :: …
+4:23:58 PM [express] GET /api/repair-customers/031c249e-3143-4dcb-ac07-717019159302/active-tickets 3…
+4:24:15 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:24:21 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+4:24:45 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:24:51 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:25:15 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:25:21 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:25:34 PM [express] GET /api/repair-tickets/3ce0b575-2aca-4868-85c7-1a1b9fff64d5 200 in 403ms :: {"…
+4:25:35 PM [express] GET /api/repair-customers/34735b27-85c8-4671-9cc8-9e0bf9f9342b 200 in 203ms :: …
+4:25:35 PM [express] GET /api/repair-customers/34735b27-85c8-4671-9cc8-9e0bf9f9342b/active-tickets 2…
+4:25:46 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:25:52 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:26:15 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:26:21 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+4:26:51 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+4:27:12 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:27:21 PM [express] POST /api/analytics/heartbeat 200 in 420ms :: {"success":true}
+4:27:51 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:28:12 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+4:28:21 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:28:51 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:29:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:29:21 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:29:51 PM [express] POST /api/analytics/heartbeat 200 in 411ms :: {"success":true}
+4:30:12 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:30:21 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:30:51 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:31:12 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:31:21 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:31:52 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:32:13 PM [express] POST /api/analytics/heartbeat 200 in 411ms :: {"success":true}
+4:32:21 PM [express] POST /api/analytics/heartbeat 200 in 421ms :: {"success":true}
+4:32:51 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:33:12 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:33:21 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:33:51 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+4:34:14 PM [express] POST /api/analytics/heartbeat 200 in 410ms :: {"success":true}
+4:34:22 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:34:51 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:35:12 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+4:35:21 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:36:13 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:36:13 PM [express] POST /api/analytics/heartbeat 200 in 203ms :: {"success":true}
+4:37:13 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:37:13 PM [express] POST /api/analytics/heartbeat 200 in 399ms :: {"success":true}
+4:38:12 PM [express] POST /api/analytics/heartbeat 200 in 412ms :: {"success":true}
+4:38:12 PM [express] POST /api/analytics/heartbeat 200 in 431ms :: {"success":true}
+4:39:12 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:39:12 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:39:15 PM [express] POST /api/analytics/heartbeat 200 in 204ms :: {"success":true}
+4:39:25 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:39:46 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:39:51 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:40:16 PM [express] POST /api/analytics/heartbeat 200 in 483ms :: {"success":true}
+4:40:21 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:40:51 PM [express] POST /api/analytics/heartbeat 200 in 410ms :: {"success":true}
+4:41:12 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:41:21 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:41:51 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:42:12 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:42:21 PM [express] POST /api/analytics/heartbeat 200 in 413ms :: {"success":true}
+4:42:52 PM [express] POST /api/analytics/heartbeat 200 in 412ms :: {"success":true}
+4:43:13 PM [express] POST /api/analytics/heartbeat 200 in 418ms :: {"success":true}
+4:43:21 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:43:51 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:44:12 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:44:21 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:45:12 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:45:12 PM [express] POST /api/analytics/heartbeat 200 in 205ms :: {"success":true}
+4:46:12 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:46:12 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:47:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:47:12 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:48:12 PM [express] POST /api/analytics/heartbeat 200 in 415ms :: {"success":true}
+4:48:12 PM [express] POST /api/analytics/heartbeat 200 in 418ms :: {"success":true}
+4:49:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:49:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:50:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:50:12 PM [express] POST /api/analytics/heartbeat 200 in 422ms :: {"success":true}
+4:51:12 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:51:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:52:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:52:12 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+4:53:12 PM [express] POST /api/analytics/heartbeat 200 in 417ms :: {"success":true}
+4:53:12 PM [express] POST /api/analytics/heartbeat 200 in 420ms :: {"success":true}
+4:54:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:54:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+4:55:12 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+4:55:12 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+4:56:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+4:56:12 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:57:12 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:57:12 PM [express] POST /api/analytics/heartbeat 200 in 415ms :: {"success":true}
+4:58:12 PM [express] POST /api/analytics/heartbeat 200 in 414ms :: {"success":true}
+4:58:12 PM [express] POST /api/analytics/heartbeat 200 in 416ms :: {"success":true}
+4:59:12 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+4:59:12 PM [express] POST /api/analytics/heartbeat 200 in 401ms :: {"success":true}
+5:00:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:00:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:01:12 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:01:12 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+5:02:12 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:02:12 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:03:12 PM [express] POST /api/analytics/heartbeat 200 in 434ms :: {"success":true}
+5:03:12 PM [express] POST /api/analytics/heartbeat 200 in 444ms :: {"success":true}
+5:04:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+5:04:12 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:05:02 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:05:03 PM [express] POST /api/analytics/heartbeat 200 in 202ms :: {"success":true}
+5:05:14 PM [express] GET /api/repair-tickets/51b20e90-a600-40c3-a5d3-83f8b6a00fa7 200 in 405ms :: {"…
+5:05:14 PM [express] GET /api/repair-customers/bcf68314-01fd-407b-b62c-e56a6a99e7b3 200 in 203ms :: …
+5:05:15 PM [express] GET /api/repair-customers/bcf68314-01fd-407b-b62c-e56a6a99e7b3/active-tickets 2…
+5:05:16 PM [express] POST /api/analytics/heartbeat 200 in 203ms :: {"success":true}
+WhatsApp template "repair_status_update" sent to 9647714447550: {
+  messaging_product: [32m'whatsapp'[39m,
+  contacts: [ { input: [32m'9647714447550'[39m, wa_id: [32m'9647714447550'[39m } ],
+  messages: [
+    {
+      id: [32m'wamid.HBgNOTY0NzcxNDQ0NzU1MBUCABEYEjdCRUQ0MTJBMTM4MUNDOUE0MAA='[39m,
+      message_status: [32m'accepted'[39m
+    }
+  ]
+}
+5:05:19 PM [express] PATCH /api/admin/repair-tickets/51b20e90-a600-40c3-a5d3-83f8b6a00fa7 200 in 108…
+5:05:19 PM [express] GET /api/repair-tickets 200 in 506ms :: [{"id":"d0a5fce7-fb75-4bd7-9813-4e2cdb9…
+5:05:20 PM [express] POST /api/analytics/heartbeat 200 in 202ms :: {"success":true}
+5:05:46 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:05:51 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:06:21 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+5:06:51 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+5:07:12 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:07:21 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+5:07:51 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+5:08:12 PM [express] POST /api/analytics/heartbeat 200 in 422ms :: {"success":true}
+5:08:21 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:08:51 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:09:13 PM [express] POST /api/analytics/heartbeat 200 in 415ms :: {"success":true}
+5:09:21 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:09:51 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+5:10:14 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:10:25 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:10:51 PM [express] POST /api/analytics/heartbeat 200 in 410ms :: {"success":true}
+5:11:13 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+5:11:21 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+5:11:51 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:12:13 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:12:25 PM [express] POST /api/analytics/heartbeat 200 in 410ms :: {"success":true}
+5:12:51 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+5:13:17 PM [express] POST /api/analytics/heartbeat 200 in 416ms :: {"success":true}
+5:13:20 PM [express] POST /api/analytics/heartbeat 200 in 203ms :: {"success":true}
+5:14:00 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:14:13 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+5:14:31 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:15:53 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:16:01 PM [express] POST /api/analytics/heartbeat 200 in 410ms :: {"success":true}
+5:16:26 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+5:16:59 PM [express] POST /api/analytics/heartbeat 200 in 410ms :: {"success":true}
+5:17:42 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:17:56 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:18:28 PM [express] POST /api/analytics/heartbeat 200 in 415ms :: {"success":true}
+5:19:08 PM [express] POST /api/analytics/heartbeat 200 in 401ms :: {"success":true}
+5:19:24 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:19:27 PM [express] GET /api/repair-tickets/2baa24c3-f802-4733-82f1-462b6662b94d 200 in 201ms :: {"…
+5:19:52 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:20:28 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+5:20:59 PM [express] POST /api/analytics/heartbeat 200 in 401ms :: {"success":true}
+5:21:27 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+5:21:52 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:22:33 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:23:03 PM [express] POST /api/analytics/heartbeat 200 in 400ms :: {"success":true}
+5:23:44 PM [express] POST /api/analytics/heartbeat 200 in 420ms :: {"success":true}
+5:24:01 PM [express] POST /api/analytics/heartbeat 200 in 428ms :: {"success":true}
+5:24:33 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:24:54 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+5:25:26 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:26:02 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:26:25 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+5:26:54 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:27:23 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:27:55 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+5:28:23 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:28:55 PM [express] POST /api/analytics/heartbeat 200 in 477ms :: {"success":true}
+5:29:55 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+5:30:58 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:31:56 PM [express] POST /api/analytics/heartbeat 200 in 411ms :: {"success":true}
+5:32:55 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+Intercom: technician/مدير النظام disconnected
+Intercom broadcastPresence: allUsers=[]
+5:35:01 PM [express] GET /api/check-blocked 304 in 423ms :: {"blocked":false}
+5:35:01 PM [express] POST /api/analytics/session 200 in 620ms :: {"success":true,"country":"Iraq","c…
+5:35:02 PM [express] POST /api/analytics/pageview 200 in 727ms :: {"success":true}
+5:35:02 PM [express] GET /api/technician/auth/me 304 in 202ms :: {"id":"2ded1d65-d564-4b95-9212-8f00…
+5:35:02 PM [express] GET /api/store-settings 304 in 202ms :: {"id":"3bc2e66a-3b7a-4b8f-99f7-24733d78…
+5:35:03 PM [express] GET /api/repair-customers 200 in 406ms :: [{"id":"4d9ce80d-7a00-49fb-9957-61ca3…
+Intercom: WS upgrade attempt from 127.0.0.1
+5:35:03 PM [express] GET /api/repair-tickets 304 in 500ms :: [{"id":"d0a5fce7-fb75-4bd7-9813-4e2cdb9…
+Intercom resolveSession: portal=technician, sid=GnuWJwLi... rows=1
+Intercom: technician/مدير النظام connected (b54c4b17-2165-429d-915f-a35418b2c012)
+Intercom broadcastPresence: allUsers=[technician/مدير النظام]
+Intercom broadcastPresence: sending to technician/مدير النظام: []
+5:35:31 PM [express] POST /api/analytics/heartbeat 200 in 416ms :: {"success":true}
+5:36:01 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:36:32 PM [express] POST /api/analytics/heartbeat 200 in 412ms :: {"success":true}
+5:37:02 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+5:37:31 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+5:38:01 PM [express] POST /api/analytics/heartbeat 200 in 422ms :: {"success":true}
+5:38:31 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:39:01 PM [express] POST /api/analytics/heartbeat 200 in 418ms :: {"success":true}
+5:39:31 PM [express] POST /api/analytics/heartbeat 200 in 413ms :: {"success":true}
+5:40:09 PM [express] POST /api/analytics/heartbeat 200 in 432ms :: {"success":true}
+5:41:09 PM [express] POST /api/analytics/heartbeat 200 in 409ms :: {"success":true}
+5:42:09 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+5:43:09 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}

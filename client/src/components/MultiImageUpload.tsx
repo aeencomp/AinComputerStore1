@@ -43,33 +43,20 @@ export function MultiImageUpload({ values, onChange, label, maxImages = 10 }: Mu
       }
 
       try {
-        const urlResponse = await fetch('/api/uploads/request-url', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: file.name,
-            size: file.size,
-            contentType: file.type,
-          }),
+        const fd = new FormData();
+        fd.append("image", file);
+
+        const res = await fetch("/api/upload/image", {
+          method: "POST",
+          body: fd,
         });
 
-        if (!urlResponse.ok) {
-          throw new Error('Failed to get upload URL');
-        }
-
-        const { uploadURL, objectPath } = await urlResponse.json();
-
-        const uploadResponse = await fetch(uploadURL, {
-          method: 'PUT',
-          body: file,
-          headers: { 'Content-Type': file.type },
-        });
-
-        if (!uploadResponse.ok) {
+        if (!res.ok) {
           throw new Error('Failed to upload file');
         }
 
-        newImages.push(objectPath);
+        const data = await res.json();
+        newImages.push(data.url);
       } catch (error) {
         setUploadError(language === 'ar' ? 'فشل رفع بعض الصور' : 'Failed to upload some images');
       }

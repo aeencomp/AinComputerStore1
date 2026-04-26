@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { playBarcodeScanBeep, playStockCountErrorBeep } from "@/lib/scanBeep";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -32,7 +33,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import QRCode from "qrcode";
-import type { InStoreProduct } from "@shared/schema";
+import type { InStoreProduct, LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 
 interface SalesUser {
   id: string;
@@ -75,8 +76,21 @@ const emptyForm: ProductForm = {
   image: "",
 };
 
+type CountItemSource = "instore" | "battery" | "adapter" | "keyboard" | "lcd";
+
+interface CountableProduct {
+  id: number | string;
+  source: CountItemSource;
+  nameAr: string;
+  nameEn?: string | null;
+  serialNumber?: string | null;
+  sku?: string | null;
+  barcode?: string | null;
+  stockQuantity: number;
+}
+
 interface ScanEntry {
-  product: InStoreProduct;
+  product: CountableProduct;
   scanned: number;
 }
 
@@ -113,6 +127,26 @@ export default function SalesInStoreInventory({ user }: Props) {
 
   const { data: products = [], isLoading } = useQuery<InStoreProduct[]>({
     queryKey: ['/api/instore/products'],
+  });
+
+  const { data: batteries = [] } = useQuery<LaptopBattery[]>({
+    queryKey: ['/api/battery/batteries'],
+    enabled: activeTab === "stockcount",
+  });
+
+  const { data: adapters = [] } = useQuery<AcAdapter[]>({
+    queryKey: ['/api/battery/adapters'],
+    enabled: activeTab === "stockcount",
+  });
+
+  const { data: keyboards = [] } = useQuery<KeyboardItem[]>({
+    queryKey: ['/api/battery/keyboards'],
+    enabled: activeTab === "stockcount",
+  });
+
+  const { data: lcds = [] } = useQuery<LcdItem[]>({
+    queryKey: ['/api/battery/lcds'],
+    enabled: activeTab === "stockcount",
   });
 
   useEffect(() => {
@@ -179,12 +213,16 @@ export default function SalesInStoreInventory({ user }: Props) {
   });
 
   const applyCountMutation = useMutation({
-    mutationFn: async (updates: { id: number; quantity: number }[]) => {
+    mutationFn: async (updates: { id: number | string; source: CountItemSource; quantity: number }[]) => {
       const res = await apiRequest('POST', '/api/instore/stock-count/apply', { updates });
       return res.json();
     },
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
       const matched = scanEntries.filter(e => e.scanned === e.product.stockQuantity).length;
       setDoneStats({ updated: data.updated, matched });
       setCountPhase("done");
@@ -350,47 +388,128 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     win.document.close();
   }, [formatPrice]);
 
-  const findProductByCode = useCallback((code: string): InStoreProduct | null => {
+  const countProducts: CountableProduct[] = [
+    ...products.map(p => ({
+      id: p.id,
+      source: "instore" as const,
+      nameAr: p.nameAr,
+      nameEn: p.nameEn,
+      serialNumber: null,
+      sku: p.sku,
+      barcode: p.barcode,
+      stockQuantity: p.stockQuantity,
+    })),
+    ...batteries.map(b => ({
+      id: b.id,
+      source: "battery" as const,
+      nameAr: `${b.brand} ${b.serialNumber}`,
+      nameEn: `${b.brand} ${b.serialNumber}`,
+      serialNumber: b.serialNumber,
+      sku: b.barcode || b.serialNumber,
+      barcode: b.barcode,
+      stockQuantity: b.stockQuantity || 0,
+    })),
+    ...adapters.map(a => ({
+      id: a.id,
+      source: "adapter" as const,
+      nameAr: `${a.brand} ${a.serialNumber}`,
+      nameEn: `${a.brand} ${a.serialNumber}`,
+      serialNumber: a.serialNumber,
+      sku: a.barcode || a.serialNumber,
+      barcode: a.barcode,
+      stockQuantity: a.stockQuantity || 0,
+    })),
+    ...keyboards.map(k => ({
+      id: k.id,
+      source: "keyboard" as const,
+      nameAr: `${k.brand} ${k.serialNumber}`,
+      nameEn: `${k.brand} ${k.serialNumber}`,
+      serialNumber: k.serialNumber,
+      sku: k.barcode || k.serialNumber,
+      barcode: k.barcode,
+      stockQuantity: k.stockQuantity || 0,
+    })),
+    ...lcds.map(l => ({
+      id: l.id,
+      source: "lcd" as const,
+      nameAr: `${l.brand} ${l.serialNumber}`,
+      nameEn: `${l.brand} ${l.serialNumber}`,
+      serialNumber: l.serialNumber,
+      sku: l.barcode || l.serialNumber,
+      barcode: l.barcode,
+      stockQuantity: l.stockQuantity || 0,
+    })),
+  ];
+
+  const countScopeStats = {
+    instore: countProducts.filter(p => p.source === "instore").length,
+    batteries: countProducts.filter(p => p.source === "battery").length,
+    adapters: countProducts.filter(p => p.source === "adapter").length,
+    keyboards: countProducts.filter(p => p.source === "keyboard").length,
+    lcds: countProducts.filter(p => p.source === "lcd").length,
+  };
+
+  const findProductByCode = useCallback((code: string): CountableProduct | null => {
     const c = code.trim().toLowerCase();
     if (!c) return null;
-    return products.find(p =>
+    return countProducts.find(p =>
       (p.barcode && p.barcode.toLowerCase() === c) ||
       (p.sku && p.sku.toLowerCase() === c)
     ) || null;
-  }, [products]);
+  }, [countProducts]);
 
   const handleScanSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key !== 'Enter') return;
     const code = scanInput.trim();
     if (!code) return;
+
+    if (unknownCodes.length > 0) {
+      playStockCountErrorBeep();
+      toast({
+        title: language === 'ar' ? 'احذف الرموز غير المعروفة أولاً' : 'Remove unknown codes first',
+        description: language === 'ar'
+          ? 'لا يمكن متابعة المسح حتى حذف كل الرموز غير الموجودة في النظام.'
+          : 'Scanning is paused until every unknown code is removed from the list below.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setScanInput("");
     setTimeout(() => scanInputRef.current?.focus(), 50);
 
     const product = findProductByCode(code);
     if (product) {
+      playBarcodeScanBeep();
       setScanEntries(prev => {
-        const existing = prev.find(e => e.product.id === product.id);
+        const productKey = makeEntryKey(product);
+        const existing = prev.find(e => makeEntryKey(e.product) === productKey);
         if (existing) {
-          return prev.map(e => e.product.id === product.id ? { ...e, scanned: e.scanned + 1 } : e);
+          const rest = prev.filter(e => makeEntryKey(e.product) !== productKey);
+          return [{ ...existing, scanned: existing.scanned + 1 }, ...rest];
         }
-        return [...prev, { product, scanned: 1 }];
+        return [{ product, scanned: 1 }, ...prev];
       });
     } else {
+      playStockCountErrorBeep();
       setUnknownCodes(prev => [...prev, code]);
+      setShowUnknown(true);
     }
   };
 
-  const adjustScanCount = (productId: number, delta: number) => {
+  const makeEntryKey = (product: CountableProduct) => `${product.source}:${product.id}`;
+
+  const adjustScanCount = (entryKey: string, delta: number) => {
     setScanEntries(prev =>
-      prev.map(e => e.product.id === productId
+      prev.map(e => makeEntryKey(e.product) === entryKey
         ? { ...e, scanned: Math.max(0, e.scanned + delta) }
         : e
       )
     );
   };
 
-  const removeScanEntry = (productId: number) => {
-    setScanEntries(prev => prev.filter(e => e.product.id !== productId));
+  const removeScanEntry = (entryKey: string) => {
+    setScanEntries(prev => prev.filter(e => makeEntryKey(e.product) !== entryKey));
   };
 
   const resetCount = () => {
@@ -404,7 +523,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   };
 
   const applyCount = () => {
-    const updates = scanEntries.map(e => ({ id: e.product.id, quantity: e.scanned }));
+    const updates = scanEntries.map(e => ({ id: e.product.id, source: e.product.source, quantity: e.scanned }));
     applyCountMutation.mutate(updates);
   };
 
@@ -419,8 +538,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       diff: e.scanned - e.product.stockQuantity,
       notScanned: false,
     })),
-    ...products
-      .filter(p => !scanEntries.find(e => e.product.id === p.id))
+    ...countProducts
+      .filter(p => !scanEntries.find(e => makeEntryKey(e.product) === makeEntryKey(p)))
       .map(p => ({
         product: p,
         systemQty: p.stockQuantity,
@@ -670,6 +789,54 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 </Card>
               </div>
 
+              {/* Count scope: show all items included in stock count */}
+              <Card>
+                <CardContent className="pt-4 pb-4 space-y-3">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <p className="font-semibold text-sm">
+                      {language === 'ar' ? 'العناصر المشمولة في الجرد' : 'Items included in stock count'}
+                    </p>
+                    <div className="flex gap-2 flex-wrap text-xs">
+                      <Badge variant="outline">{language === 'ar' ? `المتجر: ${countScopeStats.instore}` : `In-store: ${countScopeStats.instore}`}</Badge>
+                      <Badge variant="outline">{language === 'ar' ? `بطاريات: ${countScopeStats.batteries}` : `Batteries: ${countScopeStats.batteries}`}</Badge>
+                      <Badge variant="outline">{language === 'ar' ? `شواحن: ${countScopeStats.adapters}` : `Adapters: ${countScopeStats.adapters}`}</Badge>
+                      <Badge variant="outline">{language === 'ar' ? `كيبورد: ${countScopeStats.keyboards}` : `Keyboards: ${countScopeStats.keyboards}`}</Badge>
+                      <Badge variant="outline">{language === 'ar' ? `LCD: ${countScopeStats.lcds}` : `LCDs: ${countScopeStats.lcds}`}</Badge>
+                    </div>
+                  </div>
+                  <div className="max-h-56 overflow-auto border rounded-md">
+                    {countProducts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-3">
+                        {language === 'ar' ? 'لا توجد عناصر للجرد' : 'No items available for count'}
+                      </p>
+                    ) : (
+                      <div className="divide-y">
+                        {countProducts.map((p) => (
+                          <div key={`${p.source}:${p.id}`} className="px-3 py-2 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{p.nameAr}</p>
+                              <p className="text-xs text-muted-foreground font-mono truncate">
+                                {`S:${p.serialNumber || '-'} | B:${p.barcode || '-'} | SKU:${p.sku || '-'}`}
+                              </p>
+                            </div>
+                            <div className="text-end">
+                              <Badge variant="secondary" className="text-[10px]">
+                                {p.source === "instore" ? (language === 'ar' ? 'متجر' : 'In-store')
+                                  : p.source === "battery" ? (language === 'ar' ? 'بطارية' : 'Battery')
+                                  : p.source === "adapter" ? (language === 'ar' ? 'شاحن' : 'Adapter')
+                                  : p.source === "keyboard" ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
+                                  : 'LCD'}
+                              </Badge>
+                              <p className="text-xs mt-1">{language === 'ar' ? `مخزون: ${p.stockQuantity}` : `Stock: ${p.stockQuantity}`}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Scan Input */}
               <Card>
                 <CardContent className="pt-4 pb-4 space-y-3">
@@ -690,92 +857,50 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     className="text-lg font-mono h-12"
                     autoComplete="off"
                     data-testid="input-scan-barcode"
+                    disabled={unknownCodes.length > 0}
                   />
                   <p className="text-xs text-muted-foreground">
-                    {language === 'ar'
-                      ? 'اضغط على حقل الإدخال ثم امسح الباركود. كل مسح يضيف وحدة واحدة.'
-                      : 'Click the input then scan. Each scan adds 1 unit.'}
+                    {unknownCodes.length > 0
+                      ? (language === 'ar'
+                        ? 'المسح متوقف: احذف كل الرموز غير المعروفة أدناه للمتابعة.'
+                        : 'Scanning paused: remove every unknown code below to continue.')
+                      : (language === 'ar'
+                        ? 'اضغط على حقل الإدخال ثم امسح الباركود. كل مسح يضيف وحدة واحدة.'
+                        : 'Click the input then scan. Each scan adds 1 unit.')}
                   </p>
                 </CardContent>
               </Card>
 
-              {/* Scanned List */}
-              {scanEntries.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {language === 'ar' ? 'المنتجات الممسوحة:' : 'Scanned Products:'}
-                  </p>
-                  {scanEntries.map(entry => (
-                    <Card key={entry.product.id}>
-                      <CardContent className="py-2 px-3">
-                        <div className="flex items-center gap-3">
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm">{entry.product.nameAr}</p>
-                            <p className="text-xs text-muted-foreground font-mono">
-                              {entry.product.sku || entry.product.barcode || `#${entry.product.id}`}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => adjustScanCount(entry.product.id, -1)}
-                              data-testid={`button-scan-minus-${entry.product.id}`}
-                            >
-                              <ArrowDown className="h-3 w-3" />
-                            </Button>
-                            <span className="font-bold text-lg w-8 text-center">{entry.scanned}</span>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => adjustScanCount(entry.product.id, 1)}
-                              data-testid={`button-scan-plus-${entry.product.id}`}
-                            >
-                              <ArrowUp className="h-3 w-3" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => removeScanEntry(entry.product.id)}
-                              className="text-destructive"
-                              data-testid={`button-scan-remove-${entry.product.id}`}
-                            >
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              )}
-
-              {/* Unknown codes */}
+              {/* Unknown codes — must clear before more scans; shown above scanned list */}
               {unknownCodes.length > 0 && (
-                <Card className="border-orange-300">
+                <Card className="border-orange-300 border-2">
                   <CardContent className="pt-3 pb-3">
                     <button
+                      type="button"
                       className="flex items-center gap-2 w-full text-start"
                       onClick={() => setShowUnknown(v => !v)}
                     >
-                      <AlertTriangle className="h-4 w-4 text-orange-500" />
-                      <span className="text-sm font-medium text-orange-700">
+                      <AlertTriangle className="h-4 w-4 text-orange-500 shrink-0" />
+                      <span className="text-sm font-medium text-orange-700 dark:text-orange-400">
                         {language === 'ar'
-                          ? `${unknownCodes.length} رمز غير معروف`
-                          : `${unknownCodes.length} unknown code(s)`}
+                          ? `${unknownCodes.length} رمز غير معروف — احذفها لمتابعة الجرد`
+                          : `${unknownCodes.length} unknown code(s) — delete to continue counting`}
                       </span>
-                      {showUnknown ? <ChevronDown className="h-4 w-4 ms-auto" /> : <ChevronRight className="h-4 w-4 ms-auto" />}
+                      {showUnknown ? <ChevronDown className="h-4 w-4 ms-auto shrink-0" /> : <ChevronRight className="h-4 w-4 ms-auto shrink-0" />}
                     </button>
                     {showUnknown && (
                       <div className="mt-2 space-y-1">
                         {unknownCodes.map((c, i) => (
-                          <div key={i} className="flex items-center gap-2">
+                          <div key={`${c}-${i}`} className="flex items-center gap-2">
                             <span className="font-mono text-xs bg-muted px-2 py-1 rounded">{c}</span>
                             <Button
                               size="icon"
                               variant="ghost"
                               className="h-6 w-6 text-destructive"
-                              onClick={() => setUnknownCodes(prev => prev.filter((_, idx) => idx !== i))}
+                              onClick={() => {
+                                setUnknownCodes(prev => prev.filter((_, idx) => idx !== i));
+                                setTimeout(() => scanInputRef.current?.focus(), 50);
+                              }}
                             >
                               <X className="h-3 w-3" />
                             </Button>
@@ -787,11 +912,67 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 </Card>
               )}
 
+              {/* Scanned list — newest scans at the top */}
+              {scanEntries.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {language === 'ar' ? 'المنتجات الممسوحة (الأحدث أولاً):' : 'Scanned products (newest first):'}
+                  </p>
+                  {scanEntries.map(entry => (
+                    <Card key={makeEntryKey(entry.product)}>
+                      <CardContent className="py-2 px-3">
+                        <div className="flex items-center gap-3">
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm">{entry.product.nameAr}</p>
+                            <p className="text-xs text-muted-foreground font-mono">
+                              {entry.product.sku || entry.product.barcode || `#${entry.product.id}`}
+                            </p>
+                            {(entry.product.source !== "instore") && (
+                              <p className="text-[11px] text-muted-foreground font-mono">
+                                {`Serial: ${entry.product.serialNumber || '-'} | Barcode: ${entry.product.barcode || '-'}`}
+                              </p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => adjustScanCount(makeEntryKey(entry.product), -1)}
+                              data-testid={`button-scan-minus-${makeEntryKey(entry.product)}`}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                            <span className="font-bold text-lg w-8 text-center">{entry.scanned}</span>
+                            <Button
+                              size="icon"
+                              variant="outline"
+                              onClick={() => adjustScanCount(makeEntryKey(entry.product), 1)}
+                              data-testid={`button-scan-plus-${makeEntryKey(entry.product)}`}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => removeScanEntry(makeEntryKey(entry.product))}
+                              className="text-destructive"
+                              data-testid={`button-scan-remove-${makeEntryKey(entry.product)}`}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              )}
+
               {/* Action buttons */}
               <div className="flex gap-2 pt-2">
                 <Button
                   className="flex-1"
-                  disabled={scanEntries.length === 0}
+                  disabled={scanEntries.length === 0 || unknownCodes.length > 0}
                   onClick={() => setCountPhase("review")}
                   data-testid="button-review-results"
                 >
@@ -879,10 +1060,13 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                             statusEl = <Badge className="text-xs bg-yellow-200 text-yellow-900 border-yellow-300 font-bold">{language === 'ar' ? 'زيادة' : 'Extra'}</Badge>;
                           }
                           return (
-                            <tr key={row.product.id} className={`border-b ${rowClass} text-black dark:text-white`} data-testid={`row-compare-${row.product.id}`}>
+                            <tr key={`${row.product.source}-${row.product.id}`} className={`border-b ${rowClass} text-black dark:text-white`} data-testid={`row-compare-${row.product.source}-${row.product.id}`}>
                               <td className="px-3 py-2 font-medium text-black dark:text-white">{row.product.nameAr}</td>
                               <td className="px-3 py-2 text-center font-mono text-xs text-black dark:text-white opacity-80">
-                                {row.product.sku || row.product.barcode || '-'}
+                                {row.product.source === "instore"
+                                  ? (row.product.sku || row.product.barcode || '-')
+                                  : `S:${row.product.serialNumber || '-'} | B:${row.product.barcode || '-'}`
+                                }
                               </td>
                               <td className="px-3 py-2 text-center font-bold text-[#121111]">{row.systemQty}</td>
                               <td className="px-3 py-2 text-center font-bold text-[#121111]">{row.scannedQty}</td>

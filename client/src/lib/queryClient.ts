@@ -1,4 +1,5 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
+import type { User } from "@shared/schema";
 
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
@@ -40,6 +41,10 @@ export const getQueryFn: <T>(options: {
     await throwIfResNotOk(res);
     return await res.json();
   };
+
+/** Use for GET /api/auth/me — 401 means "logged out", not an error (avoids stuck error state after login). */
+export const customerAuthMeQueryKey = ["/api/auth/me"] as const;
+export const customerAuthMeQueryFn = getQueryFn<User | null>({ on401: "returnNull" });
 
 export const queryClient = new QueryClient({
   defaultOptions: {

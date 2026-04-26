@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, customerAuthMeQueryKey } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Languages } from "lucide-react";
 
@@ -26,8 +26,10 @@ export default function Register() {
     setIsLoading(true);
 
     try {
-      await apiRequest('POST', '/api/auth/register', formData);
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      const res = await apiRequest("POST", "/api/auth/register", formData);
+      const user = await res.json();
+      queryClient.setQueryData(customerAuthMeQueryKey, user);
+      void queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
       toast({
         title: t('register.success.title'),
         description: t('register.success.description'),

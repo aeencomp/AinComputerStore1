@@ -14,6 +14,7 @@ import { Minus, Plus, X, ShoppingBag, AlertCircle } from "lucide-react";
 import { useLocation } from "wouter";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatPrice } from "@/lib/formatters";
+import { resolveAssetUrl } from "@/lib/assetUrl";
 import laptopImage from "@assets/generated_images/gaming_laptop_product_photo.png";
 import desktopImage from "@assets/generated_images/desktop_pc_tower_photo.png";
 import monitorImage from "@assets/generated_images/gaming_monitor_product_photo.png";
@@ -114,7 +115,7 @@ export function CartSidebar({
                   const getImageSrc = () => {
                     if (!item.product.image) return laptopImage;
                     if (item.product.image.startsWith('/uploads/') || item.product.image.startsWith('/objects/') || item.product.image.startsWith('http')) {
-                      return item.product.image;
+                      return resolveAssetUrl(item.product.image);
                     }
                     return imageMap[item.product.image] || laptopImage;
                   };

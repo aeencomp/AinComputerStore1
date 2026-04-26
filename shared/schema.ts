@@ -768,6 +768,113 @@ export const insertAdapterSaleItemSchema = createInsertSchema(adapterSaleItems).
 export type InsertAdapterSaleItem = z.infer<typeof insertAdapterSaleItemSchema>;
 export type AdapterSaleItem = typeof adapterSaleItems.$inferSelect;
 
+// Keyboards inventory (battery system expansion)
+export const keyboards = pgTable("keyboards", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serialNumber: text("serial_number").notNull().unique(),
+  partNumber: text("part_number"),
+  barcode: text("barcode"),
+  brand: text("brand").notNull(),
+  layout: text("layout"), // US, UK, AR, etc.
+  keyboardType: text("keyboard_type"), // built-in, external, mechanical, membrane
+  backlight: integer("backlight").notNull().default(0), // 0/1
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(2),
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
+  supplier: text("supplier"),
+  location: text("location"),
+  notes: text("notes"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertKeyboardSchema = createInsertSchema(keyboards).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertKeyboard = z.infer<typeof insertKeyboardSchema>;
+export type Keyboard = typeof keyboards.$inferSelect;
+
+// LCD inventory (battery system expansion)
+export const lcds = pgTable("lcds", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serialNumber: text("serial_number").notNull().unique(),
+  partNumber: text("part_number"),
+  barcode: text("barcode"),
+  brand: text("brand").notNull(),
+  sizeInch: decimal("size_inch", { precision: 4, scale: 1 }),
+  brightnessNits: integer("brightness_nits"),
+  refreshRateHz: integer("refresh_rate_hz"),
+  resolution: text("resolution"), // e.g. 1920x1080
+  connectorType: text("connector_type"), // eDP 30-pin, eDP 40-pin, etc.
+  panelType: text("panel_type"), // IPS, TN, OLED
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(2),
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
+  supplier: text("supplier"),
+  location: text("location"),
+  notes: text("notes"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLcdSchema = createInsertSchema(lcds).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLcd = z.infer<typeof insertLcdSchema>;
+export type Lcd = typeof lcds.$inferSelect;
+
+// Keyboard sale items
+export const keyboardSaleItems = pgTable("keyboard_sale_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull(),
+  keyboardId: varchar("keyboard_id").notNull(),
+  serialNumber: text("serial_number").notNull(),
+  brand: text("brand").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertKeyboardSaleItemSchema = createInsertSchema(keyboardSaleItems).omit({
+  id: true,
+  saleId: true,
+});
+
+export type InsertKeyboardSaleItem = z.infer<typeof insertKeyboardSaleItemSchema>;
+export type KeyboardSaleItem = typeof keyboardSaleItems.$inferSelect;
+
+// LCD sale items
+export const lcdSaleItems = pgTable("lcd_sale_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull(),
+  lcdId: varchar("lcd_id").notNull(),
+  serialNumber: text("serial_number").notNull(),
+  brand: text("brand").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertLcdSaleItemSchema = createInsertSchema(lcdSaleItems).omit({
+  id: true,
+  saleId: true,
+});
+
+export type InsertLcdSaleItem = z.infer<typeof insertLcdSaleItemSchema>;
+export type LcdSaleItem = typeof lcdSaleItems.$inferSelect;
+
 // Product Requests - for customers requesting unavailable products
 export const productRequests = pgTable("product_requests", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -999,7 +1106,8 @@ export const cashWithdrawals = pgTable("cash_withdrawals", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   reason: text("reason"),
   employeeName: text("employee_name").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
+  /** timestamptz so list filters and JS Dates agree across server TZ / Postgres */
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const insertCashWithdrawalSchema = createInsertSchema(cashWithdrawals).omit({

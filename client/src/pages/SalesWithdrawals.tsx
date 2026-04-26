@@ -25,11 +25,18 @@ interface SalesWithdrawalsProps {
   user: { name: string; username: string };
 }
 
-interface SalesShift {
-  id: number;
-  status: string;
-  startTime: string;
-  endTime: string | null;
+function describeApiError(err: Error): string {
+  const raw = err.message?.replace(/^\d+:\s*/, "") ?? "";
+  const jsonMatch = raw.match(/\{[\s\S]*\}/);
+  if (jsonMatch) {
+    try {
+      const j = JSON.parse(jsonMatch[0]) as { error?: string; message?: string };
+      return j.error || j.message || raw;
+    } catch {
+      return raw;
+    }
+  }
+  return raw;
 }
 
 export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
@@ -46,24 +53,39 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   const [editReason, setEditReason] = useState("");
   const [editEmployee, setEditEmployee] = useState("");
 
-  const { data: currentShift } = useQuery<SalesShift | null>({
-    queryKey: ['/api/sales/shifts/current'],
-  });
-
-  const hasActiveShift = currentShift?.status === 'active';
-
   const { data: withdrawals = [], isLoading } = useQuery<CashWithdrawal[]>({
     queryKey: ["/api/instore/withdrawals", selectedDate],
-    queryFn: () =>
-      fetch(`/api/instore/withdrawals?date=${selectedDate}`, { credentials: "include" }).then(r => r.json()),
+    queryFn: async () => {
+      const r = await fetch(`/api/instore/withdrawals?date=${selectedDate}`, {
+        credentials: "include",
+      });
+      if (!r.ok) {
+        const text = await r.text();
+        throw new Error(text || r.statusText);
+      }
+      return r.json();
+    },
   });
 
   const addMutation = useMutation({
-    mutationFn: (data: { amount: string; reason: string; employeeName: string }) =>
-      apiRequest("POST", "/api/instore/withdrawals", data).then(r => r.json()),
-    onSuccess: () => {
+    mutationFn: async (data: { amount: string; reason: string; employeeName: string }) => {
+      const res = await apiRequest("POST", "/api/instore/withdrawals", data);
+      return res.json() as Promise<CashWithdrawal>;
+    },
+    onSuccess: (row) => {
+      const dateKey = selectedDate;
+      queryClient.setQueryData<CashWithdrawal[]>(
+        ["/api/instore/withdrawals", dateKey],
+        (prev) => {
+          const list = prev ?? [];
+          if (list.some((w) => w.id === row.id)) return list;
+          return [row, ...list];
+        },
+      );
       queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
       setAmount("");
       setReason("");
       toast({
@@ -71,8 +93,12 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
         description: language === "ar" ? "تم إضافة السحب بنجاح" : "Withdrawal added successfully",
       });
     },
-    onError: () => {
-      toast({ title: language === "ar" ? "خطأ" : "Error", variant: "destructive" });
+    onError: (err: Error) => {
+      toast({
+        title: language === "ar" ? "خطأ" : "Error",
+        description: describeApiError(err),
+        variant: "destructive",
+      });
     },
   });
 
@@ -82,14 +108,20 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
       setEditingId(null);
       toast({
         title: language === "ar" ? "تم التعديل" : "Updated",
         description: language === "ar" ? "تم تعديل السحب بنجاح" : "Withdrawal updated successfully",
       });
     },
-    onError: () => {
-      toast({ title: language === "ar" ? "خطأ" : "Error", variant: "destructive" });
+    onError: (err: Error) => {
+      toast({
+        title: language === "ar" ? "خطأ" : "Error",
+        description: describeApiError(err),
+        variant: "destructive",
+      });
     },
   });
 
@@ -99,6 +131,8 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
       toast({ title: language === "ar" ? "تم الحذف" : "Deleted" });
     },
   });
@@ -180,11 +214,7 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            {!hasActiveShift ? (
-              <p className="text-sm text-muted-foreground py-4 text-center">
-                {language === "ar" ? "ابدأ وردية لإضافة سحوبات" : "Start a shift to add withdrawals"}
-              </p>
-            ) : (<form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="withdrawal-employee">
                   {language === "ar" ? "اسم الموظف" : "Employee Name"}
@@ -239,7 +269,6 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
                   : (language === "ar" ? "تسجيل السحب" : "Record Withdrawal")}
               </Button>
             </form>
-            )}
           </CardContent>
         </Card>
 

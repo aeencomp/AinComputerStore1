@@ -10,11 +10,22 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 import { IntercomWidget } from '@/components/IntercomWidget';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 interface Technician {
   id: string;
@@ -185,6 +196,27 @@ export default function TechnicianDashboard() {
     },
   });
 
+  const bulkSendCompletionWhatsAppMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/admin/repair-tickets/bulk-send-completion-whatsapp', {});
+      return res.json();
+    },
+    onSuccess: (data: { sent: number; total: number }) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      toast({
+        title: language === 'ar' ? 'انتهى إرسال واتساب' : 'WhatsApp batch finished',
+        description: t('repair.whatsapp.bulkResult', { sent: String(data.sent), total: String(data.total) }),
+      });
+    },
+    onError: () => {
+      toast({
+        title: t('common.error'),
+        description: language === 'ar' ? 'فشل الإرسال الجماعي' : 'Bulk WhatsApp send failed',
+        variant: 'destructive',
+      });
+    },
+  });
+
   const stats = useMemo(() => {
     if (!tickets) return { totalRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0, deferredCount: 0 };
     let totalRevenue = 0;
@@ -329,6 +361,46 @@ export default function TechnicianDashboard() {
                 {language === 'ar' ? 'طلب صيانة جديد' : 'New Request'}
               </Button>
             </Link>
+            {!showArchived && stats.completedCount > 0 && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="h-7 min-h-7 gap-1 px-2 py-0 text-[11px] leading-none bg-green-600 hover:bg-green-600/90 text-white"
+                    disabled={bulkSendCompletionWhatsAppMutation.isPending || isTicketsLoading}
+                    data-testid="button-send-whatsapp-all-completed"
+                  >
+                    <MessageCircle className="h-3 w-3 shrink-0" aria-hidden />
+                    <span className="truncate max-w-[9.5rem] sm:max-w-none">{t('repair.whatsapp.dashboardButton')}</span>
+                    <span className="opacity-90 tabular-nums">({stats.completedCount})</span>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t('repair.whatsapp.confirmTitle')}</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      {t('repair.whatsapp.confirmDescription', { count: String(stats.completedCount) })}
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel data-testid="button-whatsapp-confirm-cancel">
+                      {t('repair.whatsapp.confirmCancel')}
+                    </AlertDialogCancel>
+                    <AlertDialogAction
+                      className="bg-green-600 text-white hover:bg-green-600/90"
+                      disabled={bulkSendCompletionWhatsAppMutation.isPending}
+                      onClick={() => bulkSendCompletionWhatsAppMutation.mutate()}
+                      data-testid="button-whatsapp-confirm-send"
+                    >
+                      {bulkSendCompletionWhatsAppMutation.isPending
+                        ? (language === 'ar' ? 'جاري الإرسال…' : 'Sending…')
+                        : t('repair.whatsapp.confirmSend')}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
             {isAdmin && (
               <Link href="/technician/manage">
                 <Button variant="outline" data-testid="button-manage-technicians">
@@ -371,29 +443,29 @@ export default function TechnicianDashboard() {
             </Card>
           )}
 
-          {canViewRevenue && (
-            <Card
-              className={`cursor-pointer hover-elevate ${filterStatus === 'completed' ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
-              data-testid="card-completed-count"
-            >
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'} ({stats.completedCount})</p>
-                    <p className="text-lg font-bold" data-testid="text-completed-count">
-                      {language === 'ar'
-                        ? `${stats.completedRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${stats.completedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
-                    </p>
-                  </div>
+          <Card
+            className={`cursor-pointer hover-elevate ${filterStatus === 'completed' ? 'ring-2 ring-primary' : ''}`}
+            onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
+            data-testid="card-completed-count"
+          >
+            <CardContent className="pt-4 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
-              </CardContent>
-            </Card>
-          )}
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'}</p>
+                  <p className="text-lg font-bold" data-testid="text-completed-count">
+                    {canViewRevenue
+                      ? (language === 'ar'
+                        ? `${stats.completedRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${stats.completedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`)
+                      : stats.completedCount}
+                  </p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
 
           <Card
             className={`cursor-pointer hover-elevate ${filterStatus === 'pending' ? 'ring-2 ring-primary' : ''}`}
@@ -557,6 +629,7 @@ export default function TechnicianDashboard() {
               {language === 'ar' ? `أرشفة المسلمة (${deliveredUnarchived})` : `Archive Delivered (${deliveredUnarchived})`}
             </Button>
           )}
+
           </div>
         </div>
 

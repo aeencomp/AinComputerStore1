@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { customerAuthMeQueryFn, customerAuthMeQueryKey } from '@/lib/queryClient';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -12,7 +13,7 @@ import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import { CartSidebar } from '@/components/CartSidebar';
 import { useCart } from '@/contexts/CartContext';
-import { Package, ShoppingBag, ChevronDown, ChevronUp, MapPin, CreditCard, Calendar, ArrowRight } from 'lucide-react';
+import { Package, ShoppingBag, ChevronDown, ChevronUp, MapPin, CreditCard, Calendar, ArrowRight, KeyRound } from 'lucide-react';
 import { format } from 'date-fns';
 import type { User, CartItem } from '@shared/schema';
 
@@ -55,7 +56,8 @@ export default function CustomerDashboard() {
   const [expandedOrders, setExpandedOrders] = useState<Set<string>>(new Set());
 
   const { data: currentUser, isLoading: isAuthLoading, isFetched: isAuthFetched } = useQuery<User | null>({
-    queryKey: ['/api/auth/me'],
+    queryKey: customerAuthMeQueryKey,
+    queryFn: customerAuthMeQueryFn,
   });
 
   const { data: cartItems = [] } = useQuery<CartItemWithId[]>({
@@ -192,13 +194,21 @@ export default function CustomerDashboard() {
 
       <main className="flex-1 py-8">
         <div className="max-w-5xl mx-auto px-4">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2" data-testid="text-dashboard-title">
-              {t('dashboard.myOrders')}
-            </h1>
-            <p className="text-muted-foreground">
-              {t('dashboard.orderHistory')}
-            </p>
+          <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold mb-2" data-testid="text-dashboard-title">
+                {t('dashboard.myOrders')}
+              </h1>
+              <p className="text-muted-foreground">
+                {t('dashboard.orderHistory')}
+              </p>
+            </div>
+            <Link href="/account/password">
+              <Button variant="outline" size="sm" className="gap-2" data-testid="button-change-password">
+                <KeyRound className="h-4 w-4" />
+                {t('change.title')}
+              </Button>
+            </Link>
           </div>
 
           {isOrdersLoading ? (

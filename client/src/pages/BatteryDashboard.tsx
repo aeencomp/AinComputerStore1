@@ -43,9 +43,11 @@ import {
   Receipt,
   BarChart3,
   Plug,
+  Keyboard,
+  Monitor,
   Languages
 } from "lucide-react";
-import type { LaptopBattery, AcAdapter } from "@shared/schema";
+import type { LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 import QRCode from "@/components/QRCode";
 
 interface BatteryUserAuth {
@@ -104,6 +106,26 @@ export default function BatteryDashboard() {
 
   const { data: lowStockAdapters = [] } = useQuery<AcAdapter[]>({
     queryKey: ['/api/battery/adapters/low-stock'],
+    enabled: !!currentUser,
+  });
+
+  const { data: keyboards = [] } = useQuery<KeyboardItem[]>({
+    queryKey: ['/api/battery/keyboards'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lowStockKeyboards = [] } = useQuery<KeyboardItem[]>({
+    queryKey: ['/api/battery/keyboards/low-stock'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lcds = [] } = useQuery<LcdItem[]>({
+    queryKey: ['/api/battery/lcds'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lowStockLcds = [] } = useQuery<LcdItem[]>({
+    queryKey: ['/api/battery/lcds/low-stock'],
     enabled: !!currentUser,
   });
 
@@ -282,6 +304,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   const displayBatteries = searchQuery.trim() ? searchResults : batteries;
   const totalStock = batteries.reduce((sum, b) => sum + (b.stockQuantity || 0), 0);
   const totalAdapterStock = adapters.reduce((sum, a) => sum + (a.stockQuantity || 0), 0);
+  const totalKeyboardStock = keyboards.reduce((sum, k) => sum + (k.stockQuantity || 0), 0);
+  const totalLcdStock = lcds.reduce((sum, l) => sum + (l.stockQuantity || 0), 0);
 
   const formatNumber = (num: number) => {
     // Remove trailing .00 for whole numbers
@@ -423,6 +447,62 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
               clickable: lowStockAdapters.length > 0,
               onClick: () => setLocation("/battery/manage?tab=adapters&lowstock=true"),
               testId: 'stat-low-stock-adapters'
+            },
+            {
+              label: language === 'ar' ? 'أنواع الكيبورد' : 'Keyboard Types',
+              value: keyboards.length,
+              icon: Keyboard,
+              color: 'text-primary',
+              bg: 'bg-primary/5',
+              clickable: false,
+              testId: 'stat-keyboard-types'
+            },
+            {
+              label: language === 'ar' ? 'وحدات الكيبورد' : 'Keyboard Units',
+              value: totalKeyboardStock,
+              icon: Keyboard,
+              color: 'text-blue-600',
+              bg: 'bg-blue-50',
+              clickable: false,
+              testId: 'stat-keyboard-units'
+            },
+            {
+              label: language === 'ar' ? 'نقص مخزون الكيبورد' : 'Low Stock Keyboards',
+              value: lowStockKeyboards.length,
+              icon: AlertTriangle,
+              color: lowStockKeyboards.length > 0 ? 'text-red-600' : 'text-slate-400',
+              bg: lowStockKeyboards.length > 0 ? 'bg-red-50' : 'bg-slate-50',
+              clickable: lowStockKeyboards.length > 0,
+              onClick: () => setLocation("/battery/manage?tab=keyboards&lowstock=true"),
+              testId: 'stat-low-stock-keyboards'
+            },
+            {
+              label: language === 'ar' ? 'أنواع شاشات LCD' : 'LCD Types',
+              value: lcds.length,
+              icon: Monitor,
+              color: 'text-primary',
+              bg: 'bg-primary/5',
+              clickable: false,
+              testId: 'stat-lcd-types'
+            },
+            {
+              label: language === 'ar' ? 'وحدات شاشات LCD' : 'LCD Units',
+              value: totalLcdStock,
+              icon: Monitor,
+              color: 'text-blue-600',
+              bg: 'bg-blue-50',
+              clickable: false,
+              testId: 'stat-lcd-units'
+            },
+            {
+              label: language === 'ar' ? 'نقص مخزون شاشات LCD' : 'Low Stock LCDs',
+              value: lowStockLcds.length,
+              icon: AlertTriangle,
+              color: lowStockLcds.length > 0 ? 'text-red-600' : 'text-slate-400',
+              bg: lowStockLcds.length > 0 ? 'bg-red-50' : 'bg-slate-50',
+              clickable: lowStockLcds.length > 0,
+              onClick: () => setLocation("/battery/manage?tab=lcds&lowstock=true"),
+              testId: 'stat-low-stock-lcds'
             }
           ].map((stat, i) => (
             <Card 

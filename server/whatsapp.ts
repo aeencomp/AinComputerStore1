@@ -10,9 +10,26 @@ interface WhatsAppMessageResult {
 }
 
 function formatPhoneNumber(phone: string): string {
-  let cleaned = phone.replace(/[\s\-\+]/g, '');
+  // Keep digits only to support messy user inputs like "+964 (0) 78x-xxx-xxxx"
+  let cleaned = (phone || '').replace(/\D/g, '');
+
+  // International prefix variants
   if (cleaned.startsWith('00')) cleaned = cleaned.substring(2);
-  if (cleaned.startsWith('07')) cleaned = '964' + cleaned.substring(1);
+
+  // Iraqi local mobile formats:
+  // 07XXXXXXXXX  -> 9647XXXXXXXXX
+  // 7XXXXXXXXX   -> 9647XXXXXXXXX
+  if (cleaned.startsWith('07') && cleaned.length === 11) {
+    cleaned = `964${cleaned.substring(1)}`;
+  } else if (cleaned.startsWith('7') && cleaned.length === 10) {
+    cleaned = `964${cleaned}`;
+  }
+
+  // If user entered 9640XXXXXXXXXX, drop the optional trunk "0" after country code
+  if (cleaned.startsWith('9640')) {
+    cleaned = `964${cleaned.substring(4)}`;
+  }
+
   return cleaned;
 }
 

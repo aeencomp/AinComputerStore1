@@ -1,0 +1,49 @@
+VERDICT: APPROVED_WITH_COMMENTS
+
+The diff appears to implement the core task correctly: staff advances are modeled in schema, exposed via CRUD routes with shift-lock protections, included in shift report computation, and surfaced in DailyReport UI/prinVERDICT: APPROVED_WITH_COMMENTS
+t as a positive contributor to totals.
+
+Critical f
+indings / analysis:
+- **Schema**: `staff_advances` The diff appears to implement the core task correctly: staff advances are modeled in schema, exposed via CRUD routes with shift-lock protections, included in shift report computation, and surfaced in DailyReport UI/print as a positive contributor to totals.
+table and insert schema/type are present in `shar
+ed/schema.ts` with required fieldsCritical findings / analysis:
+ (`id`, `amount`, `staffName`, optional `reason`, `createdAt`).
+- **Backend routes**:
+  - Added `GET/POST/DELETE /api/instore/staff-advances`.
+  - `POST` rejects when no active shift (`"لا توجد وردية نشطة"`).
+  - `DELETE` rejects when record falls in a closed shift window (`"الوردية مغلقة، لا يمكن التعديل"`) and also enforces active-shift guard.
+  - Existing withdrawals `POST` and `DELETE` now enforce active-shift guard and closed-shift delete lock as required.
+- **Report computation** (`computeShiftReport`): staff advances are fetched in shift window, returned as `advances`, and summary includes `advancesTotal`/`advancesCount`; `grandTotal` and `netTotal` include advances as positive values and still subtract withdrawals only in net.
+- **DailyReport UI + print**: added advances section/table, advances total in summary blocks, net/grand total presentation updated, and print HTML includes advances rows and totals with positive sign.
+- **SalesDashboard**: new staff-advance panel with add/delete and hidden add control when no active shift is implemented.
+
+Comments (non-blocking but important):
+1. `SalesDashboard` now clearly handles advances, but I don’t see equivalent withdrawal add controls in this file; if withdrawal actions are expected here, confirm the same “hide when no active shift” behavior is implemented in the actual withdrawals UI entry point.
+2. `/api/daily-report` endpoint (separate from shift report endpoints) still excludes advances. If any screens still consume it for financial totals, this can create inconsistent totals vs shift reports.
+
+Security: none observed (no serious authz/injection/secret exposure regressions in the reviewed scope).
+
+Next actions:
+1. Verify withdrawal add UI visibility lock in whichever page currently owns withdrawals actions (if not `SalesDashboard`).
+2. Decide whether `/api/daily-report` should also include advances for consistency across reporting surfaces.
+3. Run a quick end-to-end test: create advance in active shift, close shift, then confirm add/delete are blocked and printed totals remain stable.- **Schema**: `staff_advances` table and insert schema/type are present in `shared/schema.ts` with required fields (`id`, `amount`, `staffName`, optional `reason`, `createdAt`).
+- **Backend routes**:
+  - Added `GET/POST/DELETE /api/instore/staff-advances`.
+  - `POST` rejects when no active shift (`"لا توجد وردية نشطة"`).
+  - `DELETE` rejects when record falls in a closed shift window (`"الوردية مغلقة، لا يمكن التعديل"`) and also enforces active-shift guard.
+  - Existing withdrawals `POST` and `DELETE` now enforce active-shift guard and closed-shift delete lock as required.
+- **Report computation** (`computeShiftReport`): staff advances are fetched in shift window, returned as `advances`, and summary includes `advancesTotal`/`advancesCount`; `grandTotal` and `netTotal` include advances as positive values and still subtract withdrawals only in net.
+- **DailyReport UI + print**: added advances section/table, advances total in summary blocks, net/grand total presentation updated, and print HTML includes advances rows and totals with positive sign.
+- **SalesDashboard**: new staff-advance panel with add/delete and hidden add control when no active shift is implemented.
+
+Comments (non-blocking but important):
+1. `SalesDashboard` now clearly handles advances, but I don’t see equivalent withdrawal add controls in this file; if withdrawal actions are expected here, confirm the same “hide when no active shift” behavior is implemented in the actual withdrawals UI entry point.
+2. `/api/daily-report` endpoint (separate from shift report endpoints) still excludes advances. If any screens still consume it for financial totals, this can create inconsistent totals vs shift reports.
+
+Security: none observed (no serious authz/injection/secret exposure regressions in the reviewed scope).
+
+Next actions:
+1. Verify withdrawal add UI visibility lock in whichever page currently owns withdrawals actions (if not `SalesDashboard`).
+2. Decide whether `/api/daily-report` should also include advances for consistency across reporting surfaces.
+3. Run a quick end-to-end test: create advance in active shift, close shift, then confirm add/delete are blocked and printed totals remain stable.

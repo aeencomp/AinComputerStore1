@@ -14,7 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient, customerAuthMeQueryFn, customerAuthMeQueryKey } from "@/lib/queryClient";
 import { CartItem, StoreSettings, User } from "@shared/schema";
 import { Banknote, Smartphone, CreditCard, Loader2, Tag, X, Check, Languages } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -65,7 +65,8 @@ export default function Checkout() {
 
   // Check authentication
   const { data: currentUser, isLoading: userLoading } = useQuery<User | null>({
-    queryKey: ['/api/auth/me'],
+    queryKey: customerAuthMeQueryKey,
+    queryFn: customerAuthMeQueryFn,
   });
 
   const { data: cartItems = [], isLoading: cartLoading } = useQuery<CartItemWithId[]>({

@@ -110,6 +110,14 @@ interface ShiftReportData {
   summary: DailyReportSummary;
 }
 
+interface DailyReportApiResponse {
+  date: string;
+  inStoreSales: InStoreOrder[];
+  repairSales: RepairSale[];
+  withdrawals: Withdrawal[];
+  summary: Omit<DailyReportSummary, "advancesTotal" | "advancesCount">;
+}
+
 interface DailyReportProps {
   user: { id: string };
 }
@@ -550,6 +558,7 @@ function buildPrintHTML(data: ShiftReportData): string {
 export default function DailyReport({ user }: DailyReportProps) {
   const { language } = useLanguage();
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
+  const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
   // List of all shifts
   const { data: shifts = [], isLoading: shiftsLoading, refetch: refetchShifts } = useQuery<SalesShift[]>({
@@ -564,6 +573,18 @@ export default function DailyReport({ user }: DailyReportProps) {
     refetchInterval: 30000,
   });
 
+  // Calendar-day report fallback (when no active shift). This matches what users expect as "daily report".
+  const { data: dailyReportApi, isLoading: dailyLoading, refetch: refetchDaily } = useQuery<DailyReportApiResponse>({
+    queryKey: ["/api/daily-report", baghdadToday],
+    queryFn: async () => {
+      const r = await fetch(`/api/daily-report?date=${baghdadToday}`, { credentials: "include" });
+      if (!r.ok) throw new Error(`Failed to load daily report: ${r.status}`);
+      return r.json();
+    },
+    enabled: !selectedShiftId && !activeSnapshot,
+    staleTime: 0,
+  });
+
   // Full report for selected shift
   const { data: shiftReport, isLoading: reportLoading, isFetching: reportFetching, refetch: refetchReport } = useQuery<ShiftReportData>({
     queryKey: ["/api/sales/shifts", selectedShiftId, "report"],
@@ -576,8 +597,36 @@ export default function DailyReport({ user }: DailyReportProps) {
     staleTime: 0,
   });
 
-  const data: ShiftReportData | null | undefined = selectedShiftId ? shiftReport : (activeSnapshot ?? null);
-  const isLoading = selectedShiftId ? reportLoading : snapshotLoading;
+  const dailyAsShift: ShiftReportData | null = dailyReportApi ? {
+    shift: {
+      id: `daily-${baghdadToday}`,
+      salesUserId: "daily",
+      salesUserName: language === "ar" ? "تقرير اليوم" : "Daily",
+      startTime: new Date(`${baghdadToday}T00:00:00+03:00`).toISOString(),
+      endTime: new Date(`${baghdadToday}T23:59:59.999+03:00`).toISOString(),
+      openingCash: "0",
+      closingCash: null,
+      expectedCash: null,
+      cashDifference: null,
+      totalSales: String(dailyReportApi.summary.grandTotal ?? 0),
+      totalTransactions: (dailyReportApi.summary.inStoreCount ?? 0) + (dailyReportApi.summary.repairCount ?? 0),
+      notes: null,
+      status: "closed",
+      createdAt: new Date().toISOString(),
+    } as unknown as SalesShift,
+    inStoreSales: dailyReportApi.inStoreSales,
+    repairSales: dailyReportApi.repairSales,
+    withdrawals: dailyReportApi.withdrawals,
+    advances: [],
+    summary: {
+      ...dailyReportApi.summary,
+      advancesTotal: 0,
+      advancesCount: 0,
+    },
+  } : null;
+
+  const data: ShiftReportData | null | undefined = selectedShiftId ? shiftReport : (activeSnapshot ?? dailyAsShift ?? null);
+  const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
   const isFetching = selectedShiftId ? reportFetching : false;
 
   const handlePrint = () => {
@@ -592,10 +641,16 @@ export default function DailyReport({ user }: DailyReportProps) {
   const handleRefresh = () => {
     refetchShifts();
     refetchSnapshot();
+    if (!selectedShiftId && !activeSnapshot) refetchDaily();
     if (selectedShiftId) refetchReport();
   };
 
   const closedShifts = shifts.filter(s => s.status === 'closed');
+  // If the API includes active shifts, avoid showing the same one twice:
+  // it already appears as the "Active Snapshot" card.
+  const otherActiveShifts = shifts.filter(
+    (s) => s.status === "active" && s.id !== (activeSnapshot?.shift?.id ?? null),
+  );
 
   return (
     <div className="space-y-6" dir={language === "ar" ? "rtl" : "ltr"}>
@@ -666,7 +721,45 @@ export default function DailyReport({ user }: DailyReportProps) {
             </Card>
           )}
 
-          <p className="text-xs font-semibold text-muted-foreground px-1 pt-1">
+          {/* If API returns active shifts (supervisors), show them selectable too */}
+          {otherActiveShifts.length > 0 && (
+            <>
+              <p className="text-xs font-semibold text-muted-foreground px-1 pt-1">
+                {language === "ar" ? "ورديات نشطة" : "Active Shifts"}
+                <span className="ms-1">({otherActiveShifts.length})</span>
+              </p>
+              <div className="space-y-2">
+                {otherActiveShifts.map(shift => (
+                  <Card
+                    key={shift.id}
+                    className={`cursor-pointer border-2 transition-colors hover-elevate ${
+                      selectedShiftId === shift.id ? "border-primary" : "border-transparent"
+                    }`}
+                    onClick={() => setSelectedShiftId(shift.id)}
+                    data-testid={`card-active-shift-${shift.id}`}
+                  >
+                    <CardContent className="p-3">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Radio className="h-3.5 w-3.5 text-green-500" />
+                        <span className="text-xs font-semibold text-green-600">
+                          {language === "ar" ? "نشطة" : "Active"}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-sm font-medium truncate">{shift.salesUserName}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {shift.startTime ? format(new Date(shift.startTime), "HH:mm dd/MM") : "—"}
+                      </p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </>
+          )}
+
+          <p className="text-xs font-semibold text-muted-foreground px-1 pt-3">
             {language === "ar" ? "الورديات المغلقة" : "Closed Shifts"}
             {closedShifts.length > 0 && <span className="ms-1">({closedShifts.length})</span>}
           </p>

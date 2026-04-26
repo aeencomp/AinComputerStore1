@@ -28,6 +28,8 @@ import {
   Upload,
   Database,
   Plug,
+  Keyboard as KeyboardIcon,
+  Monitor,
   Printer,
   Languages
 } from "lucide-react";
@@ -41,7 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { LaptopBattery, AcAdapter } from "@shared/schema";
+import type { LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 
 export default function BatteryManage() {
   const { language, setLanguage } = useLanguage();
@@ -55,7 +57,9 @@ export default function BatteryManage() {
   const lowstockParam = urlParams.get('lowstock');
   const tabParam = urlParams.get('tab');
   
-  const [activeTab, setActiveTab] = useState(tabParam === 'adapters' ? 'adapters' : 'batteries');
+  const [activeTab, setActiveTab] = useState(
+    tabParam === 'adapters' || tabParam === 'keyboards' || tabParam === 'lcds' ? tabParam : 'batteries'
+  );
   const [showForm, setShowForm] = useState(false);
   const [editingBattery, setEditingBattery] = useState<LaptopBattery | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
@@ -96,8 +100,18 @@ export default function BatteryManage() {
   const [showAdapterForm, setShowAdapterForm] = useState(false);
   const [editingAdapter, setEditingAdapter] = useState<AcAdapter | null>(null);
   const [adapterDeleteConfirm, setAdapterDeleteConfirm] = useState<string | null>(null);
+  const [showKeyboardForm, setShowKeyboardForm] = useState(false);
+  const [editingKeyboard, setEditingKeyboard] = useState<KeyboardItem | null>(null);
+  const [keyboardDeleteConfirm, setKeyboardDeleteConfirm] = useState<string | null>(null);
+  const [showLcdForm, setShowLcdForm] = useState(false);
+  const [editingLcd, setEditingLcd] = useState<LcdItem | null>(null);
+  const [lcdDeleteConfirm, setLcdDeleteConfirm] = useState<string | null>(null);
   const [adapterSearchQuery, setAdapterSearchQuery] = useState("");
   const [showAdapterLowStockOnly, setShowAdapterLowStockOnly] = useState(false);
+  const [keyboardSearchQuery, setKeyboardSearchQuery] = useState("");
+  const [showKeyboardLowStockOnly, setShowKeyboardLowStockOnly] = useState(lowstockParam === 'true' && tabParam === 'keyboards');
+  const [lcdSearchQuery, setLcdSearchQuery] = useState("");
+  const [showLcdLowStockOnly, setShowLcdLowStockOnly] = useState(lowstockParam === 'true' && tabParam === 'lcds');
   
   const [adapterFormData, setAdapterFormData] = useState({
     serialNumber: "",
@@ -122,6 +136,43 @@ export default function BatteryManage() {
     notes: "",
   });
 
+  const [keyboardFormData, setKeyboardFormData] = useState({
+    serialNumber: "",
+    partNumber: "",
+    brand: "",
+    layout: "",
+    keyboardType: "",
+    backlight: false,
+    stockQuantity: "0",
+    minStockLevel: "2",
+    purchasePrice: "",
+    sellingPrice: "",
+    wholesalePrice: "",
+    supplier: "",
+    location: "",
+    notes: "",
+  });
+
+  const [lcdFormData, setLcdFormData] = useState({
+    serialNumber: "",
+    partNumber: "",
+    brand: "",
+    sizeInch: "",
+    brightnessNits: "",
+    refreshRateHz: "",
+    resolution: "",
+    connectorType: "",
+    panelType: "",
+    stockQuantity: "0",
+    minStockLevel: "2",
+    purchasePrice: "",
+    sellingPrice: "",
+    wholesalePrice: "",
+    supplier: "",
+    location: "",
+    notes: "",
+  });
+
   const { data: currentUser, isLoading: authLoading } = useQuery({
     queryKey: ['/api/battery/auth/me'],
     retry: false,
@@ -134,6 +185,16 @@ export default function BatteryManage() {
 
   const { data: adapters = [], isLoading: adaptersLoading } = useQuery<AcAdapter[]>({
     queryKey: ['/api/battery/adapters'],
+    enabled: !!currentUser,
+  });
+
+  const { data: keyboards = [], isLoading: keyboardsLoading } = useQuery<KeyboardItem[]>({
+    queryKey: ['/api/battery/keyboards'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lcds = [], isLoading: lcdsLoading } = useQuery<LcdItem[]>({
+    queryKey: ['/api/battery/lcds'],
     enabled: !!currentUser,
   });
 
@@ -263,6 +324,102 @@ export default function BatteryManage() {
     },
   });
 
+  const createKeyboardMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest('POST', '/api/battery/keyboards', data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم إضافة الكيبورد بنجاح' : 'Keyboard added successfully' });
+      resetKeyboardForm();
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const updateKeyboardMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest('PUT', `/api/battery/keyboards/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم تحديث الكيبورد بنجاح' : 'Keyboard updated successfully' });
+      resetKeyboardForm();
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteKeyboardMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/battery/keyboards/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم حذف الكيبورد' : 'Keyboard deleted' });
+      setKeyboardDeleteConfirm(null);
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const createLcdMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest('POST', '/api/battery/lcds', data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم إضافة شاشة LCD بنجاح' : 'LCD added successfully' });
+      resetLcdForm();
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const updateLcdMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest('PUT', `/api/battery/lcds/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم تحديث شاشة LCD بنجاح' : 'LCD updated successfully' });
+      resetLcdForm();
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteLcdMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/battery/lcds/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم حذف شاشة LCD' : 'LCD deleted' });
+      setLcdDeleteConfirm(null);
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
   const restoreMutation = useMutation({
     mutationFn: async (backupData: any) => {
       const res = await apiRequest('POST', '/api/battery/batteries/restore', backupData);
@@ -271,6 +428,12 @@ export default function BatteryManage() {
     onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters/low-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards/low-stock'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds/low-stock'] });
       setRestoreResult(result);
       setRestoreFile(null);
     },
@@ -279,6 +442,83 @@ export default function BatteryManage() {
         title: language === 'ar' ? 'خطأ في الاستعادة' : 'Restore Error', 
         description: error.message, 
         variant: 'destructive' 
+      });
+    },
+  });
+
+  const syncBarcodesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/battery/migrations/sync-barcodes-to-serial', {});
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      toast({
+        title: language === 'ar' ? 'تمت مزامنة الباركود' : 'Barcodes synced',
+        description: language === 'ar'
+          ? `تم تحديث ${result?.totalUpdated ?? 0} عنصر`
+          : `Updated ${result?.totalUpdated ?? 0} items`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const regenerateBarcodesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/battery/migrations/regenerate-sequence-barcodes', {});
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      toast({
+        title: language === 'ar' ? 'تمت إعادة توليد الباركود' : 'Barcodes regenerated',
+        description: language === 'ar'
+          ? `تم تحديث ${result?.totalUpdated ?? 0} عنصر بالتسلسل، وتم تحديث SKU للمخزن: ${result?.inStoreSkuUpdated ?? 0}`
+          : `Updated ${result?.totalUpdated ?? 0} items in sequence, in-store SKU updated: ${result?.inStoreSkuUpdated ?? 0}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const syncWithInstoreBarcodesMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', '/api/battery/migrations/sync-barcodes-with-instore', {});
+      return res.json();
+    },
+    onSuccess: (result: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      toast({
+        title: language === 'ar' ? 'تمت مزامنة باركود المخزن' : 'In-store barcodes synced',
+        description: language === 'ar'
+          ? `تم تحديث ${result?.totalUpdated ?? 0} عنصر، غير مطابق: ${result?.unmatched ?? 0}`
+          : `Updated ${result?.totalUpdated ?? 0} items, unmatched: ${result?.unmatched ?? 0}`,
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: language === 'ar' ? 'خطأ' : 'Error',
+        description: error.message,
+        variant: 'destructive',
       });
     },
   });
@@ -298,7 +538,7 @@ export default function BatteryManage() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `battery-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `inventory-backup-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -395,6 +635,51 @@ export default function BatteryManage() {
     setShowAdapterForm(false);
   };
 
+  const resetKeyboardForm = () => {
+    setKeyboardFormData({
+      serialNumber: "",
+      partNumber: "",
+      brand: "",
+      layout: "",
+      keyboardType: "",
+      backlight: false,
+      stockQuantity: "0",
+      minStockLevel: "2",
+      purchasePrice: "",
+      sellingPrice: "",
+      wholesalePrice: "",
+      supplier: "",
+      location: "",
+      notes: "",
+    });
+    setEditingKeyboard(null);
+    setShowKeyboardForm(false);
+  };
+
+  const resetLcdForm = () => {
+    setLcdFormData({
+      serialNumber: "",
+      partNumber: "",
+      brand: "",
+      sizeInch: "",
+      brightnessNits: "",
+      refreshRateHz: "",
+      resolution: "",
+      connectorType: "",
+      panelType: "",
+      stockQuantity: "0",
+      minStockLevel: "2",
+      purchasePrice: "",
+      sellingPrice: "",
+      wholesalePrice: "",
+      supplier: "",
+      location: "",
+      notes: "",
+    });
+    setEditingLcd(null);
+    setShowLcdForm(false);
+  };
+
   const addLaptopModel = () => {
     if (formData.newLaptop.trim() && !formData.compatibleLaptops.includes(formData.newLaptop.trim())) {
       setFormData({
@@ -468,15 +753,13 @@ export default function BatteryManage() {
 
   const handleAdapterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-
-    // Use brand name as the identifier
-    const serialNumber = adapterFormData.brand;
+    const serialNumber = adapterFormData.serialNumber;
 
     const data = {
       serialNumber,
       partNumber: null,
       brand: adapterFormData.brand,
-      compatibleLaptops: [],
+      compatibleLaptops: adapterFormData.compatibleLaptops,
       inputVoltage: adapterFormData.inputVoltage || null,
       outputVoltage: adapterFormData.outputVoltage ? parseFloat(adapterFormData.outputVoltage) : null,
       amperage: adapterFormData.amperage ? parseFloat(adapterFormData.amperage) : null,
@@ -528,9 +811,109 @@ export default function BatteryManage() {
     setShowAdapterForm(true);
   };
 
+  const handleKeyboardSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = {
+      serialNumber: keyboardFormData.serialNumber,
+      partNumber: keyboardFormData.partNumber || null,
+      brand: keyboardFormData.brand,
+      layout: keyboardFormData.layout || null,
+      keyboardType: keyboardFormData.keyboardType || null,
+      backlight: keyboardFormData.backlight ? 1 : 0,
+      stockQuantity: parseInt(keyboardFormData.stockQuantity) || 0,
+      minStockLevel: parseInt(keyboardFormData.minStockLevel) || 2,
+      purchasePrice: keyboardFormData.purchasePrice || null,
+      sellingPrice: keyboardFormData.sellingPrice || null,
+      wholesalePrice: keyboardFormData.wholesalePrice || null,
+      supplier: keyboardFormData.supplier || null,
+      location: keyboardFormData.location || null,
+      notes: keyboardFormData.notes || null,
+    };
+
+    if (editingKeyboard) {
+      updateKeyboardMutation.mutate({ id: editingKeyboard.id, data });
+    } else {
+      createKeyboardMutation.mutate(data);
+    }
+  };
+
+  const editKeyboard = (keyboard: KeyboardItem) => {
+    setEditingKeyboard(keyboard);
+    setKeyboardFormData({
+      serialNumber: keyboard.serialNumber,
+      partNumber: keyboard.partNumber || "",
+      brand: keyboard.brand,
+      layout: keyboard.layout || "",
+      keyboardType: keyboard.keyboardType || "",
+      backlight: !!keyboard.backlight,
+      stockQuantity: (keyboard.stockQuantity || 0).toString(),
+      minStockLevel: (keyboard.minStockLevel || 2).toString(),
+      purchasePrice: keyboard.purchasePrice ? String(parseFloat(keyboard.purchasePrice)) : "",
+      sellingPrice: keyboard.sellingPrice ? String(parseFloat(keyboard.sellingPrice)) : "",
+      wholesalePrice: keyboard.wholesalePrice ? String(parseFloat(keyboard.wholesalePrice)) : "",
+      supplier: keyboard.supplier || "",
+      location: keyboard.location || "",
+      notes: keyboard.notes || "",
+    });
+    setShowKeyboardForm(true);
+  };
+
+  const handleLcdSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const data = {
+      serialNumber: lcdFormData.serialNumber,
+      partNumber: lcdFormData.partNumber || null,
+      brand: lcdFormData.brand,
+      sizeInch: lcdFormData.sizeInch ? parseFloat(lcdFormData.sizeInch) : null,
+      brightnessNits: lcdFormData.brightnessNits ? parseInt(lcdFormData.brightnessNits) : null,
+      refreshRateHz: lcdFormData.refreshRateHz ? parseInt(lcdFormData.refreshRateHz) : null,
+      resolution: lcdFormData.resolution || null,
+      connectorType: lcdFormData.connectorType || null,
+      panelType: lcdFormData.panelType || null,
+      stockQuantity: parseInt(lcdFormData.stockQuantity) || 0,
+      minStockLevel: parseInt(lcdFormData.minStockLevel) || 2,
+      purchasePrice: lcdFormData.purchasePrice || null,
+      sellingPrice: lcdFormData.sellingPrice || null,
+      wholesalePrice: lcdFormData.wholesalePrice || null,
+      supplier: lcdFormData.supplier || null,
+      location: lcdFormData.location || null,
+      notes: lcdFormData.notes || null,
+    };
+
+    if (editingLcd) {
+      updateLcdMutation.mutate({ id: editingLcd.id, data });
+    } else {
+      createLcdMutation.mutate(data);
+    }
+  };
+
+  const editLcd = (lcd: LcdItem) => {
+    setEditingLcd(lcd);
+    setLcdFormData({
+      serialNumber: lcd.serialNumber,
+      partNumber: lcd.partNumber || "",
+      brand: lcd.brand,
+      sizeInch: lcd.sizeInch ? String(parseFloat(lcd.sizeInch)) : "",
+      brightnessNits: lcd.brightnessNits?.toString() || "",
+      refreshRateHz: lcd.refreshRateHz?.toString() || "",
+      resolution: lcd.resolution || "",
+      connectorType: lcd.connectorType || "",
+      panelType: lcd.panelType || "",
+      stockQuantity: (lcd.stockQuantity || 0).toString(),
+      minStockLevel: (lcd.minStockLevel || 2).toString(),
+      purchasePrice: lcd.purchasePrice ? String(parseFloat(lcd.purchasePrice)) : "",
+      sellingPrice: lcd.sellingPrice ? String(parseFloat(lcd.sellingPrice)) : "",
+      wholesalePrice: lcd.wholesalePrice ? String(parseFloat(lcd.wholesalePrice)) : "",
+      supplier: lcd.supplier || "",
+      location: lcd.location || "",
+      notes: lcd.notes || "",
+    });
+    setShowLcdForm(true);
+  };
+
   const printAdapterBarcode = async (adapter: AcAdapter, e: React.MouseEvent) => {
     e.stopPropagation();
-    const qrValue = adapter.brand;
+    const qrValue = adapter.barcode || adapter.serialNumber;
     const rawPrice = adapter.sellingPrice ? parseFloat(adapter.sellingPrice) : 0;
     const price = rawPrice ? Math.floor(rawPrice).toString() : '';
     const wattage = adapter.wattage ? `${adapter.wattage}W` : '';
@@ -558,8 +941,131 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 <body>
 <img class="qr" src="${qrDataURL}" width="60" height="60" />
 <div class="info">
-<div class="title">${adapter.brand}</div>
+<div class="title">${qrValue}</div>
 <div class="wattage">${wattage}</div>
+<div class="price">${price}</div>
+</div>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
+</body>
+</html>`);
+      printWindow.document.close();
+    }
+  };
+
+  const printBatteryBarcode = async (battery: LaptopBattery, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const qrValue = battery.barcode || battery.serialNumber;
+    const rawPrice = battery.sellingPrice ? parseFloat(battery.sellingPrice) : 0;
+    const price = rawPrice ? Math.floor(rawPrice).toString() : '';
+
+    const { toDataURL } = await import('qrcode');
+    const qrDataURL = await toDataURL(qrValue, { width: 70, margin: 0 });
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>Print Label</title>
+<style>
+@page{size:50mm 25mm;margin:0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
+.info{display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.title{font-size:8pt;font-weight:900;letter-spacing:0.5px}
+.serial{font-size:7pt;font-weight:700;margin-top:1mm;letter-spacing:0.3px}
+.price{font-size:10pt;font-weight:900;margin-top:1mm}
+.qr{display:block}
+</style>
+</head>
+<body>
+<img class="qr" src="${qrDataURL}" width="60" height="60" />
+<div class="info">
+<div class="title">${battery.brand}</div>
+<div class="serial">${battery.serialNumber}</div>
+<div class="price">${price}</div>
+</div>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
+</body>
+</html>`);
+      printWindow.document.close();
+    }
+  };
+
+  const printKeyboardBarcode = async (keyboard: KeyboardItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const qrValue = keyboard.barcode || keyboard.serialNumber;
+    const rawPrice = keyboard.sellingPrice ? parseFloat(keyboard.sellingPrice) : 0;
+    const price = rawPrice ? Math.floor(rawPrice).toString() : '';
+
+    const { toDataURL } = await import('qrcode');
+    const qrDataURL = await toDataURL(qrValue, { width: 70, margin: 0 });
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>Print Label</title>
+<style>
+@page{size:50mm 25mm;margin:0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
+.info{display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.title{font-size:8pt;font-weight:900;letter-spacing:0.5px}
+.serial{font-size:7pt;font-weight:700;margin-top:1mm;letter-spacing:0.3px}
+.price{font-size:10pt;font-weight:900;margin-top:1mm}
+.qr{display:block}
+</style>
+</head>
+<body>
+<img class="qr" src="${qrDataURL}" width="60" height="60" />
+<div class="info">
+<div class="title">${keyboard.brand}</div>
+<div class="serial">${keyboard.serialNumber}</div>
+<div class="price">${price}</div>
+</div>
+<script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
+</body>
+</html>`);
+      printWindow.document.close();
+    }
+  };
+
+  const printLcdBarcode = async (lcd: LcdItem, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const qrValue = lcd.barcode || lcd.serialNumber;
+    const rawPrice = lcd.sellingPrice ? parseFloat(lcd.sellingPrice) : 0;
+    const price = rawPrice ? Math.floor(rawPrice).toString() : '';
+    const specLine = `${lcd.sizeInch ? `${lcd.sizeInch}" ` : ''}${lcd.refreshRateHz ? `• ${lcd.refreshRateHz}Hz ` : ''}${lcd.brightnessNits ? `• ${lcd.brightnessNits}nits` : ''}`.trim();
+
+    const { toDataURL } = await import('qrcode');
+    const qrDataURL = await toDataURL(qrValue, { width: 70, margin: 0 });
+
+    const printWindow = window.open('', '_blank');
+    if (printWindow) {
+      printWindow.document.write(`<!DOCTYPE html>
+<html>
+<head>
+<title>Print Label</title>
+<style>
+@page{size:50mm 25mm;margin:0}
+*{margin:0;padding:0;box-sizing:border-box}
+body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;justify-content:center;font-family:'Segoe UI',Tahoma,Arial,sans-serif;background:#fff;gap:2mm;padding:1mm}
+.info{display:flex;flex-direction:column;align-items:flex-start;justify-content:center}
+.title{font-size:8pt;font-weight:900;letter-spacing:0.5px}
+.serial{font-size:7pt;font-weight:700;margin-top:1mm;letter-spacing:0.3px}
+.specs{font-size:6.5pt;font-weight:700;margin-top:0.6mm;letter-spacing:0.2px;color:#444}
+.price{font-size:10pt;font-weight:900;margin-top:1mm}
+.qr{display:block}
+</style>
+</head>
+<body>
+<img class="qr" src="${qrDataURL}" width="60" height="60" />
+<div class="info">
+<div class="title">${lcd.brand}</div>
+<div class="serial">${lcd.serialNumber}</div>
+<div class="specs">${specLine || (lcd.resolution || '')}</div>
 <div class="price">${price}</div>
 </div>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
@@ -609,6 +1115,20 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   };
 
   const lowStockAdaptersCount = adapters.filter(a => (a.stockQuantity || 0) <= (a.minStockLevel || 2)).length;
+  const filteredKeyboards = keyboards.filter(k => {
+    if (showKeyboardLowStockOnly && (k.stockQuantity || 0) > (k.minStockLevel || 2)) return false;
+    if (!keyboardSearchQuery.trim()) return true;
+    const q = keyboardSearchQuery.toLowerCase();
+    return k.serialNumber.toLowerCase().includes(q) || k.brand.toLowerCase().includes(q) || (k.partNumber || '').toLowerCase().includes(q) || (k.keyboardType || '').toLowerCase().includes(q) || (k.layout || '').toLowerCase().includes(q);
+  });
+  const lowStockKeyboardsCount = keyboards.filter(k => (k.stockQuantity || 0) <= (k.minStockLevel || 2)).length;
+  const filteredLcds = lcds.filter(l => {
+    if (showLcdLowStockOnly && (l.stockQuantity || 0) > (l.minStockLevel || 2)) return false;
+    if (!lcdSearchQuery.trim()) return true;
+    const q = lcdSearchQuery.toLowerCase();
+    return l.serialNumber.toLowerCase().includes(q) || l.brand.toLowerCase().includes(q) || (l.partNumber || '').toLowerCase().includes(q) || (l.resolution || '').toLowerCase().includes(q) || (l.connectorType || '').toLowerCase().includes(q) || (l.brightnessNits?.toString() || '').includes(q) || (l.refreshRateHz?.toString() || '').includes(q);
+  });
+  const lowStockLcdCount = lcds.filter(l => (l.stockQuantity || 0) <= (l.minStockLevel || 2)).length;
 
   return (
     <div className="min-h-screen bg-muted/30" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -641,12 +1161,51 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             <Languages className="h-4 w-4" />
             {language === 'ar' ? 'EN' : 'عربي'}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncBarcodesMutation.mutate()}
+            disabled={syncBarcodesMutation.isPending}
+            className="border-white/50 text-white hover:bg-green-700"
+            data-testid="button-sync-barcodes-serial"
+          >
+            {syncBarcodesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 me-2 animate-spin" />
+            ) : null}
+            {language === 'ar' ? 'مزامنة الباركود' : 'Sync Barcodes'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => regenerateBarcodesMutation.mutate()}
+            disabled={regenerateBarcodesMutation.isPending}
+            className="border-white/50 text-white hover:bg-green-700"
+            data-testid="button-regenerate-sequence-barcodes"
+          >
+            {regenerateBarcodesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 me-2 animate-spin" />
+            ) : null}
+            {language === 'ar' ? 'توليد باركود تسلسلي' : 'Regenerate Sequence'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => syncWithInstoreBarcodesMutation.mutate()}
+            disabled={syncWithInstoreBarcodesMutation.isPending}
+            className="border-white/50 text-white hover:bg-green-700"
+            data-testid="button-sync-barcodes-instore"
+          >
+            {syncWithInstoreBarcodesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 me-2 animate-spin" />
+            ) : null}
+            {language === 'ar' ? 'مزامنة باركود المخزن' : 'Sync In-Store Barcode'}
+          </Button>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto p-4 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-2" data-testid="tabs-list">
+          <TabsList className="grid w-full grid-cols-4" data-testid="tabs-list">
             <TabsTrigger value="batteries" data-testid="tab-batteries" className="gap-2">
               <Battery className="h-4 w-4" />
               {language === 'ar' ? 'البطاريات' : 'Batteries'}
@@ -654,6 +1213,14 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             <TabsTrigger value="adapters" data-testid="tab-adapters" className="gap-2">
               <Plug className="h-4 w-4" />
               {language === 'ar' ? 'الشواحن' : 'AC Adapters'}
+            </TabsTrigger>
+            <TabsTrigger value="keyboards" data-testid="tab-keyboards" className="gap-2">
+              <KeyboardIcon className="h-4 w-4" />
+              {language === 'ar' ? 'كيبورد' : 'Keyboards'}
+            </TabsTrigger>
+            <TabsTrigger value="lcds" data-testid="tab-lcds" className="gap-2">
+              <Monitor className="h-4 w-4" />
+              {language === 'ar' ? 'LCD' : 'LCDs'}
             </TabsTrigger>
           </TabsList>
 
@@ -885,6 +1452,15 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                     {language === 'ar' ? 'مخزون' : 'stock'}
                                   </p>
                                 </div>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={(e) => printBatteryBarcode(battery, e)}
+                                  data-testid={`button-print-battery-${battery.id}`}
+                                  title={language === 'ar' ? 'طباعة QR' : 'Print QR'}
+                                >
+                                  <Printer className="h-4 w-4" />
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -1315,15 +1891,26 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 </CardHeader>
                 <CardContent>
                   <form onSubmit={handleAdapterSubmit} className="space-y-6">
-                    <div className="space-y-2">
-                      <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
-                      <Input
-                        value={adapterFormData.brand}
-                        onChange={(e) => setAdapterFormData({ ...adapterFormData, brand: e.target.value })}
-                        placeholder="Dell / HP / Lenovo / Universal"
-                        required
-                        data-testid="input-adapter-brand"
-                      />
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{language === 'ar' ? 'الرقم التسلسلي (تلقائي إذا فارغ)' : 'Serial Number (auto if empty)'}</Label>
+                        <Input
+                          value={adapterFormData.serialNumber}
+                          onChange={(e) => setAdapterFormData({ ...adapterFormData, serialNumber: e.target.value })}
+                          placeholder="ADP-0001"
+                          data-testid="input-adapter-serial-number"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
+                        <Input
+                          value={adapterFormData.brand}
+                          onChange={(e) => setAdapterFormData({ ...adapterFormData, brand: e.target.value })}
+                          placeholder="Dell / HP / Lenovo / Universal"
+                          required
+                          data-testid="input-adapter-brand"
+                        />
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1487,6 +2074,277 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
               </Card>
             )}
           </TabsContent>
+
+          <TabsContent value="keyboards" data-testid="content-keyboards">
+            {!showKeyboardForm ? (
+              <>
+                <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+                  <Button onClick={() => setShowKeyboardForm(true)} className="bg-green-600 hover:bg-green-700" data-testid="button-new-keyboard">
+                    <Plus className="h-4 w-4 me-2" />
+                    {language === 'ar' ? 'إضافة كيبورد جديد' : 'Add New Keyboard'}
+                  </Button>
+                  <Button onClick={handleBackup} variant="outline" disabled={isBackingUp} data-testid="button-backup-keyboards">
+                    {isBackingUp ? <Loader2 className="h-4 w-4 me-2 animate-spin" /> : <Download className="h-4 w-4 me-2" />}
+                    {language === 'ar' ? 'نسخ احتياطي' : 'Backup'}
+                  </Button>
+                  <div className="relative">
+                    <input type="file" accept=".json" onChange={handleRestoreFile} className="absolute inset-0 opacity-0 cursor-pointer" data-testid="input-restore-file-keyboards" />
+                    <Button variant="outline" data-testid="button-restore-keyboards">
+                      <Upload className="h-4 w-4 me-2" />
+                      {language === 'ar' ? 'استعادة' : 'Restore'}
+                    </Button>
+                  </div>
+                  {lowStockKeyboardsCount > 0 && (
+                    <Button variant={showKeyboardLowStockOnly ? "destructive" : "outline"} onClick={() => setShowKeyboardLowStockOnly(v => !v)} className="gap-2" data-testid="button-keyboard-low-stock-filter">
+                      <AlertTriangle className="h-4 w-4" />
+                      {language === 'ar' ? 'نقص المخزون' : 'Low Stock'}
+                      <Badge variant="secondary" className={showKeyboardLowStockOnly ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}>{lowStockKeyboardsCount}</Badge>
+                    </Button>
+                  )}
+                </div>
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                      <CardTitle>{language === 'ar' ? 'جميع الكيبوردات' : 'All Keyboards'}</CardTitle>
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input value={keyboardSearchQuery} onChange={(e) => setKeyboardSearchQuery(e.target.value)} placeholder={language === 'ar' ? 'بحث...' : 'Search...'} className="ps-9" data-testid="input-search-keyboards" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {keyboardsLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    ) : filteredKeyboards.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">{language === 'ar' ? 'لا توجد كيبوردات مضافة' : 'No keyboards added'}</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredKeyboards.map((k) => (
+                          <div key={k.id} className="flex items-center justify-between p-3 border rounded-lg hover-elevate" data-testid={`row-keyboard-${k.id}`}>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold">{k.brand}</p>
+                                {k.keyboardType && <Badge variant="outline" className="text-xs">{k.keyboardType}</Badge>}
+                                {k.backlight ? <Badge variant="secondary" className="text-xs">{language === 'ar' ? 'مضئ' : 'Backlit'}</Badge> : null}
+                              </div>
+                              <p className="text-sm text-muted-foreground">{k.serialNumber}</p>
+                              <p className="text-xs text-muted-foreground">{k.layout || '-'}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-end me-4">
+                                <p className={`font-bold ${(k.stockQuantity || 0) <= (k.minStockLevel || 2) ? 'text-red-600' : ''}`}>{k.stockQuantity || 0}</p>
+                                <p className="text-xs text-muted-foreground">{language === 'ar' ? 'مخزون' : 'stock'}</p>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={() => editKeyboard(k)} data-testid={`button-edit-keyboard-${k.id}`}>{language === 'ar' ? 'تعديل' : 'Edit'}</Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={(e) => printKeyboardBarcode(k, e)}
+                                data-testid={`button-print-keyboard-${k.id}`}
+                                title={language === 'ar' ? 'طباعة QR' : 'Print QR'}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                              <Button variant="destructive" size="icon" onClick={() => setKeyboardDeleteConfirm(k.id)} data-testid={`button-delete-keyboard-${k.id}`}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{editingKeyboard ? (language === 'ar' ? 'تعديل الكيبورد' : 'Edit Keyboard') : (language === 'ar' ? 'إضافة كيبورد جديد' : 'Add New Keyboard')}</span>
+                    <Button variant="ghost" size="icon" onClick={resetKeyboardForm} data-testid="button-close-keyboard-form">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleKeyboardSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الرقم التسلسلي (تلقائي إذا فارغ)' : 'Serial Number (auto if empty)'}</Label><Input value={keyboardFormData.serialNumber} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, serialNumber: e.target.value })} placeholder="KBD-0001" data-testid="input-keyboard-serial" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label><Input value={keyboardFormData.brand} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, brand: e.target.value })} required data-testid="input-keyboard-brand" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label><Input value={keyboardFormData.partNumber} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, partNumber: e.target.value })} data-testid="input-keyboard-part-number" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'التخطيط' : 'Layout'}</Label><Input value={keyboardFormData.layout} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, layout: e.target.value })} placeholder="US / UK / AR" data-testid="input-keyboard-layout" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'النوع' : 'Type'}</Label><Input value={keyboardFormData.keyboardType} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, keyboardType: e.target.value })} placeholder="Built-in / External" data-testid="input-keyboard-type" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الكمية' : 'Stock Quantity'}</Label><Input type="number" value={keyboardFormData.stockQuantity} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, stockQuantity: e.target.value })} data-testid="input-keyboard-stock" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الحد الأدنى' : 'Min Stock Level'}</Label><Input type="number" value={keyboardFormData.minStockLevel} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, minStockLevel: e.target.value })} data-testid="input-keyboard-min-stock" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'سعر الشراء' : 'Purchase Price'}</Label><Input type="number" value={keyboardFormData.purchasePrice} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, purchasePrice: e.target.value })} data-testid="input-keyboard-purchase-price" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'سعر الجملة' : 'Wholesale Price'}</Label><Input type="number" value={keyboardFormData.wholesalePrice} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, wholesalePrice: e.target.value })} data-testid="input-keyboard-wholesale-price" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</Label><Input type="number" value={keyboardFormData.sellingPrice} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, sellingPrice: e.target.value })} data-testid="input-keyboard-selling-price" /></div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <input id="keyboard-backlight" type="checkbox" checked={keyboardFormData.backlight} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, backlight: e.target.checked })} />
+                      <Label htmlFor="keyboard-backlight">{language === 'ar' ? 'إضاءة خلفية' : 'Backlight'}</Label>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'المورد' : 'Supplier'}</Label><Input value={keyboardFormData.supplier} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, supplier: e.target.value })} data-testid="input-keyboard-supplier" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الموقع' : 'Location'}</Label><Input value={keyboardFormData.location} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, location: e.target.value })} data-testid="input-keyboard-location" /></div>
+                    </div>
+                    <div className="space-y-2"><Label>{language === 'ar' ? 'ملاحظات' : 'Notes'}</Label><Textarea rows={3} value={keyboardFormData.notes} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, notes: e.target.value })} data-testid="input-keyboard-notes" /></div>
+                    <div className="flex gap-2 justify-end">
+                      <Button type="button" variant="outline" onClick={resetKeyboardForm} data-testid="button-cancel-keyboard">{language === 'ar' ? 'إلغاء' : 'Cancel'}</Button>
+                      <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={createKeyboardMutation.isPending || updateKeyboardMutation.isPending} data-testid="button-save-keyboard">
+                        {(createKeyboardMutation.isPending || updateKeyboardMutation.isPending) ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : <Save className="h-4 w-4 me-2" />}
+                        {language === 'ar' ? 'حفظ' : 'Save'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          <TabsContent value="lcds" data-testid="content-lcds">
+            {!showLcdForm ? (
+              <>
+                <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+                  <Button onClick={() => setShowLcdForm(true)} className="bg-green-600 hover:bg-green-700" data-testid="button-new-lcd">
+                    <Plus className="h-4 w-4 me-2" />
+                    {language === 'ar' ? 'إضافة شاشة LCD جديدة' : 'Add New LCD'}
+                  </Button>
+                  <Button onClick={handleBackup} variant="outline" disabled={isBackingUp} data-testid="button-backup-lcds">
+                    {isBackingUp ? <Loader2 className="h-4 w-4 me-2 animate-spin" /> : <Download className="h-4 w-4 me-2" />}
+                    {language === 'ar' ? 'نسخ احتياطي' : 'Backup'}
+                  </Button>
+                  <div className="relative">
+                    <input type="file" accept=".json" onChange={handleRestoreFile} className="absolute inset-0 opacity-0 cursor-pointer" data-testid="input-restore-file-lcds" />
+                    <Button variant="outline" data-testid="button-restore-lcds">
+                      <Upload className="h-4 w-4 me-2" />
+                      {language === 'ar' ? 'استعادة' : 'Restore'}
+                    </Button>
+                  </div>
+                  {lowStockLcdCount > 0 && (
+                    <Button variant={showLcdLowStockOnly ? "destructive" : "outline"} onClick={() => setShowLcdLowStockOnly(v => !v)} className="gap-2" data-testid="button-lcd-low-stock-filter">
+                      <AlertTriangle className="h-4 w-4" />
+                      {language === 'ar' ? 'نقص المخزون' : 'Low Stock'}
+                      <Badge variant="secondary" className={showLcdLowStockOnly ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}>{lowStockLcdCount}</Badge>
+                    </Button>
+                  )}
+                </div>
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                      <CardTitle>{language === 'ar' ? 'جميع شاشات LCD' : 'All LCDs'}</CardTitle>
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input value={lcdSearchQuery} onChange={(e) => setLcdSearchQuery(e.target.value)} placeholder={language === 'ar' ? 'بحث...' : 'Search...'} className="ps-9" data-testid="input-search-lcds" />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {lcdsLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="h-8 w-8 animate-spin" /></div>
+                    ) : filteredLcds.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-8">{language === 'ar' ? 'لا توجد شاشات LCD مضافة' : 'No LCDs added'}</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {filteredLcds.map((l) => (
+                          <div key={l.id} className="flex items-center justify-between p-3 border rounded-lg hover-elevate" data-testid={`row-lcd-${l.id}`}>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="font-bold">{l.brand}</p>
+                                {l.sizeInch ? <Badge variant="outline" className="text-xs">{`${l.sizeInch}"`}</Badge> : null}
+                                {l.resolution ? <Badge variant="secondary" className="text-xs">{l.resolution}</Badge> : null}
+                                {l.refreshRateHz ? <Badge variant="secondary" className="text-xs">{`${l.refreshRateHz}Hz`}</Badge> : null}
+                              </div>
+                              <p className="text-sm text-muted-foreground">{l.serialNumber}</p>
+                              <p className="text-xs text-muted-foreground">{`${l.connectorType || '-'}${l.brightnessNits ? ` • ${l.brightnessNits} nits` : ''}`}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div className="text-end me-4">
+                                <p className={`font-bold ${(l.stockQuantity || 0) <= (l.minStockLevel || 2) ? 'text-red-600' : ''}`}>{l.stockQuantity || 0}</p>
+                                <p className="text-xs text-muted-foreground">{language === 'ar' ? 'مخزون' : 'stock'}</p>
+                              </div>
+                              <Button variant="outline" size="sm" onClick={() => editLcd(l)} data-testid={`button-edit-lcd-${l.id}`}>{language === 'ar' ? 'تعديل' : 'Edit'}</Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={(e) => printLcdBarcode(l, e)}
+                                data-testid={`button-print-lcd-${l.id}`}
+                                title={language === 'ar' ? 'طباعة QR' : 'Print QR'}
+                              >
+                                <Printer className="h-4 w-4" />
+                              </Button>
+                              <Button variant="destructive" size="icon" onClick={() => setLcdDeleteConfirm(l.id)} data-testid={`button-delete-lcd-${l.id}`}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center justify-between">
+                    <span>{editingLcd ? (language === 'ar' ? 'تعديل شاشة LCD' : 'Edit LCD') : (language === 'ar' ? 'إضافة شاشة LCD جديدة' : 'Add New LCD')}</span>
+                    <Button variant="ghost" size="icon" onClick={resetLcdForm} data-testid="button-close-lcd-form">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleLcdSubmit} className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الرقم التسلسلي (تلقائي إذا فارغ)' : 'Serial Number (auto if empty)'}</Label><Input value={lcdFormData.serialNumber} onChange={(e) => setLcdFormData({ ...lcdFormData, serialNumber: e.target.value })} placeholder="LCD-0001" data-testid="input-lcd-serial" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label><Input value={lcdFormData.brand} onChange={(e) => setLcdFormData({ ...lcdFormData, brand: e.target.value })} required data-testid="input-lcd-brand" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label><Input value={lcdFormData.partNumber} onChange={(e) => setLcdFormData({ ...lcdFormData, partNumber: e.target.value })} data-testid="input-lcd-part-number" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الحجم (إنش)' : 'Size (inch)'}</Label><Input type="number" step="0.1" value={lcdFormData.sizeInch} onChange={(e) => setLcdFormData({ ...lcdFormData, sizeInch: e.target.value })} data-testid="input-lcd-size-inch" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الدقة' : 'Resolution'}</Label><Input value={lcdFormData.resolution} onChange={(e) => setLcdFormData({ ...lcdFormData, resolution: e.target.value })} placeholder="1920x1080" data-testid="input-lcd-resolution" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'السطوع (Nits)' : 'Brightness (Nits)'}</Label><Input type="number" value={lcdFormData.brightnessNits} onChange={(e) => setLcdFormData({ ...lcdFormData, brightnessNits: e.target.value })} placeholder="300" data-testid="input-lcd-brightness-nits" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'معدل التحديث (Hz)' : 'Refresh Rate (Hz)'}</Label><Input type="number" value={lcdFormData.refreshRateHz} onChange={(e) => setLcdFormData({ ...lcdFormData, refreshRateHz: e.target.value })} placeholder="60" data-testid="input-lcd-refresh-rate-hz" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'نوع الموصل' : 'Connector Type'}</Label><Input value={lcdFormData.connectorType} onChange={(e) => setLcdFormData({ ...lcdFormData, connectorType: e.target.value })} placeholder="eDP 30-pin" data-testid="input-lcd-connector-type" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'نوع اللوحة' : 'Panel Type'}</Label><Input value={lcdFormData.panelType} onChange={(e) => setLcdFormData({ ...lcdFormData, panelType: e.target.value })} placeholder="IPS / TN / OLED" data-testid="input-lcd-panel-type" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الكمية' : 'Stock Quantity'}</Label><Input type="number" value={lcdFormData.stockQuantity} onChange={(e) => setLcdFormData({ ...lcdFormData, stockQuantity: e.target.value })} data-testid="input-lcd-stock" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الحد الأدنى' : 'Min Stock Level'}</Label><Input type="number" value={lcdFormData.minStockLevel} onChange={(e) => setLcdFormData({ ...lcdFormData, minStockLevel: e.target.value })} data-testid="input-lcd-min-stock" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'سعر الشراء' : 'Purchase Price'}</Label><Input type="number" value={lcdFormData.purchasePrice} onChange={(e) => setLcdFormData({ ...lcdFormData, purchasePrice: e.target.value })} data-testid="input-lcd-purchase-price" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'سعر الجملة' : 'Wholesale Price'}</Label><Input type="number" value={lcdFormData.wholesalePrice} onChange={(e) => setLcdFormData({ ...lcdFormData, wholesalePrice: e.target.value })} data-testid="input-lcd-wholesale-price" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</Label><Input type="number" value={lcdFormData.sellingPrice} onChange={(e) => setLcdFormData({ ...lcdFormData, sellingPrice: e.target.value })} data-testid="input-lcd-selling-price" /></div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'المورد' : 'Supplier'}</Label><Input value={lcdFormData.supplier} onChange={(e) => setLcdFormData({ ...lcdFormData, supplier: e.target.value })} data-testid="input-lcd-supplier" /></div>
+                      <div className="space-y-2"><Label>{language === 'ar' ? 'الموقع' : 'Location'}</Label><Input value={lcdFormData.location} onChange={(e) => setLcdFormData({ ...lcdFormData, location: e.target.value })} data-testid="input-lcd-location" /></div>
+                    </div>
+                    <div className="space-y-2"><Label>{language === 'ar' ? 'ملاحظات' : 'Notes'}</Label><Textarea rows={3} value={lcdFormData.notes} onChange={(e) => setLcdFormData({ ...lcdFormData, notes: e.target.value })} data-testid="input-lcd-notes" /></div>
+                    <div className="flex gap-2 justify-end">
+                      <Button type="button" variant="outline" onClick={resetLcdForm} data-testid="button-cancel-lcd">{language === 'ar' ? 'إلغاء' : 'Cancel'}</Button>
+                      <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={createLcdMutation.isPending || updateLcdMutation.isPending} data-testid="button-save-lcd">
+                        {(createLcdMutation.isPending || updateLcdMutation.isPending) ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : <Save className="h-4 w-4 me-2" />}
+                        {language === 'ar' ? 'حفظ' : 'Save'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
         </Tabs>
       </main>
 
@@ -1552,6 +2410,68 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
         </DialogContent>
       </Dialog>
 
+      {/* Keyboard Delete Confirmation Dialog */}
+      <Dialog open={!!keyboardDeleteConfirm} onOpenChange={() => setKeyboardDeleteConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}
+            </DialogTitle>
+          </DialogHeader>
+          <p>
+            {language === 'ar'
+              ? 'هل أنت متأكد من حذف هذا الكيبورد؟'
+              : 'Are you sure you want to delete this keyboard?'
+            }
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setKeyboardDeleteConfirm(null)} data-testid="button-cancel-delete-keyboard">
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => keyboardDeleteConfirm && deleteKeyboardMutation.mutate(keyboardDeleteConfirm)}
+              disabled={deleteKeyboardMutation.isPending}
+              data-testid="button-confirm-delete-keyboard"
+            >
+              {deleteKeyboardMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+              {language === 'ar' ? 'حذف' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* LCD Delete Confirmation Dialog */}
+      <Dialog open={!!lcdDeleteConfirm} onOpenChange={() => setLcdDeleteConfirm(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}
+            </DialogTitle>
+          </DialogHeader>
+          <p>
+            {language === 'ar'
+              ? 'هل أنت متأكد من حذف شاشة LCD هذه؟'
+              : 'Are you sure you want to delete this LCD?'
+            }
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLcdDeleteConfirm(null)} data-testid="button-cancel-delete-lcd">
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => lcdDeleteConfirm && deleteLcdMutation.mutate(lcdDeleteConfirm)}
+              disabled={deleteLcdMutation.isPending}
+              data-testid="button-confirm-delete-lcd"
+            >
+              {deleteLcdMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+              {language === 'ar' ? 'حذف' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Restore Confirmation Dialog */}
       <AlertDialog open={showRestoreDialog} onOpenChange={setShowRestoreDialog}>
         <AlertDialogContent className={language === 'ar' ? 'rtl' : ''}>
@@ -1562,8 +2482,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             </AlertDialogTitle>
             <AlertDialogDescription>
               {language === 'ar' 
-                ? `سيتم استعادة البيانات من الملف "${restoreFile?.name}". البطاريات الموجودة بنفس الرقم التسلسلي سيتم تحديثها، والجديدة ستضاف.`
-                : `Data will be restored from "${restoreFile?.name}". Existing batteries with the same serial number will be updated, new ones will be added.`
+                ? `سيتم استعادة البيانات من الملف "${restoreFile?.name}". العناصر الموجودة بنفس الرقم التسلسلي سيتم تحديثها، والجديدة ستضاف.`
+                : `Data will be restored from "${restoreFile?.name}". Existing items with the same serial number will be updated, new ones will be added.`
               }
             </AlertDialogDescription>
           </AlertDialogHeader>

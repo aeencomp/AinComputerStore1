@@ -47,16 +47,20 @@ import {
   Package,
   ChevronLeft,
   Plug,
+  Keyboard,
+  Monitor,
   Languages,
   Clock
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { LaptopBattery, AcAdapter } from "@shared/schema";
+import type { LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 
 interface CartItem {
-  productType: 'battery' | 'adapter';
+  productType: 'battery' | 'adapter' | 'keyboard' | 'lcd';
   battery?: LaptopBattery;
   adapter?: AcAdapter;
+  keyboard?: KeyboardItem;
+  lcd?: LcdItem;
   quantity: number;
   priceType: 'purchase' | 'wholesale' | 'selling';
   unitPrice: number;
@@ -96,7 +100,7 @@ export default function BatteryPOS() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  const [productType, setProductType] = useState<'battery' | 'adapter'>('battery');
+  const [productType, setProductType] = useState<'battery' | 'adapter' | 'keyboard' | 'lcd'>('battery');
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
@@ -130,6 +134,16 @@ export default function BatteryPOS() {
     enabled: !!currentUser,
   });
 
+  const { data: keyboards = [], isLoading: keyboardsLoading } = useQuery<KeyboardItem[]>({
+    queryKey: ['/api/battery/keyboards'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lcds = [], isLoading: lcdsLoading } = useQuery<LcdItem[]>({
+    queryKey: ['/api/battery/lcds'],
+    enabled: !!currentUser,
+  });
+
   const { data: searchResults = [], isLoading: searchLoading } = useQuery<LaptopBattery[]>({
     queryKey: ['/api/battery/batteries/search', searchQuery],
     queryFn: async () => {
@@ -150,6 +164,28 @@ export default function BatteryPOS() {
       return res.json();
     },
     enabled: !!currentUser && searchQuery.length > 0 && productType === 'adapter',
+  });
+
+  const { data: keyboardSearchResults = [], isLoading: keyboardSearchLoading } = useQuery<KeyboardItem[]>({
+    queryKey: ['/api/battery/keyboards/search', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/battery/keyboards/search?q=${encodeURIComponent(searchQuery)}&type=all`);
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
+    enabled: !!currentUser && searchQuery.length > 0 && productType === 'keyboard',
+  });
+
+  const { data: lcdSearchResults = [], isLoading: lcdSearchLoading } = useQuery<LcdItem[]>({
+    queryKey: ['/api/battery/lcds/search', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/battery/lcds/search?q=${encodeURIComponent(searchQuery)}&type=all`);
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
+    enabled: !!currentUser && searchQuery.length > 0 && productType === 'lcd',
   });
 
   const createSaleMutation = useMutation({
@@ -183,6 +219,8 @@ export default function BatteryPOS() {
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
     },
     onError: (error: any) => {
       toast({
@@ -195,6 +233,8 @@ export default function BatteryPOS() {
 
   const displayBatteries = searchQuery.trim() ? searchResults : batteries.filter(b => b.stockQuantity > 0).slice(0, 20);
   const displayAdapters = searchQuery.trim() ? adapterSearchResults : adapters.filter(a => a.stockQuantity > 0).slice(0, 20);
+  const displayKeyboards = searchQuery.trim() ? keyboardSearchResults : keyboards.filter(k => k.stockQuantity > 0).slice(0, 20);
+  const displayLcds = searchQuery.trim() ? lcdSearchResults : lcds.filter(l => l.stockQuantity > 0).slice(0, 20);
 
   const addBatteryToCart = (battery: LaptopBattery, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
     if (battery.stockQuantity <= 0) {
@@ -288,14 +328,76 @@ export default function BatteryPOS() {
     }
   };
 
+  const addKeyboardToCart = (keyboard: KeyboardItem, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
+    if (keyboard.stockQuantity <= 0) {
+      toast({ title: isRTL ? "لا يوجد مخزون" : "Out of Stock", description: isRTL ? "لوحة المفاتيح غير متوفرة" : "Keyboard is not available", variant: "destructive" });
+      return;
+    }
+    const existingIndex = cart.findIndex(item =>
+      item.productType === 'keyboard' &&
+      item.keyboard?.id === keyboard.id &&
+      item.priceType === priceType
+    );
+    if (existingIndex >= 0) {
+      const currentQty = cart[existingIndex].quantity;
+      if (currentQty >= keyboard.stockQuantity) {
+        toast({ title: isRTL ? "الحد الأقصى" : "Maximum Reached", description: isRTL ? `الكمية المتاحة: ${keyboard.stockQuantity}` : `Available quantity: ${keyboard.stockQuantity}`, variant: "destructive" });
+        return;
+      }
+      const newCart = [...cart];
+      newCart[existingIndex].quantity += 1;
+      setCart(newCart);
+    } else {
+      const price = priceType === 'purchase'
+        ? parseFloat(keyboard.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(keyboard.wholesalePrice || '0')
+        : parseFloat(keyboard.sellingPrice || '0');
+      setCart([...cart, { productType: 'keyboard', keyboard, quantity: 1, priceType, unitPrice: price }]);
+    }
+  };
+
+  const addLcdToCart = (lcd: LcdItem, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
+    if (lcd.stockQuantity <= 0) {
+      toast({ title: isRTL ? "لا يوجد مخزون" : "Out of Stock", description: isRTL ? "شاشة LCD غير متوفرة" : "LCD is not available", variant: "destructive" });
+      return;
+    }
+    const existingIndex = cart.findIndex(item =>
+      item.productType === 'lcd' &&
+      item.lcd?.id === lcd.id &&
+      item.priceType === priceType
+    );
+    if (existingIndex >= 0) {
+      const currentQty = cart[existingIndex].quantity;
+      if (currentQty >= lcd.stockQuantity) {
+        toast({ title: isRTL ? "الحد الأقصى" : "Maximum Reached", description: isRTL ? `الكمية المتاحة: ${lcd.stockQuantity}` : `Available quantity: ${lcd.stockQuantity}`, variant: "destructive" });
+        return;
+      }
+      const newCart = [...cart];
+      newCart[existingIndex].quantity += 1;
+      setCart(newCart);
+    } else {
+      const price = priceType === 'purchase'
+        ? parseFloat(lcd.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(lcd.wholesalePrice || '0')
+        : parseFloat(lcd.sellingPrice || '0');
+      setCart([...cart, { productType: 'lcd', lcd, quantity: 1, priceType, unitPrice: price }]);
+    }
+  };
+
   const updateQuantity = (index: number, delta: number) => {
     const newCart = [...cart];
     const item = newCart[index];
     const newQty = item.quantity + delta;
     
-    const maxStock = item.productType === 'battery' 
-      ? item.battery?.stockQuantity || 0 
-      : item.adapter?.stockQuantity || 0;
+    const maxStock = item.productType === 'battery'
+      ? item.battery?.stockQuantity || 0
+      : item.productType === 'adapter'
+      ? item.adapter?.stockQuantity || 0
+      : item.productType === 'keyboard'
+      ? item.keyboard?.stockQuantity || 0
+      : item.lcd?.stockQuantity || 0;
     
     if (newQty <= 0) {
       newCart.splice(index, 1);
@@ -335,6 +437,18 @@ export default function BatteryPOS() {
         : priceType === 'wholesale'
         ? parseFloat(item.adapter.wholesalePrice || '0')
         : parseFloat(item.adapter.sellingPrice || '0');
+    } else if (item.productType === 'keyboard' && item.keyboard) {
+      price = priceType === 'purchase'
+        ? parseFloat(item.keyboard.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(item.keyboard.wholesalePrice || '0')
+        : parseFloat(item.keyboard.sellingPrice || '0');
+    } else if (item.productType === 'lcd' && item.lcd) {
+      price = priceType === 'purchase'
+        ? parseFloat(item.lcd.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(item.lcd.wholesalePrice || '0')
+        : parseFloat(item.lcd.sellingPrice || '0');
     } else {
       return;
     }
@@ -365,6 +479,8 @@ export default function BatteryPOS() {
   const confirmSale = () => {
     const batteryItems = cart.filter(item => item.productType === 'battery');
     const adapterItems = cart.filter(item => item.productType === 'adapter');
+    const keyboardItems = cart.filter(item => item.productType === 'keyboard');
+    const lcdItems = cart.filter(item => item.productType === 'lcd');
 
     const saleData = {
       customerName: customerName || (isRTL ? 'زبون متجر' : 'Walk-in Customer'),
@@ -380,6 +496,22 @@ export default function BatteryPOS() {
       adapterItems: adapterItems.map(item => ({
         adapterId: item.adapter!.id,
         adapterName: `${item.adapter!.brand} ${item.adapter!.serialNumber}${item.adapter!.wattage ? ` ${item.adapter!.wattage}W` : ''}`,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        priceType: item.priceType,
+        totalPrice: item.unitPrice * item.quantity,
+      })),
+      keyboardItems: keyboardItems.map(item => ({
+        keyboardId: item.keyboard!.id,
+        keyboardName: `${item.keyboard!.brand} ${item.keyboard!.serialNumber}`,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        priceType: item.priceType,
+        totalPrice: item.unitPrice * item.quantity,
+      })),
+      lcdItems: lcdItems.map(item => ({
+        lcdId: item.lcd!.id,
+        lcdName: `${item.lcd!.brand} ${item.lcd!.serialNumber}`,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         priceType: item.priceType,
@@ -434,6 +566,22 @@ export default function BatteryPOS() {
             quantity: item.quantity,
             unitPrice: item.unitPrice,
           };
+        } else if (item.productType === 'keyboard' && item.keyboard) {
+          return {
+            type: 'keyboard',
+            brand: item.keyboard.brand,
+            serialNumber: item.keyboard.serialNumber,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          };
+        } else if (item.productType === 'lcd' && item.lcd) {
+          return {
+            type: 'lcd',
+            brand: item.lcd.brand,
+            serialNumber: item.lcd.serialNumber,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+          };
         }
         return null;
       }).filter(Boolean),
@@ -454,6 +602,10 @@ export default function BatteryPOS() {
       return item.battery.brand;
     } else if (item.productType === 'adapter' && item.adapter) {
       return `${item.adapter.brand}${item.adapter.wattage ? ` ${item.adapter.wattage}W` : ''}`;
+    } else if (item.productType === 'keyboard' && item.keyboard) {
+      return item.keyboard.brand;
+    } else if (item.productType === 'lcd' && item.lcd) {
+      return `${item.lcd.brand}${item.lcd.sizeInch ? ` ${item.lcd.sizeInch}"` : ''}`;
     }
     return '';
   };
@@ -463,6 +615,10 @@ export default function BatteryPOS() {
       return item.battery.serialNumber;
     } else if (item.productType === 'adapter' && item.adapter) {
       return item.adapter.serialNumber;
+    } else if (item.productType === 'keyboard' && item.keyboard) {
+      return item.keyboard.serialNumber;
+    } else if (item.productType === 'lcd' && item.lcd) {
+      return item.lcd.serialNumber;
     }
     return '';
   };
@@ -479,9 +635,13 @@ export default function BatteryPOS() {
     return null;
   }
 
-  const isLoading = productType === 'battery' 
-    ? batteriesLoading || searchLoading 
-    : adaptersLoading || adapterSearchLoading;
+  const isLoading = productType === 'battery'
+    ? batteriesLoading || searchLoading
+    : productType === 'adapter'
+    ? adaptersLoading || adapterSearchLoading
+    : productType === 'keyboard'
+    ? keyboardsLoading || keyboardSearchLoading
+    : lcdsLoading || lcdSearchLoading;
 
   return (
     <div className={`min-h-screen bg-muted/30 ${isRTL ? 'rtl' : 'ltr'}`} dir={isRTL ? 'rtl' : 'ltr'}>
@@ -556,6 +716,26 @@ export default function BatteryPOS() {
                       <Plug className="w-4 h-4" />
                       {isRTL ? 'الشواحن' : 'AC Adapters'}
                     </Button>
+                    <Button
+                      variant={productType === 'keyboard' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="rounded-none gap-1"
+                      onClick={() => { setProductType('keyboard'); setSearchQuery(''); }}
+                      data-testid="toggle-product-type-keyboard"
+                    >
+                      <Keyboard className="w-4 h-4" />
+                      {isRTL ? 'كيبورد' : 'Keyboards'}
+                    </Button>
+                    <Button
+                      variant={productType === 'lcd' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="rounded-none gap-1"
+                      onClick={() => { setProductType('lcd'); setSearchQuery(''); }}
+                      data-testid="toggle-product-type-lcd"
+                    >
+                      <Monitor className="w-4 h-4" />
+                      {isRTL ? 'LCD' : 'LCDs'}
+                    </Button>
                   </div>
                 </div>
               </CardHeader>
@@ -565,7 +745,11 @@ export default function BatteryPOS() {
                   <Input
                     placeholder={productType === 'battery' 
                       ? (isRTL ? "ابحث بالرقم التسلسلي أو الموديل..." : "Search by serial or model...")
-                      : (isRTL ? "ابحث بالرقم التسلسلي أو العلامة التجارية..." : "Search by serial or brand...")
+                      : productType === 'adapter'
+                      ? (isRTL ? "ابحث بالرقم التسلسلي أو العلامة التجارية..." : "Search by serial or brand...")
+                      : productType === 'keyboard'
+                      ? (isRTL ? "ابحث بالرقم التسلسلي أو النوع..." : "Search keyboard by serial or type...")
+                      : (isRTL ? "ابحث بالشاشة أو الدقة..." : "Search LCD by serial or resolution...")
                     }
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -582,10 +766,14 @@ export default function BatteryPOS() {
                   <Package className="w-4 h-4" />
                   {productType === 'battery' 
                     ? (isRTL ? 'البطاريات المتاحة' : 'Available Batteries')
-                    : (isRTL ? 'الشواحن المتاحة' : 'Available AC Adapters')
+                    : productType === 'adapter'
+                    ? (isRTL ? 'الشواحن المتاحة' : 'Available AC Adapters')
+                    : productType === 'keyboard'
+                    ? (isRTL ? 'الكيبوردات المتاحة' : 'Available Keyboards')
+                    : (isRTL ? 'شاشات LCD المتاحة' : 'Available LCDs')
                   }
                   <Badge variant="secondary" className="ms-auto">
-                    {productType === 'battery' ? displayBatteries.length : displayAdapters.length}
+                    {productType === 'battery' ? displayBatteries.length : productType === 'adapter' ? displayAdapters.length : productType === 'keyboard' ? displayKeyboards.length : displayLcds.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -626,7 +814,7 @@ export default function BatteryPOS() {
                       ))}
                     </div>
                   )
-                ) : (
+                ) : productType === 'adapter' ? (
                   displayAdapters.length === 0 ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <Plug className="w-12 h-12 mx-auto mb-2 opacity-50" />
@@ -666,6 +854,56 @@ export default function BatteryPOS() {
                       ))}
                     </div>
                   )
+                ) : productType === 'keyboard' ? (
+                  displayKeyboards.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Keyboard className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>{isRTL ? 'لا توجد كيبوردات' : 'No keyboards found'}</p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                      {displayKeyboards.map((keyboard) => (
+                        <div key={keyboard.id} className="p-3 border rounded-lg hover-elevate cursor-pointer transition-all" onClick={() => addKeyboardToCart(keyboard)} data-testid={`keyboard-item-${keyboard.id}`}>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{keyboard.brand}</p>
+                              <p className="text-xs text-muted-foreground truncate">{keyboard.serialNumber}</p>
+                            </div>
+                            <Badge variant={keyboard.stockQuantity <= (keyboard.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">{keyboard.stockQuantity}</Badge>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground truncate">{keyboard.keyboardType || keyboard.layout || keyboard.partNumber}</span>
+                            <span className="font-bold text-primary">{formatPrice(keyboard.sellingPrice || '0')}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : (
+                  displayLcds.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Monitor className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>{isRTL ? 'لا توجد شاشات LCD' : 'No LCDs found'}</p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                      {displayLcds.map((lcd) => (
+                        <div key={lcd.id} className="p-3 border rounded-lg hover-elevate cursor-pointer transition-all" onClick={() => addLcdToCart(lcd)} data-testid={`lcd-item-${lcd.id}`}>
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{lcd.brand}{lcd.sizeInch ? ` ${lcd.sizeInch}"` : ''}</p>
+                              <p className="text-xs text-muted-foreground truncate">{lcd.serialNumber}</p>
+                            </div>
+                            <Badge variant={lcd.stockQuantity <= (lcd.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">{lcd.stockQuantity}</Badge>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground truncate">{lcd.resolution || lcd.connectorType || lcd.partNumber}</span>
+                            <span className="font-bold text-primary">{formatPrice(lcd.sellingPrice || '0')}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
                 )}
               </CardContent>
             </Card>
@@ -692,13 +930,17 @@ export default function BatteryPOS() {
                 ) : (
                   <div className="divide-y max-h-[40vh] overflow-y-auto">
                     {cart.map((item, index) => (
-                      <div key={`${item.productType}-${item.productType === 'battery' ? item.battery?.id : item.adapter?.id}-${item.priceType}`} className="p-3">
+                      <div key={`${item.productType}-${item.productType === 'battery' ? item.battery?.id : item.productType === 'adapter' ? item.adapter?.id : item.productType === 'keyboard' ? item.keyboard?.id : item.lcd?.id}-${item.priceType}`} className="p-3">
                         <div className="flex items-start gap-2 mb-2">
                           <div className="flex items-center gap-1">
                             {item.productType === 'battery' ? (
                               <Battery className="w-3 h-3 text-muted-foreground" />
-                            ) : (
+                            ) : item.productType === 'adapter' ? (
                               <Plug className="w-3 h-3 text-muted-foreground" />
+                            ) : item.productType === 'keyboard' ? (
+                              <Keyboard className="w-3 h-3 text-muted-foreground" />
+                            ) : (
+                              <Monitor className="w-3 h-3 text-muted-foreground" />
                             )}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -1087,22 +1329,36 @@ export default function BatteryPOS() {
                           <div className="flex items-center gap-1">
                             {item.productType === 'battery' ? (
                               <Battery className="w-3 h-3 text-gray-400" />
-                            ) : (
+                            ) : item.productType === 'adapter' ? (
                               <Plug className="w-3 h-3 text-gray-400" />
+                            ) : item.productType === 'keyboard' ? (
+                              <Keyboard className="w-3 h-3 text-gray-400" />
+                            ) : (
+                              <Monitor className="w-3 h-3 text-gray-400" />
                             )}
                             <div>
                               <div className="font-medium">
-                                {item.productType === 'battery' && item.battery 
-                                  ? item.battery.brand 
-                                  : item.adapter 
-                                    ? `${item.adapter.brand}${item.adapter.wattage ? ` ${item.adapter.wattage}W` : ''}`
-                                    : ''
+                                {item.productType === 'battery' && item.battery
+                                  ? item.battery.brand
+                                  : item.productType === 'adapter' && item.adapter
+                                  ? `${item.adapter.brand}${item.adapter.wattage ? ` ${item.adapter.wattage}W` : ''}`
+                                  : item.productType === 'keyboard' && item.keyboard
+                                  ? item.keyboard.brand
+                                  : item.productType === 'lcd' && item.lcd
+                                  ? `${item.lcd.brand}${item.lcd.sizeInch ? ` ${item.lcd.sizeInch}"` : ''}`
+                                  : ''
                                 }
                               </div>
                               <div className="text-gray-500 text-[10px]">
-                                {item.productType === 'battery' && item.battery 
-                                  ? item.battery.serialNumber 
-                                  : item.adapter?.serialNumber
+                                {item.productType === 'battery' && item.battery
+                                  ? item.battery.serialNumber
+                                  : item.productType === 'adapter' && item.adapter
+                                  ? item.adapter.serialNumber
+                                  : item.productType === 'keyboard' && item.keyboard
+                                  ? item.keyboard.serialNumber
+                                  : item.productType === 'lcd' && item.lcd
+                                  ? item.lcd.serialNumber
+                                  : ''
                                 }
                               </div>
                             </div>

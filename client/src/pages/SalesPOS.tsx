@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { playBarcodeScanBeep } from "@/lib/scanBeep";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -46,10 +47,12 @@ import {
   Store,
   Battery,
   Plug,
+  Keyboard,
+  Monitor,
   FileText
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { InStoreProduct, LaptopBattery, AcAdapter } from "@shared/schema";
+import type { InStoreProduct, LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 
 interface POSProduct {
   id: string;
@@ -62,7 +65,7 @@ interface POSProduct {
   image: string | null;
   category: string | null;
   barcode?: string | null;
-  productSource?: 'instore' | 'battery' | 'adapter';
+  productSource?: 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd';
   sourceId?: string;
 }
 
@@ -146,7 +149,17 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     enabled: orderType === 'in-store',
   });
 
-  const isLoading = orderType === 'in-store' ? (inStoreLoading || batteriesLoading || adaptersLoading) : mainLoading;
+  const { data: keyboardsRaw = [], isLoading: keyboardsLoading } = useQuery<KeyboardItem[]>({
+    queryKey: ['/api/battery/keyboards'],
+    enabled: orderType === 'in-store',
+  });
+
+  const { data: lcdsRaw = [], isLoading: lcdsLoading } = useQuery<LcdItem[]>({
+    queryKey: ['/api/battery/lcds'],
+    enabled: orderType === 'in-store',
+  });
+
+  const isLoading = orderType === 'in-store' ? (inStoreLoading || batteriesLoading || adaptersLoading || keyboardsLoading || lcdsLoading) : mainLoading;
 
   const instoreProducts: POSProduct[] = orderType === 'in-store'
     ? inStoreRaw
@@ -176,7 +189,8 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           price: String(b.sellingPrice || '0'),
           wholesalePrice: b.wholesalePrice ? String(b.wholesalePrice) : null,
           stockQuantity: b.stockQuantity,
-          sku: b.serialNumber,
+          sku: b.barcode || b.serialNumber,
+          barcode: b.barcode ?? null,
           image: null,
           category: language === 'ar' ? 'بطاريات' : 'Batteries',
           productSource: 'battery' as const,
@@ -194,7 +208,8 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           price: String(a.sellingPrice || '0'),
           wholesalePrice: a.wholesalePrice ? String(a.wholesalePrice) : null,
           stockQuantity: a.stockQuantity,
-          sku: a.serialNumber,
+          sku: a.barcode || a.serialNumber,
+          barcode: a.barcode ?? null,
           image: null,
           category: language === 'ar' ? 'شواحن' : 'Chargers',
           productSource: 'adapter' as const,
@@ -202,8 +217,46 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         }))
     : [];
 
+  const keyboardProducts: POSProduct[] = orderType === 'in-store'
+    ? keyboardsRaw
+        .filter(k => (k.stockQuantity || 0) >= 0)
+        .map(k => ({
+          id: `kbd-${k.id}`,
+          nameAr: `${k.brand} ${k.serialNumber}`,
+          nameEn: `${k.brand} ${k.serialNumber}`,
+          price: String(k.sellingPrice || '0'),
+          wholesalePrice: k.wholesalePrice ? String(k.wholesalePrice) : null,
+          stockQuantity: k.stockQuantity,
+          sku: k.barcode || k.serialNumber,
+          barcode: k.barcode ?? null,
+          image: null,
+          category: language === 'ar' ? 'كيبورد' : 'Keyboards',
+          productSource: 'keyboard' as const,
+          sourceId: k.id,
+        }))
+    : [];
+
+  const lcdProducts: POSProduct[] = orderType === 'in-store'
+    ? lcdsRaw
+        .filter(l => (l.stockQuantity || 0) >= 0)
+        .map(l => ({
+          id: `lcd-${l.id}`,
+          nameAr: `${l.brand} ${l.serialNumber}`,
+          nameEn: `${l.brand} ${l.serialNumber}`,
+          price: String(l.sellingPrice || '0'),
+          wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
+          stockQuantity: l.stockQuantity,
+          sku: l.barcode || l.serialNumber,
+          barcode: l.barcode ?? null,
+          image: null,
+          category: language === 'ar' ? 'شاشات LCD' : 'LCDs',
+          productSource: 'lcd' as const,
+          sourceId: l.id,
+        }))
+    : [];
+
   const products: POSProduct[] = orderType === 'in-store'
-    ? [...instoreProducts, ...batteryProducts, ...adapterProducts]
+    ? [...instoreProducts, ...batteryProducts, ...adapterProducts, ...keyboardProducts, ...lcdProducts]
     : mainProducts.map(p => ({
         id: p.id,
         nameAr: p.nameAr,
@@ -211,6 +264,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         price: String(p.price),
         stockQuantity: p.stockQuantity,
         sku: p.sku ?? null,
+        barcode: (p as { barcode?: string | null }).barcode ?? null,
         image: p.image ?? null,
         category: p.category ?? null,
         productSource: 'instore' as const,
@@ -416,6 +470,38 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       }
       return [...prev, { product, quantity: 1, useWholesale: false }];
     });
+  };
+
+  /** Barcode scanner: exact SKU/barcode + Enter adds to cart and plays beep (works during checkout flow). */
+  const handlePosSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    const code = searchQuery.trim();
+    if (!code) return;
+    const lc = code.toLowerCase();
+    const product = products.find(p => {
+      const sku = (p.sku || "").toLowerCase();
+      const bc = (p.barcode || "").toLowerCase();
+      return (p.sku && sku === lc) || (!!p.barcode && bc === lc);
+    });
+    if (!product) return;
+
+    const stockQty = product.stockQuantity || 0;
+    const existing = cart.find(item => item.product.id === product.id);
+    const currentQty = existing ? existing.quantity : 0;
+    if (currentQty >= stockQty) {
+      e.preventDefault();
+      toast({
+        title: language === 'ar' ? 'المخزون غير كافٍ' : 'Insufficient Stock',
+        description: language === 'ar' ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    e.preventDefault();
+    playBarcodeScanBeep();
+    addToCart(product);
+    setSearchQuery("");
   };
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -732,6 +818,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                   placeholder={language === 'ar' ? 'بحث بالاسم أو الباركود...' : 'Search by name or barcode...'}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={handlePosSearchKeyDown}
                   className="ps-10 h-11 text-base"
                   data-testid="input-pos-search"
                 />
@@ -865,6 +952,10 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                               <Battery className="h-10 w-10 text-primary/40" />
                             ) : product.productSource === 'adapter' ? (
                               <Plug className="h-10 w-10 text-primary/40" />
+                            ) : product.productSource === 'keyboard' ? (
+                              <Keyboard className="h-10 w-10 text-primary/40" />
+                            ) : product.productSource === 'lcd' ? (
+                              <Monitor className="h-10 w-10 text-primary/40" />
                             ) : (
                               <Package className="h-10 w-10 text-muted-foreground/30" />
                             )}
@@ -877,6 +968,17 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                         <p className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
+                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd') && (
+                          <Badge variant="outline" className="text-[10px]">
+                            {product.productSource === 'battery'
+                              ? (language === 'ar' ? 'بطارية' : 'Battery')
+                              : product.productSource === 'adapter'
+                              ? (language === 'ar' ? 'شاحن' : 'Adapter')
+                              : product.productSource === 'keyboard'
+                              ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
+                              : (language === 'ar' ? 'LCD' : 'LCD')}
+                          </Badge>
+                        )}
                         {product.sku && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <Barcode className="h-3 w-3" />
@@ -925,6 +1027,10 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                               <Battery className="h-6 w-6 text-primary/40" />
                             ) : product.productSource === 'adapter' ? (
                               <Plug className="h-6 w-6 text-primary/40" />
+                            ) : product.productSource === 'keyboard' ? (
+                              <Keyboard className="h-6 w-6 text-primary/40" />
+                            ) : product.productSource === 'lcd' ? (
+                              <Monitor className="h-6 w-6 text-primary/40" />
                             ) : (
                               <Package className="h-6 w-6 text-muted-foreground/30" />
                             )}
@@ -937,6 +1043,17 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                         <p className="font-semibold text-sm truncate">
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
+                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd') && (
+                          <Badge variant="outline" className="text-[10px] mb-1">
+                            {product.productSource === 'battery'
+                              ? (language === 'ar' ? 'بطارية' : 'Battery')
+                              : product.productSource === 'adapter'
+                              ? (language === 'ar' ? 'شاحن' : 'Adapter')
+                              : product.productSource === 'keyboard'
+                              ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
+                              : (language === 'ar' ? 'LCD' : 'LCD')}
+                          </Badge>
+                        )}
                         <p className="text-xs text-muted-foreground">
                           {product.sku} • {language === 'ar' ? 'متوفر:' : 'Stock:'} {product.stockQuantity || 0}
                         </p>
@@ -1068,6 +1185,10 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                                 <Battery className="h-6 w-6 text-primary/40" />
                               ) : item.product.productSource === 'adapter' ? (
                                 <Plug className="h-6 w-6 text-primary/40" />
+                              ) : item.product.productSource === 'keyboard' ? (
+                                <Keyboard className="h-6 w-6 text-primary/40" />
+                              ) : item.product.productSource === 'lcd' ? (
+                                <Monitor className="h-6 w-6 text-primary/40" />
                               ) : (
                                 <Package className="h-6 w-6 text-muted-foreground/30" />
                               )}
@@ -1080,6 +1201,17 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                           <p className="font-medium text-sm line-clamp-1">
                             {language === 'ar' ? item.product.nameAr : (item.product.nameEn || item.product.nameAr)}
                           </p>
+                          {(item.product.productSource === 'battery' || item.product.productSource === 'adapter' || item.product.productSource === 'keyboard' || item.product.productSource === 'lcd') && (
+                            <Badge variant="outline" className="text-[10px] mb-1">
+                              {item.product.productSource === 'battery'
+                                ? (language === 'ar' ? 'بطارية' : 'Battery')
+                                : item.product.productSource === 'adapter'
+                                ? (language === 'ar' ? 'شاحن' : 'Adapter')
+                                : item.product.productSource === 'keyboard'
+                                ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
+                                : (language === 'ar' ? 'LCD' : 'LCD')}
+                            </Badge>
+                          )}
                           <div className="flex items-center gap-1 flex-wrap">
                             <p className="text-sm text-primary font-bold">
                               {formatPrice(parseFloat(getEffectivePrice(item)))} × {item.quantity}

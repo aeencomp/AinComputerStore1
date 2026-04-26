@@ -41,37 +41,25 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
     setUploadError(null);
 
     try {
-      // Step 1: Get presigned URL from backend
-      const urlResponse = await fetch('/api/uploads/request-url', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: file.name,
-          size: file.size,
-          contentType: file.type,
-        }),
+      const fd = new FormData();
+      fd.append("image", file);
+
+      const res = await fetch("/api/upload/image", {
+        method: "POST",
+        body: fd,
       });
 
-      if (!urlResponse.ok) {
-        const errorData = await urlResponse.json();
-        throw new Error(errorData.error || 'Failed to get upload URL');
+      if (!res.ok) {
+        let message = "Upload failed";
+        try {
+          const data = await res.json();
+          message = data?.error || message;
+        } catch {}
+        throw new Error(message);
       }
 
-      const { uploadURL, objectPath } = await urlResponse.json();
-
-      // Step 2: Upload file directly to presigned URL
-      const uploadResponse = await fetch(uploadURL, {
-        method: 'PUT',
-        body: file,
-        headers: { 'Content-Type': file.type },
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Failed to upload file');
-      }
-      
-      // Use the object path for displaying the image
-      onChange(objectPath);
+      const data = await res.json();
+      onChange(data.url);
       setActiveTab("url");
     } catch (error: any) {
       const errorMessage = error?.message || '';

@@ -1,0 +1,47 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index-dev.ts
+
+[1G[0KAdmin/Sales WebSocket servers initialized (noServer mode)
+Intercom WebSocket server initialized on /ws/intercom (noServer mode)
+[Price Sync] Scheduling price sync every 6 hours
+[Desktop Sync] Scheduling desktop/AIO price sync every 6 hours
+3:53:34 PM [express] serving on port 5000
+
+A PostCSS plugin did not pass the `from` option to `postcss.parse`. This may cause imported assets to be incorrectly transformed. If you've recently added a PostCSS plugin that raised this warning, please contact the package author to fix the issue.
+3:53:43 PM [express] GET /api/check-blocked 200 in 314ms :: {"blocked":false}
+3:53:43 PM [express] POST /api/analytics/pageview 200 in 472ms :: {"success":true}
+3:53:43 PM [express] GET /api/auth/me 401 in 1ms :: {"error":"غير مسجل الدخول"}
+3:53:43 PM [express] GET /api/store-settings 200 in 107ms :: {"id":"3bc2e66a-3b7a-4b8f-99f7-24733d78…
+3:53:43 PM [express] GET /api/cart 200 in 103ms :: []
+3:53:43 PM [express] POST /api/analytics/session 200 in 621ms :: {"success":true,"country":"Unknown"…
+3:53:44 PM [express] GET /api/products 200 in 524ms :: [{"id":"3a5affe6-ea62-4939-98cf-6f9ad89515d6"…
+3:53:57 PM [express] POST /api/analytics/pageview 200 in 505ms :: {"success":true}
+3:53:57 PM [express] POST /api/analytics/session 200 in 747ms :: {"success":true,"existing":true}
+3:53:57 PM [express] GET /api/check-blocked 304 in 203ms :: {"blocked":false}
+3:53:58 PM [express] GET /api/auth/me 304 in 201ms :: {"id":"2e06ba29-0d5d-44f4-a203-16fe1c5c2dce","…
+3:53:58 PM [express] GET /api/store-settings 304 in 202ms :: {"id":"3bc2e66a-3b7a-4b8f-99f7-24733d78…
+3:53:58 PM [express] GET /api/cart 304 in 400ms :: []
+3:53:58 PM [express] GET /api/products 304 in 605ms :: [{"id":"3a5affe6-ea62-4939-98cf-6f9ad89515d6"…
+[Price Sync] Starting price sync from globaliraq.iq...
+[Price Sync] Fetched 1105 products from globaliraq.iq
+[Price Sync] Found 75 synced products in our database
+[Price Sync] Complete. Matched: 55, Updated: 0, Errors: 0
+3:54:20 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+[Desktop Sync] Starting price sync for desktops & AIOs...
+[Desktop Sync] Fetched 1105 products from globaliraq.iq
+[Desktop Sync] Found 36 desktop/AIO products in our database
+[Desktop Sync] Complete. Matched: 34, Updated: 0, Errors: 0
+3:54:50 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+3:55:20 PM [express] POST /api/analytics/heartbeat 200 in 402ms :: {"success":true}
+3:55:50 PM [express] POST /api/analytics/heartbeat 200 in 416ms :: {"success":true}
+3:56:20 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}
+3:56:50 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+3:57:20 PM [express] POST /api/analytics/heartbeat 200 in 407ms :: {"success":true}
+3:57:50 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+3:58:20 PM [express] POST /api/analytics/heartbeat 200 in 408ms :: {"success":true}
+3:58:50 PM [express] POST /api/analytics/heartbeat 200 in 403ms :: {"success":true}
+3:59:21 PM [express] POST /api/analytics/heartbeat 200 in 404ms :: {"success":true}
+3:59:51 PM [express] POST /api/analytics/heartbeat 200 in 405ms :: {"success":true}
+4:01:13 PM [express] POST /api/analytics/heartbeat 200 in 417ms :: {"success":true}
+4:02:12 PM [express] POST /api/analytics/heartbeat 200 in 406ms :: {"success":true}

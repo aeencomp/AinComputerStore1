@@ -1,18 +1,13 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient, getQueryFn } from "@/lib/queryClient";
+import { apiRequest, queryClient, customerAuthMeQueryFn, customerAuthMeQueryKey } from "@/lib/queryClient";
+import type { User } from "@shared/schema";
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-  phone: string;
-  createdAt: string;
-}
+export type { User };
 
 export function useUser() {
   const { data: user, isLoading, error } = useQuery<User | null>({
-    queryKey: ['/api/auth/me'],
-    queryFn: getQueryFn({ on401: "returnNull" }),
+    queryKey: customerAuthMeQueryKey,
+    queryFn: customerAuthMeQueryFn,
     retry: false,
   });
 
@@ -30,7 +25,7 @@ export function useLogout() {
       return await apiRequest('POST', '/api/auth/logout', {});
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/auth/me'] });
+      queryClient.invalidateQueries({ queryKey: customerAuthMeQueryKey });
     },
   });
 }

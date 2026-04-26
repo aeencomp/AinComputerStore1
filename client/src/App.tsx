@@ -12,6 +12,8 @@ import Home from "@/pages/Home";
 import AllProducts from "@/pages/AllProducts";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
+import ForgotPassword from "@/pages/ForgotPassword";
+import ChangePassword from "@/pages/ChangePassword";
 import ProductDetail from "@/pages/ProductDetail";
 import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
@@ -72,6 +74,8 @@ function Router() {
       <Route path="/products" component={AllProducts}/>
       <Route path="/login" component={Login}/>
       <Route path="/register" component={Register}/>
+      <Route path="/forgot-password" component={ForgotPassword}/>
+      <Route path="/account/password" component={ChangePassword}/>
       <Route path="/product/:id" component={ProductDetail}/>
       <Route path="/checkout" component={Checkout}/>
       <Route path="/order-confirmation/:orderNumber" component={OrderConfirmation}/>
