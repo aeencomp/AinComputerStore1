@@ -367,7 +367,7 @@ export default function TechnicianDashboard() {
                   <Button
                     variant="default"
                     size="sm"
-                    className="h-7 min-h-7 gap-1 px-2 py-0 text-[11px] leading-none bg-green-600 hover:bg-green-600/90 text-white"
+                    className="h-7 min-h-7 gap-1 px-2 py-0 text-[11px] leading-none bg-blue-600 hover:bg-blue-600/90 text-white"
                     disabled={bulkSendCompletionWhatsAppMutation.isPending || isTicketsLoading}
                     data-testid="button-send-whatsapp-all-completed"
                   >
@@ -388,7 +388,7 @@ export default function TechnicianDashboard() {
                       {t('repair.whatsapp.confirmCancel')}
                     </AlertDialogCancel>
                     <AlertDialogAction
-                      className="bg-green-600 text-white hover:bg-green-600/90"
+                      className="bg-blue-600 text-white hover:bg-blue-600/90"
                       disabled={bulkSendCompletionWhatsAppMutation.isPending}
                       onClick={() => bulkSendCompletionWhatsAppMutation.mutate()}
                       data-testid="button-whatsapp-confirm-send"
