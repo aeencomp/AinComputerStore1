@@ -33,7 +33,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import QRCode from "qrcode";
-import type { InStoreProduct, LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import type { InStoreProduct, LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 
 interface SalesUser {
   id: string;
@@ -76,7 +76,7 @@ const emptyForm: ProductForm = {
   image: "",
 };
 
-type CountItemSource = "instore" | "battery" | "adapter" | "keyboard" | "lcd";
+type CountItemSource = "instore" | "battery" | "adapter" | "laptop" | "desktop" | "keyboard" | "lcd";
 
 interface CountableProduct {
   id: number | string;
@@ -146,6 +146,16 @@ export default function SalesInStoreInventory({ user }: Props) {
 
   const { data: lcds = [] } = useQuery<LcdItem[]>({
     queryKey: ['/api/battery/lcds'],
+    enabled: activeTab === "stockcount",
+  });
+
+  const { data: laptops = [] } = useQuery<LaptopItem[]>({
+    queryKey: ['/api/battery/laptops'],
+    enabled: activeTab === "stockcount",
+  });
+
+  const { data: desktops = [] } = useQuery<DesktopItem[]>({
+    queryKey: ['/api/battery/desktops'],
     enabled: activeTab === "stockcount",
   });
 
@@ -419,6 +429,26 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       barcode: a.barcode,
       stockQuantity: a.stockQuantity || 0,
     })),
+    ...laptops.map(l => ({
+      id: l.id,
+      source: "laptop" as const,
+      nameAr: `${l.brand} ${l.serialNumber}${l.model ? ` ${l.model}` : ""}`,
+      nameEn: `${l.brand} ${l.serialNumber}${l.model ? ` ${l.model}` : ""}`,
+      serialNumber: l.serialNumber,
+      sku: l.barcode || l.serialNumber,
+      barcode: l.barcode,
+      stockQuantity: l.stockQuantity || 0,
+    })),
+    ...desktops.map(d => ({
+      id: d.id,
+      source: "desktop" as const,
+      nameAr: `${d.brand} ${d.serialNumber}${d.model ? ` ${d.model}` : ""}`,
+      nameEn: `${d.brand} ${d.serialNumber}${d.model ? ` ${d.model}` : ""}`,
+      serialNumber: d.serialNumber,
+      sku: d.barcode || d.serialNumber,
+      barcode: d.barcode,
+      stockQuantity: d.stockQuantity || 0,
+    })),
     ...keyboards.map(k => ({
       id: k.id,
       source: "keyboard" as const,
@@ -445,6 +475,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     instore: countProducts.filter(p => p.source === "instore").length,
     batteries: countProducts.filter(p => p.source === "battery").length,
     adapters: countProducts.filter(p => p.source === "adapter").length,
+    laptops: countProducts.filter(p => p.source === "laptop").length,
+    desktops: countProducts.filter(p => p.source === "desktop").length,
     keyboards: countProducts.filter(p => p.source === "keyboard").length,
     lcds: countProducts.filter(p => p.source === "lcd").length,
   };
@@ -800,6 +832,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       <Badge variant="outline">{language === 'ar' ? `المتجر: ${countScopeStats.instore}` : `In-store: ${countScopeStats.instore}`}</Badge>
                       <Badge variant="outline">{language === 'ar' ? `بطاريات: ${countScopeStats.batteries}` : `Batteries: ${countScopeStats.batteries}`}</Badge>
                       <Badge variant="outline">{language === 'ar' ? `شواحن: ${countScopeStats.adapters}` : `Adapters: ${countScopeStats.adapters}`}</Badge>
+                      <Badge variant="outline">{language === 'ar' ? `لابتوبات: ${countScopeStats.laptops}` : `Laptops: ${countScopeStats.laptops}`}</Badge>
+                      <Badge variant="outline">{language === 'ar' ? `ديسكتوب: ${countScopeStats.desktops}` : `Desktops: ${countScopeStats.desktops}`}</Badge>
                       <Badge variant="outline">{language === 'ar' ? `كيبورد: ${countScopeStats.keyboards}` : `Keyboards: ${countScopeStats.keyboards}`}</Badge>
                       <Badge variant="outline">{language === 'ar' ? `LCD: ${countScopeStats.lcds}` : `LCDs: ${countScopeStats.lcds}`}</Badge>
                     </div>
@@ -824,6 +858,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                 {p.source === "instore" ? (language === 'ar' ? 'متجر' : 'In-store')
                                   : p.source === "battery" ? (language === 'ar' ? 'بطارية' : 'Battery')
                                   : p.source === "adapter" ? (language === 'ar' ? 'شاحن' : 'Adapter')
+                                  : p.source === "laptop" ? (language === 'ar' ? 'لابتوب' : 'Laptop')
+                                  : p.source === "desktop" ? (language === 'ar' ? 'ديسكتوب' : 'Desktop')
                                   : p.source === "keyboard" ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
                                   : 'LCD'}
                               </Badge>

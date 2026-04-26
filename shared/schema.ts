@@ -768,6 +768,74 @@ export const insertAdapterSaleItemSchema = createInsertSchema(adapterSaleItems).
 export type InsertAdapterSaleItem = z.infer<typeof insertAdapterSaleItemSchema>;
 export type AdapterSaleItem = typeof adapterSaleItems.$inferSelect;
 
+// Laptops inventory (battery system expansion)
+export const laptops = pgTable("laptops", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serialNumber: text("serial_number").notNull().unique(),
+  partNumber: text("part_number"),
+  barcode: text("barcode"),
+  brand: text("brand").notNull(),
+  model: text("model"),
+  cpu: text("cpu"),
+  ram: text("ram"),
+  storage: text("storage"),
+  gpu: text("gpu"),
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(2),
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
+  supplier: text("supplier"),
+  location: text("location"),
+  notes: text("notes"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertLaptopSchema = createInsertSchema(laptops).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertLaptop = z.infer<typeof insertLaptopSchema>;
+export type Laptop = typeof laptops.$inferSelect;
+
+// Desktops inventory (battery system expansion)
+export const desktops = pgTable("desktops", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  serialNumber: text("serial_number").notNull().unique(),
+  partNumber: text("part_number"),
+  barcode: text("barcode"),
+  brand: text("brand").notNull(),
+  model: text("model"),
+  cpu: text("cpu"),
+  ram: text("ram"),
+  storage: text("storage"),
+  gpu: text("gpu"),
+  stockQuantity: integer("stock_quantity").notNull().default(0),
+  minStockLevel: integer("min_stock_level").notNull().default(2),
+  purchasePrice: decimal("purchase_price", { precision: 10, scale: 2 }),
+  sellingPrice: decimal("selling_price", { precision: 10, scale: 2 }),
+  wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
+  supplier: text("supplier"),
+  location: text("location"),
+  notes: text("notes"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export const insertDesktopSchema = createInsertSchema(desktops).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertDesktop = z.infer<typeof insertDesktopSchema>;
+export type Desktop = typeof desktops.$inferSelect;
+
 // Keyboards inventory (battery system expansion)
 export const keyboards = pgTable("keyboards", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -834,6 +902,48 @@ export const insertLcdSchema = createInsertSchema(lcds).omit({
 
 export type InsertLcd = z.infer<typeof insertLcdSchema>;
 export type Lcd = typeof lcds.$inferSelect;
+
+// Laptop sale items
+export const laptopSaleItems = pgTable("laptop_sale_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull(),
+  laptopId: varchar("laptop_id").notNull(),
+  serialNumber: text("serial_number").notNull(),
+  brand: text("brand").notNull(),
+  model: text("model"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertLaptopSaleItemSchema = createInsertSchema(laptopSaleItems).omit({
+  id: true,
+  saleId: true,
+});
+
+export type InsertLaptopSaleItem = z.infer<typeof insertLaptopSaleItemSchema>;
+export type LaptopSaleItem = typeof laptopSaleItems.$inferSelect;
+
+// Desktop sale items
+export const desktopSaleItems = pgTable("desktop_sale_items", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  saleId: varchar("sale_id").notNull(),
+  desktopId: varchar("desktop_id").notNull(),
+  serialNumber: text("serial_number").notNull(),
+  brand: text("brand").notNull(),
+  model: text("model"),
+  quantity: integer("quantity").notNull().default(1),
+  unitPrice: decimal("unit_price", { precision: 10, scale: 2 }).notNull(),
+  lineTotal: decimal("line_total", { precision: 10, scale: 2 }).notNull(),
+});
+
+export const insertDesktopSaleItemSchema = createInsertSchema(desktopSaleItems).omit({
+  id: true,
+  saleId: true,
+});
+
+export type InsertDesktopSaleItem = z.infer<typeof insertDesktopSaleItemSchema>;
+export type DesktopSaleItem = typeof desktopSaleItems.$inferSelect;
 
 // Keyboard sale items
 export const keyboardSaleItems = pgTable("keyboard_sale_items", {

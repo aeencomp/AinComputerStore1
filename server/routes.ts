@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, keyboards, lcds, keyboardSaleItems, lcdSaleItems, adminUsers, products } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -1745,6 +1745,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (source === "adapter") {
           const row = await storage.updateAcAdapter(String(u.id), { stockQuantity: u.quantity });
           if (row) updated++;
+          continue;
+        }
+        if (source === "laptop") {
+          const result = await db.update(laptops).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(laptops.id, String(u.id))).returning();
+          if (result.length > 0) updated++;
+          continue;
+        }
+        if (source === "desktop") {
+          const result = await db.update(desktops).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(desktops.id, String(u.id))).returning();
+          if (result.length > 0) updated++;
           continue;
         }
         if (source === "keyboard") {
@@ -4659,7 +4669,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Battery Backup - Export batteries/adapters/keyboards/LCDs as JSON
+  // Battery Backup - Export batteries/adapters/keyboards/LCDs/laptops/desktops as JSON
   app.get("/api/battery/batteries/backup", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
@@ -4672,13 +4682,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       const keyboardRows = await db.select().from(keyboards).where(eq(keyboards.isActive, 1));
       const lcdRows = await db.select().from(lcds).where(eq(lcds.isActive, 1));
+      const laptopRows = await db.select().from(laptops).where(eq(laptops.isActive, 1));
+      const desktopRows = await db.select().from(desktops).where(eq(desktops.isActive, 1));
 
       const backupData = {
-        schemaVersion: "1.2",
+        schemaVersion: "1.3",
         generatedAt: new Date().toISOString(),
-        backupLabel: "Battery inventory backup (batteries, adapters, keyboards, lcds)",
+        backupLabel: "Battery inventory backup (batteries, adapters, laptops, desktops, keyboards, lcds)",
         batteryCount: batteries.length,
         adapterCount: adapters.length,
+        laptopCount: laptopRows.length,
+        desktopCount: desktopRows.length,
         keyboardCount: keyboardRows.length,
         lcdCount: lcdRows.length,
         batteries: batteries.map(b => ({
@@ -4722,6 +4736,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
           location: a.location,
           notes: a.notes,
           isActive: a.isActive,
+        })),
+        laptops: laptopRows.map(l => ({
+          serialNumber: l.serialNumber,
+          partNumber: l.partNumber,
+          barcode: l.barcode,
+          brand: l.brand,
+          model: l.model,
+          cpu: l.cpu,
+          ram: l.ram,
+          storage: l.storage,
+          gpu: l.gpu,
+          stockQuantity: l.stockQuantity,
+          minStockLevel: l.minStockLevel,
+          purchasePrice: l.purchasePrice,
+          sellingPrice: l.sellingPrice,
+          wholesalePrice: l.wholesalePrice,
+          supplier: l.supplier,
+          location: l.location,
+          notes: l.notes,
+          isActive: l.isActive,
+        })),
+        desktops: desktopRows.map(d => ({
+          serialNumber: d.serialNumber,
+          partNumber: d.partNumber,
+          barcode: d.barcode,
+          brand: d.brand,
+          model: d.model,
+          cpu: d.cpu,
+          ram: d.ram,
+          storage: d.storage,
+          gpu: d.gpu,
+          stockQuantity: d.stockQuantity,
+          minStockLevel: d.minStockLevel,
+          purchasePrice: d.purchasePrice,
+          sellingPrice: d.sellingPrice,
+          wholesalePrice: d.wholesalePrice,
+          supplier: d.supplier,
+          location: d.location,
+          notes: d.notes,
+          isActive: d.isActive,
         })),
         keyboards: keyboardRows.map(k => ({
           serialNumber: k.serialNumber,
@@ -4774,7 +4828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Battery Restore - Import batteries/adapters/keyboards/LCDs from JSON backup
+  // Battery Restore - Import batteries/adapters/keyboards/LCDs/laptops/desktops from JSON backup
   app.post("/api/battery/batteries/restore", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
@@ -4782,19 +4836,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { schemaVersion, data, batteries, adapters, keyboards: keyboardDataInput, lcds: lcdDataInput, mode = 'merge' } = req.body;
+      const { schemaVersion, data, batteries, adapters, laptops: laptopDataInput, desktops: desktopDataInput, keyboards: keyboardDataInput, lcds: lcdDataInput, mode = 'merge' } = req.body;
       
       // Support both old format (data array) and new format (batteries/adapters arrays)
       const batteryData = batteries || data || [];
       const adapterData = adapters || [];
+      const laptopData = laptopDataInput || [];
+      const desktopData = desktopDataInput || [];
       const keyboardData = keyboardDataInput || [];
       const lcdData = lcdDataInput || [];
       
-      if (!schemaVersion || (!Array.isArray(batteryData) && !Array.isArray(adapterData) && !Array.isArray(keyboardData) && !Array.isArray(lcdData))) {
+      if (!schemaVersion || (!Array.isArray(batteryData) && !Array.isArray(adapterData) && !Array.isArray(laptopData) && !Array.isArray(desktopData) && !Array.isArray(keyboardData) && !Array.isArray(lcdData))) {
         return res.status(400).json({ error: "ملف النسخة الاحتياطية غير صالح" });
       }
       
-      if (schemaVersion !== "1.0" && schemaVersion !== "1.1" && schemaVersion !== "1.2") {
+      if (schemaVersion !== "1.0" && schemaVersion !== "1.1" && schemaVersion !== "1.2" && schemaVersion !== "1.3") {
         return res.status(400).json({ error: "إصدار النسخة الاحتياطية غير مدعوم" });
       }
       
@@ -4805,6 +4861,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         adaptersAdded: 0,
         adaptersUpdated: 0,
         adaptersSkipped: 0,
+        laptopsAdded: 0,
+        laptopsUpdated: 0,
+        laptopsSkipped: 0,
+        desktopsAdded: 0,
+        desktopsUpdated: 0,
+        desktopsSkipped: 0,
         keyboardsAdded: 0,
         keyboardsUpdated: 0,
         keyboardsSkipped: 0,
@@ -4948,6 +5010,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      // Process laptops
+      for (const item of laptopData) {
+        try {
+          if (!item.serialNumber || !item.brand) {
+            results.errors.push(`بيانات ناقصة للابتوب: ${item.serialNumber || 'غير معروف'}`);
+            results.laptopsSkipped++;
+            continue;
+          }
+          const [existing] = await db.select().from(laptops).where(eq(laptops.serialNumber, item.serialNumber)).limit(1);
+          const nextValues = {
+            partNumber: item.partNumber,
+            barcode: item.barcode || item.serialNumber,
+            brand: item.brand,
+            model: item.model,
+            cpu: item.cpu,
+            ram: item.ram,
+            storage: item.storage,
+            gpu: item.gpu,
+            stockQuantity: item.stockQuantity ?? 0,
+            minStockLevel: item.minStockLevel ?? 2,
+            purchasePrice: item.purchasePrice,
+            sellingPrice: item.sellingPrice,
+            wholesalePrice: item.wholesalePrice,
+            supplier: item.supplier,
+            location: item.location,
+            notes: item.notes,
+            isActive: item.isActive ?? 1,
+            updatedAt: new Date(),
+          };
+          if (existing) {
+            if (mode === 'merge') {
+              await db.update(laptops).set(nextValues).where(eq(laptops.id, existing.id));
+              results.laptopsUpdated++;
+            } else {
+              results.laptopsSkipped++;
+            }
+          } else {
+            await db.insert(laptops).values({
+              serialNumber: item.serialNumber,
+              ...nextValues,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            results.laptopsAdded++;
+          }
+        } catch (err: any) {
+          results.errors.push(`خطأ في معالجة لابتوب ${item.serialNumber || 'غير معروف'}: ${err.message}`);
+          results.laptopsSkipped++;
+        }
+      }
+
+      // Process desktops
+      for (const item of desktopData) {
+        try {
+          if (!item.serialNumber || !item.brand) {
+            results.errors.push(`بيانات ناقصة للديسكتوب: ${item.serialNumber || 'غير معروف'}`);
+            results.desktopsSkipped++;
+            continue;
+          }
+          const [existing] = await db.select().from(desktops).where(eq(desktops.serialNumber, item.serialNumber)).limit(1);
+          const nextValues = {
+            partNumber: item.partNumber,
+            barcode: item.barcode || item.serialNumber,
+            brand: item.brand,
+            model: item.model,
+            cpu: item.cpu,
+            ram: item.ram,
+            storage: item.storage,
+            gpu: item.gpu,
+            stockQuantity: item.stockQuantity ?? 0,
+            minStockLevel: item.minStockLevel ?? 2,
+            purchasePrice: item.purchasePrice,
+            sellingPrice: item.sellingPrice,
+            wholesalePrice: item.wholesalePrice,
+            supplier: item.supplier,
+            location: item.location,
+            notes: item.notes,
+            isActive: item.isActive ?? 1,
+            updatedAt: new Date(),
+          };
+          if (existing) {
+            if (mode === 'merge') {
+              await db.update(desktops).set(nextValues).where(eq(desktops.id, existing.id));
+              results.desktopsUpdated++;
+            } else {
+              results.desktopsSkipped++;
+            }
+          } else {
+            await db.insert(desktops).values({
+              serialNumber: item.serialNumber,
+              ...nextValues,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            });
+            results.desktopsAdded++;
+          }
+        } catch (err: any) {
+          results.errors.push(`خطأ في معالجة ديسكتوب ${item.serialNumber || 'غير معروف'}: ${err.message}`);
+          results.desktopsSkipped++;
+        }
+      }
+
       // Process keyboards
       for (const item of keyboardData) {
         try {
@@ -5078,9 +5242,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      const totalAdded = results.batteriesAdded + results.adaptersAdded + results.keyboardsAdded + results.lcdsAdded;
-      const totalUpdated = results.batteriesUpdated + results.adaptersUpdated + results.keyboardsUpdated + results.lcdsUpdated;
-      const totalSkipped = results.batteriesSkipped + results.adaptersSkipped + results.keyboardsSkipped + results.lcdsSkipped;
+      const totalAdded = results.batteriesAdded + results.adaptersAdded + results.laptopsAdded + results.desktopsAdded + results.keyboardsAdded + results.lcdsAdded;
+      const totalUpdated = results.batteriesUpdated + results.adaptersUpdated + results.laptopsUpdated + results.desktopsUpdated + results.keyboardsUpdated + results.lcdsUpdated;
+      const totalSkipped = results.batteriesSkipped + results.adaptersSkipped + results.laptopsSkipped + results.desktopsSkipped + results.keyboardsSkipped + results.lcdsSkipped;
       
       return res.json({
         success: true,
@@ -5435,12 +5599,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const adapterRows = await storage.getAcAdapters();
+      const laptopRows = await db.select().from(laptops).where(eq(laptops.isActive, 1));
+      const desktopRows = await db.select().from(desktops).where(eq(desktops.isActive, 1));
       const keyboardRows = await db.select().from(keyboards).where(eq(keyboards.isActive, 1));
       const lcdRows = await db.select().from(lcds).where(eq(lcds.isActive, 1));
 
       let adaptersUpdated = 0;
       let adaptersSerialFixed = 0;
       let adaptersSerialFixSkipped = 0;
+      let laptopsUpdated = 0;
+      let desktopsUpdated = 0;
       let keyboardsUpdated = 0;
       let lcdsUpdated = 0;
 
@@ -5490,13 +5658,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
-      const totalUpdated = adaptersUpdated + keyboardsUpdated + lcdsUpdated;
+      for (const row of laptopRows) {
+        if ((row.barcode || "") !== row.serialNumber) {
+          await db
+            .update(laptops)
+            .set({ barcode: row.serialNumber, updatedAt: new Date() })
+            .where(eq(laptops.id, row.id));
+          laptopsUpdated++;
+        }
+      }
+
+      for (const row of desktopRows) {
+        if ((row.barcode || "") !== row.serialNumber) {
+          await db
+            .update(desktops)
+            .set({ barcode: row.serialNumber, updatedAt: new Date() })
+            .where(eq(desktops.id, row.id));
+          desktopsUpdated++;
+        }
+      }
+
+      const totalUpdated = adaptersUpdated + laptopsUpdated + desktopsUpdated + keyboardsUpdated + lcdsUpdated;
       return res.json({
         success: true,
         message: `Barcode sync completed. Updated ${totalUpdated} items.`,
         adaptersUpdated,
         adaptersSerialFixed,
         adaptersSerialFixSkipped,
+        laptopsUpdated,
+        desktopsUpdated,
         keyboardsUpdated,
         lcdsUpdated,
         totalUpdated,
@@ -5522,6 +5712,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const batteriesRows = [...await storage.getLaptopBatteries()].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
       const adapterRows = [...await storage.getAcAdapters()].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+      const laptopRows = [...await db.select().from(laptops).where(eq(laptops.isActive, 1))].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
+      const desktopRows = [...await db.select().from(desktops).where(eq(desktops.isActive, 1))].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
       const keyboardRows = [...await db.select().from(keyboards).where(eq(keyboards.isActive, 1))].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
       const lcdRows = [...await db.select().from(lcds).where(eq(lcds.isActive, 1))].sort((a, b) => a.serialNumber.localeCompare(b.serialNumber));
       const productRows = await db.select({ id: products.id, sku: products.sku }).from(products);
@@ -5565,6 +5757,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let batteriesUpdated = 0;
       let adaptersUpdated = 0;
+      let laptopsUpdated = 0;
+      let desktopsUpdated = 0;
       let keyboardsUpdated = 0;
       let lcdsUpdated = 0;
       let inStoreSkuUpdated = 0;
@@ -5588,6 +5782,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if ((row.barcode || "") !== newBarcode) {
           await storage.updateAcAdapter(row.id, { barcode: newBarcode });
           adaptersUpdated++;
+        }
+        const linked = await syncInstoreSku(newBarcode, row.serialNumber, row.partNumber, row.barcode);
+        inStoreSkuUpdated += linked.changed;
+        inStoreMatched += linked.matched;
+      }
+
+      for (let i = 0; i < laptopRows.length; i++) {
+        const row = laptopRows[i];
+        const newBarcode = makeCode("LAP", i + 1);
+        if ((row.barcode || "") !== newBarcode) {
+          await db
+            .update(laptops)
+            .set({ barcode: newBarcode, updatedAt: new Date() })
+            .where(eq(laptops.id, row.id));
+          laptopsUpdated++;
+        }
+        const linked = await syncInstoreSku(newBarcode, row.serialNumber, row.partNumber, row.barcode);
+        inStoreSkuUpdated += linked.changed;
+        inStoreMatched += linked.matched;
+      }
+
+      for (let i = 0; i < desktopRows.length; i++) {
+        const row = desktopRows[i];
+        const newBarcode = makeCode("DES", i + 1);
+        if ((row.barcode || "") !== newBarcode) {
+          await db
+            .update(desktops)
+            .set({ barcode: newBarcode, updatedAt: new Date() })
+            .where(eq(desktops.id, row.id));
+          desktopsUpdated++;
         }
         const linked = await syncInstoreSku(newBarcode, row.serialNumber, row.partNumber, row.barcode);
         inStoreSkuUpdated += linked.changed;
@@ -5624,12 +5848,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         inStoreMatched += linked.matched;
       }
 
-      const totalUpdated = batteriesUpdated + adaptersUpdated + keyboardsUpdated + lcdsUpdated;
+      const totalUpdated = batteriesUpdated + adaptersUpdated + laptopsUpdated + desktopsUpdated + keyboardsUpdated + lcdsUpdated;
       return res.json({
         success: true,
         message: `Sequence barcode regeneration completed. Updated ${totalUpdated} items.`,
         batteriesUpdated,
         adaptersUpdated,
+        laptopsUpdated,
+        desktopsUpdated,
         keyboardsUpdated,
         lcdsUpdated,
         inStoreSkuUpdated,
@@ -5701,6 +5927,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       let batteriesMatched = 0;
       let adaptersMatched = 0;
+      let laptopsMatched = 0;
+      let desktopsMatched = 0;
       let keyboardsMatched = 0;
       let lcdsMatched = 0;
       let inStoreSkuUpdated = 0;
@@ -5734,6 +5962,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
           continue;
         }
         adaptersMatched++;
+        for (const productId of matches) {
+          const product = productRows.find(p => p.id === productId);
+          if (product && (product.sku || "") !== targetBarcode) {
+            await db.update(products).set({ sku: targetBarcode }).where(eq(products.id, productId));
+            inStoreSkuUpdated++;
+          }
+          claimedProductIds.add(productId);
+        }
+      }
+
+      const laptopRows = await db.select().from(laptops).where(eq(laptops.isActive, 1));
+      for (const row of laptopRows) {
+        const targetBarcode = row.barcode || row.serialNumber;
+        const matches = findProductIds(row.serialNumber, row.partNumber, row.barcode);
+        if (matches.length === 0) {
+          unmatched++;
+          continue;
+        }
+        laptopsMatched++;
+        for (const productId of matches) {
+          const product = productRows.find(p => p.id === productId);
+          if (product && (product.sku || "") !== targetBarcode) {
+            await db.update(products).set({ sku: targetBarcode }).where(eq(products.id, productId));
+            inStoreSkuUpdated++;
+          }
+          claimedProductIds.add(productId);
+        }
+      }
+
+      const desktopRows = await db.select().from(desktops).where(eq(desktops.isActive, 1));
+      for (const row of desktopRows) {
+        const targetBarcode = row.barcode || row.serialNumber;
+        const matches = findProductIds(row.serialNumber, row.partNumber, row.barcode);
+        if (matches.length === 0) {
+          unmatched++;
+          continue;
+        }
+        desktopsMatched++;
         for (const productId of matches) {
           const product = productRows.find(p => p.id === productId);
           if (product && (product.sku || "") !== targetBarcode) {
@@ -5788,6 +6054,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         message: `In-store barcode sync completed. Updated ${totalUpdated} SKU values.`,
         batteriesMatched,
         adaptersMatched,
+        laptopsMatched,
+        desktopsMatched,
         keyboardsMatched,
         lcdsMatched,
         inStoreSkuUpdated,
@@ -6017,6 +6285,224 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "خطأ في حذف شاشة LCD" });
     }
   });
+
+  // Laptop Routes
+  app.get("/api/battery/laptops", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      const salesUserId = (req.session as any).salesUserId;
+      if (!batteryUserId && !salesUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(laptops).where(eq(laptops.isActive, 1)).orderBy(desc(laptops.createdAt));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting laptops:", error);
+      return res.status(500).json({ error: "خطأ في جلب اللابتوبات" });
+    }
+  });
+
+  app.get("/api/battery/laptops/low-stock", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(laptops).where(and(
+        eq(laptops.isActive, 1),
+        sql`${laptops.stockQuantity} <= ${laptops.minStockLevel}`
+      ));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting low stock laptops:", error);
+      return res.status(500).json({ error: "خطأ في جلب اللابتوبات منخفضة المخزون" });
+    }
+  });
+
+  app.get("/api/battery/laptops/search", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
+      if (!q) return res.json([]);
+      const rows = await db.select().from(laptops).where(eq(laptops.isActive, 1));
+      const terms = q.split(/\s+/).filter(Boolean);
+      const filtered = rows.filter(l => {
+        const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.model || ""} ${l.cpu || ""} ${l.ram || ""} ${l.storage || ""} ${l.gpu || ""} ${l.barcode || ""}`.toLowerCase();
+        return terms.every(t => s.includes(t));
+      });
+      return res.json(filtered);
+    } catch (error) {
+      console.error("Error searching laptops:", error);
+      return res.status(500).json({ error: "خطأ في البحث" });
+    }
+  });
+
+  app.post("/api/battery/laptops", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const { serialNumber, brand, ...rest } = req.body;
+      if (!brand) return res.status(400).json({ error: "الماركة مطلوبة" });
+      let finalSerial = (serialNumber || "").trim();
+      if (!finalSerial) {
+        const rows = await db.select({ serialNumber: laptops.serialNumber }).from(laptops);
+        const used = new Set(rows.map(r => (r.serialNumber || "").trim().toUpperCase()));
+        let max = 0;
+        for (const r of rows) {
+          const m = (r.serialNumber || "").match(/^LAP-(\d+)$/i);
+          if (m) max = Math.max(max, parseInt(m[1], 10));
+        }
+        let next = max + 1;
+        do {
+          finalSerial = `LAP-${String(next).padStart(4, "0")}`;
+          next++;
+        } while (used.has(finalSerial.toUpperCase()));
+      }
+      const existing = await db.select().from(laptops).where(eq(laptops.serialNumber, finalSerial)).limit(1);
+      if (existing.length) return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+      const barcode = rest.barcode || finalSerial;
+      const [row] = await db.insert(laptops).values({ serialNumber: finalSerial, brand, barcode, ...rest }).returning();
+      return res.status(201).json(row);
+    } catch (error) {
+      console.error("Error creating laptop:", error);
+      return res.status(500).json({ error: "خطأ في إضافة لابتوب" });
+    }
+  });
+
+  app.put("/api/battery/laptops/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const updateData = { ...req.body };
+      if (updateData.serialNumber) {
+        updateData.barcode = updateData.serialNumber;
+      }
+      const [row] = await db.update(laptops).set({ ...updateData, updatedAt: new Date() }).where(eq(laptops.id, req.params.id)).returning();
+      if (!row) return res.status(404).json({ error: "اللابتوب غير موجود" });
+      return res.json(row);
+    } catch (error) {
+      console.error("Error updating laptop:", error);
+      return res.status(500).json({ error: "خطأ في تحديث اللابتوب" });
+    }
+  });
+
+  app.delete("/api/battery/laptops/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      await db.update(laptops).set({ isActive: 0, updatedAt: new Date() }).where(eq(laptops.id, req.params.id));
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting laptop:", error);
+      return res.status(500).json({ error: "خطأ في حذف اللابتوب" });
+    }
+  });
+
+  // Desktop Routes
+  app.get("/api/battery/desktops", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      const salesUserId = (req.session as any).salesUserId;
+      if (!batteryUserId && !salesUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(desktops).where(eq(desktops.isActive, 1)).orderBy(desc(desktops.createdAt));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting desktops:", error);
+      return res.status(500).json({ error: "خطأ في جلب أجهزة الديسكتوب" });
+    }
+  });
+
+  app.get("/api/battery/desktops/low-stock", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const rows = await db.select().from(desktops).where(and(
+        eq(desktops.isActive, 1),
+        sql`${desktops.stockQuantity} <= ${desktops.minStockLevel}`
+      ));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error getting low stock desktops:", error);
+      return res.status(500).json({ error: "خطأ في جلب أجهزة الديسكتوب منخفضة المخزون" });
+    }
+  });
+
+  app.get("/api/battery/desktops/search", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : "";
+      if (!q) return res.json([]);
+      const rows = await db.select().from(desktops).where(eq(desktops.isActive, 1));
+      const terms = q.split(/\s+/).filter(Boolean);
+      const filtered = rows.filter(d => {
+        const s = `${d.serialNumber} ${d.partNumber || ""} ${d.brand} ${d.model || ""} ${d.cpu || ""} ${d.ram || ""} ${d.storage || ""} ${d.gpu || ""} ${d.barcode || ""}`.toLowerCase();
+        return terms.every(t => s.includes(t));
+      });
+      return res.json(filtered);
+    } catch (error) {
+      console.error("Error searching desktops:", error);
+      return res.status(500).json({ error: "خطأ في البحث" });
+    }
+  });
+
+  app.post("/api/battery/desktops", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const { serialNumber, brand, ...rest } = req.body;
+      if (!brand) return res.status(400).json({ error: "الماركة مطلوبة" });
+      let finalSerial = (serialNumber || "").trim();
+      if (!finalSerial) {
+        const rows = await db.select({ serialNumber: desktops.serialNumber }).from(desktops);
+        const used = new Set(rows.map(r => (r.serialNumber || "").trim().toUpperCase()));
+        let max = 0;
+        for (const r of rows) {
+          const m = (r.serialNumber || "").match(/^DES-(\d+)$/i);
+          if (m) max = Math.max(max, parseInt(m[1], 10));
+        }
+        let next = max + 1;
+        do {
+          finalSerial = `DES-${String(next).padStart(4, "0")}`;
+          next++;
+        } while (used.has(finalSerial.toUpperCase()));
+      }
+      const existing = await db.select().from(desktops).where(eq(desktops.serialNumber, finalSerial)).limit(1);
+      if (existing.length) return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
+      const barcode = rest.barcode || finalSerial;
+      const [row] = await db.insert(desktops).values({ serialNumber: finalSerial, brand, barcode, ...rest }).returning();
+      return res.status(201).json(row);
+    } catch (error) {
+      console.error("Error creating desktop:", error);
+      return res.status(500).json({ error: "خطأ في إضافة ديسكتوب" });
+    }
+  });
+
+  app.put("/api/battery/desktops/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      const updateData = { ...req.body };
+      if (updateData.serialNumber) {
+        updateData.barcode = updateData.serialNumber;
+      }
+      const [row] = await db.update(desktops).set({ ...updateData, updatedAt: new Date() }).where(eq(desktops.id, req.params.id)).returning();
+      if (!row) return res.status(404).json({ error: "الديسكتوب غير موجود" });
+      return res.json(row);
+    } catch (error) {
+      console.error("Error updating desktop:", error);
+      return res.status(500).json({ error: "خطأ في تحديث الديسكتوب" });
+    }
+  });
+
+  app.delete("/api/battery/desktops/:id", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
+      await db.update(desktops).set({ isActive: 0, updatedAt: new Date() }).where(eq(desktops.id, req.params.id));
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting desktop:", error);
+      return res.status(500).json({ error: "خطأ في حذف الديسكتوب" });
+    }
+  });
   
   // Battery users management (admin only)
   app.get("/api/battery/users", async (req, res) => {
@@ -6093,7 +6579,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const adapterItems = await storage.getAdapterSaleItems(sale.id);
           const keyboardItems = await db.select().from(keyboardSaleItems).where(eq(keyboardSaleItems.saleId, sale.id));
           const lcdItems = await db.select().from(lcdSaleItems).where(eq(lcdSaleItems.saleId, sale.id));
-          return { ...sale, items, adapterItems, keyboardItems, lcdItems };
+          const laptopItems = await db.select().from(laptopSaleItems).where(eq(laptopSaleItems.saleId, sale.id));
+          const desktopItems = await db.select().from(desktopSaleItems).where(eq(desktopSaleItems.saleId, sale.id));
+          return { ...sale, items, adapterItems, keyboardItems, lcdItems, laptopItems, desktopItems };
         })
       );
       return res.json(salesWithItems);
@@ -6119,7 +6607,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adapterItems = await storage.getAdapterSaleItems(sale.id);
       const keyboardItems = await db.select().from(keyboardSaleItems).where(eq(keyboardSaleItems.saleId, sale.id));
       const lcdItems = await db.select().from(lcdSaleItems).where(eq(lcdSaleItems.saleId, sale.id));
-      return res.json({ ...sale, items, adapterItems, keyboardItems, lcdItems });
+      const laptopItems = await db.select().from(laptopSaleItems).where(eq(laptopSaleItems.saleId, sale.id));
+      const desktopItems = await db.select().from(desktopSaleItems).where(eq(desktopSaleItems.saleId, sale.id));
+      return res.json({ ...sale, items, adapterItems, keyboardItems, lcdItems, laptopItems, desktopItems });
     } catch (error) {
       console.error("Error getting battery sale:", error);
       return res.status(500).json({ error: "خطأ في جلب عملية البيع" });
@@ -6221,10 +6711,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      const { customerName, customerPhone, items, adapterItems, keyboardItems, lcdItems, subtotal, discount, total, paymentMethod, notes } = req.body;
+      const { customerName, customerPhone, items, adapterItems, keyboardItems, lcdItems, laptopItems, desktopItems, subtotal, discount, total, paymentMethod, notes } = req.body;
       
       // Must have at least one item
-      const hasItems = (items && items.length > 0) || (adapterItems && adapterItems.length > 0) || (keyboardItems && keyboardItems.length > 0) || (lcdItems && lcdItems.length > 0);
+      const hasItems = (items && items.length > 0) ||
+        (adapterItems && adapterItems.length > 0) ||
+        (keyboardItems && keyboardItems.length > 0) ||
+        (lcdItems && lcdItems.length > 0) ||
+        (laptopItems && laptopItems.length > 0) ||
+        (desktopItems && desktopItems.length > 0);
       if (!hasItems) {
         return res.status(400).json({ error: "يجب إضافة منتجات للطلب" });
       }
@@ -6284,6 +6779,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
           if (lcd.stockQuantity < item.quantity) {
             return res.status(400).json({
               error: `المخزون غير كافي لشاشة LCD ${lcd.serialNumber}. المتاح: ${lcd.stockQuantity}`
+            });
+          }
+        }
+      }
+
+      // Validate stock for laptop items
+      if (laptopItems && laptopItems.length > 0) {
+        for (const item of laptopItems) {
+          const [laptop] = await db.select().from(laptops).where(eq(laptops.id, item.laptopId)).limit(1);
+          if (!laptop) {
+            return res.status(400).json({ error: `اللابتوب غير موجود: ${item.laptopId}` });
+          }
+          if (laptop.stockQuantity < item.quantity) {
+            return res.status(400).json({
+              error: `المخزون غير كافي للابتوب ${laptop.serialNumber}. المتاح: ${laptop.stockQuantity}`
+            });
+          }
+        }
+      }
+
+      // Validate stock for desktop items
+      if (desktopItems && desktopItems.length > 0) {
+        for (const item of desktopItems) {
+          const [desktop] = await db.select().from(desktops).where(eq(desktops.id, item.desktopId)).limit(1);
+          if (!desktop) {
+            return res.status(400).json({ error: `الديسكتوب غير موجود: ${item.desktopId}` });
+          }
+          if (desktop.stockQuantity < item.quantity) {
+            return res.status(400).json({
+              error: `المخزون غير كافي للديسكتوب ${desktop.serialNumber}. المتاح: ${desktop.stockQuantity}`
             });
           }
         }
@@ -6385,6 +6910,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
         }
       }
+
+      // Build laptop sale items
+      const laptopItemsToInsert: Array<{
+        laptopId: string;
+        serialNumber: string;
+        brand: string;
+        model: string | null;
+        quantity: number;
+        unitPrice: string;
+        lineTotal: string;
+      }> = [];
+      if (laptopItems && laptopItems.length > 0) {
+        for (const item of laptopItems) {
+          const [laptop] = await db.select().from(laptops).where(eq(laptops.id, item.laptopId)).limit(1);
+          laptopItemsToInsert.push({
+            laptopId: item.laptopId,
+            serialNumber: laptop?.serialNumber || 'N/A',
+            brand: laptop?.brand || 'Unknown',
+            model: laptop?.model || null,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toString(),
+            lineTotal: (item.unitPrice * item.quantity).toString(),
+          });
+        }
+      }
+
+      // Build desktop sale items
+      const desktopItemsToInsert: Array<{
+        desktopId: string;
+        serialNumber: string;
+        brand: string;
+        model: string | null;
+        quantity: number;
+        unitPrice: string;
+        lineTotal: string;
+      }> = [];
+      if (desktopItems && desktopItems.length > 0) {
+        for (const item of desktopItems) {
+          const [desktop] = await db.select().from(desktops).where(eq(desktops.id, item.desktopId)).limit(1);
+          desktopItemsToInsert.push({
+            desktopId: item.desktopId,
+            serialNumber: desktop?.serialNumber || 'N/A',
+            brand: desktop?.brand || 'Unknown',
+            model: desktop?.model || null,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice.toString(),
+            lineTotal: (item.unitPrice * item.quantity).toString(),
+          });
+        }
+      }
       
       const sale = await storage.createBatterySale(saleData, saleItems, adapterSaleItems);
 
@@ -6400,6 +6975,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await db.update(lcds)
           .set({ stockQuantity: sql`${lcds.stockQuantity} - ${item.quantity}` })
           .where(eq(lcds.id, item.lcdId));
+      }
+      for (const item of laptopItemsToInsert) {
+        await db.insert(laptopSaleItems).values({ ...item, saleId: sale.id });
+        await db.update(laptops)
+          .set({ stockQuantity: sql`${laptops.stockQuantity} - ${item.quantity}` })
+          .where(eq(laptops.id, item.laptopId));
+      }
+      for (const item of desktopItemsToInsert) {
+        await db.insert(desktopSaleItems).values({ ...item, saleId: sale.id });
+        await db.update(desktops)
+          .set({ stockQuantity: sql`${desktops.stockQuantity} - ${item.quantity}` })
+          .where(eq(desktops.id, item.desktopId));
       }
       
       return res.json({

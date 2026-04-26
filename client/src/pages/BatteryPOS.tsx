@@ -53,12 +53,14 @@ import {
   Clock
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import type { LaptopBattery, AcAdapter, Laptop, Desktop, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 
 interface CartItem {
-  productType: 'battery' | 'adapter' | 'keyboard' | 'lcd';
+  productType: 'battery' | 'adapter' | 'laptop' | 'desktop' | 'keyboard' | 'lcd';
   battery?: LaptopBattery;
   adapter?: AcAdapter;
+  laptop?: Laptop;
+  desktop?: Desktop;
   keyboard?: KeyboardItem;
   lcd?: LcdItem;
   quantity: number;
@@ -100,7 +102,7 @@ export default function BatteryPOS() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   
-  const [productType, setProductType] = useState<'battery' | 'adapter' | 'keyboard' | 'lcd'>('battery');
+  const [productType, setProductType] = useState<'battery' | 'adapter' | 'laptop' | 'desktop' | 'keyboard' | 'lcd'>('battery');
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState<number>(0);
@@ -134,6 +136,16 @@ export default function BatteryPOS() {
     enabled: !!currentUser,
   });
 
+  const { data: laptops = [], isLoading: laptopsLoading } = useQuery<Laptop[]>({
+    queryKey: ['/api/battery/laptops'],
+    enabled: !!currentUser,
+  });
+
+  const { data: desktops = [], isLoading: desktopsLoading } = useQuery<Desktop[]>({
+    queryKey: ['/api/battery/desktops'],
+    enabled: !!currentUser,
+  });
+
   const { data: keyboards = [], isLoading: keyboardsLoading } = useQuery<KeyboardItem[]>({
     queryKey: ['/api/battery/keyboards'],
     enabled: !!currentUser,
@@ -164,6 +176,28 @@ export default function BatteryPOS() {
       return res.json();
     },
     enabled: !!currentUser && searchQuery.length > 0 && productType === 'adapter',
+  });
+
+  const { data: laptopSearchResults = [], isLoading: laptopSearchLoading } = useQuery<Laptop[]>({
+    queryKey: ['/api/battery/laptops/search', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/battery/laptops/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
+    enabled: !!currentUser && searchQuery.length > 0 && productType === 'laptop',
+  });
+
+  const { data: desktopSearchResults = [], isLoading: desktopSearchLoading } = useQuery<Desktop[]>({
+    queryKey: ['/api/battery/desktops/search', searchQuery],
+    queryFn: async () => {
+      if (!searchQuery.trim()) return [];
+      const res = await fetch(`/api/battery/desktops/search?q=${encodeURIComponent(searchQuery)}`);
+      if (!res.ok) throw new Error('Search failed');
+      return res.json();
+    },
+    enabled: !!currentUser && searchQuery.length > 0 && productType === 'desktop',
   });
 
   const { data: keyboardSearchResults = [], isLoading: keyboardSearchLoading } = useQuery<KeyboardItem[]>({
@@ -219,6 +253,8 @@ export default function BatteryPOS() {
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
       queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
     },
@@ -233,6 +269,8 @@ export default function BatteryPOS() {
 
   const displayBatteries = searchQuery.trim() ? searchResults : batteries.filter(b => b.stockQuantity > 0).slice(0, 20);
   const displayAdapters = searchQuery.trim() ? adapterSearchResults : adapters.filter(a => a.stockQuantity > 0).slice(0, 20);
+  const displayLaptops = searchQuery.trim() ? laptopSearchResults : laptops.filter(l => (l.stockQuantity || 0) > 0).slice(0, 20);
+  const displayDesktops = searchQuery.trim() ? desktopSearchResults : desktops.filter(d => (d.stockQuantity || 0) > 0).slice(0, 20);
   const displayKeyboards = searchQuery.trim() ? keyboardSearchResults : keyboards.filter(k => k.stockQuantity > 0).slice(0, 20);
   const displayLcds = searchQuery.trim() ? lcdSearchResults : lcds.filter(l => l.stockQuantity > 0).slice(0, 20);
 
@@ -328,6 +366,64 @@ export default function BatteryPOS() {
     }
   };
 
+  const addLaptopToCart = (laptop: Laptop, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
+    if ((laptop.stockQuantity || 0) <= 0) {
+      toast({ title: isRTL ? "لا يوجد مخزون" : "Out of Stock", description: isRTL ? "اللابتوب غير متوفر" : "Laptop is not available", variant: "destructive" });
+      return;
+    }
+    const existingIndex = cart.findIndex(item =>
+      item.productType === 'laptop' &&
+      item.laptop?.id === laptop.id &&
+      item.priceType === priceType
+    );
+    if (existingIndex >= 0) {
+      const currentQty = cart[existingIndex].quantity;
+      if (currentQty >= (laptop.stockQuantity || 0)) {
+        toast({ title: isRTL ? "الحد الأقصى" : "Maximum Reached", description: isRTL ? `الكمية المتاحة: ${laptop.stockQuantity}` : `Available quantity: ${laptop.stockQuantity}`, variant: "destructive" });
+        return;
+      }
+      const newCart = [...cart];
+      newCart[existingIndex].quantity += 1;
+      setCart(newCart);
+    } else {
+      const price = priceType === 'purchase'
+        ? parseFloat(laptop.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(laptop.wholesalePrice || '0')
+        : parseFloat(laptop.sellingPrice || '0');
+      setCart([...cart, { productType: 'laptop', laptop, quantity: 1, priceType, unitPrice: price }]);
+    }
+  };
+
+  const addDesktopToCart = (desktop: Desktop, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
+    if ((desktop.stockQuantity || 0) <= 0) {
+      toast({ title: isRTL ? "لا يوجد مخزون" : "Out of Stock", description: isRTL ? "الديسكتوب غير متوفر" : "Desktop is not available", variant: "destructive" });
+      return;
+    }
+    const existingIndex = cart.findIndex(item =>
+      item.productType === 'desktop' &&
+      item.desktop?.id === desktop.id &&
+      item.priceType === priceType
+    );
+    if (existingIndex >= 0) {
+      const currentQty = cart[existingIndex].quantity;
+      if (currentQty >= (desktop.stockQuantity || 0)) {
+        toast({ title: isRTL ? "الحد الأقصى" : "Maximum Reached", description: isRTL ? `الكمية المتاحة: ${desktop.stockQuantity}` : `Available quantity: ${desktop.stockQuantity}`, variant: "destructive" });
+        return;
+      }
+      const newCart = [...cart];
+      newCart[existingIndex].quantity += 1;
+      setCart(newCart);
+    } else {
+      const price = priceType === 'purchase'
+        ? parseFloat(desktop.purchasePrice || '0')
+        : priceType === 'wholesale'
+        ? parseFloat(desktop.wholesalePrice || '0')
+        : parseFloat(desktop.sellingPrice || '0');
+      setCart([...cart, { productType: 'desktop', desktop, quantity: 1, priceType, unitPrice: price }]);
+    }
+  };
+
   const addKeyboardToCart = (keyboard: KeyboardItem, priceType: 'purchase' | 'wholesale' | 'selling' = 'selling') => {
     if (keyboard.stockQuantity <= 0) {
       toast({ title: isRTL ? "لا يوجد مخزون" : "Out of Stock", description: isRTL ? "لوحة المفاتيح غير متوفرة" : "Keyboard is not available", variant: "destructive" });
@@ -395,6 +491,10 @@ export default function BatteryPOS() {
       ? item.battery?.stockQuantity || 0
       : item.productType === 'adapter'
       ? item.adapter?.stockQuantity || 0
+      : item.productType === 'laptop'
+      ? item.laptop?.stockQuantity || 0
+      : item.productType === 'desktop'
+      ? item.desktop?.stockQuantity || 0
       : item.productType === 'keyboard'
       ? item.keyboard?.stockQuantity || 0
       : item.lcd?.stockQuantity || 0;
@@ -479,6 +579,8 @@ export default function BatteryPOS() {
   const confirmSale = () => {
     const batteryItems = cart.filter(item => item.productType === 'battery');
     const adapterItems = cart.filter(item => item.productType === 'adapter');
+    const laptopItems = cart.filter(item => item.productType === 'laptop');
+    const desktopItems = cart.filter(item => item.productType === 'desktop');
     const keyboardItems = cart.filter(item => item.productType === 'keyboard');
     const lcdItems = cart.filter(item => item.productType === 'lcd');
 
@@ -496,6 +598,22 @@ export default function BatteryPOS() {
       adapterItems: adapterItems.map(item => ({
         adapterId: item.adapter!.id,
         adapterName: `${item.adapter!.brand} ${item.adapter!.serialNumber}${item.adapter!.wattage ? ` ${item.adapter!.wattage}W` : ''}`,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        priceType: item.priceType,
+        totalPrice: item.unitPrice * item.quantity,
+      })),
+      laptopItems: laptopItems.map(item => ({
+        laptopId: item.laptop!.id,
+        laptopName: `${item.laptop!.brand} ${item.laptop!.serialNumber}${item.laptop!.model ? ` ${item.laptop!.model}` : ''}`,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        priceType: item.priceType,
+        totalPrice: item.unitPrice * item.quantity,
+      })),
+      desktopItems: desktopItems.map(item => ({
+        desktopId: item.desktop!.id,
+        desktopName: `${item.desktop!.brand} ${item.desktop!.serialNumber}${item.desktop!.model ? ` ${item.desktop!.model}` : ''}`,
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         priceType: item.priceType,
@@ -602,6 +720,10 @@ export default function BatteryPOS() {
       return item.battery.brand;
     } else if (item.productType === 'adapter' && item.adapter) {
       return `${item.adapter.brand}${item.adapter.wattage ? ` ${item.adapter.wattage}W` : ''}`;
+    } else if (item.productType === 'laptop' && item.laptop) {
+      return `${item.laptop.brand}${item.laptop.model ? ` ${item.laptop.model}` : ''}`;
+    } else if (item.productType === 'desktop' && item.desktop) {
+      return `${item.desktop.brand}${item.desktop.model ? ` ${item.desktop.model}` : ''}`;
     } else if (item.productType === 'keyboard' && item.keyboard) {
       return item.keyboard.brand;
     } else if (item.productType === 'lcd' && item.lcd) {
@@ -615,6 +737,10 @@ export default function BatteryPOS() {
       return item.battery.serialNumber;
     } else if (item.productType === 'adapter' && item.adapter) {
       return item.adapter.serialNumber;
+    } else if (item.productType === 'laptop' && item.laptop) {
+      return item.laptop.serialNumber;
+    } else if (item.productType === 'desktop' && item.desktop) {
+      return item.desktop.serialNumber;
     } else if (item.productType === 'keyboard' && item.keyboard) {
       return item.keyboard.serialNumber;
     } else if (item.productType === 'lcd' && item.lcd) {
@@ -639,6 +765,10 @@ export default function BatteryPOS() {
     ? batteriesLoading || searchLoading
     : productType === 'adapter'
     ? adaptersLoading || adapterSearchLoading
+    : productType === 'laptop'
+    ? laptopsLoading || laptopSearchLoading
+    : productType === 'desktop'
+    ? desktopsLoading || desktopSearchLoading
     : productType === 'keyboard'
     ? keyboardsLoading || keyboardSearchLoading
     : lcdsLoading || lcdSearchLoading;
@@ -717,6 +847,26 @@ export default function BatteryPOS() {
                       {isRTL ? 'الشواحن' : 'AC Adapters'}
                     </Button>
                     <Button
+                      variant={productType === 'laptop' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="rounded-none gap-1"
+                      onClick={() => { setProductType('laptop'); setSearchQuery(''); }}
+                      data-testid="toggle-product-type-laptop"
+                    >
+                      <Monitor className="w-4 h-4" />
+                      {isRTL ? 'لابتوبات' : 'Laptops'}
+                    </Button>
+                    <Button
+                      variant={productType === 'desktop' ? 'default' : 'ghost'}
+                      size="sm"
+                      className="rounded-none gap-1"
+                      onClick={() => { setProductType('desktop'); setSearchQuery(''); }}
+                      data-testid="toggle-product-type-desktop"
+                    >
+                      <Package className="w-4 h-4" />
+                      {isRTL ? 'ديسكتوب' : 'Desktops'}
+                    </Button>
+                    <Button
                       variant={productType === 'keyboard' ? 'default' : 'ghost'}
                       size="sm"
                       className="rounded-none gap-1"
@@ -747,6 +897,10 @@ export default function BatteryPOS() {
                       ? (isRTL ? "ابحث بالرقم التسلسلي أو الموديل..." : "Search by serial or model...")
                       : productType === 'adapter'
                       ? (isRTL ? "ابحث بالرقم التسلسلي أو العلامة التجارية..." : "Search by serial or brand...")
+                      : productType === 'laptop'
+                      ? (isRTL ? "ابحث بالرقم التسلسلي أو الموديل..." : "Search laptop by serial or model...")
+                      : productType === 'desktop'
+                      ? (isRTL ? "ابحث بالرقم التسلسلي أو الموديل..." : "Search desktop by serial or model...")
                       : productType === 'keyboard'
                       ? (isRTL ? "ابحث بالرقم التسلسلي أو النوع..." : "Search keyboard by serial or type...")
                       : (isRTL ? "ابحث بالشاشة أو الدقة..." : "Search LCD by serial or resolution...")
@@ -768,12 +922,26 @@ export default function BatteryPOS() {
                     ? (isRTL ? 'البطاريات المتاحة' : 'Available Batteries')
                     : productType === 'adapter'
                     ? (isRTL ? 'الشواحن المتاحة' : 'Available AC Adapters')
+                    : productType === 'laptop'
+                    ? (isRTL ? 'اللابتوبات المتاحة' : 'Available Laptops')
+                    : productType === 'desktop'
+                    ? (isRTL ? 'أجهزة الديسكتوب المتاحة' : 'Available Desktops')
                     : productType === 'keyboard'
                     ? (isRTL ? 'الكيبوردات المتاحة' : 'Available Keyboards')
                     : (isRTL ? 'شاشات LCD المتاحة' : 'Available LCDs')
                   }
                   <Badge variant="secondary" className="ms-auto">
-                    {productType === 'battery' ? displayBatteries.length : productType === 'adapter' ? displayAdapters.length : productType === 'keyboard' ? displayKeyboards.length : displayLcds.length}
+                    {productType === 'battery'
+                      ? displayBatteries.length
+                      : productType === 'adapter'
+                      ? displayAdapters.length
+                      : productType === 'laptop'
+                      ? displayLaptops.length
+                      : productType === 'desktop'
+                      ? displayDesktops.length
+                      : productType === 'keyboard'
+                      ? displayKeyboards.length
+                      : displayLcds.length}
                   </Badge>
                 </CardTitle>
               </CardHeader>
@@ -849,6 +1017,70 @@ export default function BatteryPOS() {
                           <div className="flex items-center justify-between gap-2 text-xs">
                             <span className="text-muted-foreground truncate">{adapter.connectorType || adapter.partNumber}</span>
                             <span className="font-bold text-primary">{formatPrice(adapter.sellingPrice || '0')}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : productType === 'laptop' ? (
+                  displayLaptops.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Monitor className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>{isRTL ? 'لا توجد لابتوبات' : 'No laptops found'}</p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                      {displayLaptops.map((laptop) => (
+                        <div
+                          key={laptop.id}
+                          className="p-3 border rounded-lg hover-elevate cursor-pointer transition-all"
+                          onClick={() => addLaptopToCart(laptop)}
+                          data-testid={`laptop-item-${laptop.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{laptop.brand}{laptop.model ? ` ${laptop.model}` : ''}</p>
+                              <p className="text-xs text-muted-foreground truncate">{laptop.serialNumber}</p>
+                            </div>
+                            <Badge variant={(laptop.stockQuantity || 0) <= (laptop.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">
+                              {laptop.stockQuantity || 0}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground truncate">{laptop.cpu || laptop.ram || laptop.storage || laptop.partNumber}</span>
+                            <span className="font-bold text-primary">{formatPrice(laptop.sellingPrice || '0')}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )
+                ) : productType === 'desktop' ? (
+                  displayDesktops.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <Package className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>{isRTL ? 'لا توجد أجهزة ديسكتوب' : 'No desktops found'}</p>
+                    </div>
+                  ) : (
+                    <div className="grid sm:grid-cols-2 gap-3 max-h-[50vh] overflow-y-auto">
+                      {displayDesktops.map((desktop) => (
+                        <div
+                          key={desktop.id}
+                          className="p-3 border rounded-lg hover-elevate cursor-pointer transition-all"
+                          onClick={() => addDesktopToCart(desktop)}
+                          data-testid={`desktop-item-${desktop.id}`}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-sm truncate">{desktop.brand}{desktop.model ? ` ${desktop.model}` : ''}</p>
+                              <p className="text-xs text-muted-foreground truncate">{desktop.serialNumber}</p>
+                            </div>
+                            <Badge variant={(desktop.stockQuantity || 0) <= (desktop.minStockLevel || 2) ? "destructive" : "secondary"} className="shrink-0">
+                              {desktop.stockQuantity || 0}
+                            </Badge>
+                          </div>
+                          <div className="flex items-center justify-between gap-2 text-xs">
+                            <span className="text-muted-foreground truncate">{desktop.cpu || desktop.ram || desktop.storage || desktop.partNumber}</span>
+                            <span className="font-bold text-primary">{formatPrice(desktop.sellingPrice || '0')}</span>
                           </div>
                         </div>
                       ))}

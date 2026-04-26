@@ -47,7 +47,7 @@ import {
   Monitor,
   Languages
 } from "lucide-react";
-import type { LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import type { LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 import QRCode from "@/components/QRCode";
 
 interface BatteryUserAuth {
@@ -106,6 +106,26 @@ export default function BatteryDashboard() {
 
   const { data: lowStockAdapters = [] } = useQuery<AcAdapter[]>({
     queryKey: ['/api/battery/adapters/low-stock'],
+    enabled: !!currentUser,
+  });
+
+  const { data: laptops = [] } = useQuery<LaptopItem[]>({
+    queryKey: ['/api/battery/laptops'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lowStockLaptops = [] } = useQuery<LaptopItem[]>({
+    queryKey: ['/api/battery/laptops/low-stock'],
+    enabled: !!currentUser,
+  });
+
+  const { data: desktops = [] } = useQuery<DesktopItem[]>({
+    queryKey: ['/api/battery/desktops'],
+    enabled: !!currentUser,
+  });
+
+  const { data: lowStockDesktops = [] } = useQuery<DesktopItem[]>({
+    queryKey: ['/api/battery/desktops/low-stock'],
     enabled: !!currentUser,
   });
 
@@ -304,6 +324,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   const displayBatteries = searchQuery.trim() ? searchResults : batteries;
   const totalStock = batteries.reduce((sum, b) => sum + (b.stockQuantity || 0), 0);
   const totalAdapterStock = adapters.reduce((sum, a) => sum + (a.stockQuantity || 0), 0);
+  const totalLaptopStock = laptops.reduce((sum, l) => sum + (l.stockQuantity || 0), 0);
+  const totalDesktopStock = desktops.reduce((sum, d) => sum + (d.stockQuantity || 0), 0);
   const totalKeyboardStock = keyboards.reduce((sum, k) => sum + (k.stockQuantity || 0), 0);
   const totalLcdStock = lcds.reduce((sum, l) => sum + (l.stockQuantity || 0), 0);
 
@@ -447,6 +469,62 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
               clickable: lowStockAdapters.length > 0,
               onClick: () => setLocation("/battery/manage?tab=adapters&lowstock=true"),
               testId: 'stat-low-stock-adapters'
+            },
+            {
+              label: language === 'ar' ? 'أنواع اللابتوبات' : 'Laptop Types',
+              value: laptops.length,
+              icon: Laptop,
+              color: 'text-primary',
+              bg: 'bg-primary/5',
+              clickable: false,
+              testId: 'stat-laptop-types'
+            },
+            {
+              label: language === 'ar' ? 'وحدات اللابتوبات' : 'Laptop Units',
+              value: totalLaptopStock,
+              icon: Laptop,
+              color: 'text-blue-600',
+              bg: 'bg-blue-50',
+              clickable: false,
+              testId: 'stat-laptop-units'
+            },
+            {
+              label: language === 'ar' ? 'نقص مخزون اللابتوبات' : 'Low Stock Laptops',
+              value: lowStockLaptops.length,
+              icon: AlertTriangle,
+              color: lowStockLaptops.length > 0 ? 'text-red-600' : 'text-slate-400',
+              bg: lowStockLaptops.length > 0 ? 'bg-red-50' : 'bg-slate-50',
+              clickable: lowStockLaptops.length > 0,
+              onClick: () => setLocation("/battery/manage?tab=laptops&lowstock=true"),
+              testId: 'stat-low-stock-laptops'
+            },
+            {
+              label: language === 'ar' ? 'أنواع أجهزة الديسكتوب' : 'Desktop Types',
+              value: desktops.length,
+              icon: Package,
+              color: 'text-primary',
+              bg: 'bg-primary/5',
+              clickable: false,
+              testId: 'stat-desktop-types'
+            },
+            {
+              label: language === 'ar' ? 'وحدات أجهزة الديسكتوب' : 'Desktop Units',
+              value: totalDesktopStock,
+              icon: Package,
+              color: 'text-blue-600',
+              bg: 'bg-blue-50',
+              clickable: false,
+              testId: 'stat-desktop-units'
+            },
+            {
+              label: language === 'ar' ? 'نقص مخزون أجهزة الديسكتوب' : 'Low Stock Desktops',
+              value: lowStockDesktops.length,
+              icon: AlertTriangle,
+              color: lowStockDesktops.length > 0 ? 'text-red-600' : 'text-slate-400',
+              bg: lowStockDesktops.length > 0 ? 'bg-red-50' : 'bg-slate-50',
+              clickable: lowStockDesktops.length > 0,
+              onClick: () => setLocation("/battery/manage?tab=desktops&lowstock=true"),
+              testId: 'stat-low-stock-desktops'
             },
             {
               label: language === 'ar' ? 'أنواع الكيبورد' : 'Keyboard Types',

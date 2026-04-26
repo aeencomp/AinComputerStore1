@@ -43,7 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import type { LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 
 export default function BatteryManage() {
   const { language, setLanguage } = useLanguage();
@@ -58,7 +58,7 @@ export default function BatteryManage() {
   const tabParam = urlParams.get('tab');
   
   const [activeTab, setActiveTab] = useState(
-    tabParam === 'adapters' || tabParam === 'keyboards' || tabParam === 'lcds' ? tabParam : 'batteries'
+    tabParam === 'adapters' || tabParam === 'laptops' || tabParam === 'desktops' || tabParam === 'keyboards' || tabParam === 'lcds' ? tabParam : 'batteries'
   );
   const [showForm, setShowForm] = useState(false);
   const [editingBattery, setEditingBattery] = useState<LaptopBattery | null>(null);
@@ -106,8 +106,18 @@ export default function BatteryManage() {
   const [showLcdForm, setShowLcdForm] = useState(false);
   const [editingLcd, setEditingLcd] = useState<LcdItem | null>(null);
   const [lcdDeleteConfirm, setLcdDeleteConfirm] = useState<string | null>(null);
+  const [showLaptopForm, setShowLaptopForm] = useState(false);
+  const [editingLaptop, setEditingLaptop] = useState<LaptopItem | null>(null);
+  const [laptopDeleteConfirm, setLaptopDeleteConfirm] = useState<string | null>(null);
+  const [showDesktopForm, setShowDesktopForm] = useState(false);
+  const [editingDesktop, setEditingDesktop] = useState<DesktopItem | null>(null);
+  const [desktopDeleteConfirm, setDesktopDeleteConfirm] = useState<string | null>(null);
   const [adapterSearchQuery, setAdapterSearchQuery] = useState("");
   const [showAdapterLowStockOnly, setShowAdapterLowStockOnly] = useState(false);
+  const [laptopSearchQuery, setLaptopSearchQuery] = useState("");
+  const [showLaptopLowStockOnly, setShowLaptopLowStockOnly] = useState(lowstockParam === 'true' && tabParam === 'laptops');
+  const [desktopSearchQuery, setDesktopSearchQuery] = useState("");
+  const [showDesktopLowStockOnly, setShowDesktopLowStockOnly] = useState(lowstockParam === 'true' && tabParam === 'desktops');
   const [keyboardSearchQuery, setKeyboardSearchQuery] = useState("");
   const [showKeyboardLowStockOnly, setShowKeyboardLowStockOnly] = useState(lowstockParam === 'true' && tabParam === 'keyboards');
   const [lcdSearchQuery, setLcdSearchQuery] = useState("");
@@ -173,6 +183,44 @@ export default function BatteryManage() {
     notes: "",
   });
 
+  const [laptopFormData, setLaptopFormData] = useState({
+    serialNumber: "",
+    partNumber: "",
+    brand: "",
+    model: "",
+    cpu: "",
+    ram: "",
+    storage: "",
+    gpu: "",
+    stockQuantity: "0",
+    minStockLevel: "2",
+    purchasePrice: "",
+    sellingPrice: "",
+    wholesalePrice: "",
+    supplier: "",
+    location: "",
+    notes: "",
+  });
+
+  const [desktopFormData, setDesktopFormData] = useState({
+    serialNumber: "",
+    partNumber: "",
+    brand: "",
+    model: "",
+    cpu: "",
+    ram: "",
+    storage: "",
+    gpu: "",
+    stockQuantity: "0",
+    minStockLevel: "2",
+    purchasePrice: "",
+    sellingPrice: "",
+    wholesalePrice: "",
+    supplier: "",
+    location: "",
+    notes: "",
+  });
+
   const { data: currentUser, isLoading: authLoading } = useQuery({
     queryKey: ['/api/battery/auth/me'],
     retry: false,
@@ -195,6 +243,16 @@ export default function BatteryManage() {
 
   const { data: lcds = [], isLoading: lcdsLoading } = useQuery<LcdItem[]>({
     queryKey: ['/api/battery/lcds'],
+    enabled: !!currentUser,
+  });
+
+  const { data: laptops = [], isLoading: laptopsLoading } = useQuery<LaptopItem[]>({
+    queryKey: ['/api/battery/laptops'],
+    enabled: !!currentUser,
+  });
+
+  const { data: desktops = [], isLoading: desktopsLoading } = useQuery<DesktopItem[]>({
+    queryKey: ['/api/battery/desktops'],
     enabled: !!currentUser,
   });
 
@@ -414,6 +472,144 @@ export default function BatteryManage() {
       queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds/low-stock'] });
       toast({ title: language === 'ar' ? 'تم حذف شاشة LCD' : 'LCD deleted' });
       setLcdDeleteConfirm(null);
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Laptop mutations
+  const createLaptopMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest('POST', '/api/battery/laptops', data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم إضافة اللابتوب بنجاح' : 'Laptop added successfully' });
+      setShowLaptopForm(false);
+      setEditingLaptop(null);
+      setLaptopFormData({
+        serialNumber: "",
+        partNumber: "",
+        brand: "",
+        model: "",
+        cpu: "",
+        ram: "",
+        storage: "",
+        gpu: "",
+        stockQuantity: "0",
+        minStockLevel: "2",
+        purchasePrice: "",
+        sellingPrice: "",
+        wholesalePrice: "",
+        supplier: "",
+        location: "",
+        notes: "",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const updateLaptopMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest('PUT', `/api/battery/laptops/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم تحديث اللابتوب بنجاح' : 'Laptop updated successfully' });
+      setShowLaptopForm(false);
+      setEditingLaptop(null);
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteLaptopMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/battery/laptops/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم حذف اللابتوب' : 'Laptop deleted' });
+      setLaptopDeleteConfirm(null);
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Desktop mutations
+  const createDesktopMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest('POST', '/api/battery/desktops', data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم إضافة الديسكتوب بنجاح' : 'Desktop added successfully' });
+      setShowDesktopForm(false);
+      setEditingDesktop(null);
+      setDesktopFormData({
+        serialNumber: "",
+        partNumber: "",
+        brand: "",
+        model: "",
+        cpu: "",
+        ram: "",
+        storage: "",
+        gpu: "",
+        stockQuantity: "0",
+        minStockLevel: "2",
+        purchasePrice: "",
+        sellingPrice: "",
+        wholesalePrice: "",
+        supplier: "",
+        location: "",
+        notes: "",
+      });
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const updateDesktopMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: any }) => {
+      const res = await apiRequest('PUT', `/api/battery/desktops/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم تحديث الديسكتوب بنجاح' : 'Desktop updated successfully' });
+      setShowDesktopForm(false);
+      setEditingDesktop(null);
+    },
+    onError: (error: any) => {
+      toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteDesktopMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await apiRequest('DELETE', `/api/battery/desktops/${id}`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops/low-stock'] });
+      toast({ title: language === 'ar' ? 'تم حذف الديسكتوب' : 'Desktop deleted' });
+      setDesktopDeleteConfirm(null);
     },
     onError: (error: any) => {
       toast({ title: language === 'ar' ? 'خطأ' : 'Error', description: error.message, variant: 'destructive' });
@@ -1205,7 +1401,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 
       <main className="max-w-4xl mx-auto p-4 space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-4" data-testid="tabs-list">
+          <TabsList className="grid w-full grid-cols-6" data-testid="tabs-list">
             <TabsTrigger value="batteries" data-testid="tab-batteries" className="gap-2">
               <Battery className="h-4 w-4" />
               {language === 'ar' ? 'البطاريات' : 'Batteries'}
@@ -1213,6 +1409,14 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             <TabsTrigger value="adapters" data-testid="tab-adapters" className="gap-2">
               <Plug className="h-4 w-4" />
               {language === 'ar' ? 'الشواحن' : 'AC Adapters'}
+            </TabsTrigger>
+            <TabsTrigger value="laptops" data-testid="tab-laptops" className="gap-2">
+              <Laptop className="h-4 w-4" />
+              {language === 'ar' ? 'لابتوبات' : 'Laptops'}
+            </TabsTrigger>
+            <TabsTrigger value="desktops" data-testid="tab-desktops" className="gap-2">
+              <Package className="h-4 w-4" />
+              {language === 'ar' ? 'ديسكتوب' : 'Desktops'}
             </TabsTrigger>
             <TabsTrigger value="keyboards" data-testid="tab-keyboards" className="gap-2">
               <KeyboardIcon className="h-4 w-4" />
@@ -2067,6 +2271,410 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                           <Save className="h-4 w-4 me-2" />
                         )}
                         {language === 'ar' ? 'حفظ' : 'Save'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Laptops Tab */}
+          <TabsContent value="laptops" data-testid="content-laptops">
+            {!showLaptopForm ? (
+              <>
+                <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => setShowLaptopForm(true)} className="bg-green-600 hover:bg-green-700" data-testid="button-new-laptop">
+                      <Plus className="h-4 w-4 me-2" />
+                      {language === 'ar' ? 'إضافة لابتوب' : 'Add Laptop'}
+                    </Button>
+                  </div>
+                  {laptops.filter(l => (l.stockQuantity || 0) <= (l.minStockLevel || 2)).length > 0 && (
+                    <Button
+                      variant={showLaptopLowStockOnly ? "destructive" : "outline"}
+                      onClick={() => setShowLaptopLowStockOnly(!showLaptopLowStockOnly)}
+                      className="gap-2"
+                      data-testid="button-low-stock-filter-laptops"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                      {language === 'ar' ? 'نقص المخزون' : 'Low Stock'}
+                      <Badge variant="secondary" className={showLaptopLowStockOnly ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}>
+                        {laptops.filter(l => (l.stockQuantity || 0) <= (l.minStockLevel || 2)).length}
+                      </Badge>
+                    </Button>
+                  )}
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                      <CardTitle>
+                        {showLaptopLowStockOnly
+                          ? (language === 'ar' ? 'لابتوبات نقص المخزون' : 'Low Stock Laptops')
+                          : (language === 'ar' ? 'جميع اللابتوبات' : 'All Laptops')}
+                      </CardTitle>
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder={language === 'ar' ? 'بحث...' : 'Search...'}
+                          value={laptopSearchQuery}
+                          onChange={(e) => setLaptopSearchQuery(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-search-laptops"
+                        />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {laptopsLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                    ) : (
+                      <div className="space-y-2">
+                        {laptops
+                          .filter(l => (showLaptopLowStockOnly ? (l.stockQuantity || 0) <= (l.minStockLevel || 2) : true))
+                          .filter(l => {
+                            const q = laptopSearchQuery.trim().toLowerCase();
+                            if (!q) return true;
+                            const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.model || ""} ${l.cpu || ""} ${l.ram || ""} ${l.storage || ""} ${l.gpu || ""} ${l.barcode || ""}`.toLowerCase();
+                            return s.includes(q);
+                          })
+                          .map(l => (
+                            <div key={l.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                              <div className="min-w-0">
+                                <div className="font-semibold truncate">{l.brand} {l.model || ""}</div>
+                                <div className="text-xs text-muted-foreground truncate">{l.serialNumber} {l.barcode ? `| ${l.barcode}` : ''}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={(l.stockQuantity || 0) <= (l.minStockLevel || 2) ? "destructive" : "secondary"}>
+                                  {l.stockQuantity || 0}
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingLaptop(l);
+                                    setLaptopFormData({
+                                      serialNumber: l.serialNumber || "",
+                                      partNumber: l.partNumber || "",
+                                      brand: l.brand || "",
+                                      model: l.model || "",
+                                      cpu: l.cpu || "",
+                                      ram: l.ram || "",
+                                      storage: l.storage || "",
+                                      gpu: l.gpu || "",
+                                      stockQuantity: String(l.stockQuantity || 0),
+                                      minStockLevel: String(l.minStockLevel || 2),
+                                      purchasePrice: l.purchasePrice ? String(parseFloat(l.purchasePrice)) : "",
+                                      sellingPrice: l.sellingPrice ? String(parseFloat(l.sellingPrice)) : "",
+                                      wholesalePrice: l.wholesalePrice ? String(parseFloat(l.wholesalePrice)) : "",
+                                      supplier: l.supplier || "",
+                                      location: l.location || "",
+                                      notes: l.notes || "",
+                                    });
+                                    setShowLaptopForm(true);
+                                  }}
+                                  data-testid={`button-edit-laptop-${l.id}`}
+                                >
+                                  {language === 'ar' ? 'تعديل' : 'Edit'}
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => setLaptopDeleteConfirm(l.id)}
+                                  data-testid={`button-delete-laptop-${l.id}`}
+                                >
+                                  {language === 'ar' ? 'حذف' : 'Delete'}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{editingLaptop ? (language === 'ar' ? 'تعديل لابتوب' : 'Edit Laptop') : (language === 'ar' ? 'إضافة لابتوب' : 'Add Laptop')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const data = {
+                        serialNumber: laptopFormData.serialNumber || undefined,
+                        partNumber: laptopFormData.partNumber || null,
+                        barcode: null,
+                        brand: laptopFormData.brand,
+                        model: laptopFormData.model || null,
+                        cpu: laptopFormData.cpu || null,
+                        ram: laptopFormData.ram || null,
+                        storage: laptopFormData.storage || null,
+                        gpu: laptopFormData.gpu || null,
+                        stockQuantity: parseInt(laptopFormData.stockQuantity) || 0,
+                        minStockLevel: parseInt(laptopFormData.minStockLevel) || 2,
+                        purchasePrice: laptopFormData.purchasePrice || null,
+                        sellingPrice: laptopFormData.sellingPrice || null,
+                        wholesalePrice: laptopFormData.wholesalePrice || null,
+                        supplier: laptopFormData.supplier || null,
+                        location: laptopFormData.location || null,
+                        notes: laptopFormData.notes || null,
+                      };
+                      if (editingLaptop) updateLaptopMutation.mutate({ id: editingLaptop.id, data });
+                      else createLaptopMutation.mutate(data);
+                    }}
+                    className="space-y-4"
+                    data-testid="form-laptop"
+                  >
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>{language === 'ar' ? 'الرقم التسلسلي' : 'Serial Number'}</Label>
+                        <Input value={laptopFormData.serialNumber} onChange={(e) => setLaptopFormData(v => ({ ...v, serialNumber: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الماركة' : 'Brand'}</Label>
+                        <Input value={laptopFormData.brand} onChange={(e) => setLaptopFormData(v => ({ ...v, brand: e.target.value }))} required />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الموديل' : 'Model'}</Label>
+                        <Input value={laptopFormData.model} onChange={(e) => setLaptopFormData(v => ({ ...v, model: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>CPU</Label>
+                        <Input value={laptopFormData.cpu} onChange={(e) => setLaptopFormData(v => ({ ...v, cpu: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>RAM</Label>
+                        <Input value={laptopFormData.ram} onChange={(e) => setLaptopFormData(v => ({ ...v, ram: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'التخزين' : 'Storage'}</Label>
+                        <Input value={laptopFormData.storage} onChange={(e) => setLaptopFormData(v => ({ ...v, storage: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>GPU</Label>
+                        <Input value={laptopFormData.gpu} onChange={(e) => setLaptopFormData(v => ({ ...v, gpu: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الكمية' : 'Stock Qty'}</Label>
+                        <Input type="number" value={laptopFormData.stockQuantity} onChange={(e) => setLaptopFormData(v => ({ ...v, stockQuantity: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>{language === 'ar' ? 'ملاحظات' : 'Notes'}</Label>
+                      <Textarea value={laptopFormData.notes} onChange={(e) => setLaptopFormData(v => ({ ...v, notes: e.target.value }))} />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={createLaptopMutation.isPending || updateLaptopMutation.isPending}>
+                        {(createLaptopMutation.isPending || updateLaptopMutation.isPending) ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+                        {language === 'ar' ? 'حفظ' : 'Save'}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => { setShowLaptopForm(false); setEditingLaptop(null); }}>
+                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Desktops Tab */}
+          <TabsContent value="desktops" data-testid="content-desktops">
+            {!showDesktopForm ? (
+              <>
+                <div className="flex flex-col sm:flex-row gap-4 items-stretch sm:items-center justify-between">
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={() => setShowDesktopForm(true)} className="bg-green-600 hover:bg-green-700" data-testid="button-new-desktop">
+                      <Plus className="h-4 w-4 me-2" />
+                      {language === 'ar' ? 'إضافة ديسكتوب' : 'Add Desktop'}
+                    </Button>
+                  </div>
+                  {desktops.filter(d => (d.stockQuantity || 0) <= (d.minStockLevel || 2)).length > 0 && (
+                    <Button
+                      variant={showDesktopLowStockOnly ? "destructive" : "outline"}
+                      onClick={() => setShowDesktopLowStockOnly(!showDesktopLowStockOnly)}
+                      className="gap-2"
+                      data-testid="button-low-stock-filter-desktops"
+                    >
+                      <AlertTriangle className="h-4 w-4" />
+                      {language === 'ar' ? 'نقص المخزون' : 'Low Stock'}
+                      <Badge variant="secondary" className={showDesktopLowStockOnly ? "bg-white/20 text-white" : "bg-red-100 text-red-700"}>
+                        {desktops.filter(d => (d.stockQuantity || 0) <= (d.minStockLevel || 2)).length}
+                      </Badge>
+                    </Button>
+                  )}
+                </div>
+
+                <Card>
+                  <CardHeader>
+                    <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                      <CardTitle>
+                        {showDesktopLowStockOnly
+                          ? (language === 'ar' ? 'ديسكتوب نقص المخزون' : 'Low Stock Desktops')
+                          : (language === 'ar' ? 'جميع أجهزة الديسكتوب' : 'All Desktops')}
+                      </CardTitle>
+                      <div className="relative w-full sm:w-64">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder={language === 'ar' ? 'بحث...' : 'Search...'}
+                          value={desktopSearchQuery}
+                          onChange={(e) => setDesktopSearchQuery(e.target.value)}
+                          className="pl-9"
+                          data-testid="input-search-desktops"
+                        />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    {desktopsLoading ? (
+                      <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
+                    ) : (
+                      <div className="space-y-2">
+                        {desktops
+                          .filter(d => (showDesktopLowStockOnly ? (d.stockQuantity || 0) <= (d.minStockLevel || 2) : true))
+                          .filter(d => {
+                            const q = desktopSearchQuery.trim().toLowerCase();
+                            if (!q) return true;
+                            const s = `${d.serialNumber} ${d.partNumber || ""} ${d.brand} ${d.model || ""} ${d.cpu || ""} ${d.ram || ""} ${d.storage || ""} ${d.gpu || ""} ${d.barcode || ""}`.toLowerCase();
+                            return s.includes(q);
+                          })
+                          .map(d => (
+                            <div key={d.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                              <div className="min-w-0">
+                                <div className="font-semibold truncate">{d.brand} {d.model || ""}</div>
+                                <div className="text-xs text-muted-foreground truncate">{d.serialNumber} {d.barcode ? `| ${d.barcode}` : ''}</div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Badge variant={(d.stockQuantity || 0) <= (d.minStockLevel || 2) ? "destructive" : "secondary"}>
+                                  {d.stockQuantity || 0}
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingDesktop(d);
+                                    setDesktopFormData({
+                                      serialNumber: d.serialNumber || "",
+                                      partNumber: d.partNumber || "",
+                                      brand: d.brand || "",
+                                      model: d.model || "",
+                                      cpu: d.cpu || "",
+                                      ram: d.ram || "",
+                                      storage: d.storage || "",
+                                      gpu: d.gpu || "",
+                                      stockQuantity: String(d.stockQuantity || 0),
+                                      minStockLevel: String(d.minStockLevel || 2),
+                                      purchasePrice: d.purchasePrice ? String(parseFloat(d.purchasePrice)) : "",
+                                      sellingPrice: d.sellingPrice ? String(parseFloat(d.sellingPrice)) : "",
+                                      wholesalePrice: d.wholesalePrice ? String(parseFloat(d.wholesalePrice)) : "",
+                                      supplier: d.supplier || "",
+                                      location: d.location || "",
+                                      notes: d.notes || "",
+                                    });
+                                    setShowDesktopForm(true);
+                                  }}
+                                  data-testid={`button-edit-desktop-${d.id}`}
+                                >
+                                  {language === 'ar' ? 'تعديل' : 'Edit'}
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="sm"
+                                  onClick={() => setDesktopDeleteConfirm(d.id)}
+                                  data-testid={`button-delete-desktop-${d.id}`}
+                                >
+                                  {language === 'ar' ? 'حذف' : 'Delete'}
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle>{editingDesktop ? (language === 'ar' ? 'تعديل ديسكتوب' : 'Edit Desktop') : (language === 'ar' ? 'إضافة ديسكتوب' : 'Add Desktop')}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      const data = {
+                        serialNumber: desktopFormData.serialNumber || undefined,
+                        partNumber: desktopFormData.partNumber || null,
+                        barcode: null,
+                        brand: desktopFormData.brand,
+                        model: desktopFormData.model || null,
+                        cpu: desktopFormData.cpu || null,
+                        ram: desktopFormData.ram || null,
+                        storage: desktopFormData.storage || null,
+                        gpu: desktopFormData.gpu || null,
+                        stockQuantity: parseInt(desktopFormData.stockQuantity) || 0,
+                        minStockLevel: parseInt(desktopFormData.minStockLevel) || 2,
+                        purchasePrice: desktopFormData.purchasePrice || null,
+                        sellingPrice: desktopFormData.sellingPrice || null,
+                        wholesalePrice: desktopFormData.wholesalePrice || null,
+                        supplier: desktopFormData.supplier || null,
+                        location: desktopFormData.location || null,
+                        notes: desktopFormData.notes || null,
+                      };
+                      if (editingDesktop) updateDesktopMutation.mutate({ id: editingDesktop.id, data });
+                      else createDesktopMutation.mutate(data);
+                    }}
+                    className="space-y-4"
+                    data-testid="form-desktop"
+                  >
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>{language === 'ar' ? 'الرقم التسلسلي' : 'Serial Number'}</Label>
+                        <Input value={desktopFormData.serialNumber} onChange={(e) => setDesktopFormData(v => ({ ...v, serialNumber: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الماركة' : 'Brand'}</Label>
+                        <Input value={desktopFormData.brand} onChange={(e) => setDesktopFormData(v => ({ ...v, brand: e.target.value }))} required />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الموديل' : 'Model'}</Label>
+                        <Input value={desktopFormData.model} onChange={(e) => setDesktopFormData(v => ({ ...v, model: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>CPU</Label>
+                        <Input value={desktopFormData.cpu} onChange={(e) => setDesktopFormData(v => ({ ...v, cpu: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>RAM</Label>
+                        <Input value={desktopFormData.ram} onChange={(e) => setDesktopFormData(v => ({ ...v, ram: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'التخزين' : 'Storage'}</Label>
+                        <Input value={desktopFormData.storage} onChange={(e) => setDesktopFormData(v => ({ ...v, storage: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>GPU</Label>
+                        <Input value={desktopFormData.gpu} onChange={(e) => setDesktopFormData(v => ({ ...v, gpu: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الكمية' : 'Stock Qty'}</Label>
+                        <Input type="number" value={desktopFormData.stockQuantity} onChange={(e) => setDesktopFormData(v => ({ ...v, stockQuantity: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div>
+                      <Label>{language === 'ar' ? 'ملاحظات' : 'Notes'}</Label>
+                      <Textarea value={desktopFormData.notes} onChange={(e) => setDesktopFormData(v => ({ ...v, notes: e.target.value }))} />
+                    </div>
+                    <div className="flex gap-2">
+                      <Button type="submit" className="bg-green-600 hover:bg-green-700" disabled={createDesktopMutation.isPending || updateDesktopMutation.isPending}>
+                        {(createDesktopMutation.isPending || updateDesktopMutation.isPending) ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+                        {language === 'ar' ? 'حفظ' : 'Save'}
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => { setShowDesktopForm(false); setEditingDesktop(null); }}>
+                        {language === 'ar' ? 'إلغاء' : 'Cancel'}
                       </Button>
                     </div>
                   </form>
