@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, repairTicketStatusHistory, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -3266,6 +3266,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/repair-tickets/:id/status-history", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const ticket = await storage.getRepairTicket(id);
+      if (!ticket) return res.status(404).json({ error: "Repair ticket not found" });
+      const rows = await db
+        .select()
+        .from(repairTicketStatusHistory)
+        .where(eq(repairTicketStatusHistory.ticketId, id))
+        .orderBy(desc(repairTicketStatusHistory.changedAt));
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error fetching status history:", error);
+      return res.status(500).json({ error: "Failed to fetch status history" });
+    }
+  });
+
   app.patch("/api/admin/repair-tickets/:id", async (req, res) => {
     try {
       const { id } = req.params;
@@ -3348,6 +3365,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!ticket) {
         return res.status(404).json({ error: "Repair ticket not found" });
+      }
+
+      if (existing && updateData.status && existing.status !== updateData.status) {
+        await db.insert(repairTicketStatusHistory).values({
+          ticketId: ticket.id,
+          fromStatus: existing.status,
+          toStatus: updateData.status,
+          changedAt: new Date(),
+        });
       }
       
       // Send WhatsApp update notification (non-blocking)

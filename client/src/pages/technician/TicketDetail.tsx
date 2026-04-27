@@ -40,6 +40,14 @@ interface Technician {
   permissions: string[];
 }
 
+interface TicketStatusHistoryRow {
+  id: number;
+  ticketId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  changedAt: string;
+}
+
 export default function TicketDetail() {
   const [, params] = useRoute('/technician/tickets/:id');
   const [, setLocation] = useLocation();
@@ -64,6 +72,16 @@ export default function TicketDetail() {
 
   const { data: ticket, isLoading } = useQuery<RepairTicket>({
     queryKey: ['/api/repair-tickets', params?.id],
+    enabled: !!params?.id,
+  });
+
+  const { data: statusHistory = [] } = useQuery<TicketStatusHistoryRow[]>({
+    queryKey: ['/api/repair-tickets', params?.id, 'status-history'],
+    queryFn: async () => {
+      const res = await fetch(`/api/repair-tickets/${params!.id}/status-history`, { credentials: 'include' });
+      if (!res.ok) throw new Error('failed');
+      return res.json();
+    },
     enabled: !!params?.id,
   });
 
@@ -301,7 +319,9 @@ export default function TicketDetail() {
       card: isRTL ? 'بطاقة' : 'Card',
     };
     const ticketPaymentMethod = (ticket as any).paymentMethod || 'cash';
-    const intakeDate = format(new Date(ticket.createdAt), 'dd/MM/yyyy');
+    const intakeAt = (ticket as any).receivedAt || ticket.createdAt;
+    const intakeDate = format(new Date(intakeAt), 'dd/MM/yyyy');
+    const intakeTime = format(new Date(intakeAt), 'HH:mm');
     const deliveryDate = ticket.deliveredAt
       ? format(new Date(ticket.deliveredAt), 'dd/MM/yyyy')
       : (isRTL ? 'لم يُسلَّم بعد' : 'Not delivered yet');
@@ -341,7 +361,7 @@ export default function TicketDetail() {
           <div class="row"><span class="lbl">${isRTL ? 'الأولوية:' : 'Priority:'}</span><span>${priorityMap[ticket.priority] || ticket.priority}</span></div>
           <div class="row"><span class="lbl">${isRTL ? 'الدفع:' : 'Payment:'}</span><span>${paymentMap[ticket.paymentStatus || 'unpaid'] || ticket.paymentStatus}${ticket.paymentStatus === 'paid' ? ` — ${paymentMethodMap[ticketPaymentMethod] || ticketPaymentMethod}` : ''}</span></div>
         </div>
-        <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ الاستلام:' : 'Intake Date:'}</span><span>${intakeDate}</span></div>
+        <div class="date-row"><span class="lbl">${isRTL ? 'وقت الاستلام:' : 'Intake Time:'}</span><span>${intakeDate} — ${intakeTime}</span></div>
         <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ التسليم:' : 'Delivery Date:'}</span><span>${deliveryDate}</span></div>
         ${ticket.finalCost ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span><span>${Number(ticket.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ticket.costEstimate ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة التقديرية:' : 'Est. Cost:'}</span><span>${Number(ticket.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
         ${ticket.technicianNotes ? `<div class="notes"><span style="font-weight:900;">${isRTL ? 'ملاحظات:' : 'Notes:'}</span> ${ticket.technicianNotes}</div>` : ''}
@@ -409,7 +429,7 @@ export default function TicketDetail() {
               <div>
                 <Label className="text-muted-foreground">{isRTL ? 'تاريخ الاستلام' : 'Intake Date'}</Label>
                 <p className="font-medium" data-testid="text-intake-date">
-                  {format(new Date(ticket.createdAt), 'dd/MM/yyyy')}
+                  {format(new Date((ticket as any).receivedAt || ticket.createdAt), 'dd/MM/yyyy HH:mm')}
                 </p>
               </div>
               <div>
@@ -447,6 +467,28 @@ export default function TicketDetail() {
             <div>
               <Label className="text-muted-foreground">{t('repair.ticket.issueDescription')}</Label>
               <p className="mt-2">{ticket.issueDescriptionAr || ticket.issueDescriptionEn}</p>
+            </div>
+
+            <div className="pt-2">
+              <Label className="text-muted-foreground">{isRTL ? 'سجل تغيّر الحالة' : 'Status Change Timeline'}</Label>
+              {statusHistory.length === 0 ? (
+                <p className="text-sm text-muted-foreground mt-2">{isRTL ? 'لا يوجد سجل بعد' : 'No history yet'}</p>
+              ) : (
+                <div className="mt-2 space-y-2">
+                  {statusHistory.map((h) => (
+                    <div key={h.id} className="flex items-center justify-between gap-3 p-2 border rounded-md">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {(h.fromStatus ? `${h.fromStatus} → ` : '') + h.toStatus}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(h.changedAt), 'dd/MM/yyyy HH:mm')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

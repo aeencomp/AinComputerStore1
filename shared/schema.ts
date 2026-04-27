@@ -387,6 +387,8 @@ export const repairTickets = pgTable("repair_tickets", {
   isArchived: integer("is_archived").notNull().default(0),
   completedAt: timestamp("completed_at"),
   deliveredAt: timestamp("delivered_at"),
+  /** When customer brought device in (intake time). */
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -400,6 +402,22 @@ export const insertRepairTicketSchema = createInsertSchema(repairTickets).omit({
 
 export type InsertRepairTicket = z.infer<typeof insertRepairTicketSchema>;
 export type RepairTicket = typeof repairTickets.$inferSelect;
+
+export const repairTicketStatusHistory = pgTable("repair_ticket_status_history", {
+  id: serial("id").primaryKey(),
+  ticketId: varchar("ticket_id").notNull(), // repair_tickets.id
+  fromStatus: text("from_status"),
+  toStatus: text("to_status").notNull(),
+  changedAt: timestamp("changed_at").defaultNow().notNull(),
+});
+
+export const insertRepairTicketStatusHistorySchema = createInsertSchema(repairTicketStatusHistory).omit({
+  id: true,
+  changedAt: true,
+});
+
+export type InsertRepairTicketStatusHistory = z.infer<typeof insertRepairTicketStatusHistorySchema>;
+export type RepairTicketStatusHistory = typeof repairTicketStatusHistory.$inferSelect;
 
 // Technician Users for repair management
 export const technicians = pgTable("technicians", {
@@ -776,6 +794,7 @@ export const laptops = pgTable("laptops", {
   barcode: text("barcode"),
   brand: text("brand").notNull(),
   model: text("model"),
+  sizeInch: decimal("size_inch", { precision: 4, scale: 1 }),
   cpu: text("cpu"),
   ram: text("ram"),
   storage: text("storage"),

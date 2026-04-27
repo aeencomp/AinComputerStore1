@@ -1,4 +1,4 @@
-import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct, type RecycleBinItem, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, saasShops, saasUsers, saasRepairCustomers, saasRepairTickets, inStoreProducts, recycleBin } from "@shared/schema";
+import { type Product, type InsertProduct, type CartItemRecord, type InsertCartItem, type Order, type InsertOrder, type User, type InsertUser, type StoreSettings, type InsertStoreSettings, type RepairTicket, type InsertRepairTicket, type RepairCustomer, type InsertRepairCustomer, type Technician, type InsertTechnician, type AdminUser, type InsertAdminUser, type SalesUser, type InsertSalesUser, type MarketPrice, type InsertMarketPrice, type ExternalPriceSource, type InsertExternalPriceSource, type ExchangeRate, type InsertExchangeRate, type InventoryMovement, type InsertInventoryMovement, type BatteryUser, type InsertBatteryUser, type LaptopBattery, type InsertLaptopBattery, type ProductReview, type InsertProductReview, type DiscountCode, type InsertDiscountCode, type BatterySale, type InsertBatterySale, type BatterySaleItem, type InsertBatterySaleItem, type AcAdapter, type InsertAcAdapter, type AdapterSaleItem, type InsertAdapterSaleItem, type SaasShop, type InsertSaasShop, type SaasUser, type InsertSaasUser, type SaasRepairCustomer, type InsertSaasRepairCustomer, type SaasRepairTicket, type InsertSaasRepairTicket, type InStoreProduct, type InsertInStoreProduct, type RecycleBinItem, products, cartItems, orders, users, storeSettings, repairTickets, repairCustomers, technicians, adminUsers, salesUsers, marketPrices, externalPriceSources, exchangeRates, inventoryMovements, batteryUsers, laptopBatteries, productReviews, discountCodes, batterySales, batterySaleItems, acAdapters, adapterSaleItems, saasShops, saasUsers, saasRepairCustomers, saasRepairTickets, inStoreProducts, recycleBin, repairTicketStatusHistory } from "@shared/schema";
 import { db } from "./db.js";
 import { eq, sql, and, desc, lte, or, like, ilike, not, inArray } from "drizzle-orm";
 import type { IStorage } from "./storage";
@@ -363,8 +363,18 @@ export class DrizzleStorage implements IStorage {
       ...insertTicket,
       ticketNumber,
       repairCustomerId,
+      receivedAt: (insertTicket as any).receivedAt || new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
     }).returning();
-    return result[0];
+    const ticket = result[0];
+    await db.insert(repairTicketStatusHistory).values({
+      ticketId: ticket.id,
+      fromStatus: null,
+      toStatus: ticket.status,
+      changedAt: new Date(),
+    });
+    return ticket;
   }
 
   async getRepairTickets(): Promise<RepairTicket[]> {
@@ -390,11 +400,21 @@ export class DrizzleStorage implements IStorage {
   }
 
   async updateRepairTicket(id: string, updates: Partial<InsertRepairTicket>): Promise<RepairTicket | undefined> {
+    const existing = await this.getRepairTicket(id);
     const result = await db.update(repairTickets)
       .set({ ...updates, updatedAt: new Date() })
       .where(eq(repairTickets.id, id))
       .returning();
-    return result[0];
+    const updated = result[0];
+    if (updated && existing && updates.status && updates.status !== existing.status) {
+      await db.insert(repairTicketStatusHistory).values({
+        ticketId: updated.id,
+        fromStatus: existing.status,
+        toStatus: updates.status as any,
+        changedAt: new Date(),
+      });
+    }
+    return updated;
   }
 
   async archiveRepairTicket(id: string, archived: boolean): Promise<RepairTicket | undefined> {

@@ -189,6 +189,7 @@ export default function BatteryManage() {
     partNumber: "",
     brand: "",
     model: "",
+    sizeInch: "",
     cpu: "",
     ram: "",
     storage: "",
@@ -496,6 +497,7 @@ export default function BatteryManage() {
         partNumber: "",
         brand: "",
         model: "",
+        sizeInch: "",
         cpu: "",
         ram: "",
         storage: "",
@@ -2337,13 +2339,15 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                           .filter(l => {
                             const q = laptopSearchQuery.trim().toLowerCase();
                             if (!q) return true;
-                            const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.model || ""} ${l.cpu || ""} ${l.ram || ""} ${l.storage || ""} ${l.gpu || ""} ${l.barcode || ""}`.toLowerCase();
+                            const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.model || ""} ${l.sizeInch || ""} ${l.cpu || ""} ${l.ram || ""} ${l.storage || ""} ${l.gpu || ""} ${l.barcode || ""}`.toLowerCase();
                             return s.includes(q);
                           })
                           .map(l => (
                             <div key={l.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
                               <div className="min-w-0">
-                                <div className="font-semibold truncate">{l.brand} {l.model || ""}</div>
+                                <div className="font-semibold truncate">
+                                  {l.brand} {l.model || ""}{l.sizeInch ? ` ${l.sizeInch}"` : ""}
+                                </div>
                                 <div className="text-xs text-muted-foreground truncate">{l.serialNumber} {l.barcode ? `| ${l.barcode}` : ''}</div>
                               </div>
                               <div className="flex items-center gap-2">
@@ -2360,6 +2364,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                       partNumber: l.partNumber || "",
                                       brand: l.brand || "",
                                       model: l.model || "",
+                                      sizeInch: l.sizeInch ? String(parseFloat(l.sizeInch)) : "",
                                       cpu: l.cpu || "",
                                       ram: l.ram || "",
                                       storage: l.storage || "",
@@ -2410,6 +2415,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                         barcode: null,
                         brand: laptopFormData.brand,
                         model: laptopFormData.model || null,
+                        sizeInch: laptopFormData.sizeInch || null,
                         cpu: laptopFormData.cpu || null,
                         ram: laptopFormData.ram || null,
                         storage: laptopFormData.storage || null,
@@ -2441,6 +2447,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       <div>
                         <Label>{language === 'ar' ? 'الموديل' : 'Model'}</Label>
                         <Input value={laptopFormData.model} onChange={(e) => setLaptopFormData(v => ({ ...v, model: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'حجم الشاشة (إنش)' : 'Screen Size (inch)'}</Label>
+                        <Input type="number" step="0.1" value={laptopFormData.sizeInch} onChange={(e) => setLaptopFormData(v => ({ ...v, sizeInch: e.target.value }))} />
                       </div>
                       <div>
                         <Label>CPU</Label>

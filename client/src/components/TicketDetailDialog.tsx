@@ -43,6 +43,14 @@ interface TicketDetailDialogProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface TicketStatusHistoryRow {
+  id: number;
+  ticketId: string;
+  fromStatus: string | null;
+  toStatus: string;
+  changedAt: string;
+}
+
 export default function TicketDetailDialog({ ticketId, open, onOpenChange }: TicketDetailDialogProps) {
   const { t, language } = useLanguage();
   const { toast } = useToast();
@@ -55,6 +63,16 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
 
   const { data: ticket, isLoading } = useQuery<RepairTicket>({
     queryKey: ['/api/repair-tickets', ticketId],
+    enabled: !!ticketId && open,
+  });
+
+  const { data: statusHistory = [] } = useQuery<TicketStatusHistoryRow[]>({
+    queryKey: ['/api/repair-tickets', ticketId, 'status-history'],
+    queryFn: async () => {
+      const res = await fetch(`/api/repair-tickets/${ticketId}/status-history`, { credentials: 'include' });
+      if (!res.ok) throw new Error('failed');
+      return res.json();
+    },
     enabled: !!ticketId && open,
   });
 
@@ -420,7 +438,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
           </div>` : ''}
 
         <div class="date-time">
-          ${new Date().toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')} - ${new Date().toLocaleTimeString(isRTL ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+          ${isRTL ? 'وقت الاستلام:' : 'Received at:'}
+          ${(ticket as any).receivedAt ? `${new Date((ticket as any).receivedAt).toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')} - ${new Date((ticket as any).receivedAt).toLocaleTimeString(isRTL ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}` : `${new Date(ticket.createdAt).toLocaleDateString(isRTL ? 'ar-IQ' : 'en-US')} - ${new Date(ticket.createdAt).toLocaleTimeString(isRTL ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}`}
         </div>
 
         <div class="section">
@@ -624,6 +643,43 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
           </div>
         ) : ticket ? (
           <div className="space-y-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-muted-foreground">{isRTL ? 'وقت استلام الجهاز' : 'Received At'}</div>
+                <div className="text-sm font-semibold">
+                  {format(new Date((ticket as any).receivedAt || ticket.createdAt), 'dd/MM/yyyy HH:mm')}
+                </div>
+              </div>
+              <div className="rounded-md border p-3">
+                <div className="text-xs text-muted-foreground">{isRTL ? 'آخر تحديث' : 'Last Updated'}</div>
+                <div className="text-sm font-semibold">
+                  {format(new Date(ticket.updatedAt), 'dd/MM/yyyy HH:mm')}
+                </div>
+              </div>
+            </div>
+
+            <div className="rounded-md border p-3">
+              <div className="text-sm font-semibold mb-2">{isRTL ? 'سجل تغيّر الحالة' : 'Status Change Timeline'}</div>
+              {statusHistory.length === 0 ? (
+                <div className="text-sm text-muted-foreground">{isRTL ? 'لا يوجد سجل بعد' : 'No history yet'}</div>
+              ) : (
+                <div className="space-y-2">
+                  {statusHistory.map((h) => (
+                    <div key={h.id} className="flex items-center justify-between gap-3 p-2 rounded border bg-muted/10">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium truncate">
+                          {(h.fromStatus ? `${h.fromStatus} → ` : '') + h.toStatus}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {format(new Date(h.changedAt), 'dd/MM/yyyy HH:mm')}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Customer & Device Info Section */}
             <div>
               <div className="flex items-center justify-between mb-3">
