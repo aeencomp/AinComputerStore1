@@ -32,7 +32,12 @@ import {
   Monitor,
   Printer,
   Package,
-  Languages
+  Languages,
+  Cpu,
+  MemoryStick,
+  HardDrive,
+  BadgeDollarSign,
+  Boxes
 } from "lucide-react";
 import {
   AlertDialog,
@@ -2333,7 +2338,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     {laptopsLoading ? (
                       <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {laptops
                           .filter(l => (showLaptopLowStockOnly ? (l.stockQuantity || 0) <= (l.minStockLevel || 2) : true))
                           .filter(l => {
@@ -2342,59 +2347,104 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                             const s = `${l.serialNumber} ${l.partNumber || ""} ${l.brand} ${l.model || ""} ${l.sizeInch || ""} ${l.cpu || ""} ${l.ram || ""} ${l.storage || ""} ${l.gpu || ""} ${l.barcode || ""}`.toLowerCase();
                             return s.includes(q);
                           })
-                          .map(l => (
-                            <div key={l.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
-                              <div className="min-w-0">
-                                <div className="font-semibold truncate">
-                                  {l.brand} {l.model || ""}{l.sizeInch ? ` ${l.sizeInch}"` : ""}
+                          .map(l => {
+                            const stock = l.stockQuantity || 0;
+                            const minStock = l.minStockLevel || 2;
+                            const isLowStock = stock <= minStock;
+                            const sellPrice = l.sellingPrice ? Math.floor(parseFloat(l.sellingPrice)).toLocaleString() : '-';
+                            const wholesalePrice = l.wholesalePrice ? Math.floor(parseFloat(l.wholesalePrice)).toLocaleString() : '-';
+                            return (
+                              <div key={l.id} className="rounded-xl border bg-gradient-to-b from-background to-muted/20 p-4 shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 space-y-2">
+                                    <div className="font-semibold text-base truncate">
+                                      {l.brand} {l.model || ""}{l.sizeInch ? ` ${l.sizeInch}"` : ""}
+                                    </div>
+                                    <div className="text-xs text-muted-foreground truncate">
+                                      {l.serialNumber} {l.barcode ? `| ${l.barcode}` : ''}
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {l.cpu && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><Cpu className="h-3 w-3" />{l.cpu}</Badge>}
+                                      {l.ram && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><MemoryStick className="h-3 w-3" />{l.ram}</Badge>}
+                                      {l.storage && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><HardDrive className="h-3 w-3" />{l.storage}</Badge>}
+                                      {l.gpu && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><Monitor className="h-3 w-3" />{l.gpu}</Badge>}
+                                    </div>
+                                  </div>
+                                  <Badge variant={isLowStock ? "destructive" : "secondary"} className="text-xs">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Boxes className="h-3 w-3" />
+                                      {language === 'ar' ? `المخزون: ${stock}` : `Stock: ${stock}`}
+                                    </span>
+                                  </Badge>
                                 </div>
-                                <div className="text-xs text-muted-foreground truncate">{l.serialNumber} {l.barcode ? `| ${l.barcode}` : ''}</div>
+
+                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                  <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-emerald-500/30">
+                                    <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                      <BadgeDollarSign className="h-3 w-3" />
+                                      {language === 'ar' ? 'سعر البيع' : 'Selling'}
+                                    </div>
+                                    <div className="font-bold text-emerald-700 dark:text-emerald-300">{sellPrice} IQD</div>
+                                  </div>
+                                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-blue-500/30">
+                                    <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                      <BadgeDollarSign className="h-3 w-3" />
+                                      {language === 'ar' ? 'سعر الجملة' : 'Wholesale'}
+                                    </div>
+                                    <div className="font-bold text-blue-700 dark:text-blue-300">{wholesalePrice} IQD</div>
+                                  </div>
+                                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-amber-500/30">
+                                    <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      {language === 'ar' ? 'الحد الأدنى' : 'Min Stock'}
+                                    </div>
+                                    <div className="font-bold text-amber-700 dark:text-amber-300">{minStock}</div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingLaptop(l);
+                                      setLaptopFormData({
+                                        serialNumber: l.serialNumber || "",
+                                        partNumber: l.partNumber || "",
+                                        brand: l.brand || "",
+                                        model: l.model || "",
+                                        sizeInch: l.sizeInch ? String(parseFloat(l.sizeInch)) : "",
+                                        cpu: l.cpu || "",
+                                        ram: l.ram || "",
+                                        storage: l.storage || "",
+                                        gpu: l.gpu || "",
+                                        stockQuantity: String(l.stockQuantity || 0),
+                                        minStockLevel: String(l.minStockLevel || 2),
+                                        purchasePrice: l.purchasePrice ? String(parseFloat(l.purchasePrice)) : "",
+                                        sellingPrice: l.sellingPrice ? String(parseFloat(l.sellingPrice)) : "",
+                                        wholesalePrice: l.wholesalePrice ? String(parseFloat(l.wholesalePrice)) : "",
+                                        supplier: l.supplier || "",
+                                        location: l.location || "",
+                                        notes: l.notes || "",
+                                      });
+                                      setShowLaptopForm(true);
+                                    }}
+                                    data-testid={`button-edit-laptop-${l.id}`}
+                                  >
+                                    {language === 'ar' ? 'تعديل' : 'Edit'}
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => setLaptopDeleteConfirm(l.id)}
+                                    data-testid={`button-delete-laptop-${l.id}`}
+                                  >
+                                    {language === 'ar' ? 'حذف' : 'Delete'}
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant={(l.stockQuantity || 0) <= (l.minStockLevel || 2) ? "destructive" : "secondary"}>
-                                  {l.stockQuantity || 0}
-                                </Badge>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingLaptop(l);
-                                    setLaptopFormData({
-                                      serialNumber: l.serialNumber || "",
-                                      partNumber: l.partNumber || "",
-                                      brand: l.brand || "",
-                                      model: l.model || "",
-                                      sizeInch: l.sizeInch ? String(parseFloat(l.sizeInch)) : "",
-                                      cpu: l.cpu || "",
-                                      ram: l.ram || "",
-                                      storage: l.storage || "",
-                                      gpu: l.gpu || "",
-                                      stockQuantity: String(l.stockQuantity || 0),
-                                      minStockLevel: String(l.minStockLevel || 2),
-                                      purchasePrice: l.purchasePrice ? String(parseFloat(l.purchasePrice)) : "",
-                                      sellingPrice: l.sellingPrice ? String(parseFloat(l.sellingPrice)) : "",
-                                      wholesalePrice: l.wholesalePrice ? String(parseFloat(l.wholesalePrice)) : "",
-                                      supplier: l.supplier || "",
-                                      location: l.location || "",
-                                      notes: l.notes || "",
-                                    });
-                                    setShowLaptopForm(true);
-                                  }}
-                                  data-testid={`button-edit-laptop-${l.id}`}
-                                >
-                                  {language === 'ar' ? 'تعديل' : 'Edit'}
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => setLaptopDeleteConfirm(l.id)}
-                                  data-testid={`button-delete-laptop-${l.id}`}
-                                >
-                                  {language === 'ar' ? 'حذف' : 'Delete'}
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                       </div>
                     )}
                   </CardContent>
@@ -2575,7 +2625,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     {desktopsLoading ? (
                       <div className="flex justify-center py-8"><Loader2 className="h-6 w-6 animate-spin" /></div>
                     ) : (
-                      <div className="space-y-2">
+                      <div className="space-y-3">
                         {desktops
                           .filter(d => (showDesktopLowStockOnly ? (d.stockQuantity || 0) <= (d.minStockLevel || 2) : true))
                           .filter(d => {
@@ -2584,56 +2634,99 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                             const s = `${d.serialNumber} ${d.partNumber || ""} ${d.brand} ${d.model || ""} ${d.cpu || ""} ${d.ram || ""} ${d.storage || ""} ${d.gpu || ""} ${d.barcode || ""}`.toLowerCase();
                             return s.includes(q);
                           })
-                          .map(d => (
-                            <div key={d.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
-                              <div className="min-w-0">
-                                <div className="font-semibold truncate">{d.brand} {d.model || ""}</div>
-                                <div className="text-xs text-muted-foreground truncate">{d.serialNumber} {d.barcode ? `| ${d.barcode}` : ''}</div>
+                          .map(d => {
+                            const stock = d.stockQuantity || 0;
+                            const minStock = d.minStockLevel || 2;
+                            const isLowStock = stock <= minStock;
+                            const sellPrice = d.sellingPrice ? Math.floor(parseFloat(d.sellingPrice)).toLocaleString() : '-';
+                            const wholesalePrice = d.wholesalePrice ? Math.floor(parseFloat(d.wholesalePrice)).toLocaleString() : '-';
+                            return (
+                              <div key={d.id} className="rounded-xl border bg-gradient-to-b from-background to-muted/20 p-4 shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0 space-y-2">
+                                    <div className="font-semibold text-base truncate">{d.brand} {d.model || ""}</div>
+                                    <div className="text-xs text-muted-foreground truncate">{d.serialNumber} {d.barcode ? `| ${d.barcode}` : ''}</div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {d.cpu && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><Cpu className="h-3 w-3" />{d.cpu}</Badge>}
+                                      {d.ram && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><MemoryStick className="h-3 w-3" />{d.ram}</Badge>}
+                                      {d.storage && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><HardDrive className="h-3 w-3" />{d.storage}</Badge>}
+                                      {d.gpu && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><Monitor className="h-3 w-3" />{d.gpu}</Badge>}
+                                    </div>
+                                  </div>
+                                  <Badge variant={isLowStock ? "destructive" : "secondary"} className="text-xs">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Boxes className="h-3 w-3" />
+                                      {language === 'ar' ? `المخزون: ${stock}` : `Stock: ${stock}`}
+                                    </span>
+                                  </Badge>
+                                </div>
+
+                                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
+                                  <div className="rounded-lg bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-emerald-500/30">
+                                    <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                      <BadgeDollarSign className="h-3 w-3" />
+                                      {language === 'ar' ? 'سعر البيع' : 'Selling'}
+                                    </div>
+                                    <div className="font-bold text-emerald-700 dark:text-emerald-300">{sellPrice} IQD</div>
+                                  </div>
+                                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-blue-500/30">
+                                    <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                      <BadgeDollarSign className="h-3 w-3" />
+                                      {language === 'ar' ? 'سعر الجملة' : 'Wholesale'}
+                                    </div>
+                                    <div className="font-bold text-blue-700 dark:text-blue-300">{wholesalePrice} IQD</div>
+                                  </div>
+                                  <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-amber-500/30">
+                                    <div className="text-[11px] text-muted-foreground inline-flex items-center gap-1">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      {language === 'ar' ? 'الحد الأدنى' : 'Min Stock'}
+                                    </div>
+                                    <div className="font-bold text-amber-700 dark:text-amber-300">{minStock}</div>
+                                  </div>
+                                </div>
+
+                                <div className="mt-3 flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setEditingDesktop(d);
+                                      setDesktopFormData({
+                                        serialNumber: d.serialNumber || "",
+                                        partNumber: d.partNumber || "",
+                                        brand: d.brand || "",
+                                        model: d.model || "",
+                                        cpu: d.cpu || "",
+                                        ram: d.ram || "",
+                                        storage: d.storage || "",
+                                        gpu: d.gpu || "",
+                                        stockQuantity: String(d.stockQuantity || 0),
+                                        minStockLevel: String(d.minStockLevel || 2),
+                                        purchasePrice: d.purchasePrice ? String(parseFloat(d.purchasePrice)) : "",
+                                        sellingPrice: d.sellingPrice ? String(parseFloat(d.sellingPrice)) : "",
+                                        wholesalePrice: d.wholesalePrice ? String(parseFloat(d.wholesalePrice)) : "",
+                                        supplier: d.supplier || "",
+                                        location: d.location || "",
+                                        notes: d.notes || "",
+                                      });
+                                      setShowDesktopForm(true);
+                                    }}
+                                    data-testid={`button-edit-desktop-${d.id}`}
+                                  >
+                                    {language === 'ar' ? 'تعديل' : 'Edit'}
+                                  </Button>
+                                  <Button
+                                    variant="destructive"
+                                    size="sm"
+                                    onClick={() => setDesktopDeleteConfirm(d.id)}
+                                    data-testid={`button-delete-desktop-${d.id}`}
+                                  >
+                                    {language === 'ar' ? 'حذف' : 'Delete'}
+                                  </Button>
+                                </div>
                               </div>
-                              <div className="flex items-center gap-2">
-                                <Badge variant={(d.stockQuantity || 0) <= (d.minStockLevel || 2) ? "destructive" : "secondary"}>
-                                  {d.stockQuantity || 0}
-                                </Badge>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => {
-                                    setEditingDesktop(d);
-                                    setDesktopFormData({
-                                      serialNumber: d.serialNumber || "",
-                                      partNumber: d.partNumber || "",
-                                      brand: d.brand || "",
-                                      model: d.model || "",
-                                      cpu: d.cpu || "",
-                                      ram: d.ram || "",
-                                      storage: d.storage || "",
-                                      gpu: d.gpu || "",
-                                      stockQuantity: String(d.stockQuantity || 0),
-                                      minStockLevel: String(d.minStockLevel || 2),
-                                      purchasePrice: d.purchasePrice ? String(parseFloat(d.purchasePrice)) : "",
-                                      sellingPrice: d.sellingPrice ? String(parseFloat(d.sellingPrice)) : "",
-                                      wholesalePrice: d.wholesalePrice ? String(parseFloat(d.wholesalePrice)) : "",
-                                      supplier: d.supplier || "",
-                                      location: d.location || "",
-                                      notes: d.notes || "",
-                                    });
-                                    setShowDesktopForm(true);
-                                  }}
-                                  data-testid={`button-edit-desktop-${d.id}`}
-                                >
-                                  {language === 'ar' ? 'تعديل' : 'Edit'}
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  size="sm"
-                                  onClick={() => setDesktopDeleteConfirm(d.id)}
-                                  data-testid={`button-delete-desktop-${d.id}`}
-                                >
-                                  {language === 'ar' ? 'حذف' : 'Delete'}
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                       </div>
                     )}
                   </CardContent>
