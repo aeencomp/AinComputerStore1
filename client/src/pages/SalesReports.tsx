@@ -457,7 +457,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
           amount: parseFloat(item.amount || '0') || 0,
           createdAt: item.createdAt,
         })),
-      ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      ].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     : [];
 
   const detailedCashflowByDay = (() => {
@@ -488,10 +488,10 @@ export default function SalesReports({ user }: SalesReportsProps) {
 
     const days = Array.from(map.values())
       .map((d) => ({ ...d, net: d.advancesTotal - d.withdrawalsTotal }))
-      .sort((a, b) => b.date.localeCompare(a.date));
+      .sort((a, b) => a.date.localeCompare(b.date));
 
     for (const day of days) {
-      day.rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      day.rows.sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
     }
 
     return days;
