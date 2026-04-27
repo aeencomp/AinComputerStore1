@@ -37,6 +37,13 @@ interface Technician {
   permissions: string[];
 }
 
+interface RepairReminderResponse {
+  pendingDueCount: number;
+  completedNotPickedDueCount: number;
+  pendingDueIds: string[];
+  completedNotPickedDueIds: string[];
+}
+
 export default function TechnicianDashboard() {
   const [, navigate] = useLocation();
   const { t, language, setLanguage } = useLanguage();
@@ -59,6 +66,27 @@ export default function TechnicianDashboard() {
   const { data: tickets, isLoading: isTicketsLoading } = useQuery<RepairTicket[]>({
     queryKey: ['/api/repair-tickets'],
     enabled: !!currentTechnician,
+  });
+
+  const { data: reminders } = useQuery<RepairReminderResponse>({
+    queryKey: ['/api/admin/repair-tickets/reminders'],
+    queryFn: async () => {
+      const res = await fetch('/api/admin/repair-tickets/reminders', { credentials: 'include' });
+      if (!res.ok) throw new Error('failed');
+      return res.json();
+    },
+    enabled: !!currentTechnician,
+    refetchInterval: 5 * 60 * 1000,
+  });
+
+  const ackRemindersMutation = useMutation({
+    mutationFn: async (payload: { pendingIds?: string[]; completedNotPickedIds?: string[] }) => {
+      const res = await apiRequest('POST', '/api/admin/repair-tickets/reminders/ack', payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/admin/repair-tickets/reminders'] });
+    },
   });
 
   const { data: customers } = useQuery<(RepairCustomer & { ticketCount: number })[]>({
@@ -261,7 +289,7 @@ export default function TechnicianDashboard() {
     return tickets.filter(t => t.status === 'completed' && t.isArchived !== 1);
   }, [tickets]);
 
-  const pendingReminderDueToday = useMemo(() => {
+  const pendingReminderTickets = useMemo(() => {
     if (!tickets) return [];
     const baghdadNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Baghdad' }));
     return tickets.filter(t => {
@@ -269,12 +297,12 @@ export default function TechnicianDashboard() {
       if (t.status !== 'pending') return false;
       const intakeAt = (t as any).receivedAt || t.createdAt;
       const ageDays = Math.floor((baghdadNow.getTime() - new Date(intakeAt).getTime()) / (24 * 60 * 60 * 1000));
-      // Reminder every 2 days starting day 2: 2,4,6,8,...
-      return ageDays >= 2 && ageDays % 2 === 0;
+      // Start reminding once it passes 2 days
+      return ageDays >= 2;
     });
   }, [tickets]);
 
-  const completedNotPickedReminderDueToday = useMemo(() => {
+  const completedNotPickedReminderTickets = useMemo(() => {
     if (!tickets) return [];
     const baghdadNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Baghdad' }));
     return tickets.filter(t => {
@@ -284,8 +312,8 @@ export default function TechnicianDashboard() {
       const completedAt = (t as any).completedAt;
       if (!completedAt) return false;
       const ageDays = Math.floor((baghdadNow.getTime() - new Date(completedAt).getTime()) / (24 * 60 * 60 * 1000));
-      // Reminder every 30 days starting day 30: 30,60,90,...
-      return ageDays >= 30 && ageDays % 30 === 0;
+      // Start reminding once it passes 30 days
+      return ageDays >= 30;
     });
   }, [tickets]);
 
@@ -556,27 +584,30 @@ export default function TechnicianDashboard() {
           </Card>
         </div>
 
-        {!showArchived && (completedNotPickedReminderDueToday.length > 0 || pendingReminderDueToday.length > 0) && (
+        {!showArchived && ((reminders?.completedNotPickedDueCount || 0) > 0 || (reminders?.pendingDueCount || 0) > 0) && (
           <div className="space-y-3 mb-6">
-            {completedNotPickedReminderDueToday.length > 0 && (
+            {(reminders?.completedNotPickedDueCount || 0) > 0 && (
               <Alert className="border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-900/10">
                 <BellRing className="h-4 w-4 text-blue-700 dark:text-blue-400" />
                 <div>
                   <AlertTitle className="flex items-center justify-between gap-2">
                     <span>{language === 'ar' ? 'تذكير: تذاكر مكتملة لم تُستلم' : 'Reminder: Completed (not picked up)'}</span>
-                    <Badge className="bg-blue-600 text-white">{completedNotPickedReminderDueToday.length}</Badge>
+                    <Badge className="bg-blue-600 text-white">{reminders?.completedNotPickedDueCount || 0}</Badge>
                   </AlertTitle>
                   <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="text-sm">
                       {language === 'ar'
-                        ? 'تنبيه شهري (كل 30 يوم) للتذاكر المكتملة التي لم يستلمها الزبون.'
-                        : 'Monthly reminder (every 30 days) for completed tickets not picked up.'}
+                        ? 'تذاكر مكتملة منذ أكثر من شهر ولم يستلمها الزبون.'
+                        : 'Tickets completed for more than 1 month and not picked up.'}
                     </span>
                     <Button
                       size="sm"
                       variant="outline"
                       className="border-blue-300 text-blue-800 hover:bg-blue-100 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/30"
-                      onClick={() => setFilterStatus('completed')}
+                      onClick={() => {
+                        ackRemindersMutation.mutate({ completedNotPickedIds: reminders?.completedNotPickedDueIds || [] });
+                        setFilterStatus('completed');
+                      }}
                       data-testid="button-alert-show-completed"
                     >
                       {language === 'ar' ? 'عرض' : 'Show'}
@@ -586,25 +617,28 @@ export default function TechnicianDashboard() {
               </Alert>
             )}
 
-            {pendingReminderDueToday.length > 0 && (
+            {(reminders?.pendingDueCount || 0) > 0 && (
               <Alert className="border-yellow-200 bg-yellow-50/40 dark:border-yellow-900/40 dark:bg-yellow-900/10">
                 <Clock className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
                 <div>
                   <AlertTitle className="flex items-center justify-between gap-2">
                     <span>{language === 'ar' ? 'تذكير: تذاكر قيد الانتظار' : 'Reminder: Pending Tickets'}</span>
-                    <Badge className="bg-yellow-600 text-white">{pendingReminderDueToday.length}</Badge>
+                    <Badge className="bg-yellow-600 text-white">{reminders?.pendingDueCount || 0}</Badge>
                   </AlertTitle>
                   <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="text-sm">
                       {language === 'ar'
-                        ? 'تذكير كل يومين من وقت الاستلام للتذاكر التي ما زالت قيد الانتظار.'
-                        : 'Reminder every 2 days from intake for tickets still pending.'}
+                        ? 'تذاكر قيد الانتظار منذ أكثر من يومين من وقت الاستلام.'
+                        : 'Pending tickets older than 2 days from intake.'}
                     </span>
                     <Button
                       size="sm"
                       variant="outline"
                       className="border-yellow-300 text-yellow-900 hover:bg-yellow-100 dark:border-yellow-800 dark:text-yellow-300 dark:hover:bg-yellow-900/30"
-                      onClick={() => setFilterStatus('pending')}
+                      onClick={() => {
+                        ackRemindersMutation.mutate({ pendingIds: reminders?.pendingDueIds || [] });
+                        setFilterStatus('pending');
+                      }}
                       data-testid="button-alert-show-overdue-pending"
                     >
                       {language === 'ar' ? 'عرض' : 'Show'}

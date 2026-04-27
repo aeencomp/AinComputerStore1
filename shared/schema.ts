@@ -389,6 +389,10 @@ export const repairTickets = pgTable("repair_tickets", {
   deliveredAt: timestamp("delivered_at"),
   /** When customer brought device in (intake time). */
   receivedAt: timestamp("received_at").defaultNow().notNull(),
+  /** Last time we reminded technicians about pending ticket (for 2-day cadence). */
+  pendingReminderLastAt: timestamp("pending_reminder_last_at"),
+  /** Last time we reminded about completed-not-picked (for 30-day cadence). */
+  completedPickupReminderLastAt: timestamp("completed_pickup_reminder_last_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

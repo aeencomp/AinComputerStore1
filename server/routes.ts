@@ -3283,6 +3283,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/admin/repair-tickets/reminders", async (req, res) => {
+    try {
+      const techUserId = (req.session as any).technicianId;
+      const adminId = (req.session as any).adminId;
+      if (!techUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const now = new Date();
+
+      const all = await db.select().from(repairTickets).where(eq(repairTickets.isArchived, 0));
+
+      const pendingDue: string[] = [];
+      const completedPickupDue: string[] = [];
+
+      const daysBetween = (a: Date, b: Date) => Math.floor((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000));
+
+      for (const t of all) {
+        // Pending reminder every 2 days from last reminder, starting 2 days after intake
+        if (t.status === "pending") {
+          const intakeAt = (t as any).receivedAt || t.createdAt;
+          const intakeDate = new Date(intakeAt as any);
+          const ageFromIntake = daysBetween(now, intakeDate);
+          if (ageFromIntake >= 2) {
+            const last = (t as any).pendingReminderLastAt ? new Date((t as any).pendingReminderLastAt) : null;
+            const sinceLast = last ? daysBetween(now, last) : ageFromIntake;
+            if (sinceLast >= 2) pendingDue.push(t.id);
+          }
+        }
+
+        // Completed-not-picked reminder every 30 days from last reminder, starting 30 days after completion
+        if (t.status === "completed") {
+          const completedAt = (t as any).completedAt;
+          if (completedAt) {
+            const completedDate = new Date(completedAt as any);
+            const ageFromCompleted = daysBetween(now, completedDate);
+            if (ageFromCompleted >= 30) {
+              const last = (t as any).completedPickupReminderLastAt ? new Date((t as any).completedPickupReminderLastAt) : null;
+              const sinceLast = last ? daysBetween(now, last) : ageFromCompleted;
+              if (sinceLast >= 30) completedPickupDue.push(t.id);
+            }
+          }
+        }
+      }
+
+      return res.json({
+        pendingDueCount: pendingDue.length,
+        completedNotPickedDueCount: completedPickupDue.length,
+        pendingDueIds: pendingDue,
+        completedNotPickedDueIds: completedPickupDue,
+      });
+    } catch (error) {
+      console.error("Error computing repair reminders:", error);
+      return res.status(500).json({ error: "Failed to compute reminders" });
+    }
+  });
+
+  app.post("/api/admin/repair-tickets/reminders/ack", async (req, res) => {
+    try {
+      const techUserId = (req.session as any).technicianId;
+      const adminId = (req.session as any).adminId;
+      if (!techUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+
+      const now = new Date();
+      const body = req.body && typeof req.body === "object" ? req.body as any : {};
+      const pendingIds: string[] = Array.isArray(body.pendingIds) ? body.pendingIds.filter((x: any) => typeof x === "string") : [];
+      const completedNotPickedIds: string[] = Array.isArray(body.completedNotPickedIds) ? body.completedNotPickedIds.filter((x: any) => typeof x === "string") : [];
+
+      if (pendingIds.length === 0 && completedNotPickedIds.length === 0) {
+        return res.json({ success: true, pendingAcked: 0, completedAcked: 0 });
+      }
+
+      if (pendingIds.length > 0) {
+        await db.update(repairTickets)
+          .set({ pendingReminderLastAt: now, updatedAt: now })
+          .where(inArray(repairTickets.id, pendingIds));
+      }
+
+      if (completedNotPickedIds.length > 0) {
+        await db.update(repairTickets)
+          .set({ completedPickupReminderLastAt: now, updatedAt: now })
+          .where(inArray(repairTickets.id, completedNotPickedIds));
+      }
+
+      return res.json({ success: true, pendingAcked: pendingIds.length, completedAcked: completedNotPickedIds.length });
+    } catch (error) {
+      console.error("Error acknowledging repair reminders:", error);
+      return res.status(500).json({ error: "Failed to acknowledge reminders" });
+    }
+  });
+
   app.patch("/api/admin/repair-tickets/:id", async (req, res) => {
     try {
       const { id } = req.params;
