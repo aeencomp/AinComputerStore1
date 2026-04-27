@@ -460,22 +460,74 @@ export default function SalesReports({ user }: SalesReportsProps) {
       ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
     : [];
 
+  const detailedCashflowByDay = (() => {
+    const map = new Map<string, {
+      date: string;
+      withdrawalsTotal: number;
+      advancesTotal: number;
+      net: number;
+      rows: typeof detailedCashflowRows;
+    }>();
+
+    for (const row of detailedCashflowRows) {
+      const dateKey = new Date(row.createdAt).toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+      const entry =
+        map.get(dateKey) ||
+        {
+          date: dateKey,
+          withdrawalsTotal: 0,
+          advancesTotal: 0,
+          net: 0,
+          rows: [],
+        };
+      entry.rows.push(row);
+      if (row.type === 'withdrawal') entry.withdrawalsTotal += row.amount;
+      else entry.advancesTotal += row.amount;
+      map.set(dateKey, entry);
+    }
+
+    const days = Array.from(map.values())
+      .map((d) => ({ ...d, net: d.advancesTotal - d.withdrawalsTotal }))
+      .sort((a, b) => b.date.localeCompare(a.date));
+
+    for (const day of days) {
+      day.rows.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+
+    return days;
+  })();
+
   const printMonthlyCashflow = () => {
     if (!monthlyCashflow) return;
     const monthLabel = monthlyCashflow.mode === "range"
       ? `${monthlyCashflow.from} → ${monthlyCashflow.to}`
       : monthlyCashflow.month;
-    const detailedRows = detailedCashflowRows.map((row, i) => `
-      <tr>
-        <td>${i + 1}</td>
-        <td>${formatDate(row.createdAt)}</td>
-        <td>${formatTime(row.createdAt)}</td>
-        <td>${row.type === 'withdrawal' ? 'سحب' : 'دفع من الجيب'}</td>
-        <td>${row.actor}</td>
-        <td>${row.reason || '—'}</td>
-        <td style="text-align:end;${row.type === 'withdrawal' ? 'color:#c2410c' : 'color:#059669'}">${row.type === 'withdrawal' ? '-' : '+'} ${formatPrice(row.amount)}</td>
-      </tr>
-    `).join("");
+    let rowIndex = 0;
+    const detailedRows = detailedCashflowByDay.map((day) => {
+      const header = `
+        <tr>
+          <td colspan="7" style="background:#f9fafb;font-weight:700">
+            ${day.date}
+            <span style="margin-right:10px;color:#c2410c">سحوبات: - ${formatPrice(day.withdrawalsTotal)}</span>
+            <span style="margin-right:10px;color:#059669">دفع من الجيب: + ${formatPrice(day.advancesTotal)}</span>
+            <span style="margin-right:10px;">الصافي: ${formatPrice(day.net)}</span>
+          </td>
+        </tr>`;
+      const rows = day.rows.map((row) => {
+        rowIndex += 1;
+        return `
+          <tr>
+            <td>${rowIndex}</td>
+            <td>${formatDate(row.createdAt)}</td>
+            <td>${formatTime(row.createdAt)}</td>
+            <td>${row.type === 'withdrawal' ? 'سحب' : 'دفع من الجيب'}</td>
+            <td>${row.actor}</td>
+            <td>${row.reason || '—'}</td>
+            <td style="text-align:end;${row.type === 'withdrawal' ? 'color:#c2410c' : 'color:#059669'}">${row.type === 'withdrawal' ? '-' : '+'} ${formatPrice(row.amount)}</td>
+          </tr>`;
+      }).join("");
+      return header + rows;
+    }).join("");
 
     const html = `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -1069,19 +1121,51 @@ export default function SalesReports({ user }: SalesReportsProps) {
                       </tr>
                     </thead>
                     <tbody>
-                      {detailedCashflowRows.map((row, i) => (
-                        <tr key={row.id} className="border-b">
-                          <td className="p-3">{i + 1}</td>
-                          <td className="p-3">{formatDate(row.createdAt)}</td>
-                          <td className="p-3">{formatTime(row.createdAt)}</td>
-                          <td className="p-3">{row.type === 'withdrawal' ? (language === 'ar' ? 'سحب' : 'Withdrawal') : (language === 'ar' ? 'دفع من الجيب' : 'Pay From Pocket')}</td>
-                          <td className="p-3">{row.actor}</td>
-                          <td className="p-3">{row.reason || '—'}</td>
-                          <td className={`p-3 text-end font-semibold ${row.type === 'withdrawal' ? 'text-orange-600' : 'text-emerald-600'}`}>
-                            {row.type === 'withdrawal' ? '-' : '+'} {formatPrice(row.amount)} IQD
-                          </td>
-                        </tr>
-                      ))}
+                      {(() => {
+                        let idx = 0;
+                        return detailedCashflowByDay.flatMap((day) => {
+                          const headerKey = `day-${day.date}`;
+                          const headerRow = (
+                            <tr key={headerKey} className="border-b bg-muted/30">
+                              <td colSpan={7} className="p-3 font-semibold">
+                                <span className="me-3">{day.date}</span>
+                                <span className="me-3 text-orange-700">
+                                  {language === 'ar' ? 'سحوبات:' : 'Withdrawals:'} − {formatPrice(day.withdrawalsTotal)} IQD
+                                </span>
+                                <span className="me-3 text-emerald-700">
+                                  {language === 'ar' ? 'دفع من الجيب:' : 'Pay From Pocket:'} + {formatPrice(day.advancesTotal)} IQD
+                                </span>
+                                <span className="me-3">
+                                  {language === 'ar' ? 'الصافي:' : 'Net:'} {formatPrice(day.net)} IQD
+                                </span>
+                              </td>
+                            </tr>
+                          );
+
+                          const rows = day.rows.map((row) => {
+                            idx += 1;
+                            return (
+                              <tr key={row.id} className="border-b">
+                                <td className="p-3">{idx}</td>
+                                <td className="p-3">{formatDate(row.createdAt)}</td>
+                                <td className="p-3">{formatTime(row.createdAt)}</td>
+                                <td className="p-3">
+                                  {row.type === 'withdrawal'
+                                    ? (language === 'ar' ? 'سحب' : 'Withdrawal')
+                                    : (language === 'ar' ? 'دفع من الجيب' : 'Pay From Pocket')}
+                                </td>
+                                <td className="p-3">{row.actor}</td>
+                                <td className="p-3">{row.reason || '—'}</td>
+                                <td className={`p-3 text-end font-semibold ${row.type === 'withdrawal' ? 'text-orange-600' : 'text-emerald-600'}`}>
+                                  {row.type === 'withdrawal' ? '-' : '+'} {formatPrice(row.amount)} IQD
+                                </td>
+                              </tr>
+                            );
+                          });
+
+                          return [headerRow, ...rows];
+                        });
+                      })()}
                     </tbody>
                   </table>
                 </div>
