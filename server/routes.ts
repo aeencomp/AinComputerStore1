@@ -3313,9 +3313,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
         // Completed-not-picked reminder every 30 days from last reminder, starting 30 days after completion
         if (t.status === "completed") {
-          const completedAt = (t as any).completedAt;
-          if (completedAt) {
-            const completedDate = new Date(completedAt as any);
+          const completedAtFallback = (t as any).completedAt || (t as any).updatedAt || (t as any).createdAt;
+          if (completedAtFallback) {
+            const completedDate = new Date(completedAtFallback as any);
             const ageFromCompleted = daysBetween(now, completedDate);
             if (ageFromCompleted >= 30) {
               const last = (t as any).completedPickupReminderLastAt ? new Date((t as any).completedPickupReminderLastAt) : null;
