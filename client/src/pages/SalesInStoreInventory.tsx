@@ -104,6 +104,7 @@ export default function SalesInStoreInventory({ user }: Props) {
   const [activeTab, setActiveTab] = useState<"inventory" | "stockcount">("inventory");
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [inventoryFilter, setInventoryFilter] = useState<"all" | "in-stock" | "low-stock">("all");
   const [showDialog, setShowDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<InStoreProduct | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
@@ -335,10 +336,19 @@ export default function SalesInStoreInventory({ user }: Props) {
 
   const filtered = products.filter(p => {
     const q = searchQuery.toLowerCase();
-    return !q || p.nameAr.toLowerCase().includes(q) ||
+    const matchesSearch = !q || p.nameAr.toLowerCase().includes(q) ||
       (p.nameEn || '').toLowerCase().includes(q) ||
       (p.sku || '').toLowerCase().includes(q) ||
       (p.barcode || '').toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+
+    if (inventoryFilter === "low-stock") {
+      return p.stockQuantity <= p.lowStockThreshold;
+    }
+    if (inventoryFilter === "in-stock") {
+      return p.stockQuantity > 0;
+    }
+    return true;
   });
 
   const lowStockCount = products.filter(p => p.stockQuantity <= p.lowStockThreshold).length;
@@ -643,24 +653,51 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
         <>
           {/* Stats */}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            <Card>
+            <Card
+              className={`cursor-pointer transition-colors ${inventoryFilter === "all" ? "ring-2 ring-primary border-primary/50" : "hover:border-primary/40"}`}
+              onClick={() => setInventoryFilter("all")}
+              data-testid="card-filter-total-products"
+            >
               <CardContent className="pt-4 pb-3">
                 <p className="text-sm text-muted-foreground">{language === 'ar' ? 'إجمالي المنتجات' : 'Total Products'}</p>
                 <p className="text-2xl font-bold">{products.length}</p>
               </CardContent>
             </Card>
-            <Card>
+            <Card
+              className={`cursor-pointer transition-colors ${inventoryFilter === "in-stock" ? "ring-2 ring-primary border-primary/50" : "hover:border-primary/40"}`}
+              onClick={() => setInventoryFilter("in-stock")}
+              data-testid="card-filter-total-units"
+            >
               <CardContent className="pt-4 pb-3">
                 <p className="text-sm text-muted-foreground">{language === 'ar' ? 'إجمالي الوحدات' : 'Total Units'}</p>
                 <p className="text-2xl font-bold">{products.reduce((s, p) => s + p.stockQuantity, 0)}</p>
               </CardContent>
             </Card>
-            <Card className={lowStockCount > 0 ? 'border-orange-400' : ''}>
+            <Card
+              className={`cursor-pointer transition-colors ${inventoryFilter === "low-stock" ? "ring-2 ring-orange-400 border-orange-500" : lowStockCount > 0 ? "border-orange-400 hover:border-orange-500" : "hover:border-primary/40"}`}
+              onClick={() => setInventoryFilter("low-stock")}
+              data-testid="card-filter-low-stock"
+            >
               <CardContent className="pt-4 pb-3">
                 <p className="text-sm text-muted-foreground">{language === 'ar' ? 'مخزون منخفض' : 'Low Stock'}</p>
                 <p className={`text-2xl font-bold ${lowStockCount > 0 ? 'text-orange-500' : ''}`}>{lowStockCount}</p>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="flex items-center justify-between text-sm">
+            <p className="text-muted-foreground">
+              {inventoryFilter === "all"
+                ? (language === 'ar' ? 'عرض كل المنتجات' : 'Showing all products')
+                : inventoryFilter === "in-stock"
+                ? (language === 'ar' ? 'عرض المنتجات المتوفرة فقط' : 'Showing in-stock products only')
+                : (language === 'ar' ? 'عرض المنتجات منخفضة المخزون فقط' : 'Showing low-stock products only')}
+            </p>
+            {inventoryFilter !== "all" && (
+              <Button variant="ghost" size="sm" onClick={() => setInventoryFilter("all")} data-testid="button-clear-inventory-filter">
+                {language === 'ar' ? 'إظهار الكل' : 'Show All'}
+              </Button>
+            )}
           </div>
 
           {/* Search */}
