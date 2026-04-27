@@ -6474,8 +6474,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const existing = await db.select().from(laptops).where(eq(laptops.serialNumber, finalSerial)).limit(1);
       if (existing.length) return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
-      const barcode = rest.barcode || finalSerial;
-      const [row] = await db.insert(laptops).values({ serialNumber: finalSerial, brand, barcode, ...rest }).returning();
+      const normalizedBarcode = (typeof rest.barcode === "string" && rest.barcode.trim().length > 0)
+        ? rest.barcode.trim()
+        : finalSerial;
+      const cleanValues = {
+        serialNumber: finalSerial,
+        brand,
+        partNumber: typeof rest.partNumber === "string" && rest.partNumber.trim() ? rest.partNumber.trim() : null,
+        barcode: normalizedBarcode,
+        model: typeof rest.model === "string" && rest.model.trim() ? rest.model.trim() : null,
+        sizeInch: rest.sizeInch === "" || rest.sizeInch === undefined ? null : rest.sizeInch,
+        cpu: typeof rest.cpu === "string" && rest.cpu.trim() ? rest.cpu.trim() : null,
+        ram: typeof rest.ram === "string" && rest.ram.trim() ? rest.ram.trim() : null,
+        storage: typeof rest.storage === "string" && rest.storage.trim() ? rest.storage.trim() : null,
+        gpu: typeof rest.gpu === "string" && rest.gpu.trim() ? rest.gpu.trim() : null,
+        stockQuantity: typeof rest.stockQuantity === "number" ? rest.stockQuantity : parseInt(rest.stockQuantity, 10) || 0,
+        minStockLevel: typeof rest.minStockLevel === "number" ? rest.minStockLevel : parseInt(rest.minStockLevel, 10) || 2,
+        purchasePrice: rest.purchasePrice || null,
+        sellingPrice: rest.sellingPrice || null,
+        wholesalePrice: rest.wholesalePrice || null,
+        supplier: typeof rest.supplier === "string" && rest.supplier.trim() ? rest.supplier.trim() : null,
+        location: typeof rest.location === "string" && rest.location.trim() ? rest.location.trim() : null,
+        notes: typeof rest.notes === "string" && rest.notes.trim() ? rest.notes.trim() : null,
+      };
+      const [row] = await db.insert(laptops).values(cleanValues).returning();
       return res.status(201).json(row);
     } catch (error) {
       console.error("Error creating laptop:", error);
@@ -6488,7 +6510,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
-      if (updateData.serialNumber) {
+      if (updateData.serialNumber && !updateData.barcode) {
         updateData.barcode = updateData.serialNumber;
       }
       const [row] = await db.update(laptops).set({ ...updateData, updatedAt: new Date() }).where(eq(laptops.id, req.params.id)).returning();
@@ -6583,8 +6605,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       const existing = await db.select().from(desktops).where(eq(desktops.serialNumber, finalSerial)).limit(1);
       if (existing.length) return res.status(400).json({ error: "الرقم التسلسلي موجود مسبقاً" });
-      const barcode = rest.barcode || finalSerial;
-      const [row] = await db.insert(desktops).values({ serialNumber: finalSerial, brand, barcode, ...rest }).returning();
+      const normalizedBarcode = (typeof rest.barcode === "string" && rest.barcode.trim().length > 0)
+        ? rest.barcode.trim()
+        : finalSerial;
+      const cleanValues = {
+        serialNumber: finalSerial,
+        brand,
+        partNumber: typeof rest.partNumber === "string" && rest.partNumber.trim() ? rest.partNumber.trim() : null,
+        barcode: normalizedBarcode,
+        model: typeof rest.model === "string" && rest.model.trim() ? rest.model.trim() : null,
+        cpu: typeof rest.cpu === "string" && rest.cpu.trim() ? rest.cpu.trim() : null,
+        ram: typeof rest.ram === "string" && rest.ram.trim() ? rest.ram.trim() : null,
+        storage: typeof rest.storage === "string" && rest.storage.trim() ? rest.storage.trim() : null,
+        gpu: typeof rest.gpu === "string" && rest.gpu.trim() ? rest.gpu.trim() : null,
+        stockQuantity: typeof rest.stockQuantity === "number" ? rest.stockQuantity : parseInt(rest.stockQuantity, 10) || 0,
+        minStockLevel: typeof rest.minStockLevel === "number" ? rest.minStockLevel : parseInt(rest.minStockLevel, 10) || 2,
+        purchasePrice: rest.purchasePrice || null,
+        sellingPrice: rest.sellingPrice || null,
+        wholesalePrice: rest.wholesalePrice || null,
+        supplier: typeof rest.supplier === "string" && rest.supplier.trim() ? rest.supplier.trim() : null,
+        location: typeof rest.location === "string" && rest.location.trim() ? rest.location.trim() : null,
+        notes: typeof rest.notes === "string" && rest.notes.trim() ? rest.notes.trim() : null,
+      };
+      const [row] = await db.insert(desktops).values(cleanValues).returning();
       return res.status(201).json(row);
     } catch (error) {
       console.error("Error creating desktop:", error);
@@ -6597,7 +6640,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
-      if (updateData.serialNumber) {
+      if (updateData.serialNumber && !updateData.barcode) {
         updateData.barcode = updateData.serialNumber;
       }
       const [row] = await db.update(desktops).set({ ...updateData, updatedAt: new Date() }).where(eq(desktops.id, req.params.id)).returning();
