@@ -2752,6 +2752,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 await db.update(acAdapters)
                   .set({ stockQuantity: sql`stock_quantity + ${qty}` })
                   .where(eq(acAdapters.id, item.adapterId));
+              } else if (item.productSource === 'keyboard' && item.keyboardId) {
+                await db.update(keyboards)
+                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
+                  .where(eq(keyboards.id, item.keyboardId));
+              } else if (item.productSource === 'lcd' && item.lcdId) {
+                await db.update(lcds)
+                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
+                  .where(eq(lcds.id, item.lcdId));
+              } else if (item.productSource === 'laptop' && item.laptopId) {
+                await db.update(laptops)
+                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
+                  .where(eq(laptops.id, item.laptopId));
+              } else if (item.productSource === 'desktop' && item.desktopId) {
+                await db.update(desktops)
+                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
+                  .where(eq(desktops.id, item.desktopId));
               } else if (item.productSource === 'instore' && item.productId) {
                 await storage.adjustInStoreProductStock(parseInt(item.productId), qty);
               } else if (item.productId && isNaN(parseInt(item.productId))) {
