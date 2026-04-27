@@ -2744,32 +2744,56 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               const item = typeof rawItem === 'string' ? JSON.parse(rawItem) : rawItem;
               const qty = parseInt(item.quantity) || 1;
-              if (item.productSource === 'battery' && item.batteryId) {
+              const productIdStr = item.productId ? String(item.productId) : "";
+              const numericProductId = productIdStr && !isNaN(parseInt(productIdStr, 10)) ? parseInt(productIdStr, 10) : null;
+              const inferredSource =
+                item.productSource
+                || (item.batteryId ? "battery" : null)
+                || (item.adapterId ? "adapter" : null)
+                || (item.keyboardId ? "keyboard" : null)
+                || (item.lcdId ? "lcd" : null)
+                || (item.laptopId ? "laptop" : null)
+                || (item.desktopId ? "desktop" : null)
+                || (productIdStr.startsWith("bat-") ? "battery" : null)
+                || (productIdStr.startsWith("ada-") ? "adapter" : null)
+                || (productIdStr.startsWith("kbd-") ? "keyboard" : null)
+                || (productIdStr.startsWith("lcd-") ? "lcd" : null)
+                || (productIdStr.startsWith("lap-") ? "laptop" : null)
+                || (productIdStr.startsWith("des-") ? "desktop" : null)
+                || (numericProductId !== null ? "instore" : null);
+
+              if (inferredSource === 'battery' && (item.batteryId || productIdStr.startsWith("bat-"))) {
+                const targetId = item.batteryId || productIdStr.replace(/^bat-/, "");
                 await db.update(laptopBatteries)
                   .set({ stockQuantity: sql`stock_quantity + ${qty}` })
-                  .where(eq(laptopBatteries.id, item.batteryId));
-              } else if (item.productSource === 'adapter' && item.adapterId) {
+                  .where(eq(laptopBatteries.id, String(targetId)));
+              } else if (inferredSource === 'adapter' && (item.adapterId || productIdStr.startsWith("ada-"))) {
+                const targetId = item.adapterId || productIdStr.replace(/^ada-/, "");
                 await db.update(acAdapters)
                   .set({ stockQuantity: sql`stock_quantity + ${qty}` })
-                  .where(eq(acAdapters.id, item.adapterId));
-              } else if (item.productSource === 'keyboard' && item.keyboardId) {
+                  .where(eq(acAdapters.id, String(targetId)));
+              } else if (inferredSource === 'keyboard' && (item.keyboardId || productIdStr.startsWith("kbd-"))) {
+                const targetId = item.keyboardId || productIdStr.replace(/^kbd-/, "");
                 await db.update(keyboards)
                   .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(keyboards.id, item.keyboardId));
-              } else if (item.productSource === 'lcd' && item.lcdId) {
+                  .where(eq(keyboards.id, String(targetId)));
+              } else if (inferredSource === 'lcd' && (item.lcdId || productIdStr.startsWith("lcd-"))) {
+                const targetId = item.lcdId || productIdStr.replace(/^lcd-/, "");
                 await db.update(lcds)
                   .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(lcds.id, item.lcdId));
-              } else if (item.productSource === 'laptop' && item.laptopId) {
+                  .where(eq(lcds.id, String(targetId)));
+              } else if (inferredSource === 'laptop' && (item.laptopId || productIdStr.startsWith("lap-"))) {
+                const targetId = item.laptopId || productIdStr.replace(/^lap-/, "");
                 await db.update(laptops)
                   .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(laptops.id, item.laptopId));
-              } else if (item.productSource === 'desktop' && item.desktopId) {
+                  .where(eq(laptops.id, String(targetId)));
+              } else if (inferredSource === 'desktop' && (item.desktopId || productIdStr.startsWith("des-"))) {
+                const targetId = item.desktopId || productIdStr.replace(/^des-/, "");
                 await db.update(desktops)
                   .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(desktops.id, item.desktopId));
-              } else if (item.productSource === 'instore' && item.productId) {
-                await storage.adjustInStoreProductStock(parseInt(item.productId), qty);
+                  .where(eq(desktops.id, String(targetId)));
+              } else if (inferredSource === 'instore' && numericProductId !== null) {
+                await storage.adjustInStoreProductStock(numericProductId, qty);
               } else if (item.productId && isNaN(parseInt(item.productId))) {
                 // UUID productId = regular product stock
                 await storage.adjustProductStock(item.productId, qty, undefined, `Void order ${order.orderNumber}`, order.orderNumber);
