@@ -261,16 +261,31 @@ export default function TechnicianDashboard() {
     return tickets.filter(t => t.status === 'completed' && t.isArchived !== 1);
   }, [tickets]);
 
-  const pendingOlderThan2Days = useMemo(() => {
+  const pendingReminderDueToday = useMemo(() => {
     if (!tickets) return [];
     const baghdadNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Baghdad' }));
-    const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
     return tickets.filter(t => {
       if (t.isArchived === 1) return false;
       if (t.status !== 'pending') return false;
       const intakeAt = (t as any).receivedAt || t.createdAt;
-      const ageMs = baghdadNow.getTime() - new Date(intakeAt).getTime();
-      return ageMs >= twoDaysMs;
+      const ageDays = Math.floor((baghdadNow.getTime() - new Date(intakeAt).getTime()) / (24 * 60 * 60 * 1000));
+      // Reminder every 2 days starting day 2: 2,4,6,8,...
+      return ageDays >= 2 && ageDays % 2 === 0;
+    });
+  }, [tickets]);
+
+  const completedNotPickedReminderDueToday = useMemo(() => {
+    if (!tickets) return [];
+    const baghdadNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Baghdad' }));
+    return tickets.filter(t => {
+      if (t.isArchived === 1) return false;
+      // Completed but not delivered yet
+      if (t.status !== 'completed') return false;
+      const completedAt = (t as any).completedAt;
+      if (!completedAt) return false;
+      const ageDays = Math.floor((baghdadNow.getTime() - new Date(completedAt).getTime()) / (24 * 60 * 60 * 1000));
+      // Reminder every 30 days starting day 30: 30,60,90,...
+      return ageDays >= 30 && ageDays % 30 === 0;
     });
   }, [tickets]);
 
@@ -541,21 +556,21 @@ export default function TechnicianDashboard() {
           </Card>
         </div>
 
-        {!showArchived && (completedUnarchivedTickets.length > 0 || pendingOlderThan2Days.length > 0) && (
+        {!showArchived && (completedNotPickedReminderDueToday.length > 0 || pendingReminderDueToday.length > 0) && (
           <div className="space-y-3 mb-6">
-            {completedUnarchivedTickets.length > 0 && (
+            {completedNotPickedReminderDueToday.length > 0 && (
               <Alert className="border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-900/10">
                 <BellRing className="h-4 w-4 text-blue-700 dark:text-blue-400" />
                 <div>
                   <AlertTitle className="flex items-center justify-between gap-2">
-                    <span>{language === 'ar' ? 'تنبيه: تذاكر مكتملة' : 'Alert: Completed Tickets'}</span>
-                    <Badge className="bg-blue-600 text-white">{completedUnarchivedTickets.length}</Badge>
+                    <span>{language === 'ar' ? 'تذكير: تذاكر مكتملة لم تُستلم' : 'Reminder: Completed (not picked up)'}</span>
+                    <Badge className="bg-blue-600 text-white">{completedNotPickedReminderDueToday.length}</Badge>
                   </AlertTitle>
                   <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="text-sm">
                       {language === 'ar'
-                        ? 'يوجد تذاكر مكتملة بحاجة للتسليم للزبون.'
-                        : 'There are completed tickets ready to be delivered.'}
+                        ? 'تنبيه شهري (كل 30 يوم) للتذاكر المكتملة التي لم يستلمها الزبون.'
+                        : 'Monthly reminder (every 30 days) for completed tickets not picked up.'}
                     </span>
                     <Button
                       size="sm"
@@ -571,19 +586,19 @@ export default function TechnicianDashboard() {
               </Alert>
             )}
 
-            {pendingOlderThan2Days.length > 0 && (
+            {pendingReminderDueToday.length > 0 && (
               <Alert className="border-yellow-200 bg-yellow-50/40 dark:border-yellow-900/40 dark:bg-yellow-900/10">
                 <Clock className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
                 <div>
                   <AlertTitle className="flex items-center justify-between gap-2">
-                    <span>{language === 'ar' ? 'تنبيه: تذاكر معلّقة أكثر من يومين' : 'Alert: Pending > 2 days'}</span>
-                    <Badge className="bg-yellow-600 text-white">{pendingOlderThan2Days.length}</Badge>
+                    <span>{language === 'ar' ? 'تذكير: تذاكر قيد الانتظار' : 'Reminder: Pending Tickets'}</span>
+                    <Badge className="bg-yellow-600 text-white">{pendingReminderDueToday.length}</Badge>
                   </AlertTitle>
                   <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                     <span className="text-sm">
                       {language === 'ar'
-                        ? 'يرجى متابعة التذاكر قيد الانتظار التي تجاوزت يومين.'
-                        : 'Please follow up on pending tickets older than 2 days.'}
+                        ? 'تذكير كل يومين من وقت الاستلام للتذاكر التي ما زالت قيد الانتظار.'
+                        : 'Reminder every 2 days from intake for tickets still pending.'}
                     </span>
                     <Button
                       size="sm"
