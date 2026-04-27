@@ -2412,10 +2412,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       const data = {
                         serialNumber: laptopFormData.serialNumber || undefined,
                         partNumber: laptopFormData.partNumber || null,
-                        barcode: null,
+                        barcode: undefined,
                         brand: laptopFormData.brand,
                         model: laptopFormData.model || null,
-                        sizeInch: laptopFormData.sizeInch || null,
+                        sizeInch: laptopFormData.sizeInch ? parseFloat(laptopFormData.sizeInch) : null,
                         cpu: laptopFormData.cpu || null,
                         ram: laptopFormData.ram || null,
                         storage: laptopFormData.storage || null,
@@ -2439,6 +2439,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       <div>
                         <Label>{language === 'ar' ? 'الرقم التسلسلي' : 'Serial Number'}</Label>
                         <Input value={laptopFormData.serialNumber} onChange={(e) => setLaptopFormData(v => ({ ...v, serialNumber: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label>
+                        <Input value={laptopFormData.partNumber} onChange={(e) => setLaptopFormData(v => ({ ...v, partNumber: e.target.value }))} />
                       </div>
                       <div>
                         <Label>{language === 'ar' ? 'الماركة' : 'Brand'}</Label>
@@ -2471,6 +2475,34 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       <div>
                         <Label>{language === 'ar' ? 'الكمية' : 'Stock Qty'}</Label>
                         <Input type="number" value={laptopFormData.stockQuantity} onChange={(e) => setLaptopFormData(v => ({ ...v, stockQuantity: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'حد التنبيه الأدنى' : 'Min Stock Level'}</Label>
+                        <Input type="number" value={laptopFormData.minStockLevel} onChange={(e) => setLaptopFormData(v => ({ ...v, minStockLevel: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <div>
+                        <Label>{language === 'ar' ? 'سعر الشراء' : 'Purchase Price'}</Label>
+                        <Input type="number" value={laptopFormData.purchasePrice} onChange={(e) => setLaptopFormData(v => ({ ...v, purchasePrice: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</Label>
+                        <Input type="number" value={laptopFormData.sellingPrice} onChange={(e) => setLaptopFormData(v => ({ ...v, sellingPrice: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'سعر الجملة' : 'Wholesale Price'}</Label>
+                        <Input type="number" value={laptopFormData.wholesalePrice} onChange={(e) => setLaptopFormData(v => ({ ...v, wholesalePrice: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>{language === 'ar' ? 'المجهز' : 'Supplier'}</Label>
+                        <Input value={laptopFormData.supplier} onChange={(e) => setLaptopFormData(v => ({ ...v, supplier: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الموقع' : 'Location'}</Label>
+                        <Input value={laptopFormData.location} onChange={(e) => setLaptopFormData(v => ({ ...v, location: e.target.value }))} />
                       </div>
                     </div>
                     <div>
@@ -2619,7 +2651,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       const data = {
                         serialNumber: desktopFormData.serialNumber || undefined,
                         partNumber: desktopFormData.partNumber || null,
-                        barcode: null,
+                        barcode: undefined,
                         brand: desktopFormData.brand,
                         model: desktopFormData.model || null,
                         cpu: desktopFormData.cpu || null,
@@ -2645,6 +2677,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       <div>
                         <Label>{language === 'ar' ? 'الرقم التسلسلي' : 'Serial Number'}</Label>
                         <Input value={desktopFormData.serialNumber} onChange={(e) => setDesktopFormData(v => ({ ...v, serialNumber: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label>
+                        <Input value={desktopFormData.partNumber} onChange={(e) => setDesktopFormData(v => ({ ...v, partNumber: e.target.value }))} />
                       </div>
                       <div>
                         <Label>{language === 'ar' ? 'الماركة' : 'Brand'}</Label>
@@ -2673,6 +2709,34 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       <div>
                         <Label>{language === 'ar' ? 'الكمية' : 'Stock Qty'}</Label>
                         <Input type="number" value={desktopFormData.stockQuantity} onChange={(e) => setDesktopFormData(v => ({ ...v, stockQuantity: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'حد التنبيه الأدنى' : 'Min Stock Level'}</Label>
+                        <Input type="number" value={desktopFormData.minStockLevel} onChange={(e) => setDesktopFormData(v => ({ ...v, minStockLevel: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-3 gap-4">
+                      <div>
+                        <Label>{language === 'ar' ? 'سعر الشراء' : 'Purchase Price'}</Label>
+                        <Input type="number" value={desktopFormData.purchasePrice} onChange={(e) => setDesktopFormData(v => ({ ...v, purchasePrice: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'سعر البيع' : 'Selling Price'}</Label>
+                        <Input type="number" value={desktopFormData.sellingPrice} onChange={(e) => setDesktopFormData(v => ({ ...v, sellingPrice: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'سعر الجملة' : 'Wholesale Price'}</Label>
+                        <Input type="number" value={desktopFormData.wholesalePrice} onChange={(e) => setDesktopFormData(v => ({ ...v, wholesalePrice: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="grid sm:grid-cols-2 gap-4">
+                      <div>
+                        <Label>{language === 'ar' ? 'المجهز' : 'Supplier'}</Label>
+                        <Input value={desktopFormData.supplier} onChange={(e) => setDesktopFormData(v => ({ ...v, supplier: e.target.value }))} />
+                      </div>
+                      <div>
+                        <Label>{language === 'ar' ? 'الموقع' : 'Location'}</Label>
+                        <Input value={desktopFormData.location} onChange={(e) => setDesktopFormData(v => ({ ...v, location: e.target.value }))} />
                       </div>
                     </div>
                     <div>

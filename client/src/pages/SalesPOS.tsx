@@ -49,10 +49,12 @@ import {
   Plug,
   Keyboard,
   Monitor,
+  Laptop as LaptopIcon,
+  Computer,
   FileText
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { InStoreProduct, LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import type { InStoreProduct, LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem, Laptop, Desktop } from "@shared/schema";
 
 interface POSProduct {
   id: string;
@@ -65,7 +67,7 @@ interface POSProduct {
   image: string | null;
   category: string | null;
   barcode?: string | null;
-  productSource?: 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd';
+  productSource?: 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd' | 'laptop' | 'desktop';
   sourceId?: string;
 }
 
@@ -159,7 +161,19 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     enabled: orderType === 'in-store',
   });
 
-  const isLoading = orderType === 'in-store' ? (inStoreLoading || batteriesLoading || adaptersLoading || keyboardsLoading || lcdsLoading) : mainLoading;
+  const { data: laptopsRaw = [], isLoading: laptopsLoading } = useQuery<Laptop[]>({
+    queryKey: ['/api/battery/laptops'],
+    enabled: orderType === 'in-store',
+  });
+
+  const { data: desktopsRaw = [], isLoading: desktopsLoading } = useQuery<Desktop[]>({
+    queryKey: ['/api/battery/desktops'],
+    enabled: orderType === 'in-store',
+  });
+
+  const isLoading = orderType === 'in-store'
+    ? (inStoreLoading || batteriesLoading || adaptersLoading || keyboardsLoading || lcdsLoading || laptopsLoading || desktopsLoading)
+    : mainLoading;
 
   const instoreProducts: POSProduct[] = orderType === 'in-store'
     ? inStoreRaw
@@ -255,8 +269,46 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         }))
     : [];
 
+  const laptopProducts: POSProduct[] = orderType === 'in-store'
+    ? laptopsRaw
+        .filter(l => (l.stockQuantity || 0) >= 0 && l.isActive !== 0)
+        .map(l => ({
+          id: `lap-${l.id}`,
+          nameAr: `${l.brand} ${l.model || ''} ${l.serialNumber}`.trim(),
+          nameEn: `${l.brand} ${l.model || ''} ${l.serialNumber}`.trim(),
+          price: String(l.sellingPrice || '0'),
+          wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
+          stockQuantity: l.stockQuantity,
+          sku: l.barcode || l.serialNumber,
+          barcode: l.barcode ?? null,
+          image: null,
+          category: language === 'ar' ? 'لابتوبات' : 'Laptops',
+          productSource: 'laptop' as const,
+          sourceId: l.id,
+        }))
+    : [];
+
+  const desktopProducts: POSProduct[] = orderType === 'in-store'
+    ? desktopsRaw
+        .filter(d => (d.stockQuantity || 0) >= 0 && d.isActive !== 0)
+        .map(d => ({
+          id: `des-${d.id}`,
+          nameAr: `${d.brand} ${d.model || ''} ${d.serialNumber}`.trim(),
+          nameEn: `${d.brand} ${d.model || ''} ${d.serialNumber}`.trim(),
+          price: String(d.sellingPrice || '0'),
+          wholesalePrice: d.wholesalePrice ? String(d.wholesalePrice) : null,
+          stockQuantity: d.stockQuantity,
+          sku: d.barcode || d.serialNumber,
+          barcode: d.barcode ?? null,
+          image: null,
+          category: language === 'ar' ? 'ديسكتوب' : 'Desktops',
+          productSource: 'desktop' as const,
+          sourceId: d.id,
+        }))
+    : [];
+
   const products: POSProduct[] = orderType === 'in-store'
-    ? [...instoreProducts, ...batteryProducts, ...adapterProducts, ...keyboardProducts, ...lcdProducts]
+    ? [...instoreProducts, ...batteryProducts, ...adapterProducts, ...keyboardProducts, ...lcdProducts, ...laptopProducts, ...desktopProducts]
     : mainProducts.map(p => ({
         id: p.id,
         nameAr: p.nameAr,
@@ -594,6 +646,10 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
         productSource: item.product.productSource || 'instore',
         batteryId: item.product.productSource === 'battery' ? item.product.sourceId : undefined,
         adapterId: item.product.productSource === 'adapter' ? item.product.sourceId : undefined,
+        keyboardId: item.product.productSource === 'keyboard' ? item.product.sourceId : undefined,
+        lcdId: item.product.productSource === 'lcd' ? item.product.sourceId : undefined,
+        laptopId: item.product.productSource === 'laptop' ? item.product.sourceId : undefined,
+        desktopId: item.product.productSource === 'desktop' ? item.product.sourceId : undefined,
       })),
       customerName: customerName || 'عميل في المتجر',
       customerPhone,
@@ -1075,6 +1131,10 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                               <Keyboard className="h-10 w-10 text-primary/40" />
                             ) : product.productSource === 'lcd' ? (
                               <Monitor className="h-10 w-10 text-primary/40" />
+                            ) : product.productSource === 'laptop' ? (
+                              <LaptopIcon className="h-10 w-10 text-primary/40" />
+                            ) : product.productSource === 'desktop' ? (
+                              <Computer className="h-10 w-10 text-primary/40" />
                             ) : (
                               <Package className="h-10 w-10 text-muted-foreground/30" />
                             )}
@@ -1087,7 +1147,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                         <p className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
-                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd') && (
+                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd' || product.productSource === 'laptop' || product.productSource === 'desktop') && (
                           <Badge variant="outline" className="text-[10px]">
                             {product.productSource === 'battery'
                               ? (language === 'ar' ? 'بطارية' : 'Battery')
@@ -1095,7 +1155,11 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                               ? (language === 'ar' ? 'شاحن' : 'Adapter')
                               : product.productSource === 'keyboard'
                               ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
-                              : (language === 'ar' ? 'LCD' : 'LCD')}
+                              : product.productSource === 'lcd'
+                              ? (language === 'ar' ? 'LCD' : 'LCD')
+                              : product.productSource === 'laptop'
+                              ? (language === 'ar' ? 'لابتوب' : 'Laptop')
+                              : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                           </Badge>
                         )}
                         {product.sku && (
@@ -1150,6 +1214,10 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                               <Keyboard className="h-6 w-6 text-primary/40" />
                             ) : product.productSource === 'lcd' ? (
                               <Monitor className="h-6 w-6 text-primary/40" />
+                            ) : product.productSource === 'laptop' ? (
+                              <LaptopIcon className="h-6 w-6 text-primary/40" />
+                            ) : product.productSource === 'desktop' ? (
+                              <Computer className="h-6 w-6 text-primary/40" />
                             ) : (
                               <Package className="h-6 w-6 text-muted-foreground/30" />
                             )}
@@ -1162,7 +1230,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                         <p className="font-semibold text-sm truncate">
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
-                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd') && (
+                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd' || product.productSource === 'laptop' || product.productSource === 'desktop') && (
                           <Badge variant="outline" className="text-[10px] mb-1">
                             {product.productSource === 'battery'
                               ? (language === 'ar' ? 'بطارية' : 'Battery')
@@ -1170,7 +1238,11 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                               ? (language === 'ar' ? 'شاحن' : 'Adapter')
                               : product.productSource === 'keyboard'
                               ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
-                              : (language === 'ar' ? 'LCD' : 'LCD')}
+                              : product.productSource === 'lcd'
+                              ? (language === 'ar' ? 'LCD' : 'LCD')
+                              : product.productSource === 'laptop'
+                              ? (language === 'ar' ? 'لابتوب' : 'Laptop')
+                              : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                           </Badge>
                         )}
                         <p className="text-xs text-muted-foreground">
@@ -1308,6 +1380,10 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                                 <Keyboard className="h-6 w-6 text-primary/40" />
                               ) : item.product.productSource === 'lcd' ? (
                                 <Monitor className="h-6 w-6 text-primary/40" />
+                              ) : item.product.productSource === 'laptop' ? (
+                                <LaptopIcon className="h-6 w-6 text-primary/40" />
+                              ) : item.product.productSource === 'desktop' ? (
+                                <Computer className="h-6 w-6 text-primary/40" />
                               ) : (
                                 <Package className="h-6 w-6 text-muted-foreground/30" />
                               )}
@@ -1320,7 +1396,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                           <p className="font-medium text-sm line-clamp-1">
                             {language === 'ar' ? item.product.nameAr : (item.product.nameEn || item.product.nameAr)}
                           </p>
-                          {(item.product.productSource === 'battery' || item.product.productSource === 'adapter' || item.product.productSource === 'keyboard' || item.product.productSource === 'lcd') && (
+                          {(item.product.productSource === 'battery' || item.product.productSource === 'adapter' || item.product.productSource === 'keyboard' || item.product.productSource === 'lcd' || item.product.productSource === 'laptop' || item.product.productSource === 'desktop') && (
                             <Badge variant="outline" className="text-[10px] mb-1">
                               {item.product.productSource === 'battery'
                                 ? (language === 'ar' ? 'بطارية' : 'Battery')
@@ -1328,7 +1404,11 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                                 ? (language === 'ar' ? 'شاحن' : 'Adapter')
                                 : item.product.productSource === 'keyboard'
                                 ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
-                                : (language === 'ar' ? 'LCD' : 'LCD')}
+                                : item.product.productSource === 'lcd'
+                                ? (language === 'ar' ? 'LCD' : 'LCD')
+                                : item.product.productSource === 'laptop'
+                                ? (language === 'ar' ? 'لابتوب' : 'Laptop')
+                                : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                             </Badge>
                           )}
                           <div className="flex items-center gap-1 flex-wrap">
