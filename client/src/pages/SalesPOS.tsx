@@ -69,6 +69,7 @@ interface POSProduct {
   barcode?: string | null;
   productSource?: 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd' | 'laptop' | 'desktop';
   sourceId?: string;
+  printSpecs?: string[];
 }
 
 interface Category {
@@ -285,6 +286,14 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           category: language === 'ar' ? 'لابتوبات' : 'Laptops',
           productSource: 'laptop' as const,
           sourceId: l.id,
+          printSpecs: [
+            l.cpu ? `CPU: ${l.cpu}` : null,
+            l.ram ? `RAM: ${l.ram}` : null,
+            l.storage ? `Storage: ${l.storage}` : null,
+            l.gpu ? `GPU: ${l.gpu}` : null,
+            l.sizeInch ? `Screen: ${l.sizeInch}"` : null,
+            l.partNumber ? `Part No: ${l.partNumber}` : null,
+          ].filter(Boolean) as string[],
         }))
     : [];
 
@@ -304,6 +313,13 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           category: language === 'ar' ? 'ديسكتوب' : 'Desktops',
           productSource: 'desktop' as const,
           sourceId: d.id,
+          printSpecs: [
+            d.cpu ? `CPU: ${d.cpu}` : null,
+            d.ram ? `RAM: ${d.ram}` : null,
+            d.storage ? `Storage: ${d.storage}` : null,
+            d.gpu ? `GPU: ${d.gpu}` : null,
+            d.partNumber ? `Part No: ${d.partNumber}` : null,
+          ].filter(Boolean) as string[],
         }))
     : [];
 
@@ -450,6 +466,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           category: item.product.category,
           price: getEffectivePrice(item),
           quantity: item.quantity,
+          specs: item.product.printSpecs || [],
         })),
         subtotal: subtotal.toString(),
         discount: calculatedDiscount.toString(),
@@ -695,6 +712,9 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       const skuLine = item.sku ? `<div style="font-size:9px;color:#333;font-weight:700;">SKU: ${item.sku}</div>` : '';
       const catLine = item.category ? `<div style="font-size:9px;color:#333;font-weight:700;">${item.category}</div>` : '';
       const nameLine = nameEn ? `<div style="font-size:9px;color:#333;font-weight:700;">${nameEn}</div>` : '';
+      const specsLines = Array.isArray(item.specs) && item.specs.length > 0
+        ? item.specs.map((s: string) => `<div style="font-size:9px;color:#222;font-weight:700;">${s}</div>`).join('')
+        : '';
       const unitPriceLine = `<div style="font-size:9px;color:#333;font-weight:700;">${fmt(unitPrice)} x ${qty}</div>`;
       return `<div style="padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:11px;">
         <div style="display:grid;grid-template-columns:1fr auto auto;gap:4px;align-items:start;">
@@ -703,6 +723,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
             ${nameLine}
             ${catLine}
             ${skuLine}
+            ${specsLines}
             ${unitPriceLine}
           </div>
           <div style="text-align:center;font-weight:800;color:#000;padding:0 6px;min-width:24px;">${qty}</div>
@@ -837,6 +858,9 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       const lineTotal = unitPrice * qty;
       const nameAr = item.nameAr || item.nameEn || '-';
       const nameEn = item.nameEn && item.nameEn !== item.nameAr ? item.nameEn : '';
+      const specsLine = Array.isArray(item.specs) && item.specs.length > 0
+        ? `<div style="font-size:11px;color:#444;margin-top:2px;">${item.specs.join(' • ')}</div>`
+        : '';
       const sku = item.sku || '-';
       return `
         <tr>
@@ -844,6 +868,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
           <td>
             <div style="font-weight:700;">${nameAr}</div>
             ${nameEn ? `<div style="font-size:11px;color:#555;direction:ltr;text-align:left;">${nameEn}</div>` : ''}
+            ${specsLine}
           </td>
           <td>${sku}</td>
           <td>${qty}</td>
@@ -1737,6 +1762,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                     const lineTotal = unitPrice * qty;
                     const itemName = item.nameAr || item.nameEn || item.name || '-';
                     const itemNameEn = item.nameEn && item.nameEn !== item.nameAr ? item.nameEn : null;
+                    const itemSpecs = Array.isArray(item.specs) ? item.specs : [];
                     return (
                       <div key={idx} className="px-2 py-2 grid grid-cols-12 text-sm items-start" data-testid={`receipt-item-${idx}`}>
                         <div className="col-span-6">
@@ -1744,6 +1770,18 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
                           {itemNameEn && <div className="text-xs font-bold text-gray-600">{itemNameEn}</div>}
                           {item.category && <div className="text-xs font-bold text-gray-600">{item.category}</div>}
                           {item.sku && <div className="text-xs font-bold text-gray-600">SKU: {item.sku}</div>}
+                          {itemSpecs.length > 0 && (
+                            <div className="mt-1 flex flex-wrap gap-1">
+                              {itemSpecs.map((spec: string, specIdx: number) => (
+                                <span
+                                  key={`${idx}-spec-${specIdx}`}
+                                  className="inline-flex items-center rounded-full border border-gray-200 bg-gray-100 px-2 py-0.5 text-[10px] font-semibold text-gray-700"
+                                >
+                                  {spec}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="text-xs font-bold text-gray-600">{formatPrice(unitPrice)} د.ع × {qty}</div>
                         </div>
                         <div className="col-span-2 text-center font-extrabold text-black">{qty}</div>
