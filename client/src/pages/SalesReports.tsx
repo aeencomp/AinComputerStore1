@@ -116,6 +116,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
   const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'online' | 'walk-in' | 'in-store'>('all');
   const [activeTab, setActiveTab] = useState<'sales' | 'cashflow'>('sales');
+  const [salesSearchQuery, setSalesSearchQuery] = useState("");
   const [cashflowMonth, setCashflowMonth] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).slice(0, 7));
   const [cashflowFromDate, setCashflowFromDate] = useState("");
   const [cashflowToDate, setCashflowToDate] = useState("");
@@ -211,6 +212,14 @@ export default function SalesReports({ user }: SalesReportsProps) {
       if (orderTypeFilter === 'walk-in' && orderType !== 'walk-in') return false;
       if (orderTypeFilter === 'in-store' && orderType !== 'in-store') return false;
       if (orderTypeFilter === 'online' && orderType !== 'online') return false;
+    }
+
+    const q = salesSearchQuery.trim().toLowerCase();
+    if (q) {
+      const orderNo = (order.orderNumber || "").toLowerCase();
+      const customer = (order.customerName || "").toLowerCase();
+      const phone = (order.customerPhone || "").toLowerCase();
+      if (!orderNo.includes(q) && !customer.includes(q) && !phone.includes(q)) return false;
     }
     
     return true;
@@ -607,6 +616,13 @@ export default function SalesReports({ user }: SalesReportsProps) {
                   <SelectItem value="online">{language === 'ar' ? 'أونلاين' : 'Online'}</SelectItem>
                 </SelectContent>
               </Select>
+              <Input
+                className="w-72"
+                placeholder={language === 'ar' ? 'ابحث بالعميل / الهاتف / رقم الوصل...' : 'Search by customer / phone / receipt #...'}
+                value={salesSearchQuery}
+                onChange={(e) => setSalesSearchQuery(e.target.value)}
+                data-testid="input-sales-report-search"
+              />
             </>
           ) : (
             <>

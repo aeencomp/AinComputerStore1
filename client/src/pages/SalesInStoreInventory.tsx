@@ -31,6 +31,8 @@ import {
   MinusCircle,
   ChevronDown,
   ChevronRight,
+  Grid3X3,
+  List,
 } from "lucide-react";
 import QRCode from "qrcode";
 import type { InStoreProduct, LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
@@ -105,6 +107,8 @@ export default function SalesInStoreInventory({ user }: Props) {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [inventoryFilter, setInventoryFilter] = useState<"all" | "in-stock" | "low-stock">("all");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("list");
   const [showDialog, setShowDialog] = useState(false);
   const [editingProduct, setEditingProduct] = useState<InStoreProduct | null>(null);
   const [form, setForm] = useState<ProductForm>(emptyForm);
@@ -334,20 +338,36 @@ export default function SalesInStoreInventory({ user }: Props) {
     stockMutation.mutate({ id: stockProduct.id, adjustment: adj });
   };
 
-  const filtered = products.filter(p => {
-    const q = searchQuery.toLowerCase();
-    const matchesSearch = !q || p.nameAr.toLowerCase().includes(q) ||
-      (p.nameEn || '').toLowerCase().includes(q) ||
-      (p.sku || '').toLowerCase().includes(q) ||
-      (p.barcode || '').toLowerCase().includes(q);
-    if (!matchesSearch) return false;
-
+  const matchesInventoryFilter = (p: InStoreProduct) => {
     if (inventoryFilter === "low-stock") {
       return p.stockQuantity <= p.lowStockThreshold;
     }
     if (inventoryFilter === "in-stock") {
       return p.stockQuantity > 0;
     }
+    return true;
+  };
+
+  const categoryPool = products.filter(matchesInventoryFilter);
+  const categoryNames = Array.from(
+    new Set(categoryPool.map(p => (p.category || "").trim()).filter(Boolean))
+  );
+  const categoryCounts = new Map<string, number>();
+  for (const name of categoryNames) {
+    categoryCounts.set(name, categoryPool.filter(p => (p.category || "").trim() === name).length);
+  }
+
+  const filtered = products.filter(p => {
+    if (!matchesInventoryFilter(p)) return false;
+    if (selectedCategory !== "all" && (p.category || "").trim() !== selectedCategory) return false;
+
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = !q || p.nameAr.toLowerCase().includes(q) ||
+      (p.nameEn || '').toLowerCase().includes(q) ||
+      (p.sku || '').toLowerCase().includes(q) ||
+      (p.barcode || '').toLowerCase().includes(q);
+    if (!matchesSearch) return false;
+    
     return true;
   });
 
@@ -700,16 +720,71 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             )}
           </div>
 
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              className="ps-10"
-              placeholder={language === 'ar' ? 'بحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              data-testid="input-instore-search"
-            />
+          {/* Search + View Mode */}
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                className="ps-10"
+                placeholder={language === 'ar' ? 'بحث بالاسم، SKU، أو الباركود...' : 'Search by name, SKU, or barcode...'}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                data-testid="input-instore-search"
+              />
+            </div>
+            <div className="flex items-center gap-1 border rounded-md p-1">
+              <Button
+                size="icon"
+                variant={viewMode === "grid" ? "secondary" : "ghost"}
+                className="h-8 w-8"
+                onClick={() => setViewMode("grid")}
+                data-testid="button-view-grid"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </Button>
+              <Button
+                size="icon"
+                variant={viewMode === "list" ? "secondary" : "ghost"}
+                className="h-8 w-8"
+                onClick={() => setViewMode("list")}
+                data-testid="button-view-list"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+
+          {/* Category quick filters (like POS chips) */}
+          <div className="overflow-x-auto">
+            <div className="flex items-center gap-2 min-w-max pb-1">
+              <Button
+                size="sm"
+                variant={selectedCategory === "all" ? "default" : "outline"}
+                onClick={() => setSelectedCategory("all")}
+                className="whitespace-nowrap"
+                data-testid="button-category-all"
+              >
+                {language === 'ar' ? 'الكل' : 'All'}
+                <Badge variant="secondary" className="ms-2 text-xs">
+                  {categoryPool.length}
+                </Badge>
+              </Button>
+              {categoryNames.map((cat) => (
+                <Button
+                  key={cat}
+                  size="sm"
+                  variant={selectedCategory === cat ? "default" : "outline"}
+                  onClick={() => setSelectedCategory(cat)}
+                  className="whitespace-nowrap"
+                  data-testid={`button-category-${cat}`}
+                >
+                  {cat}
+                  <Badge variant="secondary" className="ms-2 text-xs">
+                    {categoryCounts.get(cat) || 0}
+                  </Badge>
+                </Button>
+              ))}
+            </div>
           </div>
 
           {/* Product List */}
@@ -727,6 +802,71 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                   {language === 'ar' ? 'أضف أول منتج' : 'Add your first product'}
                 </Button>
               )}
+            </div>
+          ) : viewMode === "grid" ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {filtered.map(product => {
+                const isLow = product.stockQuantity <= product.lowStockThreshold;
+                const isOut = product.stockQuantity <= 0;
+                return (
+                  <Card key={product.id} className={isOut ? 'border-destructive/40' : isLow ? 'border-orange-400/60' : ''}>
+                    <CardContent className="p-3 space-y-2">
+                      {product.image ? (
+                        <img
+                          src={product.image}
+                          alt={product.nameAr}
+                          className="h-24 w-full object-cover rounded-md border"
+                        />
+                      ) : (
+                        <div className="h-24 w-full rounded-md border bg-muted/30 flex items-center justify-center">
+                          <Package className="h-7 w-7 text-muted-foreground/40" />
+                        </div>
+                      )}
+                      <div className="space-y-1 min-w-0">
+                        <div className="font-semibold truncate">{product.nameAr}</div>
+                        {product.nameEn && <div className="text-xs text-muted-foreground truncate">{product.nameEn}</div>}
+                        <div className="flex items-center gap-1 flex-wrap">
+                          {product.category && <Badge variant="outline" className="text-[10px]">{product.category}</Badge>}
+                          {isOut ? (
+                            <Badge variant="destructive" className="text-[10px]">{language === 'ar' ? 'نفذ' : 'Out'}</Badge>
+                          ) : isLow ? (
+                            <Badge variant="outline" className="text-[10px] bg-orange-500 text-white border-orange-600">
+                              {language === 'ar' ? 'منخفض' : 'Low'}
+                            </Badge>
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-mono truncate">
+                          {product.sku ? `SKU: ${product.sku}` : ''}
+                        </div>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm font-semibold">{formatPrice(product.price)} {language === 'ar' ? 'د.ع' : 'IQD'}</p>
+                          <p className={`text-sm font-bold ${isOut ? 'text-destructive' : isLow ? 'text-orange-500' : ''}`}>
+                            {language === 'ar' ? `الكمية: ${product.stockQuantity}` : `Stock: ${product.stockQuantity}`}
+                          </p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="icon" variant="outline" onClick={() => openStock(product)} data-testid={`button-stock-${product.id}`} title={language === 'ar' ? 'تعديل المخزون' : 'Adjust Stock'}>
+                            <ArrowUp className="h-4 w-4" />
+                          </Button>
+                          {(product.barcode || product.sku) && (
+                            <Button size="icon" variant="outline" onClick={() => printBarcode(product)} data-testid={`button-barcode-${product.id}`} title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}>
+                              <Printer className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button size="icon" variant="outline" onClick={() => openEdit(product)} data-testid={`button-edit-${product.id}`}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="icon" variant="outline" onClick={() => setDeleteConfirm(product)} data-testid={`button-delete-${product.id}`} className="text-destructive hover:text-destructive">
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           ) : (
             <div className="space-y-2">
