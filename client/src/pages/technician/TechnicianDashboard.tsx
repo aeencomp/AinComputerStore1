@@ -6,11 +6,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
@@ -253,6 +254,24 @@ export default function TechnicianDashboard() {
 
   const deliveredUnarchived = useMemo(() => {
     return tickets?.filter(t => t.status === 'delivered' && t.isArchived !== 1).length || 0;
+  }, [tickets]);
+
+  const completedUnarchivedTickets = useMemo(() => {
+    if (!tickets) return [];
+    return tickets.filter(t => t.status === 'completed' && t.isArchived !== 1);
+  }, [tickets]);
+
+  const pendingOlderThan2Days = useMemo(() => {
+    if (!tickets) return [];
+    const baghdadNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Baghdad' }));
+    const twoDaysMs = 2 * 24 * 60 * 60 * 1000;
+    return tickets.filter(t => {
+      if (t.isArchived === 1) return false;
+      if (t.status !== 'pending') return false;
+      const intakeAt = (t as any).receivedAt || t.createdAt;
+      const ageMs = baghdadNow.getTime() - new Date(intakeAt).getTime();
+      return ageMs >= twoDaysMs;
+    });
   }, [tickets]);
 
   const formatPrice = (price: string | null | undefined) => {
@@ -521,6 +540,66 @@ export default function TechnicianDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {!showArchived && (completedUnarchivedTickets.length > 0 || pendingOlderThan2Days.length > 0) && (
+          <div className="space-y-3 mb-6">
+            {completedUnarchivedTickets.length > 0 && (
+              <Alert className="border-blue-200 bg-blue-50/40 dark:border-blue-900/40 dark:bg-blue-900/10">
+                <BellRing className="h-4 w-4 text-blue-700 dark:text-blue-400" />
+                <div>
+                  <AlertTitle className="flex items-center justify-between gap-2">
+                    <span>{language === 'ar' ? 'تنبيه: تذاكر مكتملة' : 'Alert: Completed Tickets'}</span>
+                    <Badge className="bg-blue-600 text-white">{completedUnarchivedTickets.length}</Badge>
+                  </AlertTitle>
+                  <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="text-sm">
+                      {language === 'ar'
+                        ? 'يوجد تذاكر مكتملة بحاجة للتسليم للزبون.'
+                        : 'There are completed tickets ready to be delivered.'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-blue-300 text-blue-800 hover:bg-blue-100 dark:border-blue-800 dark:text-blue-300 dark:hover:bg-blue-900/30"
+                      onClick={() => setFilterStatus('completed')}
+                      data-testid="button-alert-show-completed"
+                    >
+                      {language === 'ar' ? 'عرض' : 'Show'}
+                    </Button>
+                  </AlertDescription>
+                </div>
+              </Alert>
+            )}
+
+            {pendingOlderThan2Days.length > 0 && (
+              <Alert className="border-yellow-200 bg-yellow-50/40 dark:border-yellow-900/40 dark:bg-yellow-900/10">
+                <Clock className="h-4 w-4 text-yellow-700 dark:text-yellow-400" />
+                <div>
+                  <AlertTitle className="flex items-center justify-between gap-2">
+                    <span>{language === 'ar' ? 'تنبيه: تذاكر معلّقة أكثر من يومين' : 'Alert: Pending > 2 days'}</span>
+                    <Badge className="bg-yellow-600 text-white">{pendingOlderThan2Days.length}</Badge>
+                  </AlertTitle>
+                  <AlertDescription className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                    <span className="text-sm">
+                      {language === 'ar'
+                        ? 'يرجى متابعة التذاكر قيد الانتظار التي تجاوزت يومين.'
+                        : 'Please follow up on pending tickets older than 2 days.'}
+                    </span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="border-yellow-300 text-yellow-900 hover:bg-yellow-100 dark:border-yellow-800 dark:text-yellow-300 dark:hover:bg-yellow-900/30"
+                      onClick={() => setFilterStatus('pending')}
+                      data-testid="button-alert-show-overdue-pending"
+                    >
+                      {language === 'ar' ? 'عرض' : 'Show'}
+                    </Button>
+                  </AlertDescription>
+                </div>
+              </Alert>
+            )}
+          </div>
+        )}
 
         <div className="space-y-3 mb-6">
           {/* Search bar — full width, prominent */}
