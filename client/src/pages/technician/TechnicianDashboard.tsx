@@ -247,23 +247,31 @@ export default function TechnicianDashboard() {
   });
 
   const stats = useMemo(() => {
-    if (!tickets) return { totalRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0, deferredCount: 0 };
+    if (!tickets) return { totalRevenue: 0, dailyRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0, deferredCount: 0 };
     let totalRevenue = 0;
+    let dailyRevenue = 0;
     let completedCount = 0;
     let completedRevenue = 0;
     let pendingCount = 0;
     let deliveredCount = 0;
     let deferredCount = 0;
+    const baghdadToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
     for (const ticket of tickets) {
       const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
       if (ticket.status === 'completed') {
         totalRevenue += cost;
+        const completedDate = (ticket as any).completedAt || ticket.updatedAt;
+        const dayKey = new Date(completedDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+        if (dayKey === baghdadToday) dailyRevenue += cost;
         if (ticket.isArchived !== 1) {
           completedCount++;
           completedRevenue += cost;
         }
       } else if (ticket.status === 'delivered') {
         totalRevenue += cost;
+        const deliveredDate = ticket.deliveredAt || ticket.updatedAt;
+        const dayKey = new Date(deliveredDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
+        if (dayKey === baghdadToday) dailyRevenue += cost;
         if (ticket.isArchived !== 1) {
           deliveredCount++;
         }
@@ -273,7 +281,7 @@ export default function TechnicianDashboard() {
         if (ticket.status === 'pending') pendingCount++;
       }
     }
-    return { totalRevenue, completedCount, completedRevenue, pendingCount, deliveredCount, deferredCount };
+    return { totalRevenue, dailyRevenue, completedCount, completedRevenue, pendingCount, deliveredCount, deferredCount };
   }, [tickets]);
 
   const archivedCount = useMemo(() => {
@@ -480,7 +488,7 @@ export default function TechnicianDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-5' : 'grid-cols-2'}`}>
+        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-6' : 'grid-cols-2'}`}>
           {canViewRevenue && (
             <Card
               className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
@@ -498,6 +506,30 @@ export default function TechnicianDashboard() {
                       {language === 'ar'
                         ? `${stats.totalRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
                         : `${stats.totalRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {canViewRevenue && (
+            <Card
+              className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
+              onClick={() => setFilterStatus('all')}
+              data-testid="card-daily-revenue"
+            >
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
+                    <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إيراد اليوم' : 'Daily Revenue'}</p>
+                    <p className="text-lg font-bold" data-testid="text-daily-revenue">
+                      {language === 'ar'
+                        ? `${stats.dailyRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${stats.dailyRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
                     </p>
                   </div>
                 </div>
