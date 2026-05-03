@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import JsBarcode from "jsbarcode";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -559,9 +560,11 @@ function buildPrintHTML(data: ShiftReportData): string {
 export default function DailyReport({ user }: DailyReportProps) {
   const { language } = useLanguage();
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
+  const [manualLabelName, setManualLabelName] = useState("");
   const [manualLabelDate, setManualLabelDate] = useState("");
   const [manualLabelAmount, setManualLabelAmount] = useState("");
   const labelPrintRef = useRef<HTMLDivElement>(null);
+  const dailyLabelBarcodeRef = useRef<SVGSVGElement>(null);
   const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
   // List of all shifts
@@ -637,6 +640,39 @@ export default function DailyReport({ user }: DailyReportProps) {
     return Number.isNaN(n) ? 0 : n;
   }, [manualLabelAmount]);
 
+  /** Same JsBarcode + CSS footprint as technician repair label print (TicketDetail). */
+  const dailyLabelBarcodeValue = useMemo(() => {
+    if (!data?.shift) return "";
+    const d = data.shift.startTime
+      ? new Date(data.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).replace(/-/g, "")
+      : baghdadToday.replace(/-/g, "");
+    const sid = String(data.shift.id ?? "")
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toUpperCase()
+      .slice(0, 6) || "DAY";
+    return `DL${d}${sid}`;
+  }, [baghdadToday, data?.shift]);
+
+  useEffect(() => {
+    if (!dailyLabelBarcodeValue || !dailyLabelBarcodeRef.current) return;
+    requestAnimationFrame(() => {
+      const el = dailyLabelBarcodeRef.current;
+      if (!el) return;
+      try {
+        JsBarcode(el, dailyLabelBarcodeValue, {
+          format: "CODE128",
+          width: 1.5,
+          height: 35,
+          displayValue: false,
+          margin: 1,
+          background: "#ffffff",
+        });
+      } catch (e) {
+        console.error("Daily label barcode error:", e);
+      }
+    });
+  }, [dailyLabelBarcodeValue]);
+
   const handlePrint = () => {
     if (!data) return;
     const html = buildPrintHTML(data);
@@ -657,10 +693,10 @@ export default function DailyReport({ user }: DailyReportProps) {
   <meta charset="UTF-8"/>
   <title>${language === "ar" ? "ملصق يومي" : "Daily label"}</title>
   <style>
-    @page { size: 50mm 25mm; margin: 1mm; }
+    @page { size: 50mm 30mm; margin: 0; }
     html, body {
       width: 50mm;
-      height: 25mm;
+      height: 30mm;
       margin: 0;
       padding: 0;
       overflow: hidden;
@@ -672,21 +708,23 @@ export default function DailyReport({ user }: DailyReportProps) {
     .label-wrap {
       box-sizing: border-box;
       width: 50mm;
-      height: 25mm;
+      height: 30mm;
       border: 1px solid #111;
-      padding: 1.5mm 2mm;
+      padding: 1mm 1.5mm;
       display: flex;
       flex-direction: column;
       justify-content: center;
-      gap: 1mm;
+      gap: 0.5mm;
     }
+    .barcode-container { text-align: center; margin: 0.5mm 0; width: 100%; }
+    .barcode-container svg { max-width: 44mm; height: 10mm; display: block; margin: 0 auto; }
     .row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
-      gap: 4mm;
-      font-size: 9pt;
-      line-height: 1.15;
+      gap: 2mm;
+      font-size: 8pt;
+      line-height: 1.1;
     }
     .row .k { color: #444; flex-shrink: 0; }
     .row .v { font-weight: 700; text-align: end; word-break: break-word; }
@@ -756,7 +794,7 @@ export default function DailyReport({ user }: DailyReportProps) {
             data-testid="button-print-daily-label"
           >
             <Printer className="h-4 w-4" />
-            {language === "ar" ? "طباعة ملصق (50×25)" : "Print label (50×25)"}
+            {language === "ar" ? "طباعة ملصق (50×30)" : "Print label (50×30)"}
           </Button>
         </div>
       </div>
@@ -904,10 +942,28 @@ export default function DailyReport({ user }: DailyReportProps) {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
-                    {language === "ar" ? "ملصق يومي (50×25 مم)" : "Daily label (50×25 mm)"}
+                    {language === "ar" ? "ملصق يومي (50×30 مم)" : "Daily label (50×30 mm)"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  <div className="flex gap-2">
+                    <Input
+                      value={manualLabelName}
+                      onChange={(e) => setManualLabelName(e.target.value)}
+                      placeholder={language === "ar" ? "الاسم (يدوي)" : "Name (manual)"}
+                      data-testid="input-daily-label-name-manual"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setManualLabelName("")}
+                      disabled={manualLabelName.trim() === ""}
+                      data-testid="button-reset-daily-label-name"
+                    >
+                      {language === "ar" ? "مسح" : "Clear"}
+                    </Button>
+                  </div>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div className="flex gap-2">
                       <Input
@@ -953,14 +1009,14 @@ export default function DailyReport({ user }: DailyReportProps) {
                       className="label-wrap"
                       style={{
                         width: "50mm",
-                        height: "25mm",
+                        height: "30mm",
                         boxSizing: "border-box",
                         border: "1px solid #111",
-                        padding: "1.5mm 2mm",
+                        padding: "1mm 1.5mm",
                         display: "flex",
                         flexDirection: "column",
                         justifyContent: "center",
-                        gap: "1mm",
+                        gap: "0.5mm",
                         background: "#fff",
                       }}
                     >
@@ -970,9 +1026,23 @@ export default function DailyReport({ user }: DailyReportProps) {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "baseline",
-                          gap: "4mm",
-                          fontSize: "9pt",
-                          lineHeight: 1.15,
+                          gap: "2mm",
+                          fontSize: "8pt",
+                          lineHeight: 1.1,
+                        }}
+                      >
+                        <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "الاسم" : "Name"}</span>
+                        <span className="v" style={{ fontWeight: 700, textAlign: "end", wordBreak: "break-word" }}>{manualLabelName.trim() || "—"}</span>
+                      </div>
+                      <div
+                        className="row"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          gap: "2mm",
+                          fontSize: "8pt",
+                          lineHeight: 1.1,
                         }}
                       >
                         <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "التاريخ" : "Date"}</span>
@@ -984,9 +1054,9 @@ export default function DailyReport({ user }: DailyReportProps) {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "baseline",
-                          gap: "4mm",
-                          fontSize: "9pt",
-                          lineHeight: 1.15,
+                          gap: "2mm",
+                          fontSize: "8pt",
+                          lineHeight: 1.1,
                         }}
                       >
                         <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "المبلغ" : "Amount"}</span>
@@ -994,6 +1064,18 @@ export default function DailyReport({ user }: DailyReportProps) {
                           {manualLabelAmount.trim() !== "" ? fmtNum(labelAmountValue) : "—"}
                         </span>
                       </div>
+                      {dailyLabelBarcodeValue ? (
+                        <div
+                          className="barcode-container"
+                          style={{ textAlign: "center", marginTop: "0.5mm", width: "100%" }}
+                        >
+                          <svg
+                            ref={dailyLabelBarcodeRef}
+                            style={{ display: "block", margin: "0 auto", maxWidth: "44mm", height: "10mm" }}
+                            data-testid="svg-daily-label-barcode"
+                          />
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 </CardContent>
