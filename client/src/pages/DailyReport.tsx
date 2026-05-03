@@ -561,8 +561,8 @@ export default function DailyReport({ user }: DailyReportProps) {
   const { language } = useLanguage();
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [labelNote, setLabelNote] = useState("");
-  const [manualGrandTotal, setManualGrandTotal] = useState("");
-  const [manualNetTotal, setManualNetTotal] = useState("");
+  const [manualLabelDate, setManualLabelDate] = useState("");
+  const [manualLabelAmount, setManualLabelAmount] = useState("");
   const labelPrintRef = useRef<HTMLDivElement>(null);
   const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
@@ -642,20 +642,10 @@ export default function DailyReport({ user }: DailyReportProps) {
     const shiftKey = data?.shift?.id ? String(data.shift.id).slice(0, 8).toUpperCase() : "DAILY";
     return `DR-${reportDateKey.replace(/-/g, "")}-${shiftKey}`;
   }, [data?.shift?.id, reportDateKey]);
-  const labelGrandTotal = useMemo(() => {
-    if (manualGrandTotal.trim() !== "") {
-      const n = Number(manualGrandTotal.replace(/,/g, ""));
-      if (!Number.isNaN(n)) return n;
-    }
-    return data?.summary.grandTotal ?? 0;
-  }, [data?.summary.grandTotal, manualGrandTotal]);
-  const labelNetTotal = useMemo(() => {
-    if (manualNetTotal.trim() !== "") {
-      const n = Number(manualNetTotal.replace(/,/g, ""));
-      if (!Number.isNaN(n)) return n;
-    }
-    return data?.summary.netTotal ?? 0;
-  }, [data?.summary.netTotal, manualNetTotal]);
+  const labelAmountValue = useMemo(() => {
+    const n = Number(manualLabelAmount.replace(/,/g, ""));
+    return Number.isNaN(n) ? 0 : n;
+  }, [manualLabelAmount]);
 
   const handlePrint = () => {
     if (!data) return;
@@ -909,62 +899,49 @@ export default function DailyReport({ user }: DailyReportProps) {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                     <div className="flex gap-2">
                       <Input
-                        inputMode="decimal"
-                        value={manualGrandTotal}
-                        onChange={(e) => setManualGrandTotal(e.target.value)}
-                        placeholder={language === "ar" ? "الإجمالي الكلي (يدوي)" : "Grand total (manual)"}
-                        data-testid="input-daily-label-grand-total-manual"
+                        value={manualLabelDate}
+                        onChange={(e) => setManualLabelDate(e.target.value)}
+                        placeholder={language === "ar" ? "التاريخ (يدوي)" : "Date (manual)"}
+                        data-testid="input-daily-label-date-manual"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setManualGrandTotal("")}
-                        disabled={manualGrandTotal.trim() === ""}
-                        data-testid="button-reset-daily-label-grand-total-auto"
+                        onClick={() => setManualLabelDate("")}
+                        disabled={manualLabelDate.trim() === ""}
+                        data-testid="button-reset-daily-label-date"
                       >
-                        {language === "ar" ? "تلقائي" : "Auto"}
+                        {language === "ar" ? "مسح" : "Clear"}
                       </Button>
                     </div>
                     <div className="flex gap-2">
                       <Input
                         inputMode="decimal"
-                        value={manualNetTotal}
-                        onChange={(e) => setManualNetTotal(e.target.value)}
-                        placeholder={language === "ar" ? "صافي الإيراد (يدوي)" : "Net total (manual)"}
-                        data-testid="input-daily-label-net-total-manual"
+                        value={manualLabelAmount}
+                        onChange={(e) => setManualLabelAmount(e.target.value)}
+                        placeholder={language === "ar" ? "المبلغ (يدوي)" : "Amount (manual)"}
+                        data-testid="input-daily-label-amount-manual"
                       />
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setManualNetTotal("")}
-                        disabled={manualNetTotal.trim() === ""}
-                        data-testid="button-reset-daily-label-net-total-auto"
+                        onClick={() => setManualLabelAmount("")}
+                        disabled={manualLabelAmount.trim() === ""}
+                        data-testid="button-reset-daily-label-amount"
                       >
-                        {language === "ar" ? "تلقائي" : "Auto"}
+                        {language === "ar" ? "مسح" : "Clear"}
                       </Button>
                     </div>
                   </div>
-                  <Input
-                    value={labelNote}
-                    onChange={(e) => setLabelNote(e.target.value)}
-                    placeholder={language === "ar" ? "إدخال مخصص (مثال: تسليم الكاش للخزنة)" : "Custom entry (e.g., cash handed to safe)"}
-                    data-testid="input-daily-label-custom-entry"
-                  />
                   <div className="rounded-md border bg-muted/20 p-3">
                     <div ref={labelPrintRef} className="label-wrap">
                       <div className="title">{language === "ar" ? "ملصق تقرير نهاية اليوم" : "End-of-Day Report Label"}</div>
-                      <div className="sub">{formatShiftRange(data.shift)}</div>
-                      <div className="row"><span className="k">{language === "ar" ? "الموظف" : "User"}</span><span className="v">{data.shift.salesUserName}</span></div>
-                      <div className="row"><span className="k">{language === "ar" ? "عدد المعاملات" : "Transactions"}</span><span className="v">{data.summary.inStoreCount + data.summary.repairCount}</span></div>
-                      <div className="row"><span className="k">{language === "ar" ? "الإجمالي" : "Grand Total"}</span><span className="v">{fmtNum(labelGrandTotal)}</span></div>
-                      <div className="row"><span className="k">{language === "ar" ? "صافي الإيراد" : "Net Total"}</span><span className="v">{fmtNum(labelNetTotal)}</span></div>
-                      {labelNote.trim() && (
-                        <div className="note">
-                          <strong>{language === "ar" ? "ملاحظة:" : "Note:"}</strong> {labelNote.trim()}
-                        </div>
-                      )}
+                      <div className="sub">{language === "ar" ? "قسم الصيانة" : "Maintenance Department"}</div>
+                      <div className="row"><span className="k">{language === "ar" ? "القسم" : "Section"}</span><span className="v">{language === "ar" ? "الصيانة" : "Maintenance"}</span></div>
+                      <div className="row"><span className="k">{language === "ar" ? "التاريخ" : "Date"}</span><span className="v">{manualLabelDate.trim() || "—"}</span></div>
+                      <div className="row"><span className="k">{language === "ar" ? "المبلغ" : "Amount"}</span><span className="v">{fmtNum(labelAmountValue)}</span></div>
                       <div className="barcode">
                         <Barcode value={barcodeValue} width={1.6} height={46} displayValue fontSize={12} />
                       </div>
