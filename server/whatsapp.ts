@@ -130,7 +130,7 @@ export async function sendWhatsAppTemplate(
   if (params.length > 0) {
     components.push({
       type: 'body',
-      parameters: params.map(p => ({ type: 'text', text: p }))
+      parameters: params.map(p => ({ type: 'text', text: sanitizeTemplateParam(p) }))
     });
   }
 
@@ -169,6 +169,30 @@ export async function sendWhatsAppTemplate(
   }
 }
 
+async function sendWhatsAppTemplateWithLanguageFallbacks(
+  to: string,
+  templateName: string,
+  preferredLanguage: string,
+  params: string[],
+): Promise<WhatsAppMessageResult> {
+  const tryLanguages = Array.from(
+    new Set(
+      [preferredLanguage, 'ar', 'ar_IQ', 'en_US']
+        .map((v) => (v || '').trim())
+        .filter(Boolean),
+    ),
+  );
+
+  let lastError: WhatsAppMessageResult = { success: false, error: 'Template send failed' };
+  for (const lang of tryLanguages) {
+    const result = await sendWhatsAppTemplate(to, templateName, lang, params);
+    if (result.success) return result;
+    lastError = result;
+  }
+
+  return lastError;
+}
+
 export async function sendTicketCreatedMessage(
   customerPhone: string,
   customerName: string,
@@ -177,7 +201,7 @@ export async function sendTicketCreatedMessage(
   deviceBrand: string
 ): Promise<WhatsAppMessageResult> {
   // Try the repair_ticket_created template first; fall back to free-form text
-  const templateResult = await sendWhatsAppTemplate(
+  const templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
     customerPhone,
     'repair_ticket_created',
     'ar',
@@ -229,7 +253,7 @@ export async function sendTicketUpdatedMessage(
     extraText,
   ];
 
-  const templateResult = await sendWhatsAppTemplate(
+  const templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
     customerPhone,
     'repair_status_update',
     'ar',
@@ -242,7 +266,7 @@ export async function sendTicketUpdatedMessage(
   console.warn(
     `WhatsApp template send failed for ticket ${ticketNumber} (code=${templateResult.errorCode ?? 'n/a'}). Retrying with minimal params.`
   );
-  const retryResult = await sendWhatsAppTemplate(
+  const retryResult = await sendWhatsAppTemplateWithLanguageFallbacks(
     customerPhone,
     'repair_status_update',
     'ar',
