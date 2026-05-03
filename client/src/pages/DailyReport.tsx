@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import Barcode from "@/components/Barcode";
 import {
   Printer,
   Store,
@@ -560,7 +559,6 @@ function buildPrintHTML(data: ShiftReportData): string {
 export default function DailyReport({ user }: DailyReportProps) {
   const { language } = useLanguage();
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
-  const [labelNote, setLabelNote] = useState("");
   const [manualLabelDate, setManualLabelDate] = useState("");
   const [manualLabelAmount, setManualLabelAmount] = useState("");
   const labelPrintRef = useRef<HTMLDivElement>(null);
@@ -634,14 +632,6 @@ export default function DailyReport({ user }: DailyReportProps) {
   const data: ShiftReportData | null | undefined = selectedShiftId ? shiftReport : (activeSnapshot ?? dailyAsShift ?? null);
   const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
   const isFetching = selectedShiftId ? reportFetching : false;
-  const reportDateKey = useMemo(() => {
-    if (!data?.shift?.startTime) return baghdadToday;
-    return new Date(data.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
-  }, [baghdadToday, data?.shift?.startTime]);
-  const barcodeValue = useMemo(() => {
-    const shiftKey = data?.shift?.id ? String(data.shift.id).slice(0, 8).toUpperCase() : "DAILY";
-    return `DR-${reportDateKey.replace(/-/g, "")}-${shiftKey}`;
-  }, [data?.shift?.id, reportDateKey]);
   const labelAmountValue = useMemo(() => {
     const n = Number(manualLabelAmount.replace(/,/g, ""));
     return Number.isNaN(n) ? 0 : n;
@@ -665,19 +655,41 @@ export default function DailyReport({ user }: DailyReportProps) {
 <html dir="rtl" lang="ar">
 <head>
   <meta charset="UTF-8"/>
-  <title>Daily Label ${barcodeValue}</title>
+  <title>${language === "ar" ? "ملصق يومي" : "Daily label"}</title>
   <style>
-    @page { size: 80mm auto; margin: 4mm; }
-    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color:#111; }
-    .label-wrap { border:1px solid #111; border-radius:8px; padding:10px; width:100%; }
-    .title { text-align:center; font-weight:700; font-size:14px; margin-bottom:4px; }
-    .sub { text-align:center; font-size:11px; color:#555; margin-bottom:8px; }
-    .row { display:flex; justify-content:space-between; gap:8px; font-size:12px; margin:3px 0; }
-    .row .k { color:#555; }
-    .row .v { font-weight:600; }
-    .note { margin-top:8px; padding-top:6px; border-top:1px dashed #ccc; font-size:11px; white-space:pre-wrap; }
-    .barcode { text-align:center; margin-top:8px; }
-    .barcode svg { max-width:100%; height:auto; }
+    @page { size: 50mm 25mm; margin: 1mm; }
+    html, body {
+      width: 50mm;
+      height: 25mm;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: "Segoe UI", Arial, sans-serif;
+      color: #111;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+    .label-wrap {
+      box-sizing: border-box;
+      width: 50mm;
+      height: 25mm;
+      border: 1px solid #111;
+      padding: 1.5mm 2mm;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1mm;
+    }
+    .row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 4mm;
+      font-size: 9pt;
+      line-height: 1.15;
+    }
+    .row .k { color: #444; flex-shrink: 0; }
+    .row .v { font-weight: 700; text-align: end; word-break: break-word; }
   </style>
 </head>
 <body>
@@ -741,10 +753,10 @@ export default function DailyReport({ user }: DailyReportProps) {
             onClick={handlePrintLabel}
             disabled={!data || isLoading}
             className="gap-2"
-            data-testid="button-print-daily-barcode-label"
+            data-testid="button-print-daily-label"
           >
             <Printer className="h-4 w-4" />
-            {language === "ar" ? "طباعة ملصق الباركود" : "Print Barcode Label"}
+            {language === "ar" ? "طباعة ملصق (50×25)" : "Print label (50×25)"}
           </Button>
         </div>
       </div>
@@ -892,7 +904,7 @@ export default function DailyReport({ user }: DailyReportProps) {
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
-                    {language === "ar" ? "ملصق نهاية اليوم (باركود)" : "End-of-Day Barcode Label"}
+                    {language === "ar" ? "ملصق يومي (50×25 مم)" : "Daily label (50×25 mm)"}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -935,15 +947,52 @@ export default function DailyReport({ user }: DailyReportProps) {
                       </Button>
                     </div>
                   </div>
-                  <div className="rounded-md border bg-muted/20 p-3">
-                    <div ref={labelPrintRef} className="label-wrap">
-                      <div className="title">{language === "ar" ? "ملصق تقرير نهاية اليوم" : "End-of-Day Report Label"}</div>
-                      <div className="sub">{language === "ar" ? "قسم الصيانة" : "Maintenance Department"}</div>
-                      <div className="row"><span className="k">{language === "ar" ? "القسم" : "Section"}</span><span className="v">{language === "ar" ? "الصيانة" : "Maintenance"}</span></div>
-                      <div className="row"><span className="k">{language === "ar" ? "التاريخ" : "Date"}</span><span className="v">{manualLabelDate.trim() || "—"}</span></div>
-                      <div className="row"><span className="k">{language === "ar" ? "المبلغ" : "Amount"}</span><span className="v">{fmtNum(labelAmountValue)}</span></div>
-                      <div className="barcode">
-                        <Barcode value={barcodeValue} width={1.6} height={46} displayValue fontSize={12} />
+                  <div className="rounded-md border bg-muted/20 p-3 flex justify-center">
+                    <div
+                      ref={labelPrintRef}
+                      className="label-wrap"
+                      style={{
+                        width: "50mm",
+                        height: "25mm",
+                        boxSizing: "border-box",
+                        border: "1px solid #111",
+                        padding: "1.5mm 2mm",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "center",
+                        gap: "1mm",
+                        background: "#fff",
+                      }}
+                    >
+                      <div
+                        className="row"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          gap: "4mm",
+                          fontSize: "9pt",
+                          lineHeight: 1.15,
+                        }}
+                      >
+                        <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "التاريخ" : "Date"}</span>
+                        <span className="v" style={{ fontWeight: 700, textAlign: "end" }}>{manualLabelDate.trim() || "—"}</span>
+                      </div>
+                      <div
+                        className="row"
+                        style={{
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "baseline",
+                          gap: "4mm",
+                          fontSize: "9pt",
+                          lineHeight: 1.15,
+                        }}
+                      >
+                        <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "المبلغ" : "Amount"}</span>
+                        <span className="v" style={{ fontWeight: 700, textAlign: "end" }}>
+                          {manualLabelAmount.trim() !== "" ? fmtNum(labelAmountValue) : "—"}
+                        </span>
                       </div>
                     </div>
                   </div>
