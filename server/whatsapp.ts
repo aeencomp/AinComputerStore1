@@ -138,47 +138,83 @@ export async function sendWhatsAppTemplate(
 
   const formattedPhone = formatPhoneNumber(to);
 
-  const components: any[] = [];
-  if (params.length > 0) {
-    components.push({
-      type: 'body',
-      parameters: params.map(p => ({ type: 'text', text: sanitizeTemplateParam(p) }))
-    });
-  }
+  const sanitizedParams = params.map((p) => sanitizeTemplateParam(p));
 
-  try {
-    const response = await axios({
-      method: 'POST',
-      url: `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'Content-Type': 'application/json'
+  const buildPayload = (components: any[]) => ({
+    messaging_product: 'whatsapp',
+    to: formattedPhone,
+    type: 'template',
+    template: {
+      name: templateName,
+      language: { code: language },
+      ...(components.length > 0 && { components }),
+    },
+  });
+
+  const componentVariants: any[][] = [];
+  if (sanitizedParams.length > 0) {
+    // Variant A: all params in body (existing behavior)
+    componentVariants.push([
+      {
+        type: 'body',
+        parameters: sanitizedParams.map((p) => ({ type: 'text', text: p })),
       },
-      data: {
-        messaging_product: 'whatsapp',
-        to: formattedPhone,
-        type: 'template',
-        template: {
-          name: templateName,
-          language: { code: language },
-          ...(components.length > 0 && { components })
-        }
-      }
-    });
+    ]);
 
-    console.log(`WhatsApp template "${templateName}" sent to ${formattedPhone}:`, response.data);
-    return { success: true, messageId: response.data.messages?.[0]?.id };
-  } catch (error: any) {
-    const errorDetail = error.response?.data?.error;
-    const errorMessage = errorDetail?.message || error.message;
-    // Template not yet approved is a known transient state — log clearly
-    if (errorDetail?.code === 132001 || errorMessage?.includes('not approved') || errorMessage?.includes('pending')) {
-      console.warn(`WhatsApp template "${templateName}" is not yet approved. Message not sent to ${formattedPhone}.`);
-    } else {
-      console.error(`WhatsApp template "${templateName}" error for ${formattedPhone}:`, JSON.stringify(errorDetail || error.message));
+    // Variant B: first param in header, rest in body.
+    // This matches templates like: Header {{1}} + Body {{2}} {{3}}
+    if (sanitizedParams.length >= 2) {
+      const bodyRest = sanitizedParams.slice(1);
+      componentVariants.push([
+        { type: 'header', parameters: [{ type: 'text', text: sanitizedParams[0] }] },
+        ...(bodyRest.length > 0
+          ? [{ type: 'body', parameters: bodyRest.map((p) => ({ type: 'text', text: p })) }]
+          : []),
+      ]);
     }
-    return { success: false, error: errorMessage, errorCode: errorDetail?.code, errorData: errorDetail };
+  } else {
+    componentVariants.push([]);
   }
+
+  let lastError: WhatsAppMessageResult = { success: false, error: 'Template send failed' };
+
+  for (const components of componentVariants) {
+    try {
+      const response = await axios({
+        method: 'POST',
+        url: `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        data: buildPayload(components),
+      });
+
+      console.log(`WhatsApp template "${templateName}" sent to ${formattedPhone}:`, response.data);
+      return { success: true, messageId: response.data.messages?.[0]?.id };
+    } catch (error: any) {
+      const errorDetail = error.response?.data?.error;
+      const errorMessage = errorDetail?.message || error.message;
+      lastError = { success: false, error: errorMessage, errorCode: errorDetail?.code, errorData: errorDetail };
+
+      // Keep trying variants only for parameter-shape problems
+      const errText = `${errorMessage || ''}`.toLowerCase();
+      const isParamMismatch =
+        errorDetail?.code === 132000 ||
+        (errText.includes('parameter') && errText.includes('match'));
+      if (!isParamMismatch) {
+        if (errorDetail?.code === 132001 || errorMessage?.includes('not approved') || errorMessage?.includes('pending')) {
+          console.warn(`WhatsApp template "${templateName}" is not yet approved. Message not sent to ${formattedPhone}.`);
+        } else {
+          console.error(`WhatsApp template "${templateName}" error for ${formattedPhone}:`, JSON.stringify(errorDetail || error.message));
+        }
+        return lastError;
+      }
+    }
+  }
+
+  console.error(`WhatsApp template "${templateName}" param-shape mismatch for ${formattedPhone}:`, JSON.stringify(lastError.errorData || lastError.error));
+  return lastError;
 }
 
 async function sendWhatsAppTemplateWithLanguageFallbacks(
