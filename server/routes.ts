@@ -6,7 +6,7 @@ import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
-import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage } from "./whatsapp";
+import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage, sendWhatsAppTemplate } from "./whatsapp";
 import bcrypt from "bcrypt";
 import { generateOTP, storeOTP, verifyOTP } from "./otp";
 import { sendOTPEmail } from "./resend-client";
@@ -8512,46 +8512,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post('/api/admin/whatsapp/send', async (req: any, res: any) => {
     if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
     const { to, templateName, language, params } = req.body;
-    const dbSettings = await storage.getStoreSettings();
-    const phoneNumberId = (dbSettings?.whatsappPhoneNumberId && dbSettings.whatsappPhoneNumberId.trim()) ? dbSettings.whatsappPhoneNumberId.trim() : process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const token = (dbSettings?.whatsappAccessToken && dbSettings.whatsappAccessToken.trim()) ? dbSettings.whatsappAccessToken.trim() : process.env.WHATSAPP_ACCESS_TOKEN;
-    if (!phoneNumberId || !token) return res.status(500).json({ error: 'WhatsApp not configured' });
     if (!to || !templateName) return res.status(400).json({ error: 'Missing required fields' });
 
-    let cleanPhone = to.replace(/[\s\-]/g, '');
-    if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
-    if (cleanPhone.startsWith('07')) cleanPhone = '964' + cleanPhone.substring(1);
-    if (cleanPhone.startsWith('+')) cleanPhone = cleanPhone.substring(1);
-
-    const components: any[] = [];
-    if (params && params.length > 0) {
-      components.push({
-        type: 'body',
-        parameters: params.map((p: string) => ({ type: 'text', text: p }))
-      });
-    }
-
     try {
-      const response = await fetch(
-        `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: cleanPhone,
-            type: 'template',
-            template: {
-              name: templateName,
-              language: { code: language || 'ar' },
-              ...(components.length > 0 && { components })
-            }
-          })
-        }
+      const parsedParams = Array.isArray(params)
+        ? params.map((p: any) => String(p ?? ''))
+        : [];
+      const result = await sendWhatsAppTemplate(
+        String(to),
+        String(templateName),
+        String(language || 'ar'),
+        parsedParams,
       );
-      const data = await response.json() as any;
-      if (!response.ok) return res.status(400).json({ error: data.error?.message || 'Send failed' });
-      return res.json({ success: true, messageId: data.messages?.[0]?.id });
+
+      if (!result.success) {
+        return res.status(400).json({
+          error: result.error || 'Send failed',
+          errorCode: result.errorCode,
+          errorData: result.errorData,
+        });
+      }
+
+      return res.json({ success: true, messageId: result.messageId });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
