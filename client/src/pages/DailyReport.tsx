@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
+import Barcode from "@/components/Barcode";
 import {
   Printer,
   Store,
@@ -558,6 +560,10 @@ function buildPrintHTML(data: ShiftReportData): string {
 export default function DailyReport({ user }: DailyReportProps) {
   const { language } = useLanguage();
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
+  const [labelNote, setLabelNote] = useState("");
+  const [manualGrandTotal, setManualGrandTotal] = useState("");
+  const [manualNetTotal, setManualNetTotal] = useState("");
+  const labelPrintRef = useRef<HTMLDivElement>(null);
   const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
   // List of all shifts
@@ -628,6 +634,28 @@ export default function DailyReport({ user }: DailyReportProps) {
   const data: ShiftReportData | null | undefined = selectedShiftId ? shiftReport : (activeSnapshot ?? dailyAsShift ?? null);
   const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
   const isFetching = selectedShiftId ? reportFetching : false;
+  const reportDateKey = useMemo(() => {
+    if (!data?.shift?.startTime) return baghdadToday;
+    return new Date(data.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+  }, [baghdadToday, data?.shift?.startTime]);
+  const barcodeValue = useMemo(() => {
+    const shiftKey = data?.shift?.id ? String(data.shift.id).slice(0, 8).toUpperCase() : "DAILY";
+    return `DR-${reportDateKey.replace(/-/g, "")}-${shiftKey}`;
+  }, [data?.shift?.id, reportDateKey]);
+  const labelGrandTotal = useMemo(() => {
+    if (manualGrandTotal.trim() !== "") {
+      const n = Number(manualGrandTotal.replace(/,/g, ""));
+      if (!Number.isNaN(n)) return n;
+    }
+    return data?.summary.grandTotal ?? 0;
+  }, [data?.summary.grandTotal, manualGrandTotal]);
+  const labelNetTotal = useMemo(() => {
+    if (manualNetTotal.trim() !== "") {
+      const n = Number(manualNetTotal.replace(/,/g, ""));
+      if (!Number.isNaN(n)) return n;
+    }
+    return data?.summary.netTotal ?? 0;
+  }, [data?.summary.netTotal, manualNetTotal]);
 
   const handlePrint = () => {
     if (!data) return;
@@ -635,6 +663,38 @@ export default function DailyReport({ user }: DailyReportProps) {
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(html);
+    win.document.close();
+  };
+
+  const handlePrintLabel = () => {
+    if (!data || !labelPrintRef.current) return;
+    const labelHtml = labelPrintRef.current.innerHTML;
+    const win = window.open("", "_blank", "width=520,height=720");
+    if (!win) return;
+    win.document.write(`<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="UTF-8"/>
+  <title>Daily Label ${barcodeValue}</title>
+  <style>
+    @page { size: 80mm auto; margin: 4mm; }
+    body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; color:#111; }
+    .label-wrap { border:1px solid #111; border-radius:8px; padding:10px; width:100%; }
+    .title { text-align:center; font-weight:700; font-size:14px; margin-bottom:4px; }
+    .sub { text-align:center; font-size:11px; color:#555; margin-bottom:8px; }
+    .row { display:flex; justify-content:space-between; gap:8px; font-size:12px; margin:3px 0; }
+    .row .k { color:#555; }
+    .row .v { font-weight:600; }
+    .note { margin-top:8px; padding-top:6px; border-top:1px dashed #ccc; font-size:11px; white-space:pre-wrap; }
+    .barcode { text-align:center; margin-top:8px; }
+    .barcode svg { max-width:100%; height:auto; }
+  </style>
+</head>
+<body>
+  ${labelHtml}
+  <script>window.onload = () => window.print();</script>
+</body>
+</html>`);
     win.document.close();
   };
 
@@ -685,6 +745,16 @@ export default function DailyReport({ user }: DailyReportProps) {
           >
             <Printer className="h-4 w-4" />
             {language === "ar" ? "طباعة A4" : "Print A4"}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={handlePrintLabel}
+            disabled={!data || isLoading}
+            className="gap-2"
+            data-testid="button-print-daily-barcode-label"
+          >
+            <Printer className="h-4 w-4" />
+            {language === "ar" ? "طباعة ملصق الباركود" : "Print Barcode Label"}
           </Button>
         </div>
       </div>
@@ -829,6 +899,80 @@ export default function DailyReport({ user }: DailyReportProps) {
             </Card>
           ) : (
             <div className="space-y-4">
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    {language === "ar" ? "ملصق نهاية اليوم (باركود)" : "End-of-Day Barcode Label"}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="flex gap-2">
+                      <Input
+                        inputMode="decimal"
+                        value={manualGrandTotal}
+                        onChange={(e) => setManualGrandTotal(e.target.value)}
+                        placeholder={language === "ar" ? "الإجمالي الكلي (يدوي)" : "Grand total (manual)"}
+                        data-testid="input-daily-label-grand-total-manual"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setManualGrandTotal("")}
+                        disabled={manualGrandTotal.trim() === ""}
+                        data-testid="button-reset-daily-label-grand-total-auto"
+                      >
+                        {language === "ar" ? "تلقائي" : "Auto"}
+                      </Button>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        inputMode="decimal"
+                        value={manualNetTotal}
+                        onChange={(e) => setManualNetTotal(e.target.value)}
+                        placeholder={language === "ar" ? "صافي الإيراد (يدوي)" : "Net total (manual)"}
+                        data-testid="input-daily-label-net-total-manual"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setManualNetTotal("")}
+                        disabled={manualNetTotal.trim() === ""}
+                        data-testid="button-reset-daily-label-net-total-auto"
+                      >
+                        {language === "ar" ? "تلقائي" : "Auto"}
+                      </Button>
+                    </div>
+                  </div>
+                  <Input
+                    value={labelNote}
+                    onChange={(e) => setLabelNote(e.target.value)}
+                    placeholder={language === "ar" ? "إدخال مخصص (مثال: تسليم الكاش للخزنة)" : "Custom entry (e.g., cash handed to safe)"}
+                    data-testid="input-daily-label-custom-entry"
+                  />
+                  <div className="rounded-md border bg-muted/20 p-3">
+                    <div ref={labelPrintRef} className="label-wrap">
+                      <div className="title">{language === "ar" ? "ملصق تقرير نهاية اليوم" : "End-of-Day Report Label"}</div>
+                      <div className="sub">{formatShiftRange(data.shift)}</div>
+                      <div className="row"><span className="k">{language === "ar" ? "الموظف" : "User"}</span><span className="v">{data.shift.salesUserName}</span></div>
+                      <div className="row"><span className="k">{language === "ar" ? "عدد المعاملات" : "Transactions"}</span><span className="v">{data.summary.inStoreCount + data.summary.repairCount}</span></div>
+                      <div className="row"><span className="k">{language === "ar" ? "الإجمالي" : "Grand Total"}</span><span className="v">{fmtNum(labelGrandTotal)}</span></div>
+                      <div className="row"><span className="k">{language === "ar" ? "صافي الإيراد" : "Net Total"}</span><span className="v">{fmtNum(labelNetTotal)}</span></div>
+                      {labelNote.trim() && (
+                        <div className="note">
+                          <strong>{language === "ar" ? "ملاحظة:" : "Note:"}</strong> {labelNote.trim()}
+                        </div>
+                      )}
+                      <div className="barcode">
+                        <Barcode value={barcodeValue} width={1.6} height={46} displayValue fontSize={12} />
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
               {/* Shift info header */}
               <Card>
                 <CardContent className="py-3 px-4">
