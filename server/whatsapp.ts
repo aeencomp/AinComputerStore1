@@ -48,6 +48,18 @@ function sanitizeTemplateParam(value: string, maxLen = 900): string {
   return `${v.slice(0, Math.max(0, maxLen - 1))}…`;
 }
 
+function getTemplateCandidates(
+  envKey: string,
+  fallback: string,
+): string[] {
+  const raw = (process.env[envKey] || '').trim();
+  const fromEnv = raw
+    ? raw.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
+  const all = [...fromEnv, fallback];
+  return Array.from(new Set(all));
+}
+
 async function getCredentials(): Promise<{ phoneNumberId: string; accessToken: string; wabaId: string }> {
   try {
     const dbSettings = await storage.getStoreSettings();
@@ -200,6 +212,11 @@ export async function sendTicketCreatedMessage(
   deviceType: string,
   deviceBrand: string
 ): Promise<WhatsAppMessageResult> {
+  const templateCandidates = getTemplateCandidates(
+    'WHATSAPP_REPAIR_CREATED_TEMPLATES',
+    'repair_ticket_created',
+  );
+
   // Try multiple param variants because approved template placeholder count may differ.
   const createdParamVariants: string[][] = [
     [customerName, ticketNumber, `${deviceBrand} - ${deviceType}`],
@@ -209,17 +226,19 @@ export async function sendTicketCreatedMessage(
     [],
   ];
   let templateResult: WhatsAppMessageResult = { success: false, error: 'Template send failed' };
-  for (const params of createdParamVariants) {
-    templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
-      customerPhone,
-      'repair_ticket_created',
-      'ar',
-      params
-    );
-    if (templateResult.success) return templateResult;
-    const errText = `${templateResult.error || ''}`.toLowerCase();
-    // Keep trying variants only when error hints parameter mismatch.
-    if (!errText.includes('parameter') || !errText.includes('match')) break;
+  for (const templateName of templateCandidates) {
+    for (const params of createdParamVariants) {
+      templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
+        customerPhone,
+        templateName,
+        'ar',
+        params
+      );
+      if (templateResult.success) return templateResult;
+      const errText = `${templateResult.error || ''}`.toLowerCase();
+      // Keep trying param variants only when error hints parameter mismatch.
+      if (!errText.includes('parameter') || !errText.includes('match')) break;
+    }
   }
 
   // Fallback: free-form text (works if customer messaged within last 24h)
@@ -238,6 +257,10 @@ export async function sendTicketUpdatedMessage(
   costEstimate?: string | null,
   finalCost?: string | null
 ): Promise<WhatsAppMessageResult> {
+  const templateCandidates = getTemplateCandidates(
+    'WHATSAPP_REPAIR_STATUS_TEMPLATES',
+    'repair_status_update',
+  );
   const statusLabels: Record<string, string> = {
     'pending':         'قيد الانتظار',
     'in-progress':     'جاري العمل عليه',
@@ -274,29 +297,34 @@ export async function sendTicketUpdatedMessage(
   ];
 
   let templateResult: WhatsAppMessageResult = { success: false, error: 'Template send failed' };
-  for (const params of statusParamVariants) {
-    templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
-      customerPhone,
-      'repair_status_update',
-      'ar',
-      params
-    );
-    if (templateResult.success) return templateResult;
-    const errText = `${templateResult.error || ''}`.toLowerCase();
-    if (!errText.includes('parameter') || !errText.includes('match')) break;
+  for (const templateName of templateCandidates) {
+    for (const params of statusParamVariants) {
+      templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
+        customerPhone,
+        templateName,
+        'ar',
+        params
+      );
+      if (templateResult.success) return templateResult;
+      const errText = `${templateResult.error || ''}`.toLowerCase();
+      if (!errText.includes('parameter') || !errText.includes('match')) break;
+    }
   }
 
   // Retry with minimal "extra" parameter. Some payloads fail due to overly long notes, newlines, etc.
   console.warn(
     `WhatsApp template send failed for ticket ${ticketNumber} (code=${templateResult.errorCode ?? 'n/a'}). Retrying with minimal params.`
   );
-  const retryResult = await sendWhatsAppTemplateWithLanguageFallbacks(
-    customerPhone,
-    'repair_status_update',
-    'ar',
-    [primaryParams[0], primaryParams[1], primaryParams[2], '-']
-  );
-  if (retryResult.success) return retryResult;
+  let retryResult: WhatsAppMessageResult = { success: false, error: 'Template retry failed' };
+  for (const templateName of templateCandidates) {
+    retryResult = await sendWhatsAppTemplateWithLanguageFallbacks(
+      customerPhone,
+      templateName,
+      'ar',
+      [primaryParams[0], primaryParams[1], primaryParams[2], '-']
+    );
+    if (retryResult.success) return retryResult;
+  }
 
   // Last resort fallback (may fail outside 24h window). Keep it, but make the failure visible via logs/result.
   console.warn(
