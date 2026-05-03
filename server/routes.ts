@@ -8515,9 +8515,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!to || !templateName) return res.status(400).json({ error: 'Missing required fields' });
 
     try {
-      const parsedParams = Array.isArray(params)
+      let parsedParams = Array.isArray(params)
         ? params.map((p: any) => String(p ?? ''))
         : [];
+
+      // Admin "Send Message" UI may not provide params input.
+      // Provide sensible defaults for known repair templates so manual testing works.
+      if (parsedParams.length === 0) {
+        if (templateName === 'repair_ticket_created') {
+          parsedParams = ['عميل', 'TKT-TEST', 'Laptop - HP'];
+        } else if (templateName === 'repair_status_update') {
+          parsedParams = ['عميل', 'TKT-TEST', 'جاري العمل عليه', 'سيتم الانتهاء قريباً'];
+        }
+      }
+
       const result = await sendWhatsAppTemplate(
         String(to),
         String(templateName),
