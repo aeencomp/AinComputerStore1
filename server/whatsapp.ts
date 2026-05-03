@@ -206,6 +206,7 @@ export async function sendTicketCreatedMessage(
     [customerName, ticketNumber],
     [ticketNumber, `${deviceBrand} - ${deviceType}`],
     [ticketNumber],
+    [],
   ];
   let templateResult: WhatsAppMessageResult = { success: false, error: 'Template send failed' };
   for (const params of createdParamVariants) {
@@ -269,6 +270,7 @@ export async function sendTicketUpdatedMessage(
     [primaryParams[0], primaryParams[1], primaryParams[2]], // 3 params
     [primaryParams[1], primaryParams[2]], // 2 params
     [primaryParams[1]], // 1 param (ticket only)
+    [], // 0 params (for templates with static body)
   ];
 
   let templateResult: WhatsAppMessageResult = { success: false, error: 'Template send failed' };
