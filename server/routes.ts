@@ -8483,29 +8483,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
     const { to } = req.body;
     if (!to) return res.status(400).json({ error: 'Phone number required' });
-    const dbSettings = await storage.getStoreSettings();
-    const phoneNumberId = (dbSettings?.whatsappPhoneNumberId && dbSettings.whatsappPhoneNumberId.trim()) ? dbSettings.whatsappPhoneNumberId.trim() : process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const token = (dbSettings?.whatsappAccessToken && dbSettings.whatsappAccessToken.trim()) ? dbSettings.whatsappAccessToken.trim() : process.env.WHATSAPP_ACCESS_TOKEN;
-    if (!phoneNumberId || !token) return res.status(500).json({ error: 'WhatsApp not configured', phoneNumberId: !!phoneNumberId, hasToken: !!token });
-    let cleanPhone = to.replace(/[\s\-\+]/g, '');
-    if (cleanPhone.startsWith('00')) cleanPhone = cleanPhone.substring(2);
-    if (cleanPhone.startsWith('07')) cleanPhone = '964' + cleanPhone.substring(1);
+
     try {
-      const response = await fetch(
-        `https://graph.facebook.com/v21.0/${phoneNumberId}/messages`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            messaging_product: 'whatsapp',
-            to: cleanPhone,
-            type: 'text',
-            text: { body: 'رسالة اختبار من العين لتجارة الحاسبات - Test message' }
-          })
-        }
+      // Use the exact same path as repair status notifications for realistic diagnostics.
+      const result = await sendTicketUpdatedMessage(
+        to,
+        'عميل اختبار',
+        'TEST-00000',
+        'completed',
+        'رسالة اختبار من النظام',
+        null,
+        null
       );
-      const data = await response.json() as any;
-      return res.json({ ok: response.ok, status: response.status, data, phoneNumberId, formattedPhone: cleanPhone });
+
+      return res.json({
+        ok: result.success,
+        source: 'repair_status_update_pipeline',
+        messageId: result.messageId,
+        error: result.error,
+        errorCode: result.errorCode,
+        errorData: result.errorData,
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
