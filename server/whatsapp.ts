@@ -12,8 +12,17 @@ interface WhatsAppMessageResult {
 }
 
 function formatPhoneNumber(phone: string): string {
+  // Normalize Arabic-Indic digits then keep digits only.
+  // This supports inputs like "٠٧٨..." which JS \d does not treat as [0-9].
+  const toLatinDigits = (s: string) =>
+    (s || '')
+      // Arabic-Indic: ٠١٢٣٤٥٦٧٨٩
+      .replace(/[٠-٩]/g, (d) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(d)))
+      // Eastern Arabic-Indic: ۰۱۲۳۴۵۶۷۸۹
+      .replace(/[۰-۹]/g, (d) => String('۰۱۲۳۴۵۶۷۸۹'.indexOf(d)));
+
   // Keep digits only to support messy user inputs like "+964 (0) 78x-xxx-xxxx"
-  let cleaned = (phone || '').replace(/\D/g, '');
+  let cleaned = toLatinDigits(phone).replace(/\D/g, '');
 
   // International prefix variants
   if (cleaned.startsWith('00')) cleaned = cleaned.substring(2);
