@@ -296,16 +296,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "هذا الحساب غير مفعّل" });
       }
 
-      if (admin.email) {
+      const emailNorm = (admin.email ?? "").trim();
+      const hasEmail =
+        emailNorm.length > 3 &&
+        emailNorm !== "-" &&
+        emailNorm !== "—" &&
+        emailNorm.toLowerCase() !== "none" &&
+        emailNorm.includes("@");
+
+      if (hasEmail) {
         const otp = generateOTP();
         storeOTP(`admin:${username}`, otp);
         try {
-          await sendOTPEmail(admin.email, otp, "لوحة تحكم الإدارة");
+          await sendOTPEmail(emailNorm, otp, "لوحة تحكم الإدارة");
         } catch (emailErr) {
           console.error("Failed to send admin OTP email:", emailErr);
           return res.status(500).json({ error: "فشل إرسال رمز التحقق. تحقق من إعدادات البريد الإلكتروني." });
         }
-        return res.json({ step: "otp", maskedEmail: admin.email.replace(/(.{2}).+(@.+)/, "$1***$2") });
+        return res.json({ step: "otp", maskedEmail: emailNorm.replace(/(.{2}).+(@.+)/, "$1***$2") });
       }
       
       // No email configured — log in directly

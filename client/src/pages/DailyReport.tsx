@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import JsBarcode from "jsbarcode";
 import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -563,8 +562,8 @@ export default function DailyReport({ user }: DailyReportProps) {
   const [manualLabelName, setManualLabelName] = useState("");
   const [manualLabelDate, setManualLabelDate] = useState("");
   const [manualLabelAmount, setManualLabelAmount] = useState("");
+  const [dailyLabelQrDataUrl, setDailyLabelQrDataUrl] = useState<string>("");
   const labelPrintRef = useRef<HTMLDivElement>(null);
-  const dailyLabelBarcodeRef = useRef<SVGSVGElement>(null);
   const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
   // List of all shifts
@@ -640,8 +639,7 @@ export default function DailyReport({ user }: DailyReportProps) {
     return Number.isNaN(n) ? 0 : n;
   }, [manualLabelAmount]);
 
-  /** Same JsBarcode + CSS footprint as technician repair label print (TicketDetail). */
-  const dailyLabelBarcodeValue = useMemo(() => {
+  const dailyLabelQrValue = useMemo(() => {
     if (!data?.shift) return "";
     const d = data.shift.startTime
       ? new Date(data.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).replace(/-/g, "")
@@ -654,24 +652,30 @@ export default function DailyReport({ user }: DailyReportProps) {
   }, [baghdadToday, data?.shift]);
 
   useEffect(() => {
-    if (!dailyLabelBarcodeValue || !dailyLabelBarcodeRef.current) return;
-    requestAnimationFrame(() => {
-      const el = dailyLabelBarcodeRef.current;
-      if (!el) return;
+    let cancelled = false;
+    (async () => {
       try {
-        JsBarcode(el, dailyLabelBarcodeValue, {
-          format: "CODE128",
-          width: 1.5,
-          height: 35,
-          displayValue: false,
-          margin: 1,
-          background: "#ffffff",
+        if (!dailyLabelQrValue) {
+          setDailyLabelQrDataUrl("");
+          return;
+        }
+        const { toDataURL } = await import("qrcode");
+        const dataUrl = await toDataURL(dailyLabelQrValue, {
+          width: 120,
+          margin: 0,
+          color: { dark: "#000000", light: "#ffffff" },
+          errorCorrectionLevel: "M",
         });
+        if (!cancelled) setDailyLabelQrDataUrl(dataUrl);
       } catch (e) {
-        console.error("Daily label barcode error:", e);
+        console.error("Daily label QR generation error:", e);
+        if (!cancelled) setDailyLabelQrDataUrl("");
       }
-    });
-  }, [dailyLabelBarcodeValue]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dailyLabelQrValue]);
 
   const handlePrint = () => {
     if (!data) return;
@@ -716,8 +720,8 @@ export default function DailyReport({ user }: DailyReportProps) {
       justify-content: center;
       gap: 0.5mm;
     }
-    .barcode-container { text-align: center; margin: 0.5mm 0; width: 100%; }
-    .barcode-container svg { max-width: 44mm; height: 10mm; display: block; margin: 0 auto; }
+    .qr { width: 100%; display: flex; justify-content: center; margin-top: 0.6mm; }
+    .qr img { width: 22mm; height: 22mm; image-rendering: pixelated; }
     .row {
       display: flex;
       justify-content: space-between;
@@ -732,6 +736,7 @@ export default function DailyReport({ user }: DailyReportProps) {
 </head>
 <body>
   ${labelHtml}
+  ${dailyLabelQrDataUrl ? `<div class="qr"><img alt="QR" src="${dailyLabelQrDataUrl}"/></div>` : ""}
   <script>window.onload = () => window.print();</script>
 </body>
 </html>`);
@@ -1064,15 +1069,13 @@ export default function DailyReport({ user }: DailyReportProps) {
                           {manualLabelAmount.trim() !== "" ? fmtNum(labelAmountValue) : "—"}
                         </span>
                       </div>
-                      {dailyLabelBarcodeValue ? (
-                        <div
-                          className="barcode-container"
-                          style={{ textAlign: "center", marginTop: "0.5mm", width: "100%" }}
-                        >
-                          <svg
-                            ref={dailyLabelBarcodeRef}
-                            style={{ display: "block", margin: "0 auto", maxWidth: "44mm", height: "10mm" }}
-                            data-testid="svg-daily-label-barcode"
+                      {dailyLabelQrDataUrl ? (
+                        <div style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "0.6mm" }}>
+                          <img
+                            src={dailyLabelQrDataUrl}
+                            alt="QR"
+                            style={{ width: "22mm", height: "22mm", imageRendering: "pixelated" }}
+                            data-testid="img-daily-label-qr"
                           />
                         </div>
                       ) : null}
