@@ -3235,7 +3235,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.json({
         ...ticket,
-        _whatsappStatus: whatsappResult.success ? 'sent' : `failed: ${whatsappResult.error || 'unknown'}`
+        _whatsappStatus: whatsappResult.success ? 'queued' : `failed: ${whatsappResult.error || 'unknown'}`
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -3553,7 +3553,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.json({
         ...ticket,
-        _whatsappStatus: whatsappResult.success ? 'sent' : `failed: ${whatsappResult.error || 'unknown'}`
+        _whatsappStatus: whatsappResult.success ? 'queued' : `failed: ${whatsappResult.error || 'unknown'}`
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -8593,6 +8593,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       for (const entry of entries) {
         for (const change of (entry.changes || [])) {
           const value = change.value;
+          const statuses = value?.statuses || [];
+
+          // Delivery receipts for our outbound messages
+          for (const st of statuses) {
+            const msgId = st?.id;
+            const status = st?.status;
+            const ts = st?.timestamp;
+            const recipientId = st?.recipient_id;
+            const errors = st?.errors;
+            console.log("WhatsApp status update:", {
+              id: msgId,
+              status,
+              timestamp: ts,
+              recipient_id: recipientId,
+              errors,
+            });
+          }
+
           const messages = value?.messages || [];
 
           for (const msg of messages) {
