@@ -100,7 +100,7 @@ async function canViewInStoreCostPrice(req: Request): Promise<boolean> {
   const salesUserId = (req.session as any).salesUserId as string | undefined;
   if (!salesUserId) return false;
   const salesUser = await storage.getSalesUser(salesUserId);
-  return salesUser?.role === "sales_admin" || salesUser?.role === "admin";
+  return salesUser?.role === "sales_admin";
 }
 
 function stripInStoreCostPrice<T extends Record<string, unknown>>(product: T): Omit<T, "costPrice"> {

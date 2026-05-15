@@ -105,8 +105,8 @@ export default function SalesInStoreInventory({ user }: Props) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const canViewCostPrice =
-    user.role === "sales_admin" || user.role === "admin";
+  /** Only مدير مبيعات (sales_admin) sees سعر الشراء when adding/editing products. */
+  const canViewCostPrice = user.role === "sales_admin";
 
   const [activeTab, setActiveTab] = useState<"inventory" | "stockcount">("inventory");
 
@@ -271,7 +271,7 @@ export default function SalesInStoreInventory({ user }: Props) {
       barcode: p.barcode || "",
       price: String(p.price),
       wholesalePrice: String(p.wholesalePrice || ""),
-      costPrice: String(p.costPrice || ""),
+      costPrice: canViewCostPrice ? String(p.costPrice || "") : "",
       bulkWholesalePrice: String(p.bulkWholesalePrice || ""),
       category: p.category || "",
       description: p.description || "",
@@ -312,14 +312,13 @@ export default function SalesInStoreInventory({ user }: Props) {
         return;
       }
     }
-    const payload = {
+    const payload: Record<string, unknown> = {
       nameAr: form.nameAr.trim(),
       nameEn: form.nameEn.trim() || null,
       sku: form.sku.trim() || null,
       barcode: form.barcode.trim() || null,
       price: form.price,
       wholesalePrice: form.wholesalePrice || null,
-      costPrice: form.costPrice || null,
       bulkWholesalePrice: form.bulkWholesalePrice || null,
       category: form.category.trim() || null,
       description: form.description.trim() || null,
