@@ -39,6 +39,7 @@ import type { InStoreProduct, LaptopBattery, AcAdapter, Laptop as LaptopItem, De
 
 interface SalesUser {
   id: string;
+  role?: string;
   permissions: {
     canInventory: number;
   };
@@ -104,6 +105,8 @@ export default function SalesInStoreInventory({ user }: Props) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const canViewCostPrice =
+    user.role === "sales_admin" || user.role === "admin";
 
   const [activeTab, setActiveTab] = useState<"inventory" | "stockcount">("inventory");
 
@@ -325,6 +328,9 @@ export default function SalesInStoreInventory({ user }: Props) {
       lowStockThreshold: parseInt(form.lowStockThreshold) || 3,
       isActive: 1,
     };
+    if (canViewCostPrice) {
+      payload.costPrice = form.costPrice || null;
+    }
     if (editingProduct) {
       updateMutation.mutate({ id: editingProduct.id, data: payload });
     } else {
@@ -1412,15 +1418,18 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                   data-testid="input-product-wholesale-price"
                 />
               </div>
-              <div>
-                <Label>{language === 'ar' ? 'سعر الشراء (د.ع)' : 'Cost Price (IQD)'}</Label>
-                <Input
-                  type="number"
-                  value={form.costPrice}
-                  onChange={e => setForm(f => ({ ...f, costPrice: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
+              {canViewCostPrice && (
+                <div>
+                  <Label>{language === 'ar' ? 'سعر الشراء (د.ع)' : 'Cost Price (IQD)'}</Label>
+                  <Input
+                    type="number"
+                    value={form.costPrice}
+                    onChange={e => setForm(f => ({ ...f, costPrice: e.target.value }))}
+                    placeholder="0"
+                    data-testid="input-product-cost-price"
+                  />
+                </div>
+              )}
               <div>
                 <Label>{language === 'ar' ? 'جملة الجملة (د.ع)' : 'Bulk Wholesale (IQD)'}</Label>
                 <Input

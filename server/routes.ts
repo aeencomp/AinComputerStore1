@@ -1,4 +1,4 @@
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, repairTicketStatusHistory, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products } from "@shared/schema";
@@ -92,6 +92,29 @@ async function isCashWithdrawalEditBlocked(recordTime: Date): Promise<boolean> {
   }
 
   return true;
+}
+
+/** Cost price (سعر الشراء) visible only to admin panel and sales_admin. */
+async function canViewInStoreCostPrice(req: Request): Promise<boolean> {
+  if ((req.session as any).adminId) return true;
+  const salesUserId = (req.session as any).salesUserId as string | undefined;
+  if (!salesUserId) return false;
+  const salesUser = await storage.getSalesUser(salesUserId);
+  return salesUser?.role === "sales_admin" || salesUser?.role === "admin";
+}
+
+function stripInStoreCostPrice<T extends Record<string, unknown>>(product: T): Omit<T, "costPrice"> {
+  const { costPrice: _omit, ...rest } = product;
+  return rest;
+}
+
+function sanitizeInStoreProductBody(
+  body: Record<string, unknown>,
+  canViewCost: boolean,
+): Record<string, unknown> {
+  if (canViewCost) return body;
+  const { costPrice: _omit, ...rest } = body;
+  return rest;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -1676,7 +1699,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
       const products = await storage.getInStoreProducts();
-      return res.json(products);
+      const canViewCost = await canViewInStoreCostPrice(req);
+      return res.json(
+        canViewCost ? products : products.map((p) => stripInStoreCostPrice(p)),
+      );
     } catch (error) {
       console.error("Error fetching in-store products:", error);
       return res.status(500).json({ error: "فشل تحميل المنتجات" });
@@ -1688,8 +1714,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      const product = await storage.createInStoreProduct(req.body);
-      return res.json(product);
+      const canViewCost = await canViewInStoreCostPrice(req);
+      const body = sanitizeInStoreProductBody(req.body, canViewCost);
+      const product = await storage.createInStoreProduct(body as any);
+      return res.json(canViewCost ? product : stripInStoreCostPrice(product));
     } catch (error) {
       console.error("Error creating in-store product:", error);
       return res.status(500).json({ error: "فشل إضافة المنتج" });
@@ -1701,9 +1729,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      const product = await storage.updateInStoreProduct(parseInt(req.params.id), req.body);
+      const canViewCost = await canViewInStoreCostPrice(req);
+      const body = sanitizeInStoreProductBody(req.body, canViewCost);
+      const product = await storage.updateInStoreProduct(parseInt(req.params.id), body as any);
       if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
-      return res.json(product);
+      return res.json(canViewCost ? product : stripInStoreCostPrice(product));
     } catch (error) {
       console.error("Error updating in-store product:", error);
       return res.status(500).json({ error: "فشل تحديث المنتج" });
