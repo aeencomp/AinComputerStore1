@@ -25,6 +25,8 @@ fi
 echo "==> Build"
 npm run build
 
+echo "==> DB migrations run automatically on app startup (server/db-migrations.ts)"
+
 echo "==> Restart PM2"
 if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
   pm2 restart "$PM2_NAME"

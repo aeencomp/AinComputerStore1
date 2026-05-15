@@ -20,6 +20,7 @@ import path from "path";
 import fs from "fs";
 import { startPriceSync, syncPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
 import { normalizeCustomerEmail } from "./auth-email";
+import { runDbMigrations } from "./db-migrations";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -94,6 +95,8 @@ async function isCashWithdrawalEditBlocked(recordTime: Date): Promise<boolean> {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  await runDbMigrations();
+
   const httpServer = createServer(app);
   
   adminNotifications.initialize(httpServer);

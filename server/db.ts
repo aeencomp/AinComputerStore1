@@ -18,7 +18,7 @@ function pgSslOption():
   return { rejectUnauthorized: false };
 }
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: pgSslOption(),
 });
