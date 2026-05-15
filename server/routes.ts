@@ -94,13 +94,19 @@ async function isCashWithdrawalEditBlocked(recordTime: Date): Promise<boolean> {
   return true;
 }
 
-/** Cost price (سعر الشراء) visible only to admin panel and sales_admin. */
+function isSalesAdminRole(role: string | null | undefined): boolean {
+  return String(role ?? "").trim().toLowerCase() === "sales_admin";
+}
+
+/** Cost price (سعر الشراء): sales_admin on sales portal; admin panel when no sales session. */
 async function canViewInStoreCostPrice(req: Request): Promise<boolean> {
-  if ((req.session as any).adminId) return true;
   const salesUserId = (req.session as any).salesUserId as string | undefined;
-  if (!salesUserId) return false;
-  const salesUser = await storage.getSalesUser(salesUserId);
-  return salesUser?.role === "sales_admin";
+  if (salesUserId) {
+    const salesUser = await storage.getSalesUser(salesUserId);
+    return isSalesAdminRole(salesUser?.role);
+  }
+  if ((req.session as any).adminId) return true;
+  return false;
 }
 
 function stripInStoreCostPrice<T extends Record<string, unknown>>(product: T): Omit<T, "costPrice"> {
@@ -845,6 +851,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         username: salesUser.username, 
         name: salesUser.name, 
         role: salesUser.role,
+        canViewInStoreCostPrice: isSalesAdminRole(salesUser.role),
         permissions: {
           canPos: salesUser.canPos,
           canInventory: salesUser.canInventory,
@@ -1693,6 +1700,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // ─── In-Store Products CRUD ─────────────────────────────────────────────────
+  app.get("/api/instore/capabilities", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const canViewCostPrice = await canViewInStoreCostPrice(req);
+      return res.json({ canViewCostPrice });
+    } catch (error) {
+      console.error("Error fetching in-store capabilities:", error);
+      return res.status(500).json({ error: "فشل التحقق من الصلاحيات" });
+    }
+  });
+
   app.get("/api/instore/products", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;

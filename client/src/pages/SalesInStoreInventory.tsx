@@ -40,9 +40,14 @@ import type { InStoreProduct, LaptopBattery, AcAdapter, Laptop as LaptopItem, De
 interface SalesUser {
   id: string;
   role?: string;
+  canViewInStoreCostPrice?: boolean;
   permissions: {
     canInventory: number;
   };
+}
+
+interface InStoreCapabilities {
+  canViewCostPrice: boolean;
 }
 
 interface Props {
@@ -105,8 +110,14 @@ export default function SalesInStoreInventory({ user }: Props) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  /** Only مدير مبيعات (sales_admin) sees سعر الشراء when adding/editing products. */
-  const canViewCostPrice = user.role === "sales_admin";
+
+  const { data: capabilities } = useQuery<InStoreCapabilities>({
+    queryKey: ["/api/instore/capabilities"],
+    staleTime: 0,
+  });
+
+  /** Server decides from DB role — hidden by default until loaded. */
+  const canViewCostPrice = capabilities?.canViewCostPrice === true;
 
   const [activeTab, setActiveTab] = useState<"inventory" | "stockcount">("inventory");
 
