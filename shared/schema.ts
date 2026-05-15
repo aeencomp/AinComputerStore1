@@ -1214,6 +1214,7 @@ export const inStoreProducts = pgTable("in_store_products", {
   price: decimal("price", { precision: 10, scale: 2 }).notNull(),
   wholesalePrice: decimal("wholesale_price", { precision: 10, scale: 2 }),
   costPrice: decimal("cost_price", { precision: 10, scale: 2 }),
+  bulkWholesalePrice: decimal("bulk_wholesale_price", { precision: 10, scale: 2 }),
   category: text("category"),
   description: text("description"),
   image: text("image"),

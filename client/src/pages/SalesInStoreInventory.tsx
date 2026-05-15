@@ -56,6 +56,7 @@ interface ProductForm {
   price: string;
   wholesalePrice: string;
   costPrice: string;
+  bulkWholesalePrice: string;
   category: string;
   description: string;
   stockQuantity: string;
@@ -71,6 +72,7 @@ const emptyForm: ProductForm = {
   price: "",
   wholesalePrice: "",
   costPrice: "",
+  bulkWholesalePrice: "",
   category: "",
   description: "",
   stockQuantity: "0",
@@ -267,6 +269,7 @@ export default function SalesInStoreInventory({ user }: Props) {
       price: String(p.price),
       wholesalePrice: String(p.wholesalePrice || ""),
       costPrice: String(p.costPrice || ""),
+      bulkWholesalePrice: String(p.bulkWholesalePrice || ""),
       category: p.category || "",
       description: p.description || "",
       stockQuantity: String(p.stockQuantity),
@@ -314,6 +317,7 @@ export default function SalesInStoreInventory({ user }: Props) {
       price: form.price,
       wholesalePrice: form.wholesalePrice || null,
       costPrice: form.costPrice || null,
+      bulkWholesalePrice: form.bulkWholesalePrice || null,
       category: form.category.trim() || null,
       description: form.description.trim() || null,
       image: imageUrl,
@@ -1415,6 +1419,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                   value={form.costPrice}
                   onChange={e => setForm(f => ({ ...f, costPrice: e.target.value }))}
                   placeholder="0"
+                />
+              </div>
+              <div>
+                <Label>{language === 'ar' ? 'جملة الجملة (د.ع)' : 'Bulk Wholesale (IQD)'}</Label>
+                <Input
+                  type="number"
+                  value={form.bulkWholesalePrice}
+                  onChange={e => setForm(f => ({ ...f, bulkWholesalePrice: e.target.value }))}
+                  placeholder="0"
+                  data-testid="input-product-bulk-wholesale-price"
                 />
               </div>
               <div>
