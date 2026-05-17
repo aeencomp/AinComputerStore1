@@ -289,21 +289,31 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label>{language === 'ar' ? 'المواقع المسموحة' : 'Allowed locations'}</Label>
-                <div className="flex flex-wrap gap-2">
-                  <Button type="button" size="sm" variant={formData.locationIds.includes(1) ? "default" : "outline"} onClick={() => toggleLocation(1)}>
-                    {language === 'ar' ? 'الموقع 1' : 'Location 1'}
-                  </Button>
-                  <Button type="button" size="sm" variant={formData.locationIds.includes(2) ? "default" : "outline"} onClick={() => toggleLocation(2)}>
-                    {language === 'ar' ? 'الموقع 2' : 'Location 2'}
-                  </Button>
-                </div>
-              </div>
-
               <div className="space-y-3">
                 <Label>{language === 'ar' ? 'الصلاحيات' : 'Permissions'}</Label>
                 <div className="grid grid-cols-2 gap-3">
+                  <div className="flex items-center justify-between p-2 border rounded">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      <span className="text-sm">{language === 'ar' ? 'الموقع 1' : 'Location 1'}</span>
+                    </div>
+                    <Switch
+                      checked={formData.locationIds.includes(1)}
+                      onCheckedChange={() => toggleLocation(1)}
+                      data-testid="switch-location-1"
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-2 border rounded">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      <span className="text-sm">{language === 'ar' ? 'الموقع 2' : 'Location 2'}</span>
+                    </div>
+                    <Switch
+                      checked={formData.locationIds.includes(2)}
+                      onCheckedChange={() => toggleLocation(2)}
+                      data-testid="switch-location-2"
+                    />
+                  </div>
                   <div className="flex items-center justify-between p-2 border rounded">
                     <div className="flex items-center gap-2">
                       <ShoppingCart className="h-4 w-4" />
