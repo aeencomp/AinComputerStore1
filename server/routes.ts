@@ -133,6 +133,145 @@ function sanitizeInStoreProductBody(
   return rest;
 }
 
+type OnlineStockAllocation = {
+  locationId: number;
+  locationName: string;
+  sourceInventoryId: number;
+  quantity: number;
+};
+
+function onlineLocationName(locationId: number): string {
+  return locationId === LOCATION_SHOP2_ID ? "Location 2" : "Location 1";
+}
+
+async function getOnlineInventoryMatches(product: any) {
+  const sku = String(product?.sku || "").trim();
+  if (!sku) return [];
+
+  return db
+    .select()
+    .from(inStoreProducts)
+    .where(
+      and(
+        inArray(inStoreProducts.salesLocationId, [LOCATION_MAIN_ID, LOCATION_SHOP2_ID]),
+        or(eq(inStoreProducts.sku, sku), eq(inStoreProducts.barcode, sku)),
+      ),
+    );
+}
+
+async function getOnlineStockInfo(product: any) {
+  const matches = await getOnlineInventoryMatches(product);
+  if (matches.length === 0) {
+    const fallbackQty = product?.stockQuantity || 0;
+    return {
+      hasLocationStock: false,
+      totalStock: fallbackQty,
+      byLocation: [
+        { locationId: LOCATION_MAIN_ID, quantity: fallbackQty },
+      ],
+      matches,
+    };
+  }
+
+  const byLocationMap = new Map<number, number>();
+  for (const row of matches) {
+    const locationId = row.salesLocationId || LOCATION_MAIN_ID;
+    byLocationMap.set(locationId, (byLocationMap.get(locationId) || 0) + (row.stockQuantity || 0));
+  }
+
+  const byLocation = Array.from(byLocationMap.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([locationId, quantity]) => ({ locationId, quantity }));
+
+  return {
+    hasLocationStock: true,
+    totalStock: byLocation.reduce((sum, item) => sum + item.quantity, 0),
+    byLocation,
+    matches,
+  };
+}
+
+async function withOnlineStock(product: any) {
+  const stock = await getOnlineStockInfo(product);
+  return {
+    ...product,
+    stockQuantity: stock.totalStock,
+    inStock: stock.totalStock > 0 ? 1 : 0,
+    onlineStockByLocation: stock.byLocation,
+    onlineStockSource: stock.hasLocationStock ? "locations" : "products",
+  };
+}
+
+async function allocateOnlineOrderItem(item: any): Promise<{
+  item: any;
+  allocations: OnlineStockAllocation[];
+  fallbackProductStock: boolean;
+}> {
+  const product = await storage.getProduct(item.productId);
+  if (!product) throw new Error(`Product not found: ${item.productId}`);
+
+  const quantity = parseInt(String(item.quantity || 0), 10);
+  if (!quantity || quantity < 1) throw new Error(`Invalid quantity for ${product.nameAr}`);
+
+  const stock = await getOnlineStockInfo(product);
+  if (stock.totalStock < quantity) {
+    throw new Error(`Insufficient stock for ${product.nameAr}`);
+  }
+
+  if (!stock.hasLocationStock) {
+    return {
+      item: {
+        ...item,
+        fulfillmentLocationId: LOCATION_MAIN_ID,
+        fulfillmentLocationName: onlineLocationName(LOCATION_MAIN_ID),
+        fulfillmentAllocations: [{
+          locationId: LOCATION_MAIN_ID,
+          locationName: onlineLocationName(LOCATION_MAIN_ID),
+          quantity,
+          source: "products",
+        }],
+      },
+      allocations: [],
+      fallbackProductStock: true,
+    };
+  }
+
+  let remaining = quantity;
+  const allocations: OnlineStockAllocation[] = [];
+  const sortedMatches = stock.matches
+    .filter((row) => (row.stockQuantity || 0) > 0)
+    .sort((a, b) => (a.salesLocationId || LOCATION_MAIN_ID) - (b.salesLocationId || LOCATION_MAIN_ID));
+
+  for (const row of sortedMatches) {
+    if (remaining <= 0) break;
+    const take = Math.min(row.stockQuantity || 0, remaining);
+    if (take <= 0) continue;
+    const locationId = row.salesLocationId || LOCATION_MAIN_ID;
+    allocations.push({
+      locationId,
+      locationName: onlineLocationName(locationId),
+      sourceInventoryId: row.id,
+      quantity: take,
+    });
+    remaining -= take;
+  }
+
+  if (remaining > 0) throw new Error(`Insufficient stock for ${product.nameAr}`);
+
+  const primary = allocations[0];
+  return {
+    item: {
+      ...item,
+      fulfillmentLocationId: primary.locationId,
+      fulfillmentLocationName: primary.locationName,
+      sourceInventoryId: primary.sourceInventoryId,
+      fulfillmentAllocations: allocations,
+    },
+    allocations,
+    fallbackProductStock: false,
+  };
+}
+
 export async function registerRoutes(app: Express): Promise<Server> {
   await runDbMigrations();
 
@@ -2177,16 +2316,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (componentType && typeof componentType === 'string') {
         const products = await storage.getProductsByComponentType(componentType);
-        return res.json(products);
+        return res.json(await Promise.all(products.map(withOnlineStock)));
       }
       
       if (category && typeof category === 'string') {
         const products = await storage.getProductsByCategory(category);
-        return res.json(products);
+        return res.json(await Promise.all(products.map(withOnlineStock)));
       }
       
       const products = await storage.getProducts();
-      return res.json(products);
+      return res.json(await Promise.all(products.map(withOnlineStock)));
     } catch (error) {
       console.error("Error fetching products:", error);
       return res.status(500).json({ error: "Failed to fetch products" });
@@ -2202,7 +2341,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
       
-      return res.json(product);
+      return res.json(await withOnlineStock(product));
     } catch (error) {
       console.error("Error fetching product:", error);
       return res.status(500).json({ error: "Failed to fetch product" });
@@ -2654,7 +2793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const itemsWithProducts = await Promise.all(
         cartItems.map(async (item) => {
           const product = await storage.getProduct(item.productId);
-          return product ? { product, quantity: item.quantity, id: item.id } : null;
+          return product ? { product: await withOnlineStock(product), quantity: item.quantity, id: item.id } : null;
         })
       );
       
@@ -2675,6 +2814,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Product not found" });
       }
 
+      const sessionId = req.session.id;
+      const currentCartItems = await storage.getCartItems(sessionId);
+      const existingQty = currentCartItems
+        .filter((item) => item.productId === validatedData.productId)
+        .reduce((sum, item) => sum + item.quantity, 0);
+      const onlineStock = await getOnlineStockInfo(product);
+      const addQuantity = validatedData.quantity ?? 1;
+      const desiredQty = existingQty + addQuantity;
+      if (desiredQty > onlineStock.totalStock) {
+        return res.status(400).json({ error: "Insufficient stock", available: onlineStock.totalStock });
+      }
+
       req.session.cartInitialized = true;
       
       return new Promise((resolve, reject) => {
@@ -2686,9 +2837,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           
           try {
-            const sessionId = req.session.id;
             const cartItem = await storage.addToCart(sessionId, validatedData);
-            resolve(res.json({ ...cartItem, product }));
+            res.json({ ...cartItem, product: await withOnlineStock(product) });
+            resolve();
           } catch (error) {
             reject(error);
           }
@@ -2721,6 +2872,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Some products not found", missingProducts });
       }
 
+      const requestedByProduct = new Map<string, number>();
+      for (const item of items) {
+        requestedByProduct.set(item.productId, (requestedByProduct.get(item.productId) || 0) + item.quantity);
+      }
+      const existingCartItems = await storage.getCartItems(req.session.id);
+      for (const item of existingCartItems) {
+        requestedByProduct.set(item.productId, (requestedByProduct.get(item.productId) || 0) + item.quantity);
+      }
+      for (const [productId, requestedQty] of Array.from(requestedByProduct.entries())) {
+        const product = products.find((p) => p?.id === productId);
+        if (!product) continue;
+        const onlineStock = await getOnlineStockInfo(product);
+        if (requestedQty > onlineStock.totalStock) {
+          return res.status(400).json({
+            error: "Insufficient stock",
+            productId,
+            available: onlineStock.totalStock,
+          });
+        }
+      }
+
       req.session.cartInitialized = true;
       
       return new Promise((resolve, reject) => {
@@ -2736,7 +2908,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const results = await Promise.all(
               items.map(item => storage.addToCart(sessionId, { productId: item.productId, quantity: item.quantity }))
             );
-            resolve(res.json({ success: true, addedItems: results.length }));
+            res.json({ success: true, addedItems: results.length });
+            resolve();
           } catch (error) {
             reject(error);
           }
@@ -2761,7 +2934,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
       
       const validatedData = quantitySchema.parse(req.body);
-      
+
+      const currentItems = await storage.getCartItems(sessionId);
+      const currentItem = currentItems.find((item) => item.id === id);
+      if (!currentItem) {
+        return res.status(404).json({ error: "Cart item not found" });
+      }
+      const currentProduct = await storage.getProduct(currentItem.productId);
+      if (currentProduct) {
+        const onlineStock = await getOnlineStockInfo(currentProduct);
+        if (validatedData.quantity > onlineStock.totalStock) {
+          return res.status(400).json({ error: "Insufficient stock", available: onlineStock.totalStock });
+        }
+      }
+
       const updatedItem = await storage.updateCartItemQuantity(id, sessionId, validatedData.quantity);
       
       if (!updatedItem) {
@@ -2769,7 +2955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const product = await storage.getProduct(updatedItem.productId);
-      return res.json({ ...updatedItem, product });
+      return res.json({ ...updatedItem, product: product ? await withOnlineStock(product) : product });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ error: "Invalid quantity", details: error.errors });
@@ -2810,9 +2996,54 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log("Received order data:", JSON.stringify(req.body, null, 2));
       const validatedData = insertOrderSchema.parse(req.body);
       console.log("Validated order data:", JSON.stringify(validatedData, null, 2));
-      
-      const order = await storage.createOrder(validatedData, sessionId, userId);
+
+      const rawOrderItems = (validatedData.items || []).map((item: any) => {
+        if (typeof item === "string") return JSON.parse(item);
+        return item;
+      });
+
+      const allocatedItems = [];
+      const stockDeductions: Array<{
+        productId: string;
+        quantity: number;
+        fallbackProductStock: boolean;
+        allocations: OnlineStockAllocation[];
+      }> = [];
+
+      for (const item of rawOrderItems) {
+        const allocated = await allocateOnlineOrderItem(item);
+        allocatedItems.push(allocated.item);
+        stockDeductions.push({
+          productId: item.productId,
+          quantity: parseInt(String(item.quantity || 0), 10),
+          fallbackProductStock: allocated.fallbackProductStock,
+          allocations: allocated.allocations,
+        });
+      }
+
+      const orderData = {
+        ...validatedData,
+        items: allocatedItems.map((item) => JSON.stringify(item)),
+      };
+
+      const order = await storage.createOrder(orderData, sessionId, userId);
       console.log("Created order:", order.id);
+
+      for (const deduction of stockDeductions) {
+        if (deduction.fallbackProductStock) {
+          await storage.adjustProductStock(deduction.productId, -deduction.quantity, userId, 'online sale', order.orderNumber);
+          continue;
+        }
+        for (const allocation of deduction.allocations) {
+          await db
+            .update(inStoreProducts)
+            .set({
+              stockQuantity: sql`${inStoreProducts.stockQuantity} - ${allocation.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(inStoreProducts.id, allocation.sourceInventoryId));
+        }
+      }
       
       // Increment discount code usage if a discount code was applied
       if (validatedData.discountCode) {

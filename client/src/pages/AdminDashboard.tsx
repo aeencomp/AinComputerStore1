@@ -386,6 +386,15 @@ export default function AdminDashboard() {
   });
 
   const productMap = new Map(products.map(p => [p.id, p]));
+  const getFulfillmentLines = (item: any) => {
+    const prefix = language === 'ar' ? 'تم الأخذ من:' : 'Taken from:';
+    if (Array.isArray(item.fulfillmentAllocations) && item.fulfillmentAllocations.length > 0) {
+      return item.fulfillmentAllocations.map((allocation: any) =>
+        `${prefix} ${allocation.locationName} (${allocation.quantity})`
+      );
+    }
+    return item.fulfillmentLocationName ? [`${prefix} ${item.fulfillmentLocationName}`] : [];
+  };
 
   const { data: adminUsers = [], isLoading: adminUsersLoading } = useQuery<AdminUser[]>({
     queryKey: ['/api/admin/users'],
@@ -897,9 +906,18 @@ export default function AdminDashboard() {
                                 : (item.nameEn || product?.nameEn || item.productId);
                               return (
                                 <div key={idx} className="flex justify-between items-center text-sm border-b border-border/50 pb-2 last:border-0 last:pb-0">
-                                  <span className="font-medium">
-                                    {displayName}
-                                  </span>
+                                  <div>
+                                    <span className="font-medium">
+                                      {displayName}
+                                    </span>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {getFulfillmentLines(item).map((line: string, lineIndex: number) => (
+                                        <Badge key={lineIndex} variant="outline" className="text-xs">
+                                          {line}
+                                        </Badge>
+                                      ))}
+                                    </div>
+                                  </div>
                                   <div className="flex gap-4 text-muted-foreground">
                                     <span>{language === 'ar' ? 'الكمية:' : 'Qty:'} {item.quantity}</span>
                                     <span>{parseFloat(item.price).toLocaleString('ar-IQ')} {t('common.currency')}</span>

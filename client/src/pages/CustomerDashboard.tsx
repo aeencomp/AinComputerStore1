@@ -21,6 +21,11 @@ interface OrderItem {
   productId: string;
   quantity: number;
   price: string;
+  fulfillmentLocationName?: string;
+  fulfillmentAllocations?: Array<{
+    locationName: string;
+    quantity: number;
+  }>;
   product: {
     nameAr: string;
     nameEn: string;
@@ -110,6 +115,16 @@ export default function CustomerDashboard() {
     const numPrice = typeof price === 'string' ? parseFloat(price) : price;
     // Always use English numerals for prices
     return `${numPrice.toLocaleString('en-US')} ${language === 'ar' ? 'د.ع' : 'IQD'}`;
+  };
+
+  const getFulfillmentLines = (item: OrderItem) => {
+    const prefix = language === 'ar' ? 'تم الأخذ من:' : 'Taken from:';
+    if (Array.isArray(item.fulfillmentAllocations) && item.fulfillmentAllocations.length > 0) {
+      return item.fulfillmentAllocations.map((allocation) =>
+        `${prefix} ${allocation.locationName} (${allocation.quantity})`
+      );
+    }
+    return item.fulfillmentLocationName ? [`${prefix} ${item.fulfillmentLocationName}`] : [];
   };
 
   if (isAuthLoading) {
@@ -350,6 +365,11 @@ export default function CustomerDashboard() {
                                   <p className="text-xs text-muted-foreground">
                                     {formatPrice(item.price)} × {item.quantity}
                                   </p>
+                                  {getFulfillmentLines(item).map((line, lineIndex) => (
+                                    <Badge key={lineIndex} variant="outline" className="mt-1 text-[10px]">
+                                      {line}
+                                    </Badge>
+                                  ))}
                                 </div>
                                 <div className="text-end">
                                   <p className="font-medium text-sm">

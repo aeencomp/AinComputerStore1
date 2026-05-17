@@ -34,6 +34,11 @@ interface OrderItem {
   productId: string;
   quantity: number;
   price: string;
+  fulfillmentLocationName?: string;
+  fulfillmentAllocations?: Array<{
+    locationName: string;
+    quantity: number;
+  }>;
   product: {
     nameAr: string;
     nameEn: string;
@@ -124,6 +129,16 @@ export default function OrderConfirmation() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  const getFulfillmentLines = (item: OrderItem) => {
+    const prefix = language === 'ar' ? 'تم الأخذ من:' : 'Taken from:';
+    if (Array.isArray(item.fulfillmentAllocations) && item.fulfillmentAllocations.length > 0) {
+      return item.fulfillmentAllocations.map((allocation) =>
+        `${prefix} ${allocation.locationName} (${allocation.quantity})`
+      );
+    }
+    return item.fulfillmentLocationName ? [`${prefix} ${item.fulfillmentLocationName}`] : [];
   };
 
   const getEstimatedDelivery = () => {
@@ -508,6 +523,11 @@ export default function OrderConfirmation() {
                     <div className="text-sm text-muted-foreground">
                       {formatPrice(item.price)} {t('common.currency')} × {item.quantity}
                     </div>
+                    {getFulfillmentLines(item).map((line, lineIndex) => (
+                      <Badge key={lineIndex} variant="outline" className="mt-2 text-xs">
+                        {line}
+                      </Badge>
+                    ))}
                   </div>
                   <div className="text-end">
                     <div className="font-semibold text-lg">
