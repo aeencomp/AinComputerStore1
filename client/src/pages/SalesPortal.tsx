@@ -177,7 +177,10 @@ export default function SalesPortal() {
   const activeLoc = currentUser.activeSalesLocationId ?? 1;
   const allowedLocationIds = currentUser.allowedLocations?.map((loc) => loc.id) ?? [activeLoc];
   const canUseLoc1 = allowedLocationIds.includes(1) || currentUser.role === 'sales_admin';
-  const canUseLoc2 = allowedLocationIds.includes(2) || currentUser.role === 'sales_admin';
+  const canUseLoc2 =
+    allowedLocationIds.includes(2) ||
+    currentUser.permissions.canInventoryLocation2 === 1 ||
+    currentUser.role === 'sales_admin';
 
   const navItems = [
     { 

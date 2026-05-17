@@ -1153,6 +1153,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const locIds = Array.isArray(locationIds)
         ? locationIds.map((id: unknown) => parseInt(String(id), 10)).filter((n: number) => !Number.isNaN(n))
         : [LOCATION_MAIN_ID];
+      if ((canInventoryLocation2 ?? 0) === 1 && !locIds.includes(LOCATION_SHOP2_ID)) {
+        locIds.push(LOCATION_SHOP2_ID);
+      }
       await setUserLocationAssignments(newUser.id, locIds.length ? locIds : [LOCATION_MAIN_ID]);
       
       return res.json({
@@ -1195,6 +1198,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const locIds = locationIds
           .map((lid: unknown) => parseInt(String(lid), 10))
           .filter((n: number) => !Number.isNaN(n));
+        if ((updates as any).canInventoryLocation2 === 1 && !locIds.includes(LOCATION_SHOP2_ID)) {
+          locIds.push(LOCATION_SHOP2_ID);
+        }
         await setUserLocationAssignments(id, locIds.length ? locIds : [LOCATION_MAIN_ID]);
       }
       if (!updated) {

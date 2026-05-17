@@ -345,7 +345,13 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                     </div>
                     <Switch
                       checked={formData.canInventoryLocation2 === 1}
-                      onCheckedChange={(v) => setFormData(prev => ({ ...prev, canInventoryLocation2: v ? 1 : 0 }))}
+                      onCheckedChange={(v) => setFormData(prev => ({
+                        ...prev,
+                        canInventoryLocation2: v ? 1 : 0,
+                        locationIds: v && !prev.locationIds.includes(2)
+                          ? [...prev.locationIds, 2]
+                          : prev.locationIds,
+                      }))}
                       data-testid="switch-can-inventory-location2"
                     />
                   </div>
