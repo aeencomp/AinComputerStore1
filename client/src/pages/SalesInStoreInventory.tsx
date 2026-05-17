@@ -149,9 +149,16 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
   const scanInputRef = useRef<HTMLInputElement>(null);
 
   const productsUrl = `/api/instore/products?locationId=${salesLocationId}`;
+  const otherSalesLocationId = salesLocationId === 1 ? 2 : 1;
+  const otherProductsUrl = `/api/instore/products?locationId=${otherSalesLocationId}`;
 
   const { data: products = [], isLoading } = useQuery<InStoreProduct[]>({
     queryKey: [productsUrl],
+  });
+
+  const { data: otherLocationProducts = [] } = useQuery<InStoreProduct[]>({
+    queryKey: [otherProductsUrl],
+    enabled: showDialog && (salesLocationId === 1 || salesLocationId === 2),
   });
 
   const { data: batteries = [] } = useQuery<LaptopBattery[]>({
@@ -305,10 +312,48 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
     setShowStockDialog(true);
   };
 
+  const normalizeCode = (value?: string | null) => (value || "").trim().toLowerCase();
+  const normalizeName = (value?: string | null) => (value || "").trim().replace(/\s+/g, " ").toLowerCase();
+  const currentProductId = editingProduct?.id ?? null;
+  const enteredCodes = [form.sku, form.barcode].map(normalizeCode).filter(Boolean);
+  const exactDuplicateMatches = enteredCodes.length
+    ? products.filter((p) =>
+        p.id !== currentProductId &&
+        [p.sku, p.barcode].map(normalizeCode).some((code) => code && enteredCodes.includes(code))
+      )
+    : [];
+  const nameDuplicateMatches = (() => {
+    const ar = normalizeName(form.nameAr);
+    const en = normalizeName(form.nameEn);
+    if (!ar && !en) return [];
+    return products.filter((p) => {
+      if (p.id === currentProductId || exactDuplicateMatches.some((dup) => dup.id === p.id)) return false;
+      const pAr = normalizeName(p.nameAr);
+      const pEn = normalizeName(p.nameEn);
+      return (ar && pAr === ar) || (en && pEn === en);
+    });
+  })();
+  const otherLocationCodeMatches = enteredCodes.length
+    ? otherLocationProducts.filter((p) =>
+        [p.sku, p.barcode].map(normalizeCode).some((code) => code && enteredCodes.includes(code))
+      )
+    : [];
+  const primaryExactDuplicate = exactDuplicateMatches[0];
+
   const handleSubmit = async () => {
     if (!form.nameAr.trim() || !form.price.trim()) {
       toast({
         title: language === 'ar' ? 'الاسم والسعر مطلوبان' : 'Name and price are required',
+        variant: 'destructive',
+      });
+      return;
+    }
+    if (primaryExactDuplicate) {
+      toast({
+        title: language === 'ar' ? 'هذا المنتج موجود مسبقاً' : 'Product already exists',
+        description: language === 'ar'
+          ? 'استخدم تعديل المخزون أو تعديل المنتج الموجود بدلاً من إضافة منتج مكرر.'
+          : 'Use stock adjustment or edit the existing product instead of adding a duplicate.',
         variant: 'destructive',
       });
       return;
@@ -1600,11 +1645,101 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 </div>
               </div>
             </div>
+            {(exactDuplicateMatches.length > 0 || nameDuplicateMatches.length > 0 || otherLocationCodeMatches.length > 0) && (
+              <div className={`rounded-lg border p-3 space-y-3 ${
+                exactDuplicateMatches.length > 0
+                  ? 'border-destructive/40 bg-destructive/10'
+                  : otherLocationCodeMatches.length > 0
+                    ? 'border-blue-400/50 bg-blue-50 dark:bg-blue-950/20'
+                  : 'border-amber-400/50 bg-amber-50 dark:bg-amber-950/20'
+              }`}>
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className={`h-5 w-5 mt-0.5 ${
+                    exactDuplicateMatches.length > 0
+                      ? 'text-destructive'
+                      : otherLocationCodeMatches.length > 0
+                        ? 'text-blue-600'
+                        : 'text-amber-600'
+                  }`} />
+                  <div>
+                    <p className="font-semibold">
+                      {exactDuplicateMatches.length > 0
+                        ? (language === 'ar' ? 'منتج بنفس SKU أو الباركود موجود مسبقاً' : 'A product with the same SKU or barcode already exists')
+                        : otherLocationCodeMatches.length > 0
+                          ? (language === 'ar' ? 'هذا الرمز موجود في موقع آخر' : 'This code exists in another location')
+                        : (language === 'ar' ? 'قد يكون المنتج موجوداً بنفس الاسم' : 'This product may already exist with the same name')}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {exactDuplicateMatches.length > 0
+                        ? (language === 'ar'
+                          ? 'لا يمكن حفظ منتج مكرر بنفس الرمز في نفس الموقع. عدّل المنتج الموجود أو أضف كمية للمخزون.'
+                          : 'You cannot save a duplicate code in the same location. Edit the existing item or adjust its stock.')
+                        : otherLocationCodeMatches.length > 0
+                          ? (language === 'ar'
+                            ? 'يمكنك حفظه في هذا الموقع، لكن تأكد أن هذا المنتج مقصود للموقع الحالي.'
+                            : 'You can save it in this location, but confirm it is intended for the current location.')
+                        : (language === 'ar'
+                          ? 'يمكنك المتابعة إذا كان منتجاً مختلفاً، أو تعديل المنتج الموجود.'
+                          : 'You can continue if it is a different item, or edit the existing product.')}
+                    </p>
+                  </div>
+                </div>
+
+                {[
+                  ...exactDuplicateMatches.map((p) => ({ product: p, locationId: salesLocationId, canEditHere: true })),
+                  ...nameDuplicateMatches.map((p) => ({ product: p, locationId: salesLocationId, canEditHere: true })),
+                  ...otherLocationCodeMatches.map((p) => ({ product: p, locationId: otherSalesLocationId, canEditHere: false })),
+                ].slice(0, 3).map(({ product: p, locationId, canEditHere }) => (
+                  <div key={`${locationId}-${p.id}`} className="rounded-md border bg-background/80 p-3">
+                    <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{p.nameAr}</p>
+                        <p className="text-xs text-muted-foreground font-mono">
+                          SKU: {p.sku || '-'} | {language === 'ar' ? 'باركود' : 'Barcode'}: {p.barcode || '-'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {language === 'ar' ? 'المخزون الحالي' : 'Current stock'}: {p.stockQuantity}
+                          {' | '}
+                          {language === 'ar' ? `الموقع ${locationId}` : `Location ${locationId}`}
+                        </p>
+                      </div>
+                      {canEditHere && (
+                        <div className="flex gap-2 shrink-0">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openEdit(p)}
+                            data-testid={`button-edit-duplicate-${p.id}`}
+                          >
+                            <Pencil className="h-3 w-3 me-1" />
+                            {language === 'ar' ? 'تعديل الموجود' : 'Edit Existing'}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setShowDialog(false);
+                              openStock(p);
+                            }}
+                            data-testid={`button-stock-duplicate-${p.id}`}
+                          >
+                            <ArrowUp className="h-3 w-3 me-1" />
+                            {language === 'ar' ? 'إضافة كمية' : 'Adjust Stock'}
+                          </Button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2 pt-2">
               <Button
                 className="flex-1"
                 onClick={handleSubmit}
-                disabled={createMutation.isPending || updateMutation.isPending}
+                disabled={createMutation.isPending || updateMutation.isPending || exactDuplicateMatches.length > 0}
                 data-testid="button-save-product"
               >
                 {(createMutation.isPending || updateMutation.isPending) && <Loader2 className="h-4 w-4 me-2 animate-spin" />}

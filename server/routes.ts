@@ -202,6 +202,29 @@ async function withOnlineStock(product: any) {
   };
 }
 
+async function findInStoreCodeDuplicate(
+  payload: Record<string, unknown>,
+  salesLocationId: number,
+  ignoreId?: number,
+) {
+  const codes = [payload.sku, payload.barcode]
+    .map((value) => String(value || "").trim())
+    .filter(Boolean);
+  if (codes.length === 0) return null;
+
+  const matches = await db
+    .select()
+    .from(inStoreProducts)
+    .where(
+      and(
+        eq(inStoreProducts.salesLocationId, salesLocationId),
+        or(inArray(inStoreProducts.sku, codes), inArray(inStoreProducts.barcode, codes)),
+      ),
+    );
+
+  return matches.find((row) => row.id !== ignoreId) || null;
+}
+
 async function allocateOnlineOrderItem(item: any): Promise<{
   item: any;
   allocations: OnlineStockAllocation[];
@@ -2177,6 +2200,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canManageInStoreLocation(req, resolvedLocationId))) {
         return res.status(403).json({ error: "ليس لديك صلاحية تعديل مخزون هذا الموقع" });
       }
+      const duplicate = await findInStoreCodeDuplicate(body, resolvedLocationId);
+      if (duplicate) {
+        return res.status(409).json({
+          error: "منتج بنفس SKU أو الباركود موجود مسبقاً في هذا الموقع",
+          duplicate: {
+            id: duplicate.id,
+            nameAr: duplicate.nameAr,
+            sku: duplicate.sku,
+            barcode: duplicate.barcode,
+            stockQuantity: duplicate.stockQuantity,
+            salesLocationId: duplicate.salesLocationId,
+          },
+        });
+      }
       const product = await storage.createInStoreProduct({
         ...(body as any),
         salesLocationId: resolvedLocationId,
@@ -2199,6 +2236,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!existing) return res.status(404).json({ error: "المنتج غير موجود" });
       if (!(await canManageInStoreLocation(req, existing.salesLocationId ?? LOCATION_MAIN_ID))) {
         return res.status(403).json({ error: "ليس لديك صلاحية تعديل مخزون هذا الموقع" });
+      }
+      const duplicate = await findInStoreCodeDuplicate(body, existing.salesLocationId ?? LOCATION_MAIN_ID, existing.id);
+      if (duplicate) {
+        return res.status(409).json({
+          error: "منتج بنفس SKU أو الباركود موجود مسبقاً في هذا الموقع",
+          duplicate: {
+            id: duplicate.id,
+            nameAr: duplicate.nameAr,
+            sku: duplicate.sku,
+            barcode: duplicate.barcode,
+            stockQuantity: duplicate.stockQuantity,
+            salesLocationId: duplicate.salesLocationId,
+          },
+        });
       }
       const product = await storage.updateInStoreProduct(parseInt(req.params.id), body as any);
       if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
