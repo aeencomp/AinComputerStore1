@@ -37,6 +37,7 @@ interface SalesUser {
   canApplyDiscount: number;
   isActive: number;
   createdAt: string;
+  locationIds?: number[];
 }
 
 interface CurrentUser {
@@ -68,6 +69,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     canViewReports: 0,
     canApplyDiscount: 0,
     isActive: 1,
+    locationIds: [1] as number[],
   });
 
   const { data: users = [], isLoading } = useQuery<SalesUser[]>({
@@ -134,6 +136,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       canViewReports: 0,
       canApplyDiscount: 0,
       isActive: 1,
+      locationIds: [1],
     });
   };
 
@@ -151,8 +154,19 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       canViewReports: u.canViewReports,
       canApplyDiscount: u.canApplyDiscount,
       isActive: u.isActive,
+      locationIds: u.locationIds?.length ? u.locationIds : [1],
     });
     setDialogOpen(true);
+  };
+
+  const toggleLocation = (locId: number) => {
+    setFormData((prev) => {
+      const set = new Set(prev.locationIds);
+      if (set.has(locId)) set.delete(locId);
+      else set.add(locId);
+      const next = Array.from(set);
+      return { ...prev, locationIds: next.length ? next : [1] };
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -272,6 +286,18 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                       <SelectItem value="sales_admin">{language === 'ar' ? 'مدير مبيعات' : 'Sales Admin'}</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'المواقع المسموحة' : 'Allowed locations'}</Label>
+                <div className="flex flex-wrap gap-2">
+                  <Button type="button" size="sm" variant={formData.locationIds.includes(1) ? "default" : "outline"} onClick={() => toggleLocation(1)}>
+                    {language === 'ar' ? 'الموقع 1' : 'Location 1'}
+                  </Button>
+                  <Button type="button" size="sm" variant={formData.locationIds.includes(2) ? "default" : "outline"} onClick={() => toggleLocation(2)}>
+                    {language === 'ar' ? 'الموقع 2' : 'Location 2'}
+                  </Button>
                 </div>
               </div>
 

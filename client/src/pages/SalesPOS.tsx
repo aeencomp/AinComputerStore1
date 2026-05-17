@@ -105,12 +105,21 @@ interface HeldOrder {
   createdAt: string;
 }
 
+type ProductSourceFilter = 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd' | 'laptop' | 'desktop';
+
 interface SalesPOSProps {
   user: SalesUser;
   orderType?: 'walk-in' | 'in-store';
+  salesLocationId?: number;
+  productSources?: ProductSourceFilter[];
 }
 
-export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps) {
+export default function SalesPOS({
+  user,
+  orderType = 'walk-in',
+  salesLocationId = 1,
+  productSources,
+}: SalesPOSProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -137,39 +146,43 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
     enabled: orderType === 'walk-in',
   });
 
+  const locQuery = `?locationId=${salesLocationId}`;
+  const includeSource = (s: ProductSourceFilter) =>
+    !productSources || productSources.includes(s);
+
   const { data: inStoreRaw = [], isLoading: inStoreLoading } = useQuery<InStoreProduct[]>({
-    queryKey: ['/api/instore/products'],
-    enabled: orderType === 'in-store',
+    queryKey: [`/api/instore/products${locQuery}`],
+    enabled: orderType === 'in-store' && includeSource('instore'),
   });
 
   const { data: batteriesRaw = [], isLoading: batteriesLoading } = useQuery<LaptopBattery[]>({
-    queryKey: ['/api/battery/batteries'],
-    enabled: orderType === 'in-store',
+    queryKey: [`/api/battery/batteries${locQuery}`],
+    enabled: orderType === 'in-store' && includeSource('battery'),
   });
 
   const { data: adaptersRaw = [], isLoading: adaptersLoading } = useQuery<AcAdapter[]>({
-    queryKey: ['/api/battery/adapters'],
-    enabled: orderType === 'in-store',
+    queryKey: [`/api/battery/adapters${locQuery}`],
+    enabled: orderType === 'in-store' && includeSource('adapter'),
   });
 
   const { data: keyboardsRaw = [], isLoading: keyboardsLoading } = useQuery<KeyboardItem[]>({
-    queryKey: ['/api/battery/keyboards'],
-    enabled: orderType === 'in-store',
+    queryKey: [`/api/battery/keyboards${locQuery}`],
+    enabled: orderType === 'in-store' && includeSource('keyboard'),
   });
 
   const { data: lcdsRaw = [], isLoading: lcdsLoading } = useQuery<LcdItem[]>({
-    queryKey: ['/api/battery/lcds'],
-    enabled: orderType === 'in-store',
+    queryKey: [`/api/battery/lcds${locQuery}`],
+    enabled: orderType === 'in-store' && includeSource('lcd'),
   });
 
   const { data: laptopsRaw = [], isLoading: laptopsLoading } = useQuery<Laptop[]>({
-    queryKey: ['/api/battery/laptops'],
-    enabled: orderType === 'in-store',
+    queryKey: [`/api/battery/laptops${locQuery}`],
+    enabled: orderType === 'in-store' && includeSource('laptop'),
   });
 
   const { data: desktopsRaw = [], isLoading: desktopsLoading } = useQuery<Desktop[]>({
-    queryKey: ['/api/battery/desktops'],
-    enabled: orderType === 'in-store',
+    queryKey: [`/api/battery/desktops${locQuery}`],
+    enabled: orderType === 'in-store' && includeSource('desktop'),
   });
 
   const isLoading = orderType === 'in-store'
@@ -676,6 +689,7 @@ export default function SalesPOS({ user, orderType = 'walk-in' }: SalesPOSProps)
       discountReason,
       notes: receiptNote || null,
       orderType,
+      salesLocationId,
     };
 
     createOrderMutation.mutate(orderData);

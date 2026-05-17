@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, timestamp, jsonb, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, timestamp, jsonb, serial, primaryKey } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -76,6 +76,44 @@ export const insertSalesUserSchema = createInsertSchema(salesUsers).omit({
 
 export type InsertSalesUser = z.infer<typeof insertSalesUserSchema>;
 export type SalesUser = typeof salesUsers.$inferSelect;
+
+export const salesLocations = pgTable("sales_locations", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  nameAr: text("name_ar").notNull(),
+  nameEn: text("name_en"),
+  isActive: integer("is_active").notNull().default(1),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type SalesLocation = typeof salesLocations.$inferSelect;
+
+export const salesUserLocations = pgTable(
+  "sales_user_locations",
+  {
+    salesUserId: varchar("sales_user_id").notNull(),
+    salesLocationId: integer("sales_location_id").notNull(),
+  },
+  (t) => ({
+    pk: primaryKey({ columns: [t.salesUserId, t.salesLocationId] }),
+  }),
+);
+
+export const stockTransfers = pgTable("stock_transfers", {
+  id: serial("id").primaryKey(),
+  fromLocationId: integer("from_location_id").notNull(),
+  toLocationId: integer("to_location_id").notNull(),
+  productSource: text("product_source").notNull(),
+  productId: text("product_id").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  serialNumber: text("serial_number"),
+  notes: text("notes"),
+  createdBy: varchar("created_by"),
+  createdByName: text("created_by_name"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type StockTransfer = typeof stockTransfers.$inferSelect;
 
 export const products = pgTable("products", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -228,6 +266,7 @@ export const orders = pgTable("orders", {
   discountCode: text("discount_code"),
   discountReason: text("discount_reason"),
   salespersonId: varchar("salesperson_id"), // Admin who created walk-in order
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   notes: text("notes"), // Internal notes for the order
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -581,6 +620,7 @@ export const salesShifts = pgTable("sales_shifts", {
   totalTransactions: integer("total_transactions").default(0),
   notes: text("notes"),
   status: text("status").notNull().default("active"), // "active", "closed"
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -812,6 +852,7 @@ export const laptops = pgTable("laptops", {
   location: text("location"),
   notes: text("notes"),
   isActive: integer("is_active").notNull().default(1),
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -846,6 +887,7 @@ export const desktops = pgTable("desktops", {
   location: text("location"),
   notes: text("notes"),
   isActive: integer("is_active").notNull().default(1),
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1221,6 +1263,7 @@ export const inStoreProducts = pgTable("in_store_products", {
   stockQuantity: integer("stock_quantity").notNull().default(0),
   lowStockThreshold: integer("low_stock_threshold").notNull().default(3),
   isActive: integer("is_active").notNull().default(1),
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -1240,6 +1283,7 @@ export const cashWithdrawals = pgTable("cash_withdrawals", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   reason: text("reason"),
   employeeName: text("employee_name").notNull(),
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   /** timestamptz so list filters and JS Dates agree across server TZ / Postgres */
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -1259,6 +1303,7 @@ export const staffAdvances = pgTable("staff_advances", {
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   staffName: text("staff_name").notNull(),
   reason: text("reason"),
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

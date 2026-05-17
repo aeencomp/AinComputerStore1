@@ -1,7 +1,7 @@
 import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, repairTicketStatusHistory, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products } from "@shared/schema";
+import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, repairTicketStatusHistory, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products, salesLocations, salesUserLocations, stockTransfers, inStoreProducts } from "@shared/schema";
 import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -21,6 +21,16 @@ import fs from "fs";
 import { startPriceSync, syncPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
 import { normalizeCustomerEmail } from "./auth-email";
 import { runDbMigrations } from "./db-migrations";
+import {
+  resolveRequestLocationId,
+  getSessionLocationId,
+  getAllowedLocationIdsForUser,
+  userCanAccessLocation,
+  setUserLocationAssignments,
+  executeStockTransfer,
+  LOCATION_MAIN_ID,
+  LOCATION_SHOP2_ID,
+} from "./sales-locations";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -772,6 +782,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).salesUserId = salesUser.id;
       (req.session as any).salesUsername = salesUser.username;
       (req.session as any).salesUserRole = salesUser.role;
+      const allowedLocs = await getAllowedLocationIdsForUser(salesUser.id, salesUser.role);
+      if (allowedLocs.length === 1) {
+        (req.session as any).activeSalesLocationId = allowedLocs[0];
+      }
       
       return res.json({ 
         success: true, 
@@ -805,6 +819,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       (req.session as any).salesUserId = salesUser.id;
       (req.session as any).salesUsername = salesUser.username;
       (req.session as any).salesUserRole = salesUser.role;
+      const allowedLocs = await getAllowedLocationIdsForUser(salesUser.id, salesUser.role);
+      if (allowedLocs.length === 1) {
+        (req.session as any).activeSalesLocationId = allowedLocs[0];
+      }
 
       return res.json({ 
         success: true, 
@@ -827,6 +845,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       delete (req.session as any).salesUserId;
       delete (req.session as any).salesUsername;
+      delete (req.session as any).activeSalesLocationId;
       return res.json({ success: true });
     } catch (error) {
       console.error("Sales logout error:", error);
@@ -846,12 +865,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "المستخدم غير موجود أو غير نشط" });
       }
       
+      const allowedLocationIds = await getAllowedLocationIdsForUser(salesUser.id, salesUser.role);
+      const locationRows = await db
+        .select()
+        .from(salesLocations)
+        .where(inArray(salesLocations.id, allowedLocationIds));
+
+      const activeSalesLocationId = getSessionLocationId(req);
+      const needsLocationPick =
+        allowedLocationIds.length > 1 && !activeSalesLocationId;
+
       return res.json({ 
         id: salesUser.id, 
         username: salesUser.username, 
         name: salesUser.name, 
         role: salesUser.role,
         canViewInStoreCostPrice: isSalesAdminRole(salesUser.role),
+        allowedLocations: locationRows.map((l) => ({
+          id: l.id,
+          code: l.code,
+          nameAr: l.nameAr,
+          nameEn: l.nameEn,
+        })),
+        activeSalesLocationId: activeSalesLocationId ?? null,
+        needsLocationPick,
         permissions: {
           canPos: salesUser.canPos,
           canInventory: salesUser.canInventory,
@@ -863,6 +900,170 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Sales auth check error:", error);
       return res.status(500).json({ error: "فشل التحقق من المستخدم" });
+    }
+  });
+
+  app.get("/api/sales/locations", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+      const salesUser = await storage.getSalesUser(salesUserId);
+      if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
+
+      const allowedIds = await getAllowedLocationIdsForUser(salesUser.id, salesUser.role);
+      const rows = await db
+        .select()
+        .from(salesLocations)
+        .where(and(inArray(salesLocations.id, allowedIds), eq(salesLocations.isActive, 1)));
+
+      return res.json(rows.map((l) => ({
+        id: l.id,
+        code: l.code,
+        nameAr: l.nameAr,
+        nameEn: l.nameEn,
+      })));
+    } catch (error) {
+      console.error("Error listing sales locations:", error);
+      return res.status(500).json({ error: "فشل جلب المواقع" });
+    }
+  });
+
+  app.post("/api/sales/locations/select", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+
+      const salesUser = await storage.getSalesUser(salesUserId);
+      if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
+
+      const locationId = parseInt(String(req.body?.locationId ?? ""), 10);
+      if (Number.isNaN(locationId) || locationId < 1) {
+        return res.status(400).json({ error: "موقع غير صالح" });
+      }
+
+      const allowed = await userCanAccessLocation(salesUser.id, salesUser.role, locationId);
+      if (!allowed) return res.status(403).json({ error: "ليس لديك صلاحية لهذا الموقع" });
+
+      (req.session as any).activeSalesLocationId = locationId;
+      return res.json({ success: true, activeSalesLocationId: locationId });
+    } catch (error) {
+      console.error("Error selecting sales location:", error);
+      return res.status(500).json({ error: "فشل اختيار الموقع" });
+    }
+  });
+
+  app.get("/api/sales/transfers", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+      const limit = Math.min(parseInt(String(req.query.limit || "50"), 10) || 50, 200);
+      const rows = await db
+        .select()
+        .from(stockTransfers)
+        .orderBy(desc(stockTransfers.createdAt))
+        .limit(limit);
+      return res.json(rows);
+    } catch (error) {
+      console.error("Error listing transfers:", error);
+      return res.status(500).json({ error: "فشل جلب سجل النقل" });
+    }
+  });
+
+  app.post("/api/sales/transfers", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+
+      const salesUser = await storage.getSalesUser(salesUserId);
+      if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
+
+      if (salesUser.role !== "sales_admin" && !salesUser.canInventory) {
+        return res.status(403).json({ error: "ليس لديك صلاحية نقل المخزون" });
+      }
+
+      const {
+        productSource,
+        productId,
+        quantity,
+        notes,
+        fromLocationId = LOCATION_MAIN_ID,
+        toLocationId = LOCATION_SHOP2_ID,
+      } = req.body;
+
+      const result = await executeStockTransfer({
+        fromLocationId: parseInt(String(fromLocationId), 10),
+        toLocationId: parseInt(String(toLocationId), 10),
+        productSource,
+        productId: String(productId),
+        quantity: parseInt(String(quantity || 1), 10),
+        notes,
+        createdBy: salesUserId,
+        createdByName: salesUser.name,
+      });
+
+      return res.json({ success: true, ...result });
+    } catch (error: any) {
+      console.error("Error transferring stock:", error);
+      return res.status(400).json({ error: error.message || "فشل نقل المخزون" });
+    }
+  });
+
+  app.get("/api/sales/inventory/search-loc1", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+
+      const q = String(req.query.q || "").trim().toLowerCase();
+      if (!q) return res.json([]);
+
+      const [instore, laps, desks] = await Promise.all([
+        db.select().from(inStoreProducts).where(eq(inStoreProducts.salesLocationId, LOCATION_MAIN_ID)),
+        db.select().from(laptops).where(and(eq(laptops.salesLocationId, LOCATION_MAIN_ID), eq(laptops.isActive, 1))),
+        db.select().from(desktops).where(and(eq(desktops.salesLocationId, LOCATION_MAIN_ID), eq(desktops.isActive, 1))),
+      ]);
+
+      const results: any[] = [];
+      for (const p of instore) {
+        const label = `${p.nameAr} ${p.sku || ""} ${p.barcode || ""}`.toLowerCase();
+        if (label.includes(q) || (p.barcode && p.barcode.toLowerCase() === q)) {
+          results.push({
+            productSource: "instore",
+            productId: String(p.id),
+            label: p.nameAr,
+            stockQuantity: p.stockQuantity,
+            barcode: p.barcode,
+          });
+        }
+      }
+      for (const l of laps) {
+        const label = `${l.brand} ${l.model || ""} ${l.serialNumber} ${l.barcode || ""}`.toLowerCase();
+        if (label.includes(q) || l.serialNumber.toLowerCase() === q) {
+          results.push({
+            productSource: "laptop",
+            productId: l.id,
+            label: `${l.brand} ${l.model || ""} — ${l.serialNumber}`,
+            stockQuantity: l.stockQuantity,
+            barcode: l.barcode,
+          });
+        }
+      }
+      for (const d of desks) {
+        const label = `${d.brand} ${d.model || ""} ${d.serialNumber} ${d.barcode || ""}`.toLowerCase();
+        if (label.includes(q) || d.serialNumber.toLowerCase() === q) {
+          results.push({
+            productSource: "desktop",
+            productId: d.id,
+            label: `${d.brand} ${d.model || ""} — ${d.serialNumber}`,
+            stockQuantity: d.stockQuantity,
+            barcode: d.barcode,
+          });
+        }
+      }
+
+      return res.json(results.slice(0, 40));
+    } catch (error) {
+      console.error("Error searching loc1 inventory:", error);
+      return res.status(500).json({ error: "فشل البحث" });
     }
   });
 
@@ -880,18 +1081,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const users = await storage.getSalesUsers();
-      const sanitizedUsers = users.map(u => ({
-        id: u.id,
-        username: u.username,
-        name: u.name,
-        role: u.role,
-        canPos: u.canPos,
-        canInventory: u.canInventory,
-        canManageUsers: u.canManageUsers,
-        canViewReports: u.canViewReports,
-        canApplyDiscount: u.canApplyDiscount,
-        isActive: u.isActive,
-        createdAt: u.createdAt,
+      const sanitizedUsers = await Promise.all(users.map(async (u) => {
+        const locIds = await getAllowedLocationIdsForUser(u.id, u.role);
+        return {
+          id: u.id,
+          username: u.username,
+          name: u.name,
+          role: u.role,
+          canPos: u.canPos,
+          canInventory: u.canInventory,
+          canManageUsers: u.canManageUsers,
+          canViewReports: u.canViewReports,
+          canApplyDiscount: u.canApplyDiscount,
+          isActive: u.isActive,
+          createdAt: u.createdAt,
+          locationIds: locIds,
+        };
       }));
       
       return res.json(sanitizedUsers);
@@ -913,7 +1118,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
       }
       
-      const { username, password, name, email, role, canPos, canInventory, canManageUsers, canViewReports, canApplyDiscount, isActive } = req.body;
+      const { username, password, name, email, role, canPos, canInventory, canManageUsers, canViewReports, canApplyDiscount, isActive, locationIds } = req.body;
       
       if (!username || !password || !name) {
         return res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم مطلوبين" });
@@ -939,6 +1144,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isActive: isActive ?? 1,
         createdBy: salesUserId,
       });
+
+      const locIds = Array.isArray(locationIds)
+        ? locationIds.map((id: unknown) => parseInt(String(id), 10)).filter((n: number) => !Number.isNaN(n))
+        : [LOCATION_MAIN_ID];
+      await setUserLocationAssignments(newUser.id, locIds.length ? locIds : [LOCATION_MAIN_ID]);
       
       return res.json({
         id: newUser.id,
@@ -965,7 +1175,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const { id } = req.params;
-      const updates = req.body;
+      const { locationIds, ...updates } = req.body;
       
       // Don't allow updating username to existing one
       if (updates.username) {
@@ -976,6 +1186,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updated = await storage.updateSalesUser(id, updates);
+      if (updated && Array.isArray(locationIds)) {
+        const locIds = locationIds
+          .map((lid: unknown) => parseInt(String(lid), 10))
+          .filter((n: number) => !Number.isNaN(n));
+        await setUserLocationAssignments(id, locIds.length ? locIds : [LOCATION_MAIN_ID]);
+      }
       if (!updated) {
         return res.status(404).json({ error: "المستخدم غير موجود" });
       }
@@ -1043,10 +1259,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discountReason,
         notes,
         orderType: requestedOrderType,
+        salesLocationId: requestedSalesLocationId,
       } = req.body;
 
       if (!items || items.length === 0) {
         return res.status(400).json({ error: "السلة فارغة" });
+      }
+
+      const salesLocationId = requestedSalesLocationId != null
+        ? parseInt(String(requestedSalesLocationId), 10)
+        : resolveRequestLocationId(req);
+      const locOk = await userCanAccessLocation(salesUserId, currentUser.role, salesLocationId);
+      if (!locOk) {
+        return res.status(403).json({ error: "ليس لديك صلاحية البيع من هذا الموقع" });
       }
 
       const allowedOrderTypes = ['walk-in', 'in-store'];
@@ -1090,6 +1315,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         discount: discount || "0",
         discountReason: discountReason || null,
         salespersonId: salesUserId,
+        salesLocationId,
         notes: notes || null,
       }).where(eq(orders.id, order.id));
 
@@ -1283,6 +1509,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
 
+      const locationId = resolveRequestLocationId(req);
+
       let activeShift;
       if (!isSupervisor && salesUserId) {
         // Self-heal: if the DB has multiple active shifts for this user, auto-close the older ones.
@@ -1292,12 +1520,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(and(
             eq(salesShifts.salesUserId, salesUserId),
             eq(salesShifts.status, 'active'),
+            eq(salesShifts.salesLocationId, locationId),
           ))
           .orderBy(desc(salesShifts.startTime))
           .limit(1);
       } else {
         [activeShift] = await db.select().from(salesShifts)
-          .where(eq(salesShifts.status, 'active'))
+          .where(and(
+            eq(salesShifts.status, 'active'),
+            eq(salesShifts.salesLocationId, locationId),
+          ))
           .orderBy(desc(salesShifts.startTime))
           .limit(1);
       }
@@ -1328,7 +1560,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "لديك وردية نشطة بالفعل", shift: existingShift });
       }
       
-      const { openingCash, notes } = req.body;
+      const { openingCash, notes, salesLocationId: bodyLocId } = req.body;
+      const salesLocationId = bodyLocId != null
+        ? parseInt(String(bodyLocId), 10)
+        : resolveRequestLocationId(req);
+
+      const locOk = await userCanAccessLocation(salesUserId, currentUser.role, salesLocationId);
+      if (!locOk) {
+        return res.status(403).json({ error: "ليس لديك صلاحية لهذا الموقع" });
+      }
+
+      const [existingAtLoc] = await db.select().from(salesShifts)
+        .where(and(
+          eq(salesShifts.salesUserId, salesUserId),
+          eq(salesShifts.status, 'active'),
+          eq(salesShifts.salesLocationId, salesLocationId),
+        ))
+        .limit(1);
+      if (existingAtLoc) {
+        return res.status(400).json({ error: "لديك وردية نشطة في هذا الموقع", shift: existingAtLoc });
+      }
       
       const [newShift] = await db.insert(salesShifts).values({
         salesUserId,
@@ -1336,6 +1587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         openingCash: (openingCash || 0).toString(),
         notes: notes || null,
         status: 'active',
+        salesLocationId,
       }).returning();
       
       return res.json({ success: true, shift: newShift });
@@ -1718,7 +1970,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      const products = await storage.getInStoreProducts();
+      const locationId = resolveRequestLocationId(req);
+      const products = await storage.getInStoreProducts(locationId);
       const canViewCost = await canViewInStoreCostPrice(req);
       return res.json(
         canViewCost ? products : products.map((p) => stripInStoreCostPrice(p)),
@@ -1736,7 +1989,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
       const canViewCost = await canViewInStoreCostPrice(req);
       const body = sanitizeInStoreProductBody(req.body, canViewCost);
-      const product = await storage.createInStoreProduct(body as any);
+      const locationId = parseInt(String((body as any).salesLocationId ?? resolveRequestLocationId(req)), 10);
+      const product = await storage.createInStoreProduct({
+        ...(body as any),
+        salesLocationId: Number.isNaN(locationId) ? LOCATION_MAIN_ID : locationId,
+      });
       return res.json(canViewCost ? product : stripInStoreCostPrice(product));
     } catch (error) {
       console.error("Error creating in-store product:", error);
@@ -6526,7 +6783,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       const salesUserId = (req.session as any).salesUserId;
       if (!batteryUserId && !salesUserId) return res.status(401).json({ error: "غير مصرح" });
-      const rows = await db.select().from(laptops).where(eq(laptops.isActive, 1)).orderBy(desc(laptops.createdAt));
+      const locationId = req.query.locationId != null
+        ? parseInt(String(req.query.locationId), 10)
+        : (salesUserId ? resolveRequestLocationId(req) : null);
+      const rows = locationId && !Number.isNaN(locationId)
+        ? await db.select().from(laptops).where(and(eq(laptops.isActive, 1), eq(laptops.salesLocationId, locationId))).orderBy(desc(laptops.createdAt))
+        : await db.select().from(laptops).where(eq(laptops.isActive, 1)).orderBy(desc(laptops.createdAt));
       return res.json(rows);
     } catch (error) {
       console.error("Error getting laptops:", error);
@@ -6657,7 +6919,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       const salesUserId = (req.session as any).salesUserId;
       if (!batteryUserId && !salesUserId) return res.status(401).json({ error: "غير مصرح" });
-      const rows = await db.select().from(desktops).where(eq(desktops.isActive, 1)).orderBy(desc(desktops.createdAt));
+      const locationId = req.query.locationId != null
+        ? parseInt(String(req.query.locationId), 10)
+        : (salesUserId ? resolveRequestLocationId(req) : null);
+      const rows = locationId && !Number.isNaN(locationId)
+        ? await db.select().from(desktops).where(and(eq(desktops.isActive, 1), eq(desktops.salesLocationId, locationId))).orderBy(desc(desktops.createdAt))
+        : await db.select().from(desktops).where(eq(desktops.isActive, 1)).orderBy(desc(desktops.createdAt));
       return res.json(rows);
     } catch (error) {
       console.error("Error getting desktops:", error);
@@ -8712,12 +8979,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
       // Calendar day in Asia/Baghdad (avoids server-local timestamp mismatch with naive timestamps)
+      const locationId = req.query.locationId != null
+        ? parseInt(String(req.query.locationId), 10)
+        : (salesUserId ? resolveRequestLocationId(req) : null);
+
+      const dateClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr2}::date`;
+      const locClause = locationId && !Number.isNaN(locationId)
+        ? eq(cashWithdrawals.salesLocationId, locationId)
+        : undefined;
+
       const rows = await db
         .select()
         .from(cashWithdrawals)
-        .where(
-          sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr2}::date`,
-        )
+        .where(locClause ? and(dateClause, locClause) : dateClause)
         .orderBy(desc(cashWithdrawals.createdAt));
       res.json(rows);
     } catch (err) {
@@ -8753,12 +9027,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "بيانات غير صالحة", details: parsed.error.flatten() });
       }
 
+      const salesLocationId = b.salesLocationId != null
+        ? parseInt(String(b.salesLocationId), 10)
+        : resolveRequestLocationId(req);
+
       const [row] = await db
         .insert(cashWithdrawals)
         .values({
           amount: parsed.data.amount,
           employeeName: parsed.data.employeeName,
           reason: parsed.data.reason,
+          salesLocationId: Number.isNaN(salesLocationId) ? LOCATION_MAIN_ID : salesLocationId,
           createdAt: new Date(),
         })
         .returning();

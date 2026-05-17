@@ -52,6 +52,8 @@ interface InStoreCapabilities {
 
 interface Props {
   user: SalesUser;
+  salesLocationId?: number;
+  readOnly?: boolean;
 }
 
 interface ProductForm {
@@ -106,7 +108,7 @@ interface ScanEntry {
 
 type CountPhase = "scanning" | "review" | "done";
 
-export default function SalesInStoreInventory({ user }: Props) {
+export default function SalesInStoreInventory({ user, salesLocationId = 1, readOnly = false }: Props) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -146,8 +148,10 @@ export default function SalesInStoreInventory({ user }: Props) {
   const [doneStats, setDoneStats] = useState<{ updated: number; matched: number } | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
 
+  const productsUrl = `/api/instore/products?locationId=${salesLocationId}`;
+
   const { data: products = [], isLoading } = useQuery<InStoreProduct[]>({
-    queryKey: ['/api/instore/products'],
+    queryKey: [productsUrl],
   });
 
   const { data: batteries = [] } = useQuery<LaptopBattery[]>({
@@ -337,6 +341,7 @@ export default function SalesInStoreInventory({ user }: Props) {
       stockQuantity: parseInt(form.stockQuantity) || 0,
       lowStockThreshold: parseInt(form.lowStockThreshold) || 3,
       isActive: 1,
+      salesLocationId,
     };
     if (canViewCostPrice) {
       payload.costPrice = form.costPrice || null;
@@ -644,15 +649,19 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold">
-            {language === 'ar' ? 'مخزون المتجر' : 'In-Store Inventory'}
+            {salesLocationId === 2
+              ? (language === 'ar' ? 'مخزون الموقع 2' : 'Inventory — Location 2')
+              : (language === 'ar' ? 'مخزون الموقع 1' : 'Inventory — Location 1')}
           </h1>
           <p className="text-muted-foreground text-sm">
-            {language === 'ar'
-              ? 'إدارة منتجات مبيعات المتجر المنفصلة عن الموقع'
-              : 'Manage products separate from the online catalog'}
+            {readOnly
+              ? (language === 'ar' ? 'عرض فقط — يُضاف المخزون عبر النقل من الموقع 1' : 'View only — stock arrives via transfer from Location 1')
+              : (language === 'ar'
+                ? 'إدارة منتجات الموقع 1'
+                : 'Manage Location 1 products')}
           </p>
         </div>
-        {activeTab === "inventory" && (
+        {activeTab === "inventory" && !readOnly && (
           <Button onClick={openAdd} data-testid="button-add-instore-product">
             <Plus className="h-4 w-4 me-2" />
             {language === 'ar' ? 'إضافة منتج' : 'Add Product'}
@@ -867,20 +876,26 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                           </p>
                         </div>
                         <div className="flex gap-1">
-                          <Button size="icon" variant="outline" onClick={() => openStock(product)} data-testid={`button-stock-${product.id}`} title={language === 'ar' ? 'تعديل المخزون' : 'Adjust Stock'}>
-                            <ArrowUp className="h-4 w-4" />
-                          </Button>
+                          {!readOnly && (
+                            <Button size="icon" variant="outline" onClick={() => openStock(product)} data-testid={`button-stock-${product.id}`} title={language === 'ar' ? 'تعديل المخزون' : 'Adjust Stock'}>
+                              <ArrowUp className="h-4 w-4" />
+                            </Button>
+                          )}
                           {(product.barcode || product.sku) && (
                             <Button size="icon" variant="outline" onClick={() => printBarcode(product)} data-testid={`button-barcode-${product.id}`} title={language === 'ar' ? 'طباعة الباركود' : 'Print Barcode'}>
                               <Printer className="h-4 w-4" />
                             </Button>
                           )}
-                          <Button size="icon" variant="outline" onClick={() => openEdit(product)} data-testid={`button-edit-${product.id}`}>
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="outline" onClick={() => setDeleteConfirm(product)} data-testid={`button-delete-${product.id}`} className="text-destructive hover:text-destructive">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          {!readOnly && (
+                            <>
+                              <Button size="icon" variant="outline" onClick={() => openEdit(product)} data-testid={`button-edit-${product.id}`}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button size="icon" variant="outline" onClick={() => setDeleteConfirm(product)} data-testid={`button-delete-${product.id}`} className="text-destructive hover:text-destructive">
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
                         </div>
                       </div>
                     </CardContent>
@@ -940,15 +955,17 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                             <p className="text-xs text-muted-foreground">{language === 'ar' ? 'وحدة' : 'units'}</p>
                           </div>
                           <div className="flex gap-1">
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => openStock(product)}
-                              data-testid={`button-stock-${product.id}`}
-                              title={language === 'ar' ? 'تعديل المخزون' : 'Adjust Stock'}
-                            >
-                              <ArrowUp className="h-4 w-4" />
-                            </Button>
+                            {!readOnly && (
+                              <Button
+                                size="icon"
+                                variant="outline"
+                                onClick={() => openStock(product)}
+                                data-testid={`button-stock-${product.id}`}
+                                title={language === 'ar' ? 'تعديل المخزون' : 'Adjust Stock'}
+                              >
+                                <ArrowUp className="h-4 w-4" />
+                              </Button>
+                            )}
                             {(product.barcode || product.sku) && (
                               <Button
                                 size="icon"
@@ -960,23 +977,27 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                 <Printer className="h-4 w-4" />
                               </Button>
                             )}
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => openEdit(product)}
-                              data-testid={`button-edit-${product.id}`}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              onClick={() => setDeleteConfirm(product)}
-                              data-testid={`button-delete-${product.id}`}
-                              className="text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {!readOnly && (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => openEdit(product)}
+                                  data-testid={`button-edit-${product.id}`}
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="outline"
+                                  onClick={() => setDeleteConfirm(product)}
+                                  data-testid={`button-delete-${product.id}`}
+                                  className="text-destructive hover:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>

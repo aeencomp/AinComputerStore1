@@ -1414,7 +1414,14 @@ export class DrizzleStorage implements IStorage {
   }
 
   // ─── In-Store Products ────────────────────────────────────────────────────────
-  async getInStoreProducts(): Promise<InStoreProduct[]> {
+  async getInStoreProducts(salesLocationId?: number): Promise<InStoreProduct[]> {
+    if (salesLocationId != null) {
+      return db
+        .select()
+        .from(inStoreProducts)
+        .where(eq(inStoreProducts.salesLocationId, salesLocationId))
+        .orderBy(desc(inStoreProducts.createdAt));
+    }
     return db.select().from(inStoreProducts).orderBy(desc(inStoreProducts.createdAt));
   }
 

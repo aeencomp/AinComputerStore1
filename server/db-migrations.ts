@@ -1,14 +1,61 @@
 import { pool } from "./db";
+import { seedSalesLocations } from "./sales-locations";
 
 /** Idempotent SQL run on startup so deploy does not require manual ALTER TABLE. */
 const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE in_store_products
      ADD COLUMN IF NOT EXISTS bulk_wholesale_price NUMERIC(10, 2)`,
+
+  `CREATE TABLE IF NOT EXISTS sales_locations (
+     id SERIAL PRIMARY KEY,
+     code TEXT NOT NULL UNIQUE,
+     name_ar TEXT NOT NULL,
+     name_en TEXT,
+     is_active INTEGER NOT NULL DEFAULT 1,
+     created_at TIMESTAMP NOT NULL DEFAULT NOW()
+   )`,
+
+  `CREATE TABLE IF NOT EXISTS sales_user_locations (
+     sales_user_id VARCHAR NOT NULL,
+     sales_location_id INTEGER NOT NULL,
+     PRIMARY KEY (sales_user_id, sales_location_id)
+   )`,
+
+  `CREATE TABLE IF NOT EXISTS stock_transfers (
+     id SERIAL PRIMARY KEY,
+     from_location_id INTEGER NOT NULL,
+     to_location_id INTEGER NOT NULL,
+     product_source TEXT NOT NULL,
+     product_id TEXT NOT NULL,
+     quantity INTEGER NOT NULL DEFAULT 1,
+     serial_number TEXT,
+     notes TEXT,
+     created_by VARCHAR,
+     created_by_name TEXT,
+     created_at TIMESTAMP NOT NULL DEFAULT NOW()
+   )`,
+
+  `ALTER TABLE in_store_products ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE laptops ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE desktops ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE orders ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE sales_shifts ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE cash_withdrawals ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
+  `ALTER TABLE staff_advances ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
+
+  `UPDATE in_store_products SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
+  `UPDATE laptops SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
+  `UPDATE desktops SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
+  `UPDATE orders SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
+  `UPDATE sales_shifts SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
+  `UPDATE cash_withdrawals SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
+  `UPDATE staff_advances SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
 ];
 
 export async function runDbMigrations(): Promise<void> {
   for (const statement of STARTUP_MIGRATIONS) {
     await pool.query(statement);
   }
+  await seedSalesLocations();
   console.log("[db-migrations] startup migrations applied");
 }

@@ -46,6 +46,8 @@ import SalesDashboard from "./SalesDashboard";
 import SalesPOS from "./SalesPOS";
 import SalesInventory from "./SalesInventory";
 import SalesInStoreInventory from "./SalesInStoreInventory";
+import SalesLocationPick from "./SalesLocationPick";
+import SalesTransferStock from "./SalesTransferStock";
 import SalesWithdrawals from "./SalesWithdrawals";
 import SalesUsers from "./SalesUsers";
 import SalesReports from "./SalesReports";
@@ -56,6 +58,9 @@ interface SalesUser {
   username: string;
   name: string;
   role: string;
+  activeSalesLocationId?: number | null;
+  needsLocationPick?: boolean;
+  allowedLocations?: { id: number; code: string; nameAr: string; nameEn?: string | null }[];
   permissions: {
     canPos: number;
     canInventory: number;
@@ -137,6 +142,17 @@ export default function SalesPortal() {
     }
   }, [isLoading, error, currentUser, setLocation]);
 
+  useEffect(() => {
+    if (!currentUser || isLoading) return;
+    if (currentUser.needsLocationPick && location !== "/sales/pick-location") {
+      setLocation("/sales/pick-location");
+    }
+  }, [currentUser, isLoading, location, setLocation]);
+
+  if (location === "/sales/pick-location") {
+    return <SalesLocationPick />;
+  }
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
@@ -157,6 +173,9 @@ export default function SalesPortal() {
     return null;
   }
 
+  const activeLoc = currentUser.activeSalesLocationId ?? 1;
+  const isLoc2 = activeLoc === 2;
+
   const navItems = [
     { 
       path: "/sales", 
@@ -166,25 +185,53 @@ export default function SalesPortal() {
       permission: true,
       color: 'text-primary',
     },
-    { 
-      path: "/sales/pos", 
-      label: language === 'ar' ? 'POS عام' : 'General POS', 
+    ...(isLoc2 ? [] : [{
+      path: "/sales/pos",
+      label: language === 'ar' ? 'POS عام' : 'General POS',
       icon: ShoppingCart,
       permission: currentUser.permissions.canPos,
       color: 'text-green-500',
-    },
-    { 
-      path: "/sales/instore-pos", 
-      label: language === 'ar' ? 'مبيعات المتجر' : 'In-Store', 
+    }]),
+    ...(isLoc2 ? [{
+      path: "/sales/pos-loc2",
+      label: language === 'ar' ? 'POS الموقع 2' : 'POS Location 2',
       icon: Store,
       permission: currentUser.permissions.canPos,
       color: 'text-violet-500',
-    },
-    { 
-      path: "/sales/instore-inventory", 
-      label: language === 'ar' ? 'مخزون المتجر' : 'Store Inventory', 
+    }] : [{
+      path: "/sales/instore-pos",
+      label: language === 'ar' ? 'POS الموقع 1' : 'POS Location 1',
+      icon: Store,
+      permission: currentUser.permissions.canPos,
+      color: 'text-violet-500',
+    }]),
+    ...(isLoc2 ? [{
+      path: "/sales/inventory-loc2",
+      label: language === 'ar' ? 'مخزون الموقع 2' : 'Inventory Loc 2',
       icon: Warehouse,
       permission: currentUser.permissions.canInventory,
+      color: 'text-violet-400',
+    }] : [
+      {
+        path: "/sales/inventory-loc1",
+        label: language === 'ar' ? 'مخزون الموقع 1' : 'Inventory Loc 1',
+        icon: Warehouse,
+        permission: currentUser.permissions.canInventory,
+        color: 'text-violet-400',
+      },
+      {
+        path: "/sales/transfer-stock",
+        label: language === 'ar' ? 'نقل إلى الموقع 2' : 'Transfer to Loc 2',
+        icon: Package,
+        permission: currentUser.permissions.canInventory || currentUser.role === 'sales_admin',
+        color: 'text-amber-500',
+      },
+    ]),
+    {
+      path: "/sales/instore-inventory",
+      label: language === 'ar' ? 'مخزون المتجر (قديم)' : 'Store Inventory (legacy)',
+      icon: Warehouse,
+      permission: false,
       color: 'text-violet-400',
     },
     { 
@@ -468,9 +515,28 @@ export default function SalesPortal() {
 
         {/* Render Active Page */}
         {(location === "/sales" || location === "/sales/") && <SalesDashboard user={currentUser} />}
-        {location === "/sales/pos" && <SalesPOS user={currentUser} orderType="walk-in" />}
-        {location === "/sales/instore-pos" && <SalesPOS user={currentUser} orderType="in-store" />}
-        {location === "/sales/instore-inventory" && <SalesInStoreInventory user={currentUser} />}
+        {location === "/sales/pos" && <SalesPOS user={currentUser} orderType="walk-in" salesLocationId={1} />}
+        {location === "/sales/instore-pos" && (
+          <SalesPOS user={currentUser} orderType="in-store" salesLocationId={1} />
+        )}
+        {location === "/sales/pos-loc2" && (
+          <SalesPOS
+            user={currentUser}
+            orderType="in-store"
+            salesLocationId={2}
+            productSources={['laptop', 'desktop', 'instore']}
+          />
+        )}
+        {location === "/sales/inventory-loc1" && (
+          <SalesInStoreInventory user={currentUser} salesLocationId={1} />
+        )}
+        {location === "/sales/inventory-loc2" && (
+          <SalesInStoreInventory user={currentUser} salesLocationId={2} readOnly />
+        )}
+        {location === "/sales/transfer-stock" && <SalesTransferStock />}
+        {location === "/sales/instore-inventory" && (
+          <SalesInStoreInventory user={currentUser} salesLocationId={1} />
+        )}
         {location === "/sales/withdrawals" && <SalesWithdrawals user={currentUser} />}
         {location === "/sales/inventory" && <SalesInventory user={currentUser} />}
         {location === "/sales/daily-report" && <DailyReport user={currentUser} />}
