@@ -531,7 +531,7 @@ export default function SalesPortal() {
           <SalesInStoreInventory user={currentUser} salesLocationId={1} />
         )}
         {location === "/sales/inventory-loc2" && (
-          <SalesInStoreInventory user={currentUser} salesLocationId={2} readOnly />
+          <SalesInStoreInventory user={currentUser} salesLocationId={2} />
         )}
         {location === "/sales/transfer-stock" && <SalesTransferStock />}
         {location === "/sales/instore-inventory" && (
@@ -539,8 +539,12 @@ export default function SalesPortal() {
         )}
         {location === "/sales/withdrawals" && <SalesWithdrawals user={currentUser} />}
         {location === "/sales/inventory" && <SalesInventory user={currentUser} />}
-        {location === "/sales/daily-report" && <DailyReport user={currentUser} />}
-        {location === "/sales/reports" && <SalesReports user={currentUser} />}
+        {location === "/sales/daily-report" && (
+          <DailyReport user={currentUser} salesLocationId={activeLoc} />
+        )}
+        {location === "/sales/reports" && (
+          <SalesReports user={currentUser} salesLocationId={activeLoc} />
+        )}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}
       </main>
       <IntercomWidget portal="sales" />

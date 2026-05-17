@@ -121,6 +121,7 @@ interface DailyReportApiResponse {
 
 interface DailyReportProps {
   user: { id: string };
+  salesLocationId?: number;
 }
 
 function fmtNum(n: number) {
@@ -556,7 +557,7 @@ function buildPrintHTML(data: ShiftReportData): string {
 </html>`;
 }
 
-export default function DailyReport({ user }: DailyReportProps) {
+export default function DailyReport({ user, salesLocationId = 1 }: DailyReportProps) {
   const { language } = useLanguage();
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [manualLabelName, setManualLabelName] = useState("");
@@ -568,22 +569,32 @@ export default function DailyReport({ user }: DailyReportProps) {
 
   // List of all shifts
   const { data: shifts = [], isLoading: shiftsLoading, refetch: refetchShifts } = useQuery<SalesShift[]>({
-    queryKey: ["/api/sales/shifts"],
+    queryKey: ["/api/sales/shifts", salesLocationId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sales/shifts?locationId=${salesLocationId}`, { credentials: "include" });
+      if (!r.ok) throw new Error(`Failed to load shifts: ${r.status}`);
+      return r.json();
+    },
     staleTime: 0,
   });
 
   // Active shift live snapshot
   const { data: activeSnapshot, isLoading: snapshotLoading, refetch: refetchSnapshot } = useQuery<ShiftReportData | null>({
-    queryKey: ["/api/sales/shifts/active-snapshot"],
+    queryKey: ["/api/sales/shifts/active-snapshot", salesLocationId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sales/shifts/active-snapshot?locationId=${salesLocationId}`, { credentials: "include" });
+      if (!r.ok) throw new Error(`Failed to load active snapshot: ${r.status}`);
+      return r.json();
+    },
     staleTime: 0,
     refetchInterval: 30000,
   });
 
   // Calendar-day report fallback (when no active shift). This matches what users expect as "daily report".
   const { data: dailyReportApi, isLoading: dailyLoading, refetch: refetchDaily } = useQuery<DailyReportApiResponse>({
-    queryKey: ["/api/daily-report", baghdadToday],
+    queryKey: ["/api/daily-report", baghdadToday, salesLocationId],
     queryFn: async () => {
-      const r = await fetch(`/api/daily-report?date=${baghdadToday}`, { credentials: "include" });
+      const r = await fetch(`/api/daily-report?date=${baghdadToday}&locationId=${salesLocationId}`, { credentials: "include" });
       if (!r.ok) throw new Error(`Failed to load daily report: ${r.status}`);
       return r.json();
     },

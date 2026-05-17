@@ -1726,6 +1726,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   //   start := sales_shifts.start_time
   //   end   := COALESCE(sales_shifts.end_time, timezone('Asia/Baghdad', now()))
   async function computeShiftReportForShift(shiftId: string) {
+    const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, shiftId)).limit(1);
+    const salesLocationId = shift?.salesLocationId ?? LOCATION_MAIN_ID;
     const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
     const shiftEndSql = sql`(select coalesce(end_time, timezone('Asia/Baghdad', now())) from sales_shifts where id = ${shiftId} limit 1)`;
 
@@ -1734,28 +1736,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .from(orders)
       .where(and(
         inArray(orders.orderType, ['walk-in', 'in-store']),
+        eq(orders.salesLocationId, salesLocationId),
         sql`${orders.createdAt} >= ${shiftStartSql}`,
         sql`${orders.createdAt} <= ${shiftEndSql}`,
       ));
 
-    const paidRepairTickets = await db
-      .select()
-      .from(repairTickets)
-      .where(
-        or(
-          and(
-            eq(repairTickets.paymentStatus, 'paid'),
-            sql`${repairTickets.updatedAt} >= ${shiftStartSql}`,
-            sql`${repairTickets.updatedAt} <= ${shiftEndSql}`,
+    const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID
+      ? await db
+        .select()
+        .from(repairTickets)
+        .where(
+          or(
+            and(
+              eq(repairTickets.paymentStatus, 'paid'),
+              sql`${repairTickets.updatedAt} >= ${shiftStartSql}`,
+              sql`${repairTickets.updatedAt} <= ${shiftEndSql}`,
+            ),
+            and(
+              eq(repairTickets.status, 'delivered'),
+              isNotNull(repairTickets.deliveredAt),
+              sql`${repairTickets.deliveredAt} >= ${shiftStartSql}`,
+              sql`${repairTickets.deliveredAt} <= ${shiftEndSql}`,
+            ),
           ),
-          and(
-            eq(repairTickets.status, 'delivered'),
-            isNotNull(repairTickets.deliveredAt),
-            sql`${repairTickets.deliveredAt} >= ${shiftStartSql}`,
-            sql`${repairTickets.deliveredAt} <= ${shiftEndSql}`,
-          ),
-        ),
-      );
+        )
+      : [];
 
     // Note: cashWithdrawals table has no salesUserId column so withdrawals are scoped
     // by time range only. If multiple employees work concurrently and all record withdrawals,
@@ -1765,6 +1770,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .select()
       .from(cashWithdrawals)
       .where(and(
+        eq(cashWithdrawals.salesLocationId, salesLocationId),
         sql`${cashWithdrawals.createdAt} >= ${shiftStartSql}`,
         sql`${cashWithdrawals.createdAt} <= ${shiftEndSql}`,
       ))
@@ -1775,6 +1781,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .select()
       .from(staffAdvances)
       .where(and(
+        eq(staffAdvances.salesLocationId, salesLocationId),
         sql`${staffAdvances.createdAt} >= ${shiftStartSql}`,
         sql`${staffAdvances.createdAt} <= ${shiftEndSql}`,
       ))
@@ -1849,7 +1856,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Keep list clean even if bad historical data exists.
       await closeDuplicateActiveShiftsAllUsers();
 
+      const locationId = resolveRequestLocationId(req);
       const conditions: any[] = [];
+      conditions.push(eq(salesShifts.salesLocationId, locationId));
       if (canViewAll) {
         // show both active+closed for all employees (lets supervisors pick correct active shift)
         conditions.push(inArray(salesShifts.status, ['active', 'closed']));
@@ -1893,13 +1902,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
       let activeShift;
+      const locationId = resolveRequestLocationId(req);
       if (!canViewAll && salesUserId) {
         [activeShift] = await db.select().from(salesShifts)
-          .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, 'active')))
+          .where(and(
+            eq(salesShifts.salesUserId, salesUserId),
+            eq(salesShifts.status, 'active'),
+            eq(salesShifts.salesLocationId, locationId),
+          ))
           .orderBy(desc(salesShifts.startTime)).limit(1);
       } else {
         [activeShift] = await db.select().from(salesShifts)
-          .where(eq(salesShifts.status, 'active'))
+          .where(and(
+            eq(salesShifts.status, 'active'),
+            eq(salesShifts.salesLocationId, locationId),
+          ))
           .orderBy(desc(salesShifts.startTime)).limit(1);
       }
 
@@ -2844,6 +2861,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/orders", async (req, res) => {
     try {
+      const locationParam = req.query.locationId;
+      if (locationParam != null && locationParam !== "") {
+        const locationId = parseInt(String(locationParam), 10);
+        if (!Number.isNaN(locationId)) {
+          const rows = await db
+            .select()
+            .from(orders)
+            .where(eq(orders.salesLocationId, locationId))
+            .orderBy(desc(orders.createdAt));
+          return res.json(rows);
+        }
+      }
+
       const allOrders = await storage.getOrders();
       return res.json(allOrders);
     } catch (error) {
@@ -9141,6 +9171,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const currentBaghdadMonth = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).slice(0, 7);
       const month = /^\d{4}-\d{2}$/.test(monthParam) ? monthParam : currentBaghdadMonth;
       const hasRange = /^\d{4}-\d{2}-\d{2}$/.test(fromParam) && /^\d{4}-\d{2}-\d{2}$/.test(toParam);
+      const locationId = req.query.locationId != null
+        ? parseInt(String(req.query.locationId), 10)
+        : resolveRequestLocationId(req);
 
       let startDate = "";
       let endDate = "";
@@ -9164,6 +9197,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(cashWithdrawals)
         .where(
           and(
+            eq(cashWithdrawals.salesLocationId, Number.isNaN(locationId) ? LOCATION_MAIN_ID : locationId),
             sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${startDate}::date`,
             sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date <= ${endDate}::date`,
           ),
@@ -9175,6 +9209,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(staffAdvances)
         .where(
           and(
+            eq(staffAdvances.salesLocationId, Number.isNaN(locationId) ? LOCATION_MAIN_ID : locationId),
             sql`(${staffAdvances.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${startDate}::date`,
             sql`(${staffAdvances.createdAt} AT TIME ZONE 'Asia/Baghdad')::date <= ${endDate}::date`,
           ),
@@ -9316,6 +9351,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { db } = await import("./db");
       const { orders, repairTickets, cashWithdrawals, salesShifts } = await import("../shared/schema");
       const { and, or, gte, lte, inArray, eq, isNotNull, isNull, desc } = await import("drizzle-orm");
+      const requestedLocationId = req.query.locationId != null
+        ? parseInt(String(req.query.locationId), 10)
+        : resolveRequestLocationId(req);
+      const salesLocationId = Number.isNaN(requestedLocationId) ? LOCATION_MAIN_ID : requestedLocationId;
 
       // ── Shift-aware day boundary ──────────────────────────────────────────────
       // Find all shifts that STARTED on the requested calendar date (Baghdad TZ).
@@ -9323,6 +9362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // should be counted for this date, not the next one.
       const shiftsOnDate = await db.select().from(salesShifts)
         .where(and(
+          eq(salesShifts.salesLocationId, salesLocationId),
           gte(salesShifts.startTime, startOfDay),
           lte(salesShifts.startTime, endOfDay),
         ))
@@ -9345,6 +9385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const shiftEnd = shift.endTime || now;
           const shiftOrders = await db.select().from(orders).where(and(
             inArray(orders.orderType, ['walk-in', 'in-store']),
+            eq(orders.salesLocationId, salesLocationId),
             eq(orders.salespersonId, shift.salesUserId),
             gte(orders.createdAt, shift.startTime),
             lte(orders.createdAt, shiftEnd),
@@ -9359,6 +9400,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Also include orders with no salesperson (direct admin) within calendar day
         const adminOrders = await db.select().from(orders).where(and(
           inArray(orders.orderType, ['walk-in', 'in-store']),
+          eq(orders.salesLocationId, salesLocationId),
           isNull(orders.salespersonId),
           gte(orders.createdAt, startOfDay),
           lte(orders.createdAt, effectiveEnd),
@@ -9376,6 +9418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .innerJoin(adminUsers, eq(orders.salespersonId, adminUsers.id))
           .where(and(
             inArray(orders.orderType, ['walk-in', 'in-store']),
+            eq(orders.salesLocationId, salesLocationId),
             gte(orders.createdAt, startOfDay),
             lte(orders.createdAt, effectiveEnd),
           ));
@@ -9390,6 +9433,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // No shifts started on this date — fall back to plain calendar day window
         const calOrders = await db.select().from(orders).where(and(
           inArray(orders.orderType, ['walk-in', 'in-store']),
+          eq(orders.salesLocationId, salesLocationId),
           gte(orders.createdAt, startOfDay),
           lte(orders.createdAt, endOfDay),
         ));
@@ -9401,7 +9445,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // ── Repair ticket payments ────────────────────────────────────────────────
       // Use the extended end so repairs settled after midnight during an open shift
       // are also captured for this date.
-      const paidRepairTickets = await db.select().from(repairTickets).where(
+      const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
         or(
           and(
             eq(repairTickets.paymentStatus, 'paid'),
@@ -9415,7 +9459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             lte(repairTickets.deliveredAt, effectiveEnd)
           )
         )
-      );
+      ) : [];
 
       const inStoreTotalCash = inStoreOrders
         .filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred')
@@ -9438,7 +9482,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Withdrawals — use the effective (extended) window
       const dailyWithdrawals = await db.select().from(cashWithdrawals)
-        .where(and(gte(cashWithdrawals.createdAt, startOfDay), lte(cashWithdrawals.createdAt, effectiveEnd)))
+        .where(and(
+          eq(cashWithdrawals.salesLocationId, salesLocationId),
+          gte(cashWithdrawals.createdAt, startOfDay),
+          lte(cashWithdrawals.createdAt, effectiveEnd),
+        ))
         .orderBy(desc(cashWithdrawals.createdAt));
       const totalWithdrawals = dailyWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
 

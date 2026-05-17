@@ -656,9 +656,9 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
           <p className="text-muted-foreground text-sm">
             {readOnly
               ? (language === 'ar' ? 'عرض فقط — يُضاف المخزون عبر النقل من الموقع 1' : 'View only — stock arrives via transfer from Location 1')
-              : (language === 'ar'
-                ? 'إدارة منتجات الموقع 1'
-                : 'Manage Location 1 products')}
+              : (salesLocationId === 2
+                ? (language === 'ar' ? 'إدارة منتجات الموقع 2' : 'Manage Location 2 products')
+                : (language === 'ar' ? 'إدارة منتجات الموقع 1' : 'Manage Location 1 products'))}
           </p>
         </div>
         {activeTab === "inventory" && !readOnly && (

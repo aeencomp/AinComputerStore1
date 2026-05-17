@@ -108,9 +108,10 @@ interface MonthlyCashflowResponse {
 
 interface SalesReportsProps {
   user: SalesUser;
+  salesLocationId?: number;
 }
 
-export default function SalesReports({ user }: SalesReportsProps) {
+export default function SalesReports({ user, salesLocationId = 1 }: SalesReportsProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
@@ -122,7 +123,12 @@ export default function SalesReports({ user }: SalesReportsProps) {
   const [cashflowToDate, setCashflowToDate] = useState("");
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
-    queryKey: ['/api/orders'],
+    queryKey: ['/api/orders', salesLocationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/orders?locationId=${salesLocationId}`, { credentials: 'include' });
+      if (!res.ok) throw new Error("Failed to load orders");
+      return res.json();
+    },
   });
 
   const { data: allRepairTickets = [] } = useQuery<RepairTicket[]>({
@@ -130,7 +136,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
   });
 
   const { data: monthlyCashflow, isLoading: cashflowLoading } = useQuery<MonthlyCashflowResponse>({
-    queryKey: ['/api/instore/monthly-cashflow', cashflowMonth, cashflowFromDate, cashflowToDate],
+    queryKey: ['/api/instore/monthly-cashflow', cashflowMonth, cashflowFromDate, cashflowToDate, salesLocationId],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (cashflowFromDate && cashflowToDate) {
@@ -139,6 +145,7 @@ export default function SalesReports({ user }: SalesReportsProps) {
       } else {
         params.set("month", cashflowMonth);
       }
+      params.set("locationId", String(salesLocationId));
       const res = await fetch(`/api/instore/monthly-cashflow?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to load monthly cashflow");
       return res.json();
@@ -232,13 +239,13 @@ export default function SalesReports({ user }: SalesReportsProps) {
   const inStoreOrders = filteredOrders.filter(o => o.orderType === 'in-store').length;
   const onlineOrders = filteredOrders.filter(o => o.orderType === 'online').length;
 
-  const filteredRepairTickets = allRepairTickets.filter(t => {
+  const filteredRepairTickets = salesLocationId === 1 ? allRepairTickets.filter(t => {
     if (t.paymentStatus !== 'paid' && t.paymentStatus !== 'deferred' && t.status !== 'delivered') return false;
     const ticketDate = new Date(t.deliveredAt || t.updatedAt);
     const rangeStart = getDateRangeStart();
     if (dateRange !== 'all' && !isAfter(ticketDate, rangeStart)) return false;
     return true;
-  });
+  }) : [];
 
   const repairTotalCash = filteredRepairTickets
     .filter(t => t.paymentStatus !== 'deferred' && (!t.paymentMethod || t.paymentMethod === 'cash'))
