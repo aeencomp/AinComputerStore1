@@ -151,6 +151,24 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
   const productsUrl = `/api/instore/products?locationId=${salesLocationId}`;
   const otherSalesLocationId = salesLocationId === 1 ? 2 : 1;
   const otherProductsUrl = `/api/instore/products?locationId=${otherSalesLocationId}`;
+  const invalidateInventoryQueries = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = String(query.queryKey[0] || "");
+        return (
+          key.startsWith("/api/instore/products") ||
+          key.startsWith("/api/battery/batteries") ||
+          key.startsWith("/api/battery/adapters") ||
+          key.startsWith("/api/battery/keyboards") ||
+          key.startsWith("/api/battery/lcds") ||
+          key.startsWith("/api/battery/laptops") ||
+          key.startsWith("/api/battery/desktops")
+        );
+      },
+    });
+    queryClient.invalidateQueries({ queryKey: [productsUrl] });
+    queryClient.invalidateQueries({ queryKey: [otherProductsUrl] });
+  };
 
   const { data: products = [], isLoading } = useQuery<InStoreProduct[]>({
     queryKey: [productsUrl],
@@ -203,7 +221,7 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
+      invalidateInventoryQueries();
       setShowDialog(false);
       setForm(emptyForm);
       toast({ title: language === 'ar' ? 'تم إضافة المنتج' : 'Product added' });
@@ -217,7 +235,7 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
+      invalidateInventoryQueries();
       setShowDialog(false);
       setEditingProduct(null);
       setForm(emptyForm);
@@ -232,7 +250,7 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
+      invalidateInventoryQueries();
       setDeleteConfirm(null);
       toast({ title: language === 'ar' ? 'تم حذف المنتج' : 'Product deleted' });
     },
@@ -245,7 +263,7 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
+      invalidateInventoryQueries();
       setShowStockDialog(false);
       setStockProduct(null);
       setStockAdjustment("0");
@@ -260,11 +278,7 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
       return res.json();
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/keyboards'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/lcds'] });
+      invalidateInventoryQueries();
       const matched = scanEntries.filter(e => e.scanned === e.product.stockQuantity).length;
       setDoneStats({ updated: data.updated, matched });
       setCountPhase("done");

@@ -162,12 +162,17 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     enabled: activeTab === 'cashflow',
   });
 
+  const invalidateOrderQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/orders', salesLocationId] });
+  };
+
   const deleteOrderMutation = useMutation({
     mutationFn: async (id: string) => {
       await apiRequest('DELETE', `/api/orders/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      invalidateOrderQueries();
       toast({ title: language === 'ar' ? 'تم حذف الطلب' : 'Order deleted' });
     },
     onError: () => {
@@ -181,7 +186,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      invalidateOrderQueries();
       toast({ title: language === 'ar' ? 'تم تحديث حالة الطلب' : 'Order status updated' });
     },
     onError: () => {
@@ -195,7 +200,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      invalidateOrderQueries();
       setReceiptEditorOpen(false);
       setReceiptDraft(null);
       toast({ title: language === 'ar' ? 'تم تعديل الوصل' : 'Receipt updated' });

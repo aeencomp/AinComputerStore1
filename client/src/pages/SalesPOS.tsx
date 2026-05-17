@@ -153,6 +153,34 @@ export default function SalesPOS({
   const locQuery = `?locationId=${salesLocationId}`;
   const includeSource = (s: ProductSourceFilter) =>
     !productSources || productSources.includes(s);
+  const invalidatePosStockQueries = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = String(query.queryKey[0] || "");
+        return (
+          key === "/api/products" ||
+          key.startsWith("/api/instore/products") ||
+          key.startsWith("/api/battery/batteries") ||
+          key.startsWith("/api/battery/adapters") ||
+          key.startsWith("/api/battery/keyboards") ||
+          key.startsWith("/api/battery/lcds") ||
+          key.startsWith("/api/battery/laptops") ||
+          key.startsWith("/api/battery/desktops") ||
+          key === "/api/orders" ||
+          key.startsWith("/api/sales/shifts/current") ||
+          key.startsWith("/api/sales/shifts/active-snapshot")
+        );
+      },
+    });
+    queryClient.invalidateQueries({ queryKey: [`/api/instore/products${locQuery}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/battery/batteries${locQuery}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/battery/adapters${locQuery}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/battery/keyboards${locQuery}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/battery/lcds${locQuery}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/battery/laptops${locQuery}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/battery/desktops${locQuery}`] });
+    queryClient.invalidateQueries({ queryKey: ["/api/orders", salesLocationId] });
+  };
 
   const { data: inStoreRaw = [], isLoading: inStoreLoading } = useQuery<InStoreProduct[]>({
     queryKey: [`/api/instore/products${locQuery}`],
@@ -507,10 +535,7 @@ export default function SalesPOS({
       setDiscountReason("");
       
       setTimeout(() => {
-        queryClient.invalidateQueries({ queryKey: ['/api/products'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/instore/products'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/battery/adapters'] });
+        invalidatePosStockQueries();
       }, 100);
     },
     onError: (error: any) => {

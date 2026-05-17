@@ -25,6 +25,20 @@ export default function SalesTransferStock() {
   const [selected, setSelected] = useState<SearchHit | null>(null);
   const [quantity, setQuantity] = useState("1");
   const [notes, setNotes] = useState("");
+  const invalidateTransferStockQueries = () => {
+    queryClient.invalidateQueries({
+      predicate: (query) => {
+        const key = String(query.queryKey[0] || "");
+        return (
+          key.startsWith("/api/instore/products") ||
+          key.startsWith("/api/battery/laptops") ||
+          key.startsWith("/api/battery/desktops") ||
+          key.startsWith("/api/sales/inventory/search-loc1") ||
+          key.startsWith("/api/sales/transfers")
+        );
+      },
+    });
+  };
 
   const { data: results = [], isFetching } = useQuery<SearchHit[]>({
     queryKey: ["/api/sales/inventory/search-loc1", search],
@@ -61,10 +75,7 @@ export default function SalesTransferStock() {
       setSearch("");
       setQuantity("1");
       setNotes("");
-      queryClient.invalidateQueries({ queryKey: ["/api/instore/products"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/battery/laptops"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/battery/desktops"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/transfers"] });
+      invalidateTransferStockQueries();
     },
     onError: (e: Error) => {
       toast({ title: e.message, variant: "destructive" });
