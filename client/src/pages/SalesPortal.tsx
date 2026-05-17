@@ -174,7 +174,9 @@ export default function SalesPortal() {
   }
 
   const activeLoc = currentUser.activeSalesLocationId ?? 1;
-  const isLoc2 = activeLoc === 2;
+  const allowedLocationIds = currentUser.allowedLocations?.map((loc) => loc.id) ?? [activeLoc];
+  const canUseLoc1 = allowedLocationIds.includes(1) || currentUser.role === 'sales_admin';
+  const canUseLoc2 = allowedLocationIds.includes(2) || currentUser.role === 'sales_admin';
 
   const navItems = [
     { 
@@ -185,33 +187,28 @@ export default function SalesPortal() {
       permission: true,
       color: 'text-primary',
     },
-    ...(isLoc2 ? [] : [{
+    ...(canUseLoc1 ? [{
       path: "/sales/pos",
       label: language === 'ar' ? 'POS عام' : 'General POS',
       icon: ShoppingCart,
       permission: currentUser.permissions.canPos,
       color: 'text-green-500',
-    }]),
-    ...(isLoc2 ? [{
-      path: "/sales/pos-loc2",
-      label: language === 'ar' ? 'POS الموقع 2' : 'POS Location 2',
-      icon: Store,
-      permission: currentUser.permissions.canPos,
-      color: 'text-violet-500',
-    }] : [{
+    }] : []),
+    ...(canUseLoc1 ? [{
       path: "/sales/instore-pos",
       label: language === 'ar' ? 'POS الموقع 1' : 'POS Location 1',
       icon: Store,
       permission: currentUser.permissions.canPos,
       color: 'text-violet-500',
-    }]),
-    ...(isLoc2 ? [{
-      path: "/sales/inventory-loc2",
-      label: language === 'ar' ? 'مخزون الموقع 2' : 'Inventory Loc 2',
-      icon: Warehouse,
-      permission: currentUser.permissions.canInventory,
-      color: 'text-violet-400',
-    }] : [
+    }] : []),
+    ...(canUseLoc2 ? [{
+      path: "/sales/pos-loc2",
+      label: language === 'ar' ? 'POS الموقع 2' : 'POS Location 2',
+      icon: Store,
+      permission: currentUser.permissions.canPos,
+      color: 'text-violet-500',
+    }] : []),
+    ...(canUseLoc1 ? [
       {
         path: "/sales/inventory-loc1",
         label: language === 'ar' ? 'مخزون الموقع 1' : 'Inventory Loc 1',
@@ -219,6 +216,15 @@ export default function SalesPortal() {
         permission: currentUser.permissions.canInventory,
         color: 'text-violet-400',
       },
+    ] : []),
+    ...(canUseLoc2 ? [{
+      path: "/sales/inventory-loc2",
+      label: language === 'ar' ? 'مخزون الموقع 2' : 'Inventory Loc 2',
+      icon: Warehouse,
+      permission: currentUser.permissions.canInventory,
+      color: 'text-violet-400',
+    }] : []),
+    ...(canUseLoc1 ? [
       {
         path: "/sales/transfer-stock",
         label: language === 'ar' ? 'نقل إلى الموقع 2' : 'Transfer to Loc 2',
@@ -226,7 +232,7 @@ export default function SalesPortal() {
         permission: currentUser.permissions.canInventory || currentUser.role === 'sales_admin',
         color: 'text-amber-500',
       },
-    ]),
+    ] : []),
     {
       path: "/sales/instore-inventory",
       label: language === 'ar' ? 'مخزون المتجر (قديم)' : 'Store Inventory (legacy)',
