@@ -285,6 +285,44 @@ export default function SalesPortal() {
   };
 
   const currentPage = navItems.find(item => isActive(item.path, item.exactMatch)) || navItems[0];
+  const dashboardItem = navItems.find(item => item.path === "/sales");
+  const navGroups = [
+    {
+      label: language === 'ar' ? 'المبيعات' : 'Sales',
+      icon: ShoppingCart,
+      items: navItems.filter(item => [
+        "/sales/pos",
+        "/sales/instore-pos",
+        "/sales/pos-loc2",
+        "/sales/withdrawals",
+      ].includes(item.path)),
+    },
+    {
+      label: language === 'ar' ? 'المخزون' : 'Inventory',
+      icon: Warehouse,
+      items: navItems.filter(item => [
+        "/sales/inventory-loc1",
+        "/sales/inventory-loc2",
+        "/sales/transfer-stock",
+        "/sales/inventory",
+      ].includes(item.path)),
+    },
+    {
+      label: language === 'ar' ? 'التقارير' : 'Reports',
+      icon: BarChart3,
+      items: navItems.filter(item => [
+        "/sales/daily-report",
+        "/sales/reports",
+      ].includes(item.path)),
+    },
+    {
+      label: language === 'ar' ? 'الإدارة' : 'Admin',
+      icon: Settings,
+      items: navItems.filter(item => [
+        "/sales/users",
+      ].includes(item.path)),
+    },
+  ].filter(group => group.items.length > 0);
 
   return (
     <div className="min-h-screen bg-muted/30" dir={language === 'ar' ? 'rtl' : 'ltr'}>
@@ -322,23 +360,54 @@ export default function SalesPortal() {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-              {navItems.map((item) => (
-                <Link key={item.path} href={item.path}>
+              {dashboardItem && (
+                <Link href={dashboardItem.path}>
                   <Button
-                    variant={isActive(item.path, item.exactMatch) ? "default" : "ghost"}
+                    variant={isActive(dashboardItem.path, dashboardItem.exactMatch) ? "default" : "ghost"}
                     size="sm"
                     className={`gap-2 transition-all ${
-                      isActive(item.path, item.exactMatch) 
+                      isActive(dashboardItem.path, dashboardItem.exactMatch)
                         ? 'shadow-sm' 
                         : 'hover:bg-background'
                     }`}
-                    data-testid={`nav-${item.path.replace('/sales/', '') || 'dashboard'}`}
+                    data-testid="nav-dashboard"
                   >
-                    <item.icon className={`h-4 w-4 ${!isActive(item.path, item.exactMatch) ? item.color : ''}`} />
-                    <span className="hidden lg:inline">{item.label}</span>
+                    <dashboardItem.icon className={`h-4 w-4 ${!isActive(dashboardItem.path, dashboardItem.exactMatch) ? dashboardItem.color : ''}`} />
+                    <span className="hidden lg:inline">{dashboardItem.label}</span>
                   </Button>
                 </Link>
-              ))}
+              )}
+              {navGroups.map((group) => {
+                const groupActive = group.items.some(item => isActive(item.path, item.exactMatch));
+                return (
+                  <DropdownMenu key={group.label}>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant={groupActive ? "default" : "ghost"}
+                        size="sm"
+                        className={`gap-2 transition-all ${groupActive ? 'shadow-sm' : 'hover:bg-background'}`}
+                        data-testid={`nav-group-${group.label}`}
+                      >
+                        <group.icon className="h-4 w-4" />
+                        <span className="hidden lg:inline">{group.label}</span>
+                        <ChevronDown className="h-3 w-3 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align={language === 'ar' ? 'end' : 'start'} className="w-56">
+                      {group.items.map((item) => (
+                        <DropdownMenuItem
+                          key={item.path}
+                          className="gap-2 cursor-pointer"
+                          onSelect={() => setLocation(item.path)}
+                        >
+                          <item.icon className={`h-4 w-4 ${item.color}`} />
+                          <span>{item.label}</span>
+                        </DropdownMenuItem>
+                      ))}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })}
             </nav>
 
             {/* User Menu & Actions */}
