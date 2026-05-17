@@ -699,6 +699,7 @@ export class DrizzleStorage implements IStorage {
           canManageUsers: 1,
           canViewReports: 1,
           canApplyDiscount: 1,
+          canEditReceipt: 1,
           isActive: 1,
         });
         console.log('Default sales admin created (username: salesadmin, password: sales123)');

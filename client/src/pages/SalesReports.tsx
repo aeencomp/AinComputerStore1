@@ -4,10 +4,13 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { 
   BarChart3, 
@@ -24,7 +27,9 @@ import {
   Wrench,
   Banknote,
   CreditCard,
-  HandCoins
+  HandCoins,
+  Edit3,
+  Save,
 } from "lucide-react";
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns";
 
@@ -41,6 +46,7 @@ interface Order {
   status: string;
   createdAt: string;
   items: any[];
+  notes?: string | null;
 }
 
 interface RepairTicket {
@@ -63,6 +69,7 @@ interface SalesUser {
   id: string;
   permissions: {
     canViewReports: number;
+    canEditReceipt?: number;
   };
 }
 
@@ -121,6 +128,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const [cashflowMonth, setCashflowMonth] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).slice(0, 7));
   const [cashflowFromDate, setCashflowFromDate] = useState("");
   const [cashflowToDate, setCashflowToDate] = useState("");
+  const [receiptEditorOpen, setReceiptEditorOpen] = useState(false);
+  const [receiptDraft, setReceiptDraft] = useState<any>(null);
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders', salesLocationId],
@@ -180,11 +189,74 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     },
   });
 
+  const updateReceiptMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest('PATCH', `/api/sales/orders/${data.id}/receipt`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+      setReceiptEditorOpen(false);
+      setReceiptDraft(null);
+      toast({ title: language === 'ar' ? 'تم تعديل الوصل' : 'Receipt updated' });
+    },
+    onError: (error: any) => {
+      toast({
+        title: language === 'ar' ? 'فشل تعديل الوصل' : 'Receipt update failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
   const confirmDelete = (order: Order) => {
     const msg = language === 'ar'
       ? `هل تريد حذف الطلب ${order.orderNumber}؟ لا يمكن التراجع عن هذا الإجراء.`
       : `Delete order ${order.orderNumber}? This cannot be undone.`;
     if (window.confirm(msg)) deleteOrderMutation.mutate(order.id);
+  };
+
+  const parseOrderItems = (order: Order) => (order.items || []).map((item: any) => {
+    if (typeof item === 'string') {
+      try { return JSON.parse(item); }
+      catch { return null; }
+    }
+    return item;
+  }).filter((item: any) => item !== null && typeof item === 'object');
+
+  const openReceiptEditor = (order: Order) => {
+    setReceiptDraft({
+      id: order.id,
+      orderNumber: order.orderNumber,
+      customerName: order.customerName || '',
+      customerPhone: order.customerPhone || '',
+      paymentMethod: order.paymentMethod || 'cash',
+      discount: order.discount || '0',
+      notes: (order as any).notes || '',
+      items: parseOrderItems(order).map((item: any) => ({
+        ...item,
+        nameAr: item.nameAr || item.name || item.nameEn || '',
+        nameEn: item.nameEn || '',
+        sku: item.sku || '',
+        price: String(item.price || item.unitPrice || '0'),
+        quantity: parseInt(String(item.quantity || '1'), 10) || 1,
+      })),
+    });
+    setReceiptEditorOpen(true);
+  };
+
+  const updateReceiptItem = (index: number, field: string, value: string) => {
+    setReceiptDraft((prev: any) => {
+      if (!prev) return prev;
+      const items = [...(prev.items || [])];
+      items[index] = { ...items[index], [field]: value };
+      return { ...prev, items };
+    });
+  };
+
+  const saveReceiptEdits = () => {
+    if (!receiptDraft) return;
+    updateReceiptMutation.mutate(receiptDraft);
   };
 
   if (!user.permissions.canViewReports) {
@@ -269,6 +341,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       'zaincash': { ar: 'زين كاش', en: 'ZainCash' },
       'qicard': { ar: 'كي كارد', en: 'QiCard' },
       'cod': { ar: 'عند الاستلام', en: 'COD' },
+      'deferred': { ar: 'أجل', en: 'Deferred' },
     };
     return language === 'ar' ? labels[method]?.ar || method : labels[method]?.en || method;
   };
@@ -286,15 +359,10 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       : order.paymentMethod === 'card' ? '\u0628\u0637\u0627\u0642\u0629'
       : order.paymentMethod === 'zaincash' ? '\u0632\u064a\u0646 \u0643\u0627\u0634'
       : order.paymentMethod === 'qicard' ? '\u0643\u064a \u0643\u0627\u0631\u062f'
+      : order.paymentMethod === 'deferred' ? '\u0623\u062c\u0644'
       : '\u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645';
 
-    const parsedItems: any[] = (order.items || []).map((item: any) => {
-      if (typeof item === 'string') {
-        try { return JSON.parse(item); }
-        catch { return null; }
-      }
-      return item;
-    }).filter((item: any) => item !== null && typeof item === 'object');
+    const parsedItems: any[] = parseOrderItems(order);
 
     const saleDate = new Date(order.createdAt);
 
@@ -402,6 +470,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     <span style="font-weight:700;">\u0637\u0631\u064a\u0642\u0629 \u0627\u0644\u062f\u0641\u0639: </span>
     <span style="font-weight:800;">${payLabel}</span>
   </div>
+
+  ${(order as any).notes ? `<div style="padding:8px 12px;border-bottom:1px solid #d1d5db;font-size:11px;"><span style="font-weight:700;">\u0645\u0644\u0627\u062d\u0638\u0629: </span><span style="font-weight:800;">${(order as any).notes}</span></div>` : ''}
 
   <div style="text-align:center;padding:10px 12px;border-top:2px dashed #000;margin-top:4px;">
     <div style="font-weight:800;font-size:13px;">\u0634\u0643\u0631\u0627\u064b \u0644\u062a\u0633\u0648\u0642\u0643\u0645 \u0645\u0639\u0646\u0627</div>
@@ -929,6 +999,17 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                           >
                             <Printer className="w-4 h-4" />
                           </Button>
+                          {user.permissions.canEditReceipt === 1 && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openReceiptEditor(order)}
+                              data-testid={`button-edit-receipt-${order.id}`}
+                              title={language === 'ar' ? 'تعديل الوصل' : 'Edit Receipt'}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                            </Button>
+                          )}
                           <Button
                             size="icon"
                             variant="ghost"
@@ -1197,6 +1278,158 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={receiptEditorOpen} onOpenChange={setReceiptEditorOpen}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit3 className="h-5 w-5" />
+              {language === 'ar' ? 'تعديل الوصل بعد البيع' : 'Edit Receipt After Sale'}
+            </DialogTitle>
+          </DialogHeader>
+
+          {receiptDraft && (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/40 p-3 text-sm text-muted-foreground">
+                {language === 'ar'
+                  ? `سيتم حفظ تعديل الوصل رقم ${receiptDraft.orderNumber}. لا يتم تعديل المخزون.`
+                  : `Changes will be saved for receipt ${receiptDraft.orderNumber}. Stock is not adjusted.`}
+              </div>
+
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1.5">
+                  <Label>{language === 'ar' ? 'اسم الزبون' : 'Customer Name'}</Label>
+                  <Input
+                    value={receiptDraft.customerName || ''}
+                    onChange={(e) => setReceiptDraft((prev: any) => ({ ...prev, customerName: e.target.value }))}
+                    data-testid="input-report-receipt-customer"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{language === 'ar' ? 'رقم الهاتف' : 'Phone'}</Label>
+                  <Input
+                    value={receiptDraft.customerPhone || ''}
+                    onChange={(e) => setReceiptDraft((prev: any) => ({ ...prev, customerPhone: e.target.value }))}
+                    data-testid="input-report-receipt-phone"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{language === 'ar' ? 'طريقة الدفع' : 'Payment Method'}</Label>
+                  <Select
+                    value={receiptDraft.paymentMethod || 'cash'}
+                    onValueChange={(value) => setReceiptDraft((prev: any) => ({ ...prev, paymentMethod: value }))}
+                  >
+                    <SelectTrigger data-testid="select-report-receipt-payment">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cash">{language === 'ar' ? 'نقدي' : 'Cash'}</SelectItem>
+                      <SelectItem value="card">{language === 'ar' ? 'بطاقة' : 'Card'}</SelectItem>
+                      <SelectItem value="zaincash">{language === 'ar' ? 'زين كاش' : 'ZainCash'}</SelectItem>
+                      <SelectItem value="qicard">{language === 'ar' ? 'كي كارد' : 'QiCard'}</SelectItem>
+                      <SelectItem value="deferred">{language === 'ar' ? 'أجل' : 'Deferred'}</SelectItem>
+                      <SelectItem value="cod">{language === 'ar' ? 'عند الاستلام' : 'COD'}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>{language === 'ar' ? 'الخصم' : 'Discount'}</Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={receiptDraft.discount || '0'}
+                    onChange={(e) => setReceiptDraft((prev: any) => ({ ...prev, discount: e.target.value }))}
+                    data-testid="input-report-receipt-discount"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'منتجات الوصل' : 'Receipt Items'}</Label>
+                <div className="space-y-3">
+                  {(receiptDraft.items || []).map((item: any, index: number) => (
+                    <div key={index} className="rounded-lg border p-3 space-y-3">
+                      <div className="grid gap-3 md:grid-cols-2">
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">{language === 'ar' ? 'اسم المنتج عربي' : 'Arabic Name'}</Label>
+                          <Input
+                            value={item.nameAr || ''}
+                            onChange={(e) => updateReceiptItem(index, 'nameAr', e.target.value)}
+                            data-testid={`input-report-receipt-name-ar-${index}`}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">{language === 'ar' ? 'اسم المنتج إنكليزي' : 'English Name'}</Label>
+                          <Input
+                            value={item.nameEn || ''}
+                            onChange={(e) => updateReceiptItem(index, 'nameEn', e.target.value)}
+                            data-testid={`input-report-receipt-name-en-${index}`}
+                          />
+                        </div>
+                      </div>
+                      <div className="grid gap-3 md:grid-cols-4">
+                        <div className="space-y-1.5 md:col-span-2">
+                          <Label className="text-xs">SKU</Label>
+                          <Input
+                            value={item.sku || ''}
+                            onChange={(e) => updateReceiptItem(index, 'sku', e.target.value)}
+                            data-testid={`input-report-receipt-sku-${index}`}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">{language === 'ar' ? 'الكمية' : 'Qty'}</Label>
+                          <Input
+                            type="number"
+                            min="1"
+                            value={item.quantity || 1}
+                            onChange={(e) => updateReceiptItem(index, 'quantity', e.target.value)}
+                            data-testid={`input-report-receipt-qty-${index}`}
+                          />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label className="text-xs">{language === 'ar' ? 'السعر' : 'Price'}</Label>
+                          <Input
+                            type="number"
+                            min="0"
+                            value={item.price || '0'}
+                            onChange={(e) => updateReceiptItem(index, 'price', e.target.value)}
+                            data-testid={`input-report-receipt-price-${index}`}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>{language === 'ar' ? 'ملاحظة الوصل' : 'Receipt Note'}</Label>
+                <Textarea
+                  value={receiptDraft.notes || ''}
+                  onChange={(e) => setReceiptDraft((prev: any) => ({ ...prev, notes: e.target.value }))}
+                  className="min-h-[80px]"
+                  data-testid="textarea-report-receipt-note"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setReceiptEditorOpen(false)}>
+                  {language === 'ar' ? 'إلغاء' : 'Cancel'}
+                </Button>
+                <Button
+                  onClick={saveReceiptEdits}
+                  disabled={updateReceiptMutation.isPending}
+                  className="gap-2"
+                  data-testid="button-save-report-receipt"
+                >
+                  {updateReceiptMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  {language === 'ar' ? 'حفظ التعديل' : 'Save Edits'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

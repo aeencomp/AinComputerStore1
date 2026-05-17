@@ -65,6 +65,7 @@ export const salesUsers = pgTable("sales_users", {
   canManageUsers: integer("can_manage_users").notNull().default(0), // Can create/edit users
   canViewReports: integer("can_view_reports").notNull().default(0), // Access to sales reports
   canApplyDiscount: integer("can_apply_discount").notNull().default(0), // Can apply discounts
+  canEditReceipt: integer("can_edit_receipt").notNull().default(0), // Can edit receipts after sale
   isActive: integer("is_active").notNull().default(1), // Account status
   createdAt: timestamp("created_at").defaultNow().notNull(),
   createdBy: varchar("created_by"), // Who created this user

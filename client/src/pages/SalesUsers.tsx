@@ -21,7 +21,8 @@ import {
   ShoppingCart,
   Package,
   BarChart3,
-  Percent
+  Percent,
+  Receipt
 } from "lucide-react";
 
 interface SalesUser {
@@ -36,6 +37,7 @@ interface SalesUser {
   canManageUsers: number;
   canViewReports: number;
   canApplyDiscount: number;
+  canEditReceipt: number;
   isActive: number;
   createdAt: string;
   locationIds?: number[];
@@ -70,6 +72,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     canManageUsers: 0,
     canViewReports: 0,
     canApplyDiscount: 0,
+    canEditReceipt: 0,
     isActive: 1,
     locationIds: [1] as number[],
   });
@@ -138,6 +141,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       canManageUsers: 0,
       canViewReports: 0,
       canApplyDiscount: 0,
+      canEditReceipt: 0,
       isActive: 1,
       locationIds: [1],
     });
@@ -157,6 +161,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       canManageUsers: u.canManageUsers,
       canViewReports: u.canViewReports,
       canApplyDiscount: u.canApplyDiscount,
+      canEditReceipt: u.canEditReceipt,
       isActive: u.isActive,
       locationIds: u.locationIds?.length ? u.locationIds : [1],
     });
@@ -200,6 +205,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     canManageUsers: Users,
     canViewReports: BarChart3,
     canApplyDiscount: Percent,
+    canEditReceipt: Receipt,
   };
 
   return (
@@ -385,6 +391,17 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                       onCheckedChange={(v) => setFormData(prev => ({ ...prev, canApplyDiscount: v ? 1 : 0 }))}
                     />
                   </div>
+                  <div className="flex items-center justify-between p-2 border rounded col-span-2">
+                    <div className="flex items-center gap-2">
+                      <Receipt className="h-4 w-4" />
+                      <span className="text-sm">{language === 'ar' ? 'تعديل الوصل بعد البيع' : 'Edit Receipt After Sale'}</span>
+                    </div>
+                    <Switch
+                      checked={formData.canEditReceipt === 1}
+                      onCheckedChange={(v) => setFormData(prev => ({ ...prev, canEditReceipt: v ? 1 : 0 }))}
+                      data-testid="switch-can-edit-receipt"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -485,6 +502,12 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                             <Badge variant="outline" className="text-xs">
                               <Percent className="h-3 w-3 me-1" />
                               {language === 'ar' ? 'خصم' : 'Disc'}
+                            </Badge>
+                          )}
+                          {u.canEditReceipt === 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              <Receipt className="h-3 w-3 me-1" />
+                              {language === 'ar' ? 'تعديل وصل' : 'Receipt'}
                             </Badge>
                           )}
                         </div>

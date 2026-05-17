@@ -935,6 +935,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             canInventoryLocation2: salesUser.canInventoryLocation2,
             canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
             canApplyDiscount: salesUser.canApplyDiscount,
+            canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
           }
         } 
       });
@@ -973,6 +974,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             canInventoryLocation2: salesUser.canInventoryLocation2,
             canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
             canApplyDiscount: salesUser.canApplyDiscount,
+            canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
           }
         }
       });
@@ -1037,6 +1039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canManageUsers: salesUser.canManageUsers,
           canViewReports: salesUser.canViewReports,
           canApplyDiscount: salesUser.canApplyDiscount,
+          canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
         }
       });
     } catch (error) {
@@ -1236,6 +1239,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canManageUsers: u.canManageUsers,
           canViewReports: u.canViewReports,
           canApplyDiscount: u.canApplyDiscount,
+          canEditReceipt: (u as any).canEditReceipt ?? 0,
           isActive: u.isActive,
           createdAt: u.createdAt,
           locationIds: locIds,
@@ -1261,7 +1265,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
       }
       
-      const { username, password, name, email, role, canPos, canInventory, canInventoryLocation2, canManageUsers, canViewReports, canApplyDiscount, isActive, locationIds } = req.body;
+      const { username, password, name, email, role, canPos, canInventory, canInventoryLocation2, canManageUsers, canViewReports, canApplyDiscount, canEditReceipt, isActive, locationIds } = req.body;
       
       if (!username || !password || !name) {
         return res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم مطلوبين" });
@@ -1285,6 +1289,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canManageUsers: canManageUsers ?? 0,
         canViewReports: canViewReports ?? 0,
         canApplyDiscount: canApplyDiscount ?? 0,
+        canEditReceipt: canEditReceipt ?? 0,
         isActive: isActive ?? 1,
         createdBy: salesUserId,
       });
@@ -3275,6 +3280,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching order:", error);
       return res.status(500).json({ error: "Failed to fetch order" });
+    }
+  });
+
+  app.patch("/api/sales/orders/:id/receipt", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+
+      const currentUser = await storage.getSalesUser(salesUserId);
+      const canEditReceipt =
+        currentUser?.role === "sales_admin" ||
+        ((currentUser as any)?.canEditReceipt ?? 0) === 1;
+      if (!currentUser || !canEditReceipt) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل الوصل" });
+      }
+
+      const { id } = req.params;
+      const receiptSchema = z.object({
+        customerName: z.string().optional(),
+        customerPhone: z.string().optional().nullable(),
+        paymentMethod: z.string().optional(),
+        discount: z.union([z.string(), z.number()]).optional(),
+        notes: z.string().optional().nullable(),
+        items: z.array(z.record(z.any())).min(1),
+      });
+      const data = receiptSchema.parse(req.body);
+
+      const sanitizedItems = data.items.map((item) => ({
+        ...item,
+        nameAr: String(item.nameAr || item.name || item.nameEn || "-"),
+        nameEn: item.nameEn ? String(item.nameEn) : null,
+        sku: item.sku ? String(item.sku) : null,
+        price: String(Math.max(0, parseFloat(String(item.price || item.unitPrice || "0")) || 0)),
+        quantity: Math.max(1, parseInt(String(item.quantity || "1"), 10) || 1),
+      }));
+
+      const subtotal = sanitizedItems.reduce((sum, item) => {
+        return sum + (parseFloat(String(item.price)) || 0) * (parseInt(String(item.quantity), 10) || 1);
+      }, 0);
+      const discount = Math.min(Math.max(0, parseFloat(String(data.discount || "0")) || 0), subtotal);
+      const total = Math.max(0, subtotal - discount);
+
+      const [updated] = await db
+        .update(orders)
+        .set({
+          customerName: data.customerName || "عميل في المتجر",
+          customerPhone: data.customerPhone || "",
+          paymentMethod: data.paymentMethod || "cash",
+          items: sanitizedItems.map((item) => JSON.stringify(item)),
+          subtotal: subtotal.toString(),
+          discount: discount.toString(),
+          total: total.toString(),
+          notes: data.notes || null,
+        })
+        .where(eq(orders.id, id))
+        .returning();
+
+      if (!updated) return res.status(404).json({ error: "الطلب غير موجود" });
+      return res.json(updated);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: "بيانات الوصل غير صحيحة", details: error.errors });
+      }
+      console.error("Error updating receipt:", error);
+      return res.status(500).json({ error: "فشل تعديل الوصل" });
     }
   });
 
