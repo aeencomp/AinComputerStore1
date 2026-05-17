@@ -64,6 +64,7 @@ interface SalesUser {
   permissions: {
     canPos: number;
     canInventory: number;
+    canInventoryLocation2: number;
     canManageUsers: number;
     canViewReports: number;
     canApplyDiscount: number;
@@ -221,7 +222,7 @@ export default function SalesPortal() {
       path: "/sales/inventory-loc2",
       label: language === 'ar' ? 'مخزون الموقع 2' : 'Inventory Loc 2',
       icon: Warehouse,
-      permission: currentUser.permissions.canInventory,
+      permission: currentUser.permissions.canInventoryLocation2 || currentUser.role === 'sales_admin',
       color: 'text-violet-400',
     }] : []),
     ...(canUseLoc1 ? [
@@ -606,7 +607,11 @@ export default function SalesPortal() {
           <SalesInStoreInventory user={currentUser} salesLocationId={1} />
         )}
         {location === "/sales/inventory-loc2" && (
-          <SalesInStoreInventory user={currentUser} salesLocationId={2} />
+          <SalesInStoreInventory
+            user={currentUser}
+            salesLocationId={2}
+            readOnly={!(currentUser.permissions.canInventoryLocation2 || currentUser.role === 'sales_admin')}
+          />
         )}
         {location === "/sales/transfer-stock" && <SalesTransferStock />}
         {location === "/sales/instore-inventory" && (

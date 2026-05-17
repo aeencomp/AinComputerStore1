@@ -793,6 +793,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: salesUser.id, username: salesUser.username, name: salesUser.name, role: salesUser.role,
           permissions: {
             canPos: salesUser.canPos, canInventory: salesUser.canInventory,
+            canInventoryLocation2: salesUser.canInventoryLocation2,
             canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
             canApplyDiscount: salesUser.canApplyDiscount,
           }
@@ -830,6 +831,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: salesUser.id, username: salesUser.username, name: salesUser.name, role: salesUser.role,
           permissions: {
             canPos: salesUser.canPos, canInventory: salesUser.canInventory,
+            canInventoryLocation2: salesUser.canInventoryLocation2,
             canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
             canApplyDiscount: salesUser.canApplyDiscount,
           }
@@ -892,6 +894,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         permissions: {
           canPos: salesUser.canPos,
           canInventory: salesUser.canInventory,
+          canInventoryLocation2: salesUser.canInventoryLocation2,
           canManageUsers: salesUser.canManageUsers,
           canViewReports: salesUser.canViewReports,
           canApplyDiscount: salesUser.canApplyDiscount,
@@ -1090,6 +1093,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           role: u.role,
           canPos: u.canPos,
           canInventory: u.canInventory,
+          canInventoryLocation2: u.canInventoryLocation2,
           canManageUsers: u.canManageUsers,
           canViewReports: u.canViewReports,
           canApplyDiscount: u.canApplyDiscount,
@@ -1118,7 +1122,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
       }
       
-      const { username, password, name, email, role, canPos, canInventory, canManageUsers, canViewReports, canApplyDiscount, isActive, locationIds } = req.body;
+      const { username, password, name, email, role, canPos, canInventory, canInventoryLocation2, canManageUsers, canViewReports, canApplyDiscount, isActive, locationIds } = req.body;
       
       if (!username || !password || !name) {
         return res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم مطلوبين" });
@@ -1138,6 +1142,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         role: role || 'sales',
         canPos: canPos ?? 1,
         canInventory: canInventory ?? 0,
+        canInventoryLocation2: canInventoryLocation2 ?? 0,
         canManageUsers: canManageUsers ?? 0,
         canViewReports: canViewReports ?? 0,
         canApplyDiscount: canApplyDiscount ?? 0,
@@ -1982,6 +1987,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  async function canManageInStoreLocation(req: Request, locationId: number): Promise<boolean> {
+    if ((req.session as any).adminId) return true;
+    const salesUserId = (req.session as any).salesUserId as string | undefined;
+    if (!salesUserId) return false;
+    const salesUser = await storage.getSalesUser(salesUserId);
+    if (!salesUser) return false;
+    if (salesUser.role === "sales_admin") return true;
+    if (locationId === LOCATION_SHOP2_ID) return salesUser.canInventoryLocation2 === 1;
+    return salesUser.canInventory === 1;
+  }
+
   app.get("/api/instore/products", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
@@ -2007,9 +2023,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const canViewCost = await canViewInStoreCostPrice(req);
       const body = sanitizeInStoreProductBody(req.body, canViewCost);
       const locationId = parseInt(String((body as any).salesLocationId ?? resolveRequestLocationId(req)), 10);
+      const resolvedLocationId = Number.isNaN(locationId) ? LOCATION_MAIN_ID : locationId;
+      if (!(await canManageInStoreLocation(req, resolvedLocationId))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل مخزون هذا الموقع" });
+      }
       const product = await storage.createInStoreProduct({
         ...(body as any),
-        salesLocationId: Number.isNaN(locationId) ? LOCATION_MAIN_ID : locationId,
+        salesLocationId: resolvedLocationId,
       });
       return res.json(canViewCost ? product : stripInStoreCostPrice(product));
     } catch (error) {
@@ -2025,6 +2045,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
       const canViewCost = await canViewInStoreCostPrice(req);
       const body = sanitizeInStoreProductBody(req.body, canViewCost);
+      const existing = await storage.getInStoreProductById(parseInt(req.params.id));
+      if (!existing) return res.status(404).json({ error: "المنتج غير موجود" });
+      if (!(await canManageInStoreLocation(req, existing.salesLocationId ?? LOCATION_MAIN_ID))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل مخزون هذا الموقع" });
+      }
       const product = await storage.updateInStoreProduct(parseInt(req.params.id), body as any);
       if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
       return res.json(canViewCost ? product : stripInStoreCostPrice(product));
@@ -2039,6 +2064,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const existing = await storage.getInStoreProductById(parseInt(req.params.id));
+      if (!existing) return res.status(404).json({ error: "المنتج غير موجود" });
+      if (!(await canManageInStoreLocation(req, existing.salesLocationId ?? LOCATION_MAIN_ID))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية حذف مخزون هذا الموقع" });
+      }
       await storage.deleteInStoreProduct(parseInt(req.params.id));
       return res.json({ success: true });
     } catch (error) {
@@ -2053,6 +2083,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
       const { adjustment } = req.body;
+      const existing = await storage.getInStoreProductById(parseInt(req.params.id));
+      if (!existing) return res.status(404).json({ error: "المنتج غير موجود" });
+      if (!(await canManageInStoreLocation(req, existing.salesLocationId ?? LOCATION_MAIN_ID))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل مخزون هذا الموقع" });
+      }
       const product = await storage.adjustInStoreProductStock(parseInt(req.params.id), adjustment);
       if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
       return res.json(product);

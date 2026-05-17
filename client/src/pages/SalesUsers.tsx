@@ -32,6 +32,7 @@ interface SalesUser {
   role: string;
   canPos: number;
   canInventory: number;
+  canInventoryLocation2: number;
   canManageUsers: number;
   canViewReports: number;
   canApplyDiscount: number;
@@ -65,6 +66,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     role: "sales",
     canPos: 1,
     canInventory: 0,
+    canInventoryLocation2: 0,
     canManageUsers: 0,
     canViewReports: 0,
     canApplyDiscount: 0,
@@ -132,6 +134,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       role: "sales",
       canPos: 1,
       canInventory: 0,
+      canInventoryLocation2: 0,
       canManageUsers: 0,
       canViewReports: 0,
       canApplyDiscount: 0,
@@ -150,6 +153,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       role: u.role,
       canPos: u.canPos,
       canInventory: u.canInventory,
+      canInventoryLocation2: u.canInventoryLocation2,
       canManageUsers: u.canManageUsers,
       canViewReports: u.canViewReports,
       canApplyDiscount: u.canApplyDiscount,
@@ -332,6 +336,17 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                     <Switch
                       checked={formData.canInventory === 1}
                       onCheckedChange={(v) => setFormData(prev => ({ ...prev, canInventory: v ? 1 : 0 }))}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between p-2 border rounded">
+                    <div className="flex items-center gap-2">
+                      <Package className="h-4 w-4" />
+                      <span className="text-sm">{language === 'ar' ? 'إضافة مخزون الموقع 2' : 'Add Inventory Loc 2'}</span>
+                    </div>
+                    <Switch
+                      checked={formData.canInventoryLocation2 === 1}
+                      onCheckedChange={(v) => setFormData(prev => ({ ...prev, canInventoryLocation2: v ? 1 : 0 }))}
+                      data-testid="switch-can-inventory-location2"
                     />
                   </div>
                   <div className="flex items-center justify-between p-2 border rounded">

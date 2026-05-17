@@ -61,6 +61,7 @@ export const salesUsers = pgTable("sales_users", {
   // Permissions
   canPos: integer("can_pos").notNull().default(1), // Access to POS
   canInventory: integer("can_inventory").notNull().default(0), // Access to Inventory
+  canInventoryLocation2: integer("can_inventory_location2").notNull().default(0), // Access to Location 2 Inventory
   canManageUsers: integer("can_manage_users").notNull().default(0), // Can create/edit users
   canViewReports: integer("can_view_reports").notNull().default(0), // Access to sales reports
   canApplyDiscount: integer("can_apply_discount").notNull().default(0), // Can apply discounts
