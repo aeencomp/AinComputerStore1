@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { playBarcodeScanBeep } from "@/lib/scanBeep";
+import { openA4InvoicePrint } from "@/lib/a4InvoicePrint";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -518,6 +519,7 @@ export default function SalesPOS({
         total: total.toString(),
         paymentMethod: paymentMethod,
         notes: receiptNote || null,
+        issuedBy: user.name,
       };
       
       setLastOrder(receiptOrder);
@@ -921,126 +923,11 @@ export default function SalesPOS({
 
   const printA4Invoice = async () => {
     if (!lastOrder) return;
-    const { toDataURL } = await import('qrcode');
-    const qrDataUrl = await toDataURL(
-      `ORDER:${lastOrder.orderNumber}|TOTAL:${lastOrder.total}`,
-      { width: 120, margin: 1 }
-    );
-
-    const subtotalNum = parseFloat(lastOrder.subtotal || '0');
-    const discountNum = parseFloat(lastOrder.discount || '0');
-    const totalNum = parseFloat(lastOrder.total || '0');
-    const saleDate = new Date(lastOrder.createdAt);
-    const items: any[] = lastOrder.items || [];
-
-    const payLabel = lastOrder.paymentMethod === 'cash' ? 'Cash / نقدي'
-      : lastOrder.paymentMethod === 'card' ? 'Card / بطاقة'
-      : lastOrder.paymentMethod === 'zaincash' ? 'ZainCash / زين كاش'
-      : lastOrder.paymentMethod === 'qicard' ? 'QiCard / كي كارد'
-      : lastOrder.paymentMethod === 'deferred' ? 'Deferred / أجل'
-      : 'COD / عند الاستلام';
-
-    const itemRows = items.map((item: any, idx: number) => {
-      const unitPrice = parseFloat(item.price) || 0;
-      const qty = parseInt(item.quantity) || 1;
-      const lineTotal = unitPrice * qty;
-      const nameAr = item.nameAr || item.nameEn || '-';
-      const nameEn = item.nameEn && item.nameEn !== item.nameAr ? item.nameEn : '';
-      const specsLine = Array.isArray(item.specs) && item.specs.length > 0
-        ? `<div style="font-size:11px;color:#444;margin-top:2px;">${item.specs.join(' • ')}</div>`
-        : '';
-      const sku = item.sku || '-';
-      return `
-        <tr>
-          <td>${idx + 1}</td>
-          <td>
-            <div style="font-weight:700;">${nameAr}</div>
-            ${nameEn ? `<div style="font-size:11px;color:#555;direction:ltr;text-align:left;">${nameEn}</div>` : ''}
-            ${specsLine}
-          </td>
-          <td>${sku}</td>
-          <td>${qty}</td>
-          <td>${unitPrice.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-          <td>${lineTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })}</td>
-        </tr>
-      `;
-    }).join('');
-
-    const html = `<!DOCTYPE html>
-<html lang="en" dir="rtl">
-<head>
-<meta charset="UTF-8"/>
-<title>A4 Invoice - ${lastOrder.orderNumber}</title>
-<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800&display=swap" rel="stylesheet"/>
-<style>
-  @page { size: A4; margin: 12mm; }
-  * { box-sizing: border-box; }
-  body { font-family: 'Cairo', Arial, sans-serif; color: #111; margin: 0; direction: rtl; }
-  .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #111; padding-bottom:10px; margin-bottom:12px; }
-  .brand h1 { margin:0; font-size:24px; }
-  .brand p { margin:2px 0; font-size:12px; color:#444; }
-  .meta { text-align:left; font-size:12px; }
-  .meta strong { display:block; font-size:16px; margin-bottom:4px; }
-  .customer { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; font-size:12px; }
-  .box { border:1px solid #ddd; border-radius:6px; padding:8px; }
-  table { width:100%; border-collapse:collapse; margin-bottom:12px; }
-  th, td { border:1px solid #ddd; padding:6px; font-size:12px; text-align:right; }
-  th { background:#f4f4f4; }
-  .totals { width:360px; margin-right:auto; font-size:12px; }
-  .totals .r { display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid #eee; }
-  .totals .grand { font-weight:700; font-size:16px; border-top:2px solid #111; margin-top:6px; padding-top:8px; }
-  .foot { margin-top:20px; border-top:1px dashed #777; padding-top:8px; font-size:11px; color:#555; display:flex; justify-content:space-between; align-items:center; }
-</style>
-</head>
-<body>
-  <div class="head">
-    <div class="brand">
-      <h1>العين لتجارة الحاسبات | AEEN COMPUTER TRADING</h1>
-      <p>كربلاء - العراق | Karbala - Iraq</p>
-      <p>هاتف | Phone: 07850006977</p>
-    </div>
-    <div class="meta">
-      <strong>فاتورة | INVOICE</strong>
-      <div>رقم الطلب | Order: ${lastOrder.orderNumber}</div>
-      <div>التاريخ | Date: ${saleDate.toLocaleDateString('en-GB')}</div>
-      <div>الوقت | Time: ${saleDate.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</div>
-      <div style="margin-top:4px;"><img src="${qrDataUrl}" width="90" height="90"/></div>
-    </div>
-  </div>
-
-  <div class="customer">
-    <div class="box"><strong>الزبون | Customer</strong><div>${lastOrder.customerName || 'عميل في المتجر | Walk-in Customer'}</div></div>
-    <div class="box"><strong>الهاتف | Phone</strong><div>${lastOrder.customerPhone || '-'}</div><div><strong>طريقة الدفع | Payment:</strong> ${payLabel}</div></div>
-  </div>
-
-  <table>
-    <thead>
-      <tr><th>#</th><th>الصنف | Item</th><th>الباركود/SKU</th><th>الكمية | Qty</th><th>سعر الوحدة | Unit (IQD)</th><th>المجموع | Total (IQD)</th></tr>
-    </thead>
-    <tbody>
-      ${itemRows || '<tr><td colspan="6" style="text-align:center;color:#666;">لا توجد عناصر | No items</td></tr>'}
-    </tbody>
-  </table>
-
-  <div class="totals">
-    <div class="r"><span>المجموع الفرعي | Subtotal</span><span>${subtotalNum.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD</span></div>
-    <div class="r"><span>الخصم | Discount</span><span>${discountNum > 0 ? '-' : ''}${discountNum.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD</span></div>
-    <div class="r grand"><span>الإجمالي | Grand Total</span><span>${totalNum.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD</span></div>
-  </div>
-
-  ${lastOrder.notes ? `<div class="box" style="margin-top:12px;"><strong>ملاحظة | Note</strong><div>${lastOrder.notes}</div></div>` : ''}
-
-  <div class="foot">
-    <span>شكراً لتسوقكم معنا | Thank you for your business.</span>
-    <span>تم الإنشاء بواسطة نقطة البيع | Generated by POS</span>
-  </div>
-  <script>window.onload = () => setTimeout(() => { window.print(); window.onafterprint = () => window.close(); }, 300);</script>
-</body>
-</html>`;
-
-    const popup = window.open('', '_blank', 'width=1000,height=800');
-    if (popup) { popup.document.write(html); popup.document.close(); }
+    await openA4InvoicePrint(lastOrder, {
+      issuedBy: lastOrder.issuedBy || user.name,
+    });
   };
+
 
   const handleHoldOrder = () => {
     if (cart.length === 0) {
