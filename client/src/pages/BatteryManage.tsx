@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useLocation, useSearch } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -37,7 +37,8 @@ import {
   MemoryStick,
   HardDrive,
   BadgeDollarSign,
-  Boxes
+  Boxes,
+  RefreshCw
 } from "lucide-react";
 import {
   AlertDialog,
@@ -50,6 +51,78 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+
+type SerialSource = { serialNumber?: string | null; barcode?: string | null };
+
+function getNextSerial(prefix: string, items: SerialSource[], padLength = 4): string {
+  const pattern = new RegExp(`^${prefix}-(\\d+)$`, "i");
+  let max = 0;
+  const used = new Set<string>();
+  for (const item of items) {
+    for (const val of [item.serialNumber, item.barcode]) {
+      if (!val) continue;
+      const trimmed = val.trim();
+      used.add(trimmed.toUpperCase());
+      const m = trimmed.match(pattern);
+      if (m) max = Math.max(max, parseInt(m[1], 10));
+    }
+  }
+  let next = max + 1;
+  let candidate: string;
+  do {
+    candidate = `${prefix}-${String(next).padStart(padLength, "0")}`;
+    next++;
+  } while (used.has(candidate.toUpperCase()));
+  return candidate;
+}
+
+function SerialNumberField({
+  label,
+  value,
+  onChange,
+  onGenerate,
+  placeholder,
+  required,
+  testId,
+  generateTestId,
+  language,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  onGenerate: () => void;
+  placeholder?: string;
+  required?: boolean;
+  testId?: string;
+  generateTestId?: string;
+  language: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <div className="flex gap-2">
+        <Input
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          required={required}
+          className="font-mono text-sm"
+          data-testid={testId}
+        />
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          onClick={onGenerate}
+          title={language === "ar" ? "توليد رقم تسلسلي" : "Generate serial number"}
+          data-testid={generateTestId}
+        >
+          <RefreshCw className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
 
 export default function BatteryManage() {
   const { language, setLanguage } = useLanguage();
@@ -262,6 +335,13 @@ export default function BatteryManage() {
     queryKey: ['/api/battery/desktops'],
     enabled: !!currentUser,
   });
+
+  const generateBatterySerial = useCallback(() => getNextSerial("BAT", batteries), [batteries]);
+  const generateAdapterSerial = useCallback(() => getNextSerial("ADP", adapters), [adapters]);
+  const generateKeyboardSerial = useCallback(() => getNextSerial("KBD", keyboards), [keyboards]);
+  const generateLcdSerial = useCallback(() => getNextSerial("LCD", lcds), [lcds]);
+  const generateLaptopSerial = useCallback(() => getNextSerial("LAP", laptops), [laptops]);
+  const generateDesktopSerial = useCallback(() => getNextSerial("DES", desktops), [desktops]);
 
   useEffect(() => {
     if (editId && batteries.length > 0) {
@@ -1819,16 +1899,17 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>{language === 'ar' ? 'الرقم التسلسلي *' : 'Serial Number *'}</Label>
-                        <Input
-                          value={formData.serialNumber}
-                          onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
-                          placeholder="PA3817U-1BRS"
-                          required
-                          data-testid="input-battery-serial-number"
-                        />
-                      </div>
+                      <SerialNumberField
+                        label={language === 'ar' ? 'الرقم التسلسلي / SKU *' : 'Serial Number / SKU *'}
+                        value={formData.serialNumber}
+                        onChange={(serialNumber) => setFormData({ ...formData, serialNumber })}
+                        onGenerate={() => setFormData((f) => ({ ...f, serialNumber: generateBatterySerial() }))}
+                        placeholder="BAT-0001"
+                        required
+                        testId="input-battery-serial-number"
+                        generateTestId="button-generate-battery-serial"
+                        language={language}
+                      />
                       <div className="space-y-2">
                         <Label>{language === 'ar' ? 'رقم القطعة البديل' : 'Part Number'}</Label>
                         <Input
@@ -2186,15 +2267,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleAdapterSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <Label>{language === 'ar' ? 'الرقم التسلسلي (تلقائي إذا فارغ)' : 'Serial Number (auto if empty)'}</Label>
-                        <Input
-                          value={adapterFormData.serialNumber}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, serialNumber: e.target.value })}
-                          placeholder="ADP-0001"
-                          data-testid="input-adapter-serial-number"
-                        />
-                      </div>
+                      <SerialNumberField
+                        label={language === 'ar' ? 'الرقم التسلسلي / SKU (تلقائي إذا فارغ)' : 'Serial Number / SKU (auto if empty)'}
+                        value={adapterFormData.serialNumber}
+                        onChange={(serialNumber) => setAdapterFormData({ ...adapterFormData, serialNumber })}
+                        onGenerate={() => setAdapterFormData((f) => ({ ...f, serialNumber: generateAdapterSerial() }))}
+                        placeholder="ADP-0001"
+                        testId="input-adapter-serial-number"
+                        generateTestId="button-generate-adapter-serial"
+                        language={language}
+                      />
                       <div className="space-y-2">
                         <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
                         <Input
@@ -2577,10 +2659,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     data-testid="form-laptop"
                   >
                     <div className="grid sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label>{language === 'ar' ? 'الرقم التسلسلي' : 'Serial Number'}</Label>
-                        <Input value={laptopFormData.serialNumber} onChange={(e) => setLaptopFormData(v => ({ ...v, serialNumber: e.target.value }))} />
-                      </div>
+                      <SerialNumberField
+                        label={language === 'ar' ? 'الرقم التسلسلي / SKU' : 'Serial Number / SKU'}
+                        value={laptopFormData.serialNumber}
+                        onChange={(serialNumber) => setLaptopFormData((v) => ({ ...v, serialNumber }))}
+                        onGenerate={() => setLaptopFormData((v) => ({ ...v, serialNumber: generateLaptopSerial() }))}
+                        placeholder="LAP-0001"
+                        testId="input-laptop-serial"
+                        generateTestId="button-generate-laptop-serial"
+                        language={language}
+                      />
                       <div>
                         <Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label>
                         <Input value={laptopFormData.partNumber} onChange={(e) => setLaptopFormData(v => ({ ...v, partNumber: e.target.value }))} />
@@ -2867,10 +2955,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     data-testid="form-desktop"
                   >
                     <div className="grid sm:grid-cols-2 gap-4">
-                      <div>
-                        <Label>{language === 'ar' ? 'الرقم التسلسلي' : 'Serial Number'}</Label>
-                        <Input value={desktopFormData.serialNumber} onChange={(e) => setDesktopFormData(v => ({ ...v, serialNumber: e.target.value }))} />
-                      </div>
+                      <SerialNumberField
+                        label={language === 'ar' ? 'الرقم التسلسلي / SKU' : 'Serial Number / SKU'}
+                        value={desktopFormData.serialNumber}
+                        onChange={(serialNumber) => setDesktopFormData((v) => ({ ...v, serialNumber }))}
+                        onGenerate={() => setDesktopFormData((v) => ({ ...v, serialNumber: generateDesktopSerial() }))}
+                        placeholder="DES-0001"
+                        testId="input-desktop-serial"
+                        generateTestId="button-generate-desktop-serial"
+                        language={language}
+                      />
                       <div>
                         <Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label>
                         <Input value={desktopFormData.partNumber} onChange={(e) => setDesktopFormData(v => ({ ...v, partNumber: e.target.value }))} />
@@ -3045,7 +3139,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleKeyboardSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label>{language === 'ar' ? 'الرقم التسلسلي (تلقائي إذا فارغ)' : 'Serial Number (auto if empty)'}</Label><Input value={keyboardFormData.serialNumber} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, serialNumber: e.target.value })} placeholder="KBD-0001" data-testid="input-keyboard-serial" /></div>
+                      <SerialNumberField
+                        label={language === 'ar' ? 'الرقم التسلسلي / SKU (تلقائي إذا فارغ)' : 'Serial Number / SKU (auto if empty)'}
+                        value={keyboardFormData.serialNumber}
+                        onChange={(serialNumber) => setKeyboardFormData({ ...keyboardFormData, serialNumber })}
+                        onGenerate={() => setKeyboardFormData((f) => ({ ...f, serialNumber: generateKeyboardSerial() }))}
+                        placeholder="KBD-0001"
+                        testId="input-keyboard-serial"
+                        generateTestId="button-generate-keyboard-serial"
+                        language={language}
+                      />
                       <div className="space-y-2"><Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label><Input value={keyboardFormData.brand} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, brand: e.target.value })} required data-testid="input-keyboard-brand" /></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -3179,7 +3282,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleLcdSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2"><Label>{language === 'ar' ? 'الرقم التسلسلي (تلقائي إذا فارغ)' : 'Serial Number (auto if empty)'}</Label><Input value={lcdFormData.serialNumber} onChange={(e) => setLcdFormData({ ...lcdFormData, serialNumber: e.target.value })} placeholder="LCD-0001" data-testid="input-lcd-serial" /></div>
+                      <SerialNumberField
+                        label={language === 'ar' ? 'الرقم التسلسلي / SKU (تلقائي إذا فارغ)' : 'Serial Number / SKU (auto if empty)'}
+                        value={lcdFormData.serialNumber}
+                        onChange={(serialNumber) => setLcdFormData({ ...lcdFormData, serialNumber })}
+                        onGenerate={() => setLcdFormData((f) => ({ ...f, serialNumber: generateLcdSerial() }))}
+                        placeholder="LCD-0001"
+                        testId="input-lcd-serial"
+                        generateTestId="button-generate-lcd-serial"
+                        language={language}
+                      />
                       <div className="space-y-2"><Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label><Input value={lcdFormData.brand} onChange={(e) => setLcdFormData({ ...lcdFormData, brand: e.target.value })} required data-testid="input-lcd-brand" /></div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
