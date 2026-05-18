@@ -49,6 +49,7 @@ import {
 } from "lucide-react";
 import type { LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
 import QRCode from "@/components/QRCode";
+import { BrandSelect } from "@/components/BrandSelect";
 
 interface BatteryUserAuth {
   id: string;
@@ -56,8 +57,6 @@ interface BatteryUserAuth {
   name: string;
   role: string;
 }
-
-const BRANDS = ['Apple', 'Dell', 'HP', 'Lenovo', 'Asus', 'Acer', 'Sony', 'Samsung', 'Toshiba', 'MSI', 'Razer', 'Other'];
 
 export default function BatteryDashboard() {
   const { language, setLanguage } = useLanguage();
@@ -839,19 +838,11 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <Label htmlFor="brand">
                   {language === 'ar' ? 'الماركة *' : 'Brand *'}
                 </Label>
-                <Select 
-                  value={newBattery.brand} 
+                <BrandSelect
+                  value={newBattery.brand}
                   onValueChange={(val) => setNewBattery(prev => ({ ...prev, brand: val }))}
-                >
-                  <SelectTrigger data-testid="select-brand">
-                    <SelectValue placeholder={language === 'ar' ? 'اختر الماركة' : 'Select brand'} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {BRANDS.map(brand => (
-                      <SelectItem key={brand} value={brand}>{brand}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  testId="select-brand"
+                />
               </div>
             </div>
 

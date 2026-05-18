@@ -18,6 +18,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { BrandSelect } from '@/components/BrandSelect';
 
 export default function ShopNewRepair() {
   const [, navigate] = useLocation();
@@ -432,7 +433,11 @@ export default function ShopNewRepair() {
                       <FormItem>
                         <FormLabel>{isRTL ? 'الماركة' : 'Brand'}</FormLabel>
                         <FormControl>
-                          <Input placeholder="HP, Dell, Apple..." {...field} data-testid="input-device-brand" />
+                          <BrandSelect
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            testId="input-device-brand"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

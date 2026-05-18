@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { QRCodeSVG as QRCode } from 'qrcode.react';
+import { BrandSelect } from '@/components/BrandSelect';
 
 export default function RepairRequest() {
   const [, setLocation] = useLocation();
@@ -178,7 +179,11 @@ export default function RepairRequest() {
                         <FormItem>
                           <FormLabel>{t('repair.request.deviceBrand')}</FormLabel>
                           <FormControl>
-                            <Input {...field} data-testid="input-device-brand" />
+                            <BrandSelect
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              testId="input-device-brand"
+                            />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

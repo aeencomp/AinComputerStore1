@@ -19,6 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Label } from '@/components/ui/label';
+import { BrandSelect } from '@/components/BrandSelect';
 
 interface Technician {
   id: string;
@@ -985,10 +986,10 @@ export default function NewRepairRequest() {
                         <FormItem>
                           <FormLabel>{isRTL ? 'الشركة المصنعة' : 'Brand'} *</FormLabel>
                           <FormControl>
-                            <Input
-                              {...field}
-                              placeholder={isRTL ? 'مثال: Dell, HP, Lenovo' : 'e.g., Dell, HP, Lenovo'}
-                              data-testid="input-device-brand"
+                            <BrandSelect
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              testId="input-device-brand"
                             />
                           </FormControl>
                           <FormMessage />

@@ -51,6 +51,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import { BrandSelect } from "@/components/BrandSelect";
 
 type SerialSource = { serialNumber?: string | null; barcode?: string | null };
 
@@ -1923,12 +1924,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 
                     <div className="space-y-2">
                       <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
-                      <Input
+                      <BrandSelect
                         value={formData.brand}
-                        onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                        placeholder="Toshiba / Dell / HP / OEM"
-                        required
-                        data-testid="input-battery-brand"
+                        onValueChange={(brand) => setFormData({ ...formData, brand })}
+                        testId="input-battery-brand"
                       />
                     </div>
 
@@ -2279,12 +2278,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       />
                       <div className="space-y-2">
                         <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
-                        <Input
+                        <BrandSelect
                           value={adapterFormData.brand}
-                          onChange={(e) => setAdapterFormData({ ...adapterFormData, brand: e.target.value })}
-                          placeholder="Dell / HP / Lenovo / Universal"
-                          required
-                          data-testid="input-adapter-brand"
+                          onValueChange={(brand) => setAdapterFormData({ ...adapterFormData, brand })}
+                          testId="input-adapter-brand"
                         />
                       </div>
                     </div>
@@ -2675,7 +2672,11 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       </div>
                       <div>
                         <Label>{language === 'ar' ? 'الماركة' : 'Brand'}</Label>
-                        <Input value={laptopFormData.brand} onChange={(e) => setLaptopFormData(v => ({ ...v, brand: e.target.value }))} required />
+                        <BrandSelect
+                          value={laptopFormData.brand}
+                          onValueChange={(brand) => setLaptopFormData((v) => ({ ...v, brand }))}
+                          testId="input-laptop-brand"
+                        />
                       </div>
                       <div>
                         <Label>{language === 'ar' ? 'الموديل' : 'Model'}</Label>
@@ -2971,7 +2972,11 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       </div>
                       <div>
                         <Label>{language === 'ar' ? 'الماركة' : 'Brand'}</Label>
-                        <Input value={desktopFormData.brand} onChange={(e) => setDesktopFormData(v => ({ ...v, brand: e.target.value }))} required />
+                        <BrandSelect
+                          value={desktopFormData.brand}
+                          onValueChange={(brand) => setDesktopFormData((v) => ({ ...v, brand }))}
+                          testId="input-desktop-brand"
+                        />
                       </div>
                       <div>
                         <Label>{language === 'ar' ? 'الموديل' : 'Model'}</Label>
@@ -3149,7 +3154,14 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                         generateTestId="button-generate-keyboard-serial"
                         language={language}
                       />
-                      <div className="space-y-2"><Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label><Input value={keyboardFormData.brand} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, brand: e.target.value })} required data-testid="input-keyboard-brand" /></div>
+                      <div className="space-y-2">
+                        <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
+                        <BrandSelect
+                          value={keyboardFormData.brand}
+                          onValueChange={(brand) => setKeyboardFormData({ ...keyboardFormData, brand })}
+                          testId="input-keyboard-brand"
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2"><Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label><Input value={keyboardFormData.partNumber} onChange={(e) => setKeyboardFormData({ ...keyboardFormData, partNumber: e.target.value })} data-testid="input-keyboard-part-number" /></div>
@@ -3292,7 +3304,14 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                         generateTestId="button-generate-lcd-serial"
                         language={language}
                       />
-                      <div className="space-y-2"><Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label><Input value={lcdFormData.brand} onChange={(e) => setLcdFormData({ ...lcdFormData, brand: e.target.value })} required data-testid="input-lcd-brand" /></div>
+                      <div className="space-y-2">
+                        <Label>{language === 'ar' ? 'العلامة التجارية *' : 'Brand *'}</Label>
+                        <BrandSelect
+                          value={lcdFormData.brand}
+                          onValueChange={(brand) => setLcdFormData({ ...lcdFormData, brand })}
+                          testId="input-lcd-brand"
+                        />
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                       <div className="space-y-2"><Label>{language === 'ar' ? 'رقم القطعة' : 'Part Number'}</Label><Input value={lcdFormData.partNumber} onChange={(e) => setLcdFormData({ ...lcdFormData, partNumber: e.target.value })} data-testid="input-lcd-part-number" /></div>

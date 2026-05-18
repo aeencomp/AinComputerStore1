@@ -18,6 +18,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { BrandSelect } from '@/components/BrandSelect';
 import {
   Dialog,
   DialogContent,
@@ -745,7 +746,13 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                       <FormField control={customerForm.control} name="deviceBrand" render={({ field }) => (
                         <FormItem>
                           <FormLabel>{t('repair.ticket.deviceBrand')}</FormLabel>
-                          <FormControl><Input {...field} data-testid="input-edit-device-brand" /></FormControl>
+                          <FormControl>
+                            <BrandSelect
+                              value={field.value}
+                              onValueChange={field.onChange}
+                              testId="input-edit-device-brand"
+                            />
+                          </FormControl>
                           <FormMessage />
                         </FormItem>
                       )} />
