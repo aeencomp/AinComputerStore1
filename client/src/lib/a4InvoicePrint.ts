@@ -34,13 +34,25 @@ export interface A4InvoiceOptions {
 
 const STORE = {
   motto: "وعند العين تتضح الرؤيا",
-  subtitle: "العين لتجارة الحاسبات",
+  nameAr: "العين لتجارة الحاسبات",
+  address: "كربلاء - شارع النقيب - ركن شارع النهر",
   salesPhone: "07750006977",
   maintenancePhone: "07850006977",
   assemblyPhone: "07750008466",
   supportPhone: "07850008466",
   defaultUsdRate: 1500,
+  brandBlue: "#1565c0",
+  brandRed: "#c41e3a",
 };
+
+/** Inline eye + house logo for reliable print (matches store branding) */
+const STORE_EYE_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" class="store-logo-svg" aria-hidden="true">
+  <path d="M20 58 Q100 8 180 58" fill="none" stroke="#111" stroke-width="9" stroke-linecap="round"/>
+  <path d="M24 62 Q100 108 176 62" fill="none" stroke="${STORE.brandBlue}" stroke-width="9" stroke-linecap="round"/>
+  <ellipse cx="100" cy="58" rx="52" ry="30" fill="#fff" stroke="#e8e8e8" stroke-width="1"/>
+  <path d="M78 68 L78 48 L100 36 L122 48 L122 68 Z" fill="none" stroke="#111" stroke-width="3.5" stroke-linejoin="round"/>
+  <path d="M88 48 L88 68 M112 48 L112 68 M88 58 L112 58 M88 48 L112 48" fill="none" stroke="#111" stroke-width="2.5"/>
+</svg>`;
 
 function getReceiptTerms(issuedBy: string): string[] {
   const organizer = issuedBy.trim() || "—";
@@ -168,6 +180,7 @@ export function buildA4InvoiceHtml(
   order: A4InvoiceOrder,
   options: A4InvoiceOptions = {},
   barcodeSvg = "",
+  qrDataUrl = "",
 ): string {
   const subtotalNum = parseFloat(String(order.subtotal ?? order.total ?? 0)) || 0;
   const discountNum = parseFloat(String(order.discount ?? 0)) || 0;
@@ -275,27 +288,46 @@ export function buildA4InvoiceHtml(
     pointer-events: none; user-select: none; letter-spacing: 8px;
   }
   .top-accent {
-    height: 5px; border-radius: 3px;
-    background: linear-gradient(90deg, #c41e3a 0%, #e85d75 35%, #1565c0 100%);
-    margin-bottom: 10px;
+    height: 4px; border-radius: 2px;
+    background: linear-gradient(90deg, ${STORE.brandRed} 0%, #e85d75 40%, ${STORE.brandBlue} 100%);
+    margin-bottom: 0;
   }
-  .header { position: relative; text-align: center; padding: 6px 0 12px; border-bottom: 2px solid #222; }
-  .invoice-no {
-    position: absolute; top: 0; left: 0; text-align: left; direction: ltr;
-    font-size: 15px; font-weight: 800; color: #c41e3a;
+  .banner-header {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    padding: 14px 8px 12px; border-bottom: 2px solid #1a1a1a;
+    background: linear-gradient(180deg, #fafbfd 0%, #fff 100%);
   }
-  .invoice-no span { color: #333; font-weight: 600; }
-  .title {
-    margin: 0; font-size: 28px; font-weight: 900; color: #111;
-    letter-spacing: 0.5px; line-height: 1.3;
+  .banner-store { flex: 1; text-align: start; min-width: 0; }
+  .banner-store .store-name {
+    margin: 0; font-size: 26px; font-weight: 900; color: #111; line-height: 1.25;
+    letter-spacing: -0.3px;
   }
-  .subtitle { margin: 4px 0 0; font-size: 12px; color: #555; font-weight: 600; }
-  .contacts {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px;
-    margin-top: 12px; font-size: 12px; font-weight: 700; text-align: start;
+  .banner-store .store-address {
+    margin: 6px 0 0; font-size: 13px; font-weight: 700; color: #333; line-height: 1.5;
   }
-  .contacts .dept { color: #444; font-weight: 600; }
-  .contacts .phone { direction: ltr; display: inline-block; font-weight: 800; color: #111; }
+  .banner-center { flex: 0 0 auto; text-align: center; padding: 0 12px; }
+  .store-logo-svg { width: 118px; height: auto; display: block; margin: 0 auto 4px; }
+  .banner-motto {
+    margin: 0; font-size: 15px; font-weight: 900; color: #111; white-space: nowrap;
+  }
+  .banner-qr { flex: 0 0 auto; text-align: center; direction: ltr; }
+  .banner-qr img {
+    width: 92px; height: 92px; display: block; margin: 0 auto;
+    border: 2px solid ${STORE.brandBlue}; border-radius: 6px; padding: 4px; background: #fff;
+    box-shadow: 0 2px 8px rgba(21, 101, 192, 0.12);
+  }
+  .banner-invoice-no {
+    margin-top: 6px; font-size: 14px; font-weight: 800; color: ${STORE.brandRed};
+    font-family: 'Cairo', Arial, sans-serif; letter-spacing: 0.3px;
+  }
+  .banner-invoice-no span { color: #444; font-weight: 700; }
+  .contacts-strip {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px;
+    padding: 8px 10px; font-size: 10.5px; font-weight: 700;
+    background: #f4f6f9; border-bottom: 1px solid #dde3ea;
+  }
+  .contacts-strip .dept { color: #555; font-weight: 600; display: block; }
+  .contacts-strip .phone { direction: ltr; color: #111; font-weight: 800; }
   .meta-row {
     display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
     padding: 12px 4px; font-size: 13px; font-weight: 700;
@@ -372,21 +404,26 @@ export function buildA4InvoiceHtml(
 <div class="page">
   <div class="watermark">العين</div>
   <div class="top-accent"></div>
-  <header class="header">
-    <div class="invoice-no"><span>Invoice :</span> #${invoiceNo}</div>
-    <h1 class="title">${STORE.motto}</h1>
-    <p class="subtitle">${STORE.subtitle}</p>
-    <div class="contacts">
-      <div>
-        <div><span class="dept">قسم المبيعات:</span> <span class="phone">${STORE.salesPhone}</span></div>
-        <div><span class="dept">قسم الصيانة:</span> <span class="phone">${STORE.maintenancePhone}</span></div>
-      </div>
-      <div>
-        <div><span class="dept">قسم التجميعات:</span> <span class="phone">${STORE.assemblyPhone}</span></div>
-        <div><span class="dept">الدعم الفني:</span> <span class="phone">${STORE.supportPhone}</span></div>
-      </div>
+  <header class="banner-header" dir="rtl">
+    <div class="banner-store">
+      <h1 class="store-name">${STORE.nameAr}</h1>
+      <p class="store-address">${STORE.address}</p>
+    </div>
+    <div class="banner-center">
+      ${STORE_EYE_LOGO_SVG}
+      <p class="banner-motto">${STORE.motto}</p>
+    </div>
+    <div class="banner-qr">
+      ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR" width="92" height="92"/>` : ""}
+      <div class="banner-invoice-no"><span>Invoice :</span> #${invoiceNo}</div>
     </div>
   </header>
+  <div class="contacts-strip" dir="rtl">
+    <div><span class="dept">قسم المبيعات</span><span class="phone">${STORE.salesPhone}</span></div>
+    <div><span class="dept">قسم الصيانة</span><span class="phone">${STORE.maintenancePhone}</span></div>
+    <div><span class="dept">قسم التجميعات</span><span class="phone">${STORE.assemblyPhone}</span></div>
+    <div><span class="dept">الدعم الفني</span><span class="phone">${STORE.supportPhone}</span></div>
+  </div>
 
   <section class="meta-row">
     <div>
@@ -489,12 +526,29 @@ export async function renderInvoiceBarcodeSvg(value: string): Promise<string> {
   return new XMLSerializer().serializeToString(svg);
 }
 
+export async function renderInvoiceQrDataUrl(
+  order: A4InvoiceOrder,
+): Promise<string> {
+  const { toDataURL } = await import("qrcode");
+  return toDataURL(
+    `ORDER:${order.orderNumber}|TOTAL:${order.total ?? ""}`,
+    {
+      width: 200,
+      margin: 1,
+      color: { dark: STORE.brandBlue, light: "#ffffff" },
+    },
+  );
+}
+
 export async function openA4InvoicePrint(
   order: A4InvoiceOrder,
   options: A4InvoiceOptions = {},
 ): Promise<void> {
-  const barcodeSvg = await renderInvoiceBarcodeSvg(order.orderNumber);
-  const html = buildA4InvoiceHtml(order, options, barcodeSvg);
+  const [barcodeSvg, qrDataUrl] = await Promise.all([
+    renderInvoiceBarcodeSvg(order.orderNumber),
+    renderInvoiceQrDataUrl(order),
+  ]);
+  const html = buildA4InvoiceHtml(order, options, barcodeSvg, qrDataUrl);
   const popup = window.open("", "_blank", "width=1000,height=900");
   if (popup) {
     popup.document.write(html);
