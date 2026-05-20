@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { playBarcodeScanBeep } from "@/lib/scanBeep";
-import { openA4InvoicePrint } from "@/lib/a4InvoicePrint";
+import { openA4InvoicePrint, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -851,6 +851,7 @@ export default function SalesPOS({
     <div style="font-size:18px;font-weight:900;letter-spacing:0.5px;">\u0627\u0644\u0639\u064a\u0646 \u0644\u062a\u062c\u0627\u0631\u0629 \u0627\u0644\u062d\u0627\u0633\u0628\u0627\u062a</div>
     <div style="font-size:12px;font-weight:700;margin-top:2px;opacity:0.9;">AEEN COMPUTER TRADING</div>
     <div style="font-size:10px;margin-top:2px;opacity:0.75;">\u0643\u0631\u0628\u0644\u0627\u0621 - \u0627\u0644\u0639\u0631\u0627\u0642</div>
+    <div style="font-size:11px;font-weight:800;margin-top:4px;opacity:0.95;direction:ltr;">${STORE_WEBSITE}</div>
   </div>
 
   <div style="padding:10px 12px;border-bottom:2px solid #000;display:flex;justify-content:space-between;align-items:center;">
@@ -904,6 +905,7 @@ export default function SalesPOS({
     <div style="font-weight:800;font-size:13px;">\u0634\u0643\u0631\u0627\u064b \u0644\u062a\u0633\u0648\u0642\u0643\u0645 \u0645\u0639\u0646\u0627</div>
     <div style="font-size:10px;font-weight:700;margin-top:4px;">\u064a\u0631\u062c\u0649 \u0627\u0644\u0627\u062d\u062a\u0641\u0627\u0638 \u0628\u0627\u0644\u0648\u0635\u0644 \u0644\u063a\u0631\u0636 \u0627\u0644\u0636\u0645\u0627\u0646</div>
     <div style="font-weight:900;font-size:14px;margin-top:6px;" dir="ltr">07850006977</div>
+    <div style="font-size:11px;font-weight:800;margin-top:6px;color:#1565c0;direction:ltr;">${STORE_WEBSITE}</div>
   </div>
 
   <script>

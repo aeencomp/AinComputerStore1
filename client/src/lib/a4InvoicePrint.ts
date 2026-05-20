@@ -1,5 +1,7 @@
 /** A4 sales invoice HTML — styled after store invoice template */
 
+export const STORE_WEBSITE = "Http://Aeen-Iq.com";
+
 export interface A4InvoiceItem {
   nameAr?: string;
   nameEn?: string;
@@ -39,6 +41,7 @@ const STORE = {
   maintenancePhone: "07850006977",
   assemblyPhone: "07750008466",
   supportPhone: "07850008466",
+  website: STORE_WEBSITE,
   brandBlue: "#1565c0",
   brandRed: "#c41e3a",
 };
@@ -305,6 +308,10 @@ export function buildA4InvoiceHtml(
   .banner-store .store-address {
     margin: 4px 0 0; font-size: 11px; font-weight: 700; color: #444; line-height: 1.45;
   }
+  .banner-store .store-website {
+    margin: 4px 0 0; font-size: 11px; font-weight: 800; color: ${STORE.brandBlue};
+    direction: ltr; unicode-bidi: embed; letter-spacing: 0.2px;
+  }
   .banner-center {
     justify-self: center;
     text-align: center;
@@ -394,6 +401,10 @@ export function buildA4InvoiceHtml(
   .barcode-wrap svg { max-width: 120px; height: auto; transform: rotate(90deg); margin: 8px auto; display: block; }
   .barcode-id { font-family: monospace; font-weight: 900; font-size: 13px; direction: ltr; color: #c41e3a; }
   .disclaimer { font-size: 10px; color: #555; margin-top: 8px; font-weight: 600; }
+  .footer-website {
+    font-size: 11px; font-weight: 800; color: ${STORE.brandBlue};
+    margin-top: 6px; direction: ltr; unicode-bidi: embed;
+  }
   .receipt-organizer {
     position: absolute;
     bottom: 11mm;
@@ -426,6 +437,7 @@ export function buildA4InvoiceHtml(
     <div class="banner-store">
       <h1 class="store-name">${STORE.nameAr}</h1>
       <p class="store-address">${STORE.address}</p>
+      <p class="store-website">${STORE.website}</p>
     </div>
     <div class="banner-center">
       ${STORE_EYE_LOGO_SVG}
@@ -506,12 +518,14 @@ export function buildA4InvoiceHtml(
       ${barcodeSvg}
       <div class="barcode-id">${invoiceNo}</div>
       <p class="disclaimer">الخطأ والسهو مرجوع للطرفين</p>
+      <p class="footer-website">${STORE.website}</p>
     </div>
   </footer>
   <div class="receipt-organizer">منظم الوصل : ${organizer}</div>
 </div>
 <div class="page-meta">
   <span>صفحة 1 من 1</span>
+  <span dir="ltr">${STORE.website}</span>
   <span>${footerDate}</span>
   <span dir="ltr">${footerShort}</span>
 </div>
