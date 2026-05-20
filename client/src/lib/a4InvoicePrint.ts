@@ -281,7 +281,7 @@ export function buildA4InvoiceHtml(
     margin: 0; padding: 0; color: #1a1a1a; direction: rtl;
     background: #fff;
   }
-  .page { position: relative; min-height: 277mm; padding: 4mm 2mm; }
+  .page { position: relative; min-height: 277mm; padding: 4mm 2mm 14mm; }
   .watermark {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
     font-size: 120px; font-weight: 900; color: rgba(196, 30, 58, 0.04);
@@ -396,7 +396,7 @@ export function buildA4InvoiceHtml(
   .terms { font-size: 9.5px; line-height: 1.55; color: #222; list-style: none; padding: 0; margin: 0; }
   .terms li { margin-bottom: 3px; }
   .terms .term-num { color: #c41e3a; font-weight: 800; margin-left: 4px; }
-  .footer-mid { text-align: center; font-size: 12px; font-weight: 700; padding-top: 20px; }
+  .footer-mid { min-height: 0; }
   .barcode-wrap { text-align: center; }
   .barcode-wrap svg { max-width: 120px; height: auto; transform: rotate(90deg); margin: 8px auto; display: block; }
   .barcode-id { font-family: monospace; font-weight: 900; font-size: 13px; direction: ltr; color: #c41e3a; }
@@ -405,17 +405,23 @@ export function buildA4InvoiceHtml(
     font-size: 11px; font-weight: 800; color: ${STORE.brandBlue};
     margin-top: 6px; direction: ltr; unicode-bidi: embed;
   }
-  .receipt-organizer {
-    position: absolute;
-    bottom: 11mm;
-    right: 10mm;
-    font-size: 13px;
+  .footer-sign-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-top: 10px;
+    padding: 8px 6px 6px;
+    border-top: 1px dashed #bbb;
+    font-size: 12px;
     font-weight: 800;
     color: #111;
-    z-index: 2;
-    background: rgba(255, 255, 255, 0.92);
-    padding: 4px 8px;
-    border-radius: 4px;
+  }
+  .footer-sign-row .product-count { direction: rtl; }
+  .footer-sign-row .receipt-organizer {
+    direction: rtl;
+    text-align: end;
+    white-space: nowrap;
   }
   .page-meta {
     position: fixed; bottom: 0; left: 0; right: 0;
@@ -511,9 +517,7 @@ export function buildA4InvoiceHtml(
 
   <footer class="footer">
     <ol class="terms">${termsHtml}</ol>
-    <div class="footer-mid">
-      <div>عدد المنتجات : ${productCount}</div>
-    </div>
+    <div class="footer-mid"></div>
     <div class="barcode-wrap">
       ${barcodeSvg}
       <div class="barcode-id">${invoiceNo}</div>
@@ -521,7 +525,10 @@ export function buildA4InvoiceHtml(
       <p class="footer-website">${STORE.website}</p>
     </div>
   </footer>
-  <div class="receipt-organizer">منظم الوصل : ${organizer}</div>
+  <div class="footer-sign-row" dir="ltr">
+    <span class="product-count" dir="rtl">عدد المنتجات : ${productCount}</span>
+    <span class="receipt-organizer" dir="rtl">منظم الوصل : ${organizer}</span>
+  </div>
 </div>
 <div class="page-meta">
   <span>صفحة 1 من 1</span>
