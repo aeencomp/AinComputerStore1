@@ -27,7 +27,6 @@ export interface A4InvoiceOrder {
 
 export interface A4InvoiceOptions {
   issuedBy?: string;
-  usdRate?: number;
   previousBalance?: number;
   amountReceived?: number;
 }
@@ -40,7 +39,6 @@ const STORE = {
   maintenancePhone: "07850006977",
   assemblyPhone: "07750008466",
   supportPhone: "07850008466",
-  defaultUsdRate: 1500,
   brandBlue: "#1565c0",
   brandRed: "#c41e3a",
 };
@@ -54,10 +52,9 @@ const STORE_EYE_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0
   <path d="M88 48 L88 68 M112 48 L112 68 M88 58 L112 58 M88 48 L112 48" fill="none" stroke="#111" stroke-width="2.5"/>
 </svg>`;
 
-function getReceiptTerms(issuedBy: string): string[] {
-  const organizer = issuedBy.trim() || "—";
+function getReceiptTerms(): string[] {
   return [
-    `الضمان 5 أشهر صيانة، أول أسبوع استبدال فوري في حال وجود خلل مصنعي. منظم الوصل: ${organizer}`,
+    "الضمان 5 أشهر صيانة، أول أسبوع استبدال فوري في حال وجود خلل مصنعي.",
     "الضمان لا يشمل الاستبدال والاسترجاع والحرق والكسر والكهرباء.",
     "يسقط حق الضمان في حال فتح الجهاز.",
     "يسقط حق الضمان في حال فقدان الوصل.",
@@ -77,6 +74,8 @@ const PAYMENT_AR: Record<string, string> = {
 
 const fmtNum = (v: number) =>
   v.toLocaleString("en-US", { maximumFractionDigits: 0 });
+
+const fmtIqd = (v: number) => `${fmtNum(v)} د.ع`;
 
 const escapeHtml = (s: string) =>
   s
@@ -211,11 +210,8 @@ export function buildA4InvoiceHtml(
     timeZone: "Asia/Baghdad",
   })}`;
 
-  const usdRate = options.usdRate ?? STORE.defaultUsdRate;
-  const netUsd = Math.round(totalNum / usdRate);
   const received =
     options.amountReceived ?? (order.paymentMethod === "deferred" ? 0 : totalNum);
-  const receivedUsd = Math.round(received / usdRate);
   const prevBalance = options.previousBalance ?? 0;
   const currentBalance = prevBalance + totalNum - received;
 
@@ -249,8 +245,8 @@ export function buildA4InvoiceHtml(
         <td class="name">${name}</td>
         <td>${qty}</td>
         <td>قطعة</td>
-        <td>${fmtNum(unitPrice)}</td>
-        <td>${fmtNum(lineTotal)}</td>
+        <td>${fmtIqd(unitPrice)}</td>
+        <td>${fmtIqd(lineTotal)}</td>
         <td class="notes">${notes}</td>
       </tr>`;
     })
@@ -263,7 +259,8 @@ export function buildA4InvoiceHtml(
   const invoiceNo = escapeHtml(order.orderNumber);
   const amountWords = escapeHtml(iqdToArabicWords(totalNum));
 
-  const termsHtml = getReceiptTerms(options.issuedBy || "").map(
+  const organizer = escapeHtml((options.issuedBy || "").trim() || "—");
+  const termsHtml = getReceiptTerms().map(
     (t, i) => `<li><span class="term-num">${i + 1}.</span> ${escapeHtml(t)}</li>`,
   ).join("");
 
@@ -293,24 +290,34 @@ export function buildA4InvoiceHtml(
     margin-bottom: 0;
   }
   .banner-header {
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    padding: 14px 8px 12px; border-bottom: 2px solid #1a1a1a;
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
+    column-gap: 10px;
+    padding: 12px 8px 10px;
+    border-bottom: 2px solid #1a1a1a;
     background: linear-gradient(180deg, #fafbfd 0%, #fff 100%);
   }
-  .banner-store { flex: 1; text-align: start; min-width: 0; }
+  .banner-store { justify-self: start; text-align: start; min-width: 0; max-width: 100%; }
   .banner-store .store-name {
-    margin: 0; font-size: 26px; font-weight: 900; color: #111; line-height: 1.25;
-    letter-spacing: -0.3px;
+    margin: 0; font-size: 17px; font-weight: 800; color: #111; line-height: 1.3;
   }
   .banner-store .store-address {
-    margin: 6px 0 0; font-size: 13px; font-weight: 700; color: #333; line-height: 1.5;
+    margin: 4px 0 0; font-size: 11px; font-weight: 700; color: #444; line-height: 1.45;
   }
-  .banner-center { flex: 0 0 auto; text-align: center; padding: 0 12px; }
-  .store-logo-svg { width: 118px; height: auto; display: block; margin: 0 auto 4px; }
+  .banner-center {
+    justify-self: center;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .store-logo-svg { width: 128px; height: auto; display: block; margin: 0 auto 2px; }
   .banner-motto {
     margin: 0; font-size: 15px; font-weight: 900; color: #111; white-space: nowrap;
   }
-  .banner-qr { flex: 0 0 auto; text-align: center; direction: ltr; }
+  .banner-qr { justify-self: end; text-align: center; direction: ltr; }
   .banner-qr img {
     width: 92px; height: 92px; display: block; margin: 0 auto;
     border: 2px solid ${STORE.brandBlue}; border-radius: 6px; padding: 4px; background: #fff;
@@ -375,7 +382,6 @@ export function buildA4InvoiceHtml(
     font-size: 14px;
   }
   .total-row.net .val { color: #c41e3a; background: #fff; border-color: #c41e3a; font-size: 16px; }
-  .total-row.usd .val { color: #1565c0; background: #fff; border-color: #1565c0; font-size: 16px; }
   .footer {
     border-top: 2px solid #222; padding-top: 12px;
     display: grid; grid-template-columns: 1fr auto 140px; gap: 16px; align-items: start;
@@ -388,6 +394,18 @@ export function buildA4InvoiceHtml(
   .barcode-wrap svg { max-width: 120px; height: auto; transform: rotate(90deg); margin: 8px auto; display: block; }
   .barcode-id { font-family: monospace; font-weight: 900; font-size: 13px; direction: ltr; color: #c41e3a; }
   .disclaimer { font-size: 10px; color: #555; margin-top: 8px; font-weight: 600; }
+  .receipt-organizer {
+    position: absolute;
+    bottom: 11mm;
+    right: 10mm;
+    font-size: 13px;
+    font-weight: 800;
+    color: #111;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.92);
+    padding: 4px 8px;
+    border-radius: 4px;
+  }
   .page-meta {
     position: fixed; bottom: 0; left: 0; right: 0;
     display: flex; justify-content: space-between; align-items: center;
@@ -456,30 +474,25 @@ export function buildA4InvoiceHtml(
 
   <section class="summary">
     <div class="balance-box">
-      <div class="row"><span>رصيد العميل السابق :</span><span>${fmtNum(prevBalance)}</span></div>
+      <div class="row"><span>رصيد العميل السابق :</span><span>${fmtIqd(prevBalance)}</span></div>
       <div class="received">
-        <div class="row"><span>المبلغ الواصل :</span><span>$ ${fmtNum(receivedUsd)}</span></div>
-        <div class="row"><span></span><span>${fmtNum(received)} دينار</span></div>
+        <div class="row"><span>المبلغ الواصل :</span><span>${fmtIqd(received)}</span></div>
       </div>
-      <div class="row"><span>رصيد العميل الحالي :</span><span>${fmtNum(currentBalance)}</span></div>
+      <div class="row"><span>رصيد العميل الحالي :</span><span>${fmtIqd(currentBalance)}</span></div>
     </div>
     <div class="amount-words">${amountWords}</div>
     <div class="totals-stack">
       <div class="total-row">
         <span>المبلغ الاجمالي :</span>
-        <span class="val">${fmtNum(subtotalNum)}</span>
+        <span class="val">${fmtIqd(subtotalNum)}</span>
       </div>
       <div class="total-row">
         <span>اجمالي الخصم :</span>
-        <span class="val">${fmtNum(discountNum)}</span>
+        <span class="val">${fmtIqd(discountNum)}</span>
       </div>
       <div class="total-row net">
         <span>المبلغ الصافي :</span>
-        <span class="val">${fmtNum(totalNum)}</span>
-      </div>
-      <div class="total-row usd">
-        <span>المبلغ الصافي $</span>
-        <span class="val">${fmtNum(netUsd)}</span>
+        <span class="val">${fmtIqd(totalNum)}</span>
       </div>
     </div>
   </section>
@@ -495,6 +508,7 @@ export function buildA4InvoiceHtml(
       <p class="disclaimer">الخطأ والسهو مرجوع للطرفين</p>
     </div>
   </footer>
+  <div class="receipt-organizer">منظم الوصل : ${organizer}</div>
 </div>
 <div class="page-meta">
   <span>صفحة 1 من 1</span>
