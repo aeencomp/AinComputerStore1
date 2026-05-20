@@ -42,14 +42,17 @@ const STORE = {
   defaultUsdRate: 1500,
 };
 
-const TERMS = [
-  "تخضع كافة الوصلات للمساءلة ولا يمكن إرجاعها إلا بموافقة الإدارة.",
-  "يتم تحديد مدة الصيانة بحد أقصى 3 أيام بعد تأكيد الهاتف.",
-  "الكفالة تنتهي عند فتح الجهاز من قبل غير المختص.",
-  "غير مسؤولين عن الأعطال بعد انتهاء الكفالة أو التسليم بدون وصل.",
-  "كفالة البطاريات مع الشاحن الأصلي للجهاز داخل المعرض فقط.",
-  "كفالة الطابعة المكتبية فقط مع الخرطوشة الأصلية للحبر.",
-];
+function getReceiptTerms(issuedBy: string): string[] {
+  const organizer = issuedBy.trim() || "—";
+  return [
+    `الضمان 5 أشهر صيانة، أول أسبوع استبدال فوري في حال وجود خلل مصنعي. منظم الوصل: ${organizer}`,
+    "الضمان لا يشمل الاستبدال والاسترجاع والحرق والكسر والكهرباء.",
+    "يسقط حق الضمان في حال فتح الجهاز.",
+    "يسقط حق الضمان في حال فقدان الوصل.",
+    "ضمان البطارية: تشغيل ساعة فما فوق ولمدة أسبوع واحد للبطارية.",
+    "الضمان لا يشمل الشاشة وسوء الاستخدام.",
+  ];
+}
 
 const PAYMENT_AR: Record<string, string> = {
   cash: "نقدي",
@@ -240,7 +243,6 @@ export function buildA4InvoiceHtml(
     })
     .join("");
 
-  const issuedBy = escapeHtml(options.issuedBy || "—");
   const customerName = escapeHtml(order.customerName || "");
   const customerAddress = escapeHtml(
     order.customerAddress || order.customerPhone || "",
@@ -248,8 +250,8 @@ export function buildA4InvoiceHtml(
   const invoiceNo = escapeHtml(order.orderNumber);
   const amountWords = escapeHtml(iqdToArabicWords(totalNum));
 
-  const termsHtml = TERMS.map(
-    (t, i) => `<li><span class="term-num">${i + 1}.</span> ${t}</li>`,
+  const termsHtml = getReceiptTerms(options.issuedBy || "").map(
+    (t, i) => `<li><span class="term-num">${i + 1}.</span> ${escapeHtml(t)}</li>`,
   ).join("");
 
   return `<!DOCTYPE html>
@@ -448,8 +450,7 @@ export function buildA4InvoiceHtml(
   <footer class="footer">
     <ol class="terms">${termsHtml}</ol>
     <div class="footer-mid">
-      <div>منظم الوصل : ${issuedBy}</div>
-      <div style="margin-top:8px;">عدد المنتجات : ${productCount}</div>
+      <div>عدد المنتجات : ${productCount}</div>
     </div>
     <div class="barcode-wrap">
       ${barcodeSvg}
