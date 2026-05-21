@@ -118,6 +118,33 @@ async function salesUserCanViewWithdrawals(req: Request): Promise<boolean> {
   return salesUser.canViewWithdrawals === 1;
 }
 
+function salesPermissionsPayload(user: {
+  canPos: number;
+  canInventory: number;
+  canInventoryLocation2: number;
+  canManageUsers: number;
+  canViewReports: number;
+  canViewWithdrawals?: number | null;
+  canApplyDiscount: number;
+  canEditReceipt?: number | null;
+}) {
+  return {
+    canPos: user.canPos,
+    canInventory: user.canInventory,
+    canInventoryLocation2: user.canInventoryLocation2,
+    canManageUsers: user.canManageUsers,
+    canViewReports: user.canViewReports,
+    canViewWithdrawals: user.canViewWithdrawals ?? 0,
+    canApplyDiscount: user.canApplyDiscount,
+    canEditReceipt: user.canEditReceipt ?? 0,
+  };
+}
+
+function isDbSchemaError(error: unknown): boolean {
+  const msg = String((error as { message?: string })?.message ?? error ?? "");
+  return /does not exist|column .* does not|can_view_withdrawals/i.test(msg);
+}
+
 /** Cost price (سعر الشراء): sales_admin on sales portal; admin panel when no sales session. */
 async function canViewInStoreCostPrice(req: Request): Promise<boolean> {
   const salesUserId = (req.session as any).salesUserId as string | undefined;
@@ -963,19 +990,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true, 
         user: { 
           id: salesUser.id, username: salesUser.username, name: salesUser.name, role: salesUser.role,
-          permissions: {
-            canPos: salesUser.canPos, canInventory: salesUser.canInventory,
-            canInventoryLocation2: salesUser.canInventoryLocation2,
-            canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
-            canViewWithdrawals: salesUser.canViewWithdrawals ?? 0,
-            canApplyDiscount: salesUser.canApplyDiscount,
-            canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
-          }
+          permissions: salesPermissionsPayload(salesUser),
         } 
       });
     } catch (error) {
       console.error("Sales login error:", error);
-      return res.status(500).json({ error: "فشل تسجيل الدخول" });
+      return res.status(500).json({
+        error: isDbSchemaError(error)
+          ? "قاعدة البيانات تحتاج تحديث — أعد تشغيل الخادم (pm2 restart all)"
+          : "فشل تسجيل الدخول",
+      });
     }
   });
 
@@ -1003,19 +1027,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true, 
         user: { 
           id: salesUser.id, username: salesUser.username, name: salesUser.name, role: salesUser.role,
-          permissions: {
-            canPos: salesUser.canPos, canInventory: salesUser.canInventory,
-            canInventoryLocation2: salesUser.canInventoryLocation2,
-            canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
-            canViewWithdrawals: salesUser.canViewWithdrawals ?? 0,
-            canApplyDiscount: salesUser.canApplyDiscount,
-            canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
-          }
+          permissions: salesPermissionsPayload(salesUser),
         }
       });
     } catch (error) {
       console.error("Sales OTP verify error:", error);
-      return res.status(500).json({ error: "فشل التحقق" });
+      return res.status(500).json({
+        error: isDbSchemaError(error)
+          ? "قاعدة البيانات تحتاج تحديث — أعد تشغيل الخادم (pm2 restart all)"
+          : "فشل التحقق",
+      });
     }
   });
 
@@ -1067,20 +1088,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         })),
         activeSalesLocationId: activeSalesLocationId ?? null,
         needsLocationPick,
-        permissions: {
-          canPos: salesUser.canPos,
-          canInventory: salesUser.canInventory,
-          canInventoryLocation2: salesUser.canInventoryLocation2,
-          canManageUsers: salesUser.canManageUsers,
-          canViewReports: salesUser.canViewReports,
-          canViewWithdrawals: salesUser.canViewWithdrawals ?? 0,
-          canApplyDiscount: salesUser.canApplyDiscount,
-          canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
-        }
+        permissions: salesPermissionsPayload(salesUser),
       });
     } catch (error) {
       console.error("Sales auth check error:", error);
-      return res.status(500).json({ error: "فشل التحقق من المستخدم" });
+      return res.status(500).json({
+        error: isDbSchemaError(error)
+          ? "قاعدة البيانات تحتاج تحديث — أعد تشغيل الخادم (pm2 restart all)"
+          : "فشل التحقق من المستخدم",
+      });
     }
   });
 
