@@ -93,6 +93,98 @@ export async function setUserLocationAssignments(
 
 export type TransferProductSource = "instore" | "laptop" | "desktop";
 
+async function nextInventorySerial(
+  prefix: string,
+  table: typeof laptops | typeof desktops,
+): Promise<string> {
+  const rows = await db.select({ serialNumber: table.serialNumber }).from(table);
+  const used = new Set(rows.map((r) => (r.serialNumber || "").trim().toUpperCase()));
+  let max = 0;
+  const pattern = new RegExp(`^${prefix}-(\\d+)$`, "i");
+  for (const r of rows) {
+    const m = (r.serialNumber || "").match(pattern);
+    if (m) max = Math.max(max, parseInt(m[1], 10));
+  }
+  let next = max + 1;
+  let candidate: string;
+  do {
+    candidate = `${prefix}-${String(next).padStart(4, "0")}`;
+    next++;
+  } while (used.has(candidate.toUpperCase()));
+  return candidate;
+}
+
+async function transferLaptopOrDesktopQuantity(params: {
+  table: typeof laptops | typeof desktops;
+  serialPrefix: "LAP" | "DES";
+  row: typeof laptops.$inferSelect | typeof desktops.$inferSelect;
+  productId: string;
+  fromLocationId: number;
+  toLocationId: number;
+  quantity: number;
+}): Promise<string | null> {
+  const { table, serialPrefix, row, productId, fromLocationId, toLocationId, quantity } = params;
+  const available = row.stockQuantity || 0;
+  if (available < quantity) {
+    throw new Error("لا يوجد مخزون كافٍ");
+  }
+
+  const matchClause = row.barcode
+    ? eq(table.barcode, row.barcode)
+    : row.partNumber
+      ? and(eq(table.brand, row.brand), eq(table.partNumber, row.partNumber))
+      : row.model
+        ? and(eq(table.brand, row.brand), eq(table.model, row.model))
+        : eq(table.brand, row.brand);
+
+  if (quantity === available) {
+    await db
+      .update(table)
+      .set({ salesLocationId: toLocationId, updatedAt: new Date() })
+      .where(eq(table.id, productId));
+    return row.serialNumber;
+  }
+
+  await db
+    .update(table)
+    .set({ stockQuantity: available - quantity, updatedAt: new Date() })
+    .where(eq(table.id, productId));
+
+  const [existingAtDest] = await db
+    .select()
+    .from(table)
+    .where(
+      and(
+        eq(table.salesLocationId, toLocationId),
+        eq(table.isActive, 1),
+        matchClause,
+      ),
+    )
+    .limit(1);
+
+  if (existingAtDest) {
+    await db
+      .update(table)
+      .set({
+        stockQuantity: (existingAtDest.stockQuantity || 0) + quantity,
+        updatedAt: new Date(),
+      })
+      .where(eq(table.id, existingAtDest.id));
+    return existingAtDest.serialNumber;
+  }
+
+  const newSerial = await nextInventorySerial(serialPrefix, table);
+  const { id: _id, createdAt: _c, updatedAt: _u, serialNumber: _s, stockQuantity: _q, salesLocationId: _loc, ...rest } = row;
+  await db.insert(table).values({
+    ...rest,
+    serialNumber: newSerial,
+    stockQuantity: quantity,
+    salesLocationId: toLocationId,
+    isActive: 1,
+  });
+  return newSerial;
+}
+
 export async function executeStockTransfer(params: {
   fromLocationId: number;
   toLocationId: number;
@@ -129,24 +221,30 @@ export async function executeStockTransfer(params: {
     if (row.salesLocationId !== fromLocationId) {
       throw new Error("المنتج ليس في المخزون المصدر");
     }
-    if ((row.stockQuantity || 0) < 1) throw new Error("لا يوجد مخزون كافٍ");
-    serialNumber = row.serialNumber;
-    await db
-      .update(laptops)
-      .set({ salesLocationId: toLocationId, updatedAt: new Date() })
-      .where(eq(laptops.id, productId));
+    serialNumber = await transferLaptopOrDesktopQuantity({
+      table: laptops,
+      serialPrefix: "LAP",
+      row,
+      productId,
+      fromLocationId,
+      toLocationId,
+      quantity,
+    });
   } else if (productSource === "desktop") {
     const [row] = await db.select().from(desktops).where(eq(desktops.id, productId));
     if (!row) throw new Error("الديسكتوب غير موجود");
     if (row.salesLocationId !== fromLocationId) {
       throw new Error("المنتج ليس في المخزون المصدر");
     }
-    if ((row.stockQuantity || 0) < 1) throw new Error("لا يوجد مخزون كافٍ");
-    serialNumber = row.serialNumber;
-    await db
-      .update(desktops)
-      .set({ salesLocationId: toLocationId, updatedAt: new Date() })
-      .where(eq(desktops.id, productId));
+    serialNumber = await transferLaptopOrDesktopQuantity({
+      table: desktops,
+      serialPrefix: "DES",
+      row,
+      productId,
+      fromLocationId,
+      toLocationId,
+      quantity,
+    });
   } else if (productSource === "instore") {
     const id = parseInt(productId, 10);
     const fromProduct = await storage.getInStoreProductById(id);
@@ -206,7 +304,7 @@ export async function executeStockTransfer(params: {
       toLocationId,
       productSource,
       productId,
-      quantity: productSource === "instore" ? quantity : 1,
+      quantity,
       serialNumber,
       notes: notes || null,
       createdBy: createdBy || null,

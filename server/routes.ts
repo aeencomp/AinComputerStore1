@@ -1221,37 +1221,43 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const results: any[] = [];
       for (const p of instore) {
+        const qty = p.stockQuantity || 0;
+        if (qty < 1) continue;
         const label = `${p.nameAr} ${p.sku || ""} ${p.barcode || ""}`.toLowerCase();
         if (label.includes(q) || (p.barcode && p.barcode.toLowerCase() === q)) {
           results.push({
             productSource: "instore",
             productId: String(p.id),
             label: p.nameAr,
-            stockQuantity: p.stockQuantity,
+            stockQuantity: qty,
             barcode: p.barcode,
           });
         }
       }
       for (const l of laps) {
+        const qty = l.stockQuantity || 0;
+        if (qty < 1) continue;
         const label = `${l.brand} ${l.model || ""} ${l.serialNumber} ${l.barcode || ""}`.toLowerCase();
         if (label.includes(q) || l.serialNumber.toLowerCase() === q) {
           results.push({
             productSource: "laptop",
             productId: l.id,
             label: `${l.brand} ${l.model || ""} — ${l.serialNumber}`,
-            stockQuantity: l.stockQuantity,
+            stockQuantity: qty,
             barcode: l.barcode,
           });
         }
       }
       for (const d of desks) {
+        const qty = d.stockQuantity || 0;
+        if (qty < 1) continue;
         const label = `${d.brand} ${d.model || ""} ${d.serialNumber} ${d.barcode || ""}`.toLowerCase();
         if (label.includes(q) || d.serialNumber.toLowerCase() === q) {
           results.push({
             productSource: "desktop",
             productId: d.id,
             label: `${d.brand} ${d.model || ""} — ${d.serialNumber}`,
-            stockQuantity: d.stockQuantity,
+            stockQuantity: qty,
             barcode: d.barcode,
           });
         }
