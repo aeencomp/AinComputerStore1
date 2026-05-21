@@ -1,5 +1,7 @@
 /** A4 sales invoice HTML — styled after store invoice template */
 
+import storeLogoSrc from "@assets/aeen-receipt-logo.png";
+
 export const STORE_WEBSITE = "Http://Aeen-Iq.com";
 
 export interface A4InvoiceItem {
@@ -46,17 +48,9 @@ const STORE = {
   brandRed: "#c41e3a",
 };
 
-/** Inline eye + house logo for reliable print (matches store branding) */
-const STORE_EYE_LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 120" class="store-logo-svg" aria-hidden="true">
-  <path d="M20 58 Q100 8 180 58" fill="none" stroke="#111" stroke-width="9" stroke-linecap="round"/>
-  <path d="M24 62 Q100 108 176 62" fill="none" stroke="${STORE.brandBlue}" stroke-width="9" stroke-linecap="round"/>
-  <ellipse cx="100" cy="58" rx="52" ry="30" fill="#fff" stroke="#e8e8e8" stroke-width="1"/>
-  <path d="M78 68 L78 48 L100 36 L122 48 L122 68 Z" fill="none" stroke="#111" stroke-width="3.5" stroke-linejoin="round"/>
-  <path d="M88 48 L88 68 M112 48 L112 68 M88 58 L112 58 M88 48 L112 48" fill="none" stroke="#111" stroke-width="2.5"/>
-</svg>`;
-
 function getReceiptTerms(): string[] {
   return [
+    "ضمان سنة كاملة للأجهزة الجديدة.",
     "الضمان 5 أشهر صيانة، أول أسبوع استبدال فوري في حال وجود خلل مصنعي.",
     "الضمان لا يشمل الاستبدال والاسترجاع والحرق والكسر والكهرباء.",
     "يسقط حق الضمان في حال فتح الجهاز.",
@@ -178,11 +172,23 @@ export function iqdToArabicWords(amount: number): string {
   return `${text} دينار فقط لاغيرها`;
 }
 
+export async function loadStoreLogoDataUrl(): Promise<string> {
+  const response = await fetch(storeLogoSrc);
+  const blob = await response.blob();
+  return await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Failed to load store logo"));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export function buildA4InvoiceHtml(
   order: A4InvoiceOrder,
   options: A4InvoiceOptions = {},
   barcodeSvg = "",
   qrDataUrl = "",
+  logoDataUrl = "",
 ): string {
   const subtotalNum = parseFloat(String(order.subtotal ?? order.total ?? 0)) || 0;
   const discountNum = parseFloat(String(order.discount ?? 0)) || 0;
@@ -320,7 +326,23 @@ export function buildA4InvoiceHtml(
     align-items: center;
     justify-content: center;
   }
-  .store-logo-svg { width: 128px; height: auto; display: block; margin: 0 auto 2px; }
+  .store-logo-img {
+    width: 150px; height: auto; max-height: 88px;
+    display: block; margin: 0 auto 4px;
+    object-fit: contain;
+  }
+  .new-device-warranty {
+    text-align: center;
+    padding: 9px 14px;
+    margin: 0 0 10px;
+    background: linear-gradient(90deg, #e8f1fc 0%, #fff 50%, #e8f1fc 100%);
+    border: 2px solid ${STORE.brandBlue};
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 900;
+    color: ${STORE.brandBlue};
+    letter-spacing: 0.2px;
+  }
   .banner-motto {
     margin: 0; font-size: 15px; font-weight: 900; color: #111; white-space: nowrap;
   }
@@ -446,7 +468,7 @@ export function buildA4InvoiceHtml(
       <p class="store-website">${STORE.website}</p>
     </div>
     <div class="banner-center">
-      ${STORE_EYE_LOGO_SVG}
+      ${logoDataUrl ? `<img src="${logoDataUrl}" alt="العين لتجارة الحاسبات" class="store-logo-img"/>` : ""}
       <p class="banner-motto">${STORE.motto}</p>
     </div>
     <div class="banner-qr">
@@ -460,6 +482,8 @@ export function buildA4InvoiceHtml(
     <div><span class="dept">قسم التجميعات</span><span class="phone">${STORE.assemblyPhone}</span></div>
     <div><span class="dept">الدعم الفني</span><span class="phone">${STORE.supportPhone}</span></div>
   </div>
+
+  <div class="new-device-warranty">ضمان سنة كاملة للأجهزة الجديدة</div>
 
   <section class="meta-row">
     <div>
@@ -579,11 +603,12 @@ export async function openA4InvoicePrint(
   order: A4InvoiceOrder,
   options: A4InvoiceOptions = {},
 ): Promise<void> {
-  const [barcodeSvg, qrDataUrl] = await Promise.all([
+  const [barcodeSvg, qrDataUrl, logoDataUrl] = await Promise.all([
     renderInvoiceBarcodeSvg(order.orderNumber),
     renderInvoiceQrDataUrl(order),
+    loadStoreLogoDataUrl(),
   ]);
-  const html = buildA4InvoiceHtml(order, options, barcodeSvg, qrDataUrl);
+  const html = buildA4InvoiceHtml(order, options, barcodeSvg, qrDataUrl, logoDataUrl);
   const popup = window.open("", "_blank", "width=1000,height=900");
   if (popup) {
     popup.document.write(html);
