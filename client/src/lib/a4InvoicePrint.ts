@@ -327,8 +327,8 @@ export function buildA4InvoiceHtml(
     justify-content: center;
   }
   .store-logo-img {
-    width: 160px; height: auto; max-height: 96px;
-    display: block; margin: 0 auto 4px;
+    width: 240px; height: auto; max-height: 140px;
+    display: block; margin: 0 auto 6px;
     object-fit: contain;
   }
   .banner-motto {
@@ -337,8 +337,8 @@ export function buildA4InvoiceHtml(
   .banner-qr { justify-self: end; text-align: center; direction: ltr; }
   .banner-qr img {
     width: 92px; height: 92px; display: block; margin: 0 auto;
-    border: 2px solid ${STORE.brandRed}; border-radius: 6px; padding: 4px; background: #fff;
-    box-shadow: 0 2px 8px rgba(200, 50, 51, 0.18);
+    border: 2px solid #222; border-radius: 6px; padding: 4px; background: #fff;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   }
   .banner-invoice-no {
     margin-top: 6px; font-size: 14px; font-weight: 800; color: ${STORE.brandRed};
@@ -593,7 +593,7 @@ export async function renderInvoiceQrDataUrl(
     {
       width: 200,
       margin: 1,
-      color: { dark: STORE.brandRed, light: "#ffffff" },
+      color: { dark: "#000000", light: "#ffffff" },
     },
   );
 }

@@ -30,7 +30,9 @@ import {
   HandCoins,
   Edit3,
   Save,
+  FileText,
 } from "lucide-react";
+import { openA4InvoicePrint, type A4InvoiceOrder } from "@/lib/a4InvoicePrint";
 import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns";
 
 interface Order {
@@ -67,6 +69,7 @@ interface RepairTicket {
 
 interface SalesUser {
   id: string;
+  name?: string;
   permissions: {
     canViewReports: number;
     canEditReceipt?: number;
@@ -497,6 +500,42 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
 
     const popup = window.open('', '_blank', 'width=420,height=700');
     if (popup) { popup.document.write(html); popup.document.close(); }
+  };
+
+  const toA4InvoiceOrder = (order: Order): A4InvoiceOrder => ({
+    orderNumber: order.orderNumber,
+    createdAt: order.createdAt,
+    customerName: order.customerName,
+    customerPhone: order.customerPhone,
+    customerAddress: (order as { customerAddress?: string }).customerAddress,
+    items: parseOrderItems(order).map((item: any) => ({
+      nameAr: item.nameAr || item.name,
+      nameEn: item.nameEn,
+      name: item.name,
+      sku: item.sku,
+      price: item.price ?? item.unitPrice ?? "0",
+      quantity: parseInt(String(item.quantity || "1"), 10) || 1,
+      specs: item.specs,
+      notes: item.notes,
+    })),
+    subtotal: order.subtotal ?? order.total,
+    discount: order.discount,
+    total: order.total,
+    paymentMethod: order.paymentMethod,
+    notes: order.notes,
+  });
+
+  const printA4OrderReceipt = async (order: Order) => {
+    try {
+      await openA4InvoicePrint(toA4InvoiceOrder(order), {
+        issuedBy: user.name || "",
+      });
+    } catch {
+      toast({
+        title: language === "ar" ? "فشل طباعة فاتورة A4" : "A4 print failed",
+        variant: "destructive",
+      });
+    }
   };
 
   const formatDate = (value: string) => new Date(value).toLocaleDateString('ar-IQ');
@@ -1000,9 +1039,18 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                             variant="ghost"
                             onClick={() => printOrderReceipt(order)}
                             data-testid={`button-print-${order.id}`}
-                            title={language === 'ar' ? 'طباعة الوصل' : 'Print Receipt'}
+                            title={language === 'ar' ? 'طباعة وصل حراري' : 'Print thermal receipt'}
                           >
                             <Printer className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => printA4OrderReceipt(order)}
+                            data-testid={`button-print-a4-${order.id}`}
+                            title={language === 'ar' ? 'طباعة فاتورة A4' : 'Print A4 invoice'}
+                          >
+                            <FileText className="w-4 h-4" />
                           </Button>
                           {user.permissions.canEditReceipt === 1 && (
                             <Button
