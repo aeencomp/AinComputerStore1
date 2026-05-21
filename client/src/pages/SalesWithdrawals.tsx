@@ -22,7 +22,14 @@ interface CashWithdrawal {
 }
 
 interface SalesWithdrawalsProps {
-  user: { name: string; username: string };
+  user: {
+    name: string;
+    username: string;
+    role?: string;
+    permissions: {
+      canViewWithdrawals: number;
+    };
+  };
 }
 
 function describeApiError(err: Error): string {
@@ -42,6 +49,19 @@ function describeApiError(err: Error): string {
 export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   const { language, isRTL } = useLanguage();
   const { toast } = useToast();
+
+  const canViewWithdrawals =
+    user.role === 'sales_admin' || user.permissions.canViewWithdrawals === 1;
+
+  if (!canViewWithdrawals) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">
+          {language === 'ar' ? 'ليس لديك صلاحية عرض السحوبات' : 'You do not have access to withdrawals'}
+        </p>
+      </div>
+    );
+  }
   const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
   const [selectedDate, setSelectedDate] = useState(today);
   const [amount, setAmount] = useState("");

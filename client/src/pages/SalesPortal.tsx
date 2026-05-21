@@ -67,7 +67,9 @@ interface SalesUser {
     canInventoryLocation2: number;
     canManageUsers: number;
     canViewReports: number;
+    canViewWithdrawals: number;
     canApplyDiscount: number;
+    canEditReceipt?: number;
   };
 }
 
@@ -248,7 +250,9 @@ export default function SalesPortal() {
       path: "/sales/withdrawals", 
       label: language === 'ar' ? 'السحوبات اليومية' : 'Withdrawals', 
       icon: TrendingDown,
-      permission: currentUser.permissions.canPos,
+      permission:
+        currentUser.permissions.canViewWithdrawals === 1 ||
+        currentUser.role === 'sales_admin',
       color: 'text-orange-500',
     },
     { 

@@ -22,7 +22,8 @@ import {
   Package,
   BarChart3,
   Percent,
-  Receipt
+  Receipt,
+  TrendingDown,
 } from "lucide-react";
 
 interface SalesUser {
@@ -36,6 +37,7 @@ interface SalesUser {
   canInventoryLocation2: number;
   canManageUsers: number;
   canViewReports: number;
+  canViewWithdrawals: number;
   canApplyDiscount: number;
   canEditReceipt: number;
   isActive: number;
@@ -71,6 +73,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     canInventoryLocation2: 0,
     canManageUsers: 0,
     canViewReports: 0,
+    canViewWithdrawals: 0,
     canApplyDiscount: 0,
     canEditReceipt: 0,
     isActive: 1,
@@ -140,6 +143,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       canInventoryLocation2: 0,
       canManageUsers: 0,
       canViewReports: 0,
+      canViewWithdrawals: 0,
       canApplyDiscount: 0,
       canEditReceipt: 0,
       isActive: 1,
@@ -160,6 +164,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       canInventoryLocation2: u.canInventoryLocation2,
       canManageUsers: u.canManageUsers,
       canViewReports: u.canViewReports,
+      canViewWithdrawals: u.canViewWithdrawals ?? 0,
       canApplyDiscount: u.canApplyDiscount,
       canEditReceipt: u.canEditReceipt,
       isActive: u.isActive,
@@ -204,6 +209,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     canInventory: Package,
     canManageUsers: Users,
     canViewReports: BarChart3,
+    canViewWithdrawals: TrendingDown,
     canApplyDiscount: Percent,
     canEditReceipt: Receipt,
   };
@@ -381,6 +387,17 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                       onCheckedChange={(v) => setFormData(prev => ({ ...prev, canViewReports: v ? 1 : 0 }))}
                     />
                   </div>
+                  <div className="flex items-center justify-between p-2 border rounded">
+                    <div className="flex items-center gap-2">
+                      <TrendingDown className="h-4 w-4" />
+                      <span className="text-sm">{language === 'ar' ? 'السحوبات اليومية' : 'Daily Withdrawals'}</span>
+                    </div>
+                    <Switch
+                      checked={formData.canViewWithdrawals === 1}
+                      onCheckedChange={(v) => setFormData(prev => ({ ...prev, canViewWithdrawals: v ? 1 : 0 }))}
+                      data-testid="switch-can-view-withdrawals"
+                    />
+                  </div>
                   <div className="flex items-center justify-between p-2 border rounded col-span-2">
                     <div className="flex items-center gap-2">
                       <Percent className="h-4 w-4" />
@@ -496,6 +513,12 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                             <Badge variant="outline" className="text-xs">
                               <BarChart3 className="h-3 w-3 me-1" />
                               {language === 'ar' ? 'تقارير' : 'Reports'}
+                            </Badge>
+                          )}
+                          {(u.canViewWithdrawals ?? 0) === 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              <TrendingDown className="h-3 w-3 me-1" />
+                              {language === 'ar' ? 'سحوبات' : 'Withdrawals'}
                             </Badge>
                           )}
                           {u.canApplyDiscount === 1 && (

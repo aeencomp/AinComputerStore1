@@ -25,6 +25,7 @@ import {
   RefreshCcw,
   Wallet,
   BarChart3,
+  TrendingDown,
   Loader2,
   PlayCircle,
   StopCircle,
@@ -46,6 +47,7 @@ interface SalesUser {
     canInventory: number;
     canManageUsers: number;
     canViewReports: number;
+    canViewWithdrawals: number;
     canApplyDiscount: number;
   };
 }
@@ -475,6 +477,23 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
                   </div>
                   <span className="text-sm font-medium">
                     {language === 'ar' ? 'التقارير' : 'Reports'}
+                  </span>
+                </Button>
+              </Link>
+            ) : null}
+
+            {user.permissions.canViewWithdrawals === 1 || user.role === 'sales_admin' ? (
+              <Link href="/sales/withdrawals">
+                <Button
+                  variant="outline"
+                  className="w-full h-24 flex-col gap-2 hover:bg-orange-500 hover:text-white transition-colors group"
+                  data-testid="quick-action-withdrawals"
+                >
+                  <div className="h-10 w-10 rounded-full bg-orange-500/10 group-hover:bg-white/20 flex items-center justify-center transition-colors">
+                    <TrendingDown className="h-5 w-5 text-orange-500 group-hover:text-white" />
+                  </div>
+                  <span className="text-sm font-medium">
+                    {language === 'ar' ? 'السحوبات' : 'Withdrawals'}
                   </span>
                 </Button>
               </Link>

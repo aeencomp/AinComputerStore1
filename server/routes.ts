@@ -108,6 +108,16 @@ function isSalesAdminRole(role: string | null | undefined): boolean {
   return String(role ?? "").trim().toLowerCase() === "sales_admin";
 }
 
+async function salesUserCanViewWithdrawals(req: Request): Promise<boolean> {
+  if ((req.session as any).adminId) return true;
+  const salesUserId = (req.session as any).salesUserId as string | undefined;
+  if (!salesUserId) return false;
+  const salesUser = await storage.getSalesUser(salesUserId);
+  if (!salesUser) return false;
+  if (isSalesAdminRole(salesUser.role)) return true;
+  return salesUser.canViewWithdrawals === 1;
+}
+
 /** Cost price (سعر الشراء): sales_admin on sales portal; admin panel when no sales session. */
 async function canViewInStoreCostPrice(req: Request): Promise<boolean> {
   const salesUserId = (req.session as any).salesUserId as string | undefined;
@@ -957,6 +967,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             canPos: salesUser.canPos, canInventory: salesUser.canInventory,
             canInventoryLocation2: salesUser.canInventoryLocation2,
             canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
+            canViewWithdrawals: salesUser.canViewWithdrawals ?? 0,
             canApplyDiscount: salesUser.canApplyDiscount,
             canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
           }
@@ -996,6 +1007,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             canPos: salesUser.canPos, canInventory: salesUser.canInventory,
             canInventoryLocation2: salesUser.canInventoryLocation2,
             canManageUsers: salesUser.canManageUsers, canViewReports: salesUser.canViewReports,
+            canViewWithdrawals: salesUser.canViewWithdrawals ?? 0,
             canApplyDiscount: salesUser.canApplyDiscount,
             canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
           }
@@ -1061,6 +1073,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canInventoryLocation2: salesUser.canInventoryLocation2,
           canManageUsers: salesUser.canManageUsers,
           canViewReports: salesUser.canViewReports,
+          canViewWithdrawals: salesUser.canViewWithdrawals ?? 0,
           canApplyDiscount: salesUser.canApplyDiscount,
           canEditReceipt: (salesUser as any).canEditReceipt ?? 0,
         }
@@ -1261,6 +1274,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canInventoryLocation2: u.canInventoryLocation2,
           canManageUsers: u.canManageUsers,
           canViewReports: u.canViewReports,
+          canViewWithdrawals: u.canViewWithdrawals ?? 0,
           canApplyDiscount: u.canApplyDiscount,
           canEditReceipt: (u as any).canEditReceipt ?? 0,
           isActive: u.isActive,
@@ -1288,7 +1302,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
       }
       
-      const { username, password, name, email, role, canPos, canInventory, canInventoryLocation2, canManageUsers, canViewReports, canApplyDiscount, canEditReceipt, isActive, locationIds } = req.body;
+      const { username, password, name, email, role, canPos, canInventory, canInventoryLocation2, canManageUsers, canViewReports, canViewWithdrawals, canApplyDiscount, canEditReceipt, isActive, locationIds } = req.body;
       
       if (!username || !password || !name) {
         return res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم مطلوبين" });
@@ -1311,6 +1325,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canInventoryLocation2: canInventoryLocation2 ?? 0,
         canManageUsers: canManageUsers ?? 0,
         canViewReports: canViewReports ?? 0,
+        canViewWithdrawals: canViewWithdrawals ?? 0,
         canApplyDiscount: canApplyDiscount ?? 0,
         canEditReceipt: canEditReceipt ?? 0,
         isActive: isActive ?? 1,
@@ -9391,6 +9406,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية عرض السحوبات" });
+      }
 
       const { db } = await import("./db");
       const { cashWithdrawals } = await import("../shared/schema");
@@ -9428,6 +9446,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية إدارة السحوبات" });
+      }
 
       // Do not require an open shift to save a withdrawal. Shift matching was fragile
       // (supervisor vs cashier, session role casing, concurrent shifts) and blocked valid saves.
@@ -9483,6 +9504,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل السحوبات" });
+      }
 
       const recordId = parseInt(req.params.id);
       const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
@@ -9511,6 +9535,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية حذف السحوبات" });
+      }
 
       const recordId = parseInt(req.params.id);
       // Fetch record to get its timestamp

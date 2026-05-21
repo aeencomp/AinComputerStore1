@@ -64,6 +64,7 @@ export const salesUsers = pgTable("sales_users", {
   canInventoryLocation2: integer("can_inventory_location2").notNull().default(0), // Access to Location 2 Inventory
   canManageUsers: integer("can_manage_users").notNull().default(0), // Can create/edit users
   canViewReports: integer("can_view_reports").notNull().default(0), // Access to sales reports
+  canViewWithdrawals: integer("can_view_withdrawals").notNull().default(0), // Access to daily cash withdrawals
   canApplyDiscount: integer("can_apply_discount").notNull().default(0), // Can apply discounts
   canEditReceipt: integer("can_edit_receipt").notNull().default(0), // Can edit receipts after sale
   isActive: integer("is_active").notNull().default(1), // Account status
