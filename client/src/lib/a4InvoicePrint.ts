@@ -331,18 +331,6 @@ export function buildA4InvoiceHtml(
     display: block; margin: 0 auto 4px;
     object-fit: contain;
   }
-  .new-device-warranty {
-    text-align: center;
-    padding: 9px 14px;
-    margin: 0 0 10px;
-    background: linear-gradient(90deg, #e8f1fc 0%, #fff 50%, #e8f1fc 100%);
-    border: 2px solid ${STORE.brandBlue};
-    border-radius: 8px;
-    font-size: 15px;
-    font-weight: 900;
-    color: ${STORE.brandBlue};
-    letter-spacing: 0.2px;
-  }
   .banner-motto {
     margin: 0; font-size: 15px; font-weight: 900; color: #111; white-space: nowrap;
   }
@@ -365,13 +353,26 @@ export function buildA4InvoiceHtml(
   .contacts-strip .dept { color: #555; font-weight: 600; display: block; }
   .contacts-strip .phone { direction: ltr; color: #111; font-weight: 800; }
   .meta-row {
-    display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
-    padding: 12px 4px; font-size: 13px; font-weight: 700;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    padding: 12px 4px;
+    font-size: 13px;
+    font-weight: 700;
   }
   .meta-row .field { margin-bottom: 6px; }
   .meta-row .label { color: #333; }
   .meta-row .value { border-bottom: 1px dotted #999; min-height: 18px; padding: 0 4px; }
-  .meta-left { text-align: start; }
+  .meta-customer { flex: 1; min-width: 0; text-align: start; }
+  .meta-invoice-info {
+    flex-shrink: 0;
+    text-align: left;
+    align-self: flex-start;
+    line-height: 1.65;
+    padding-left: 2px;
+  }
+  .meta-invoice-info > div { white-space: nowrap; }
   table.items {
     width: 100%; border-collapse: collapse; margin: 8px 0 14px;
     font-size: 12px;
@@ -483,14 +484,12 @@ export function buildA4InvoiceHtml(
     <div><span class="dept">الدعم الفني</span><span class="phone">${STORE.supportPhone}</span></div>
   </div>
 
-  <div class="new-device-warranty">ضمان سنة كاملة للأجهزة الجديدة</div>
-
   <section class="meta-row">
-    <div>
+    <div class="meta-customer">
       <div class="field"><span class="label">اسم العميل :</span> <span class="value">${customerName}</span></div>
       <div class="field"><span class="label">العنوان :</span> <span class="value">${customerAddress}</span></div>
     </div>
-    <div class="meta-left">
+    <div class="meta-invoice-info">
       <div><span class="label">نوع الفاتورة :</span> ${payType}</div>
       <div><span class="label">التاريخ :</span> ${dateStr}</div>
     </div>
