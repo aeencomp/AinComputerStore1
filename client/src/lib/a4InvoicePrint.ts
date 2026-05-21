@@ -2,7 +2,8 @@
 
 import storeLogoSrc from "@assets/aeen-receipt-logo.png";
 
-export const STORE_WEBSITE = "Http://Aeen-Iq.com";
+export const STORE_WEBSITE = "https://Aeen-Iq.com";
+export const STORE_BRAND_RED = "#c83233";
 
 export interface A4InvoiceItem {
   nameAr?: string;
@@ -44,8 +45,7 @@ const STORE = {
   assemblyPhone: "07750008466",
   supportPhone: "07850008466",
   website: STORE_WEBSITE,
-  brandBlue: "#1565c0",
-  brandRed: "#c41e3a",
+  brandRed: STORE_BRAND_RED,
 };
 
 function getReceiptTerms(): string[] {
@@ -290,12 +290,12 @@ export function buildA4InvoiceHtml(
   .page { position: relative; min-height: 277mm; padding: 4mm 2mm 14mm; }
   .watermark {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 120px; font-weight: 900; color: rgba(196, 30, 58, 0.04);
+    font-size: 120px; font-weight: 900; color: rgba(200, 50, 51, 0.05);
     pointer-events: none; user-select: none; letter-spacing: 8px;
   }
   .top-accent {
     height: 4px; border-radius: 2px;
-    background: linear-gradient(90deg, ${STORE.brandRed} 0%, #e85d75 40%, ${STORE.brandBlue} 100%);
+    background: linear-gradient(90deg, ${STORE.brandRed} 0%, #ef5350 55%, #b71c1c 100%);
     margin-bottom: 0;
   }
   .banner-header {
@@ -315,7 +315,7 @@ export function buildA4InvoiceHtml(
     margin: 4px 0 0; font-size: 11px; font-weight: 700; color: #444; line-height: 1.45;
   }
   .banner-store .store-website {
-    margin: 4px 0 0; font-size: 11px; font-weight: 800; color: ${STORE.brandBlue};
+    margin: 4px 0 0; font-size: 11px; font-weight: 800; color: ${STORE.brandRed};
     direction: ltr; unicode-bidi: embed; letter-spacing: 0.2px;
   }
   .banner-center {
@@ -327,7 +327,7 @@ export function buildA4InvoiceHtml(
     justify-content: center;
   }
   .store-logo-img {
-    width: 150px; height: auto; max-height: 88px;
+    width: 160px; height: auto; max-height: 96px;
     display: block; margin: 0 auto 4px;
     object-fit: contain;
   }
@@ -337,8 +337,8 @@ export function buildA4InvoiceHtml(
   .banner-qr { justify-self: end; text-align: center; direction: ltr; }
   .banner-qr img {
     width: 92px; height: 92px; display: block; margin: 0 auto;
-    border: 2px solid ${STORE.brandBlue}; border-radius: 6px; padding: 4px; background: #fff;
-    box-shadow: 0 2px 8px rgba(21, 101, 192, 0.12);
+    border: 2px solid ${STORE.brandRed}; border-radius: 6px; padding: 4px; background: #fff;
+    box-shadow: 0 2px 8px rgba(200, 50, 51, 0.18);
   }
   .banner-invoice-no {
     margin-top: 6px; font-size: 14px; font-weight: 800; color: ${STORE.brandRed};
@@ -378,7 +378,7 @@ export function buildA4InvoiceHtml(
     font-size: 12px;
   }
   table.items thead th {
-    background: linear-gradient(180deg, #c41e3a 0%, #a81830 100%);
+    background: linear-gradient(180deg, ${STORE.brandRed} 0%, #9b1c1c 100%);
     color: #fff; font-weight: 800; padding: 8px 6px;
     border: 1px solid #8f1528; text-align: center;
   }
@@ -411,21 +411,21 @@ export function buildA4InvoiceHtml(
     background: linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%);
     font-size: 14px;
   }
-  .total-row.net .val { color: #c41e3a; background: #fff; border-color: #c41e3a; font-size: 16px; }
+  .total-row.net .val { color: ${STORE.brandRed}; background: #fff; border-color: ${STORE.brandRed}; font-size: 16px; }
   .footer {
     border-top: 2px solid #222; padding-top: 12px;
     display: grid; grid-template-columns: 1fr auto 140px; gap: 16px; align-items: start;
   }
   .terms { font-size: 9.5px; line-height: 1.55; color: #222; list-style: none; padding: 0; margin: 0; }
   .terms li { margin-bottom: 3px; }
-  .terms .term-num { color: #c41e3a; font-weight: 800; margin-left: 4px; }
+  .terms .term-num { color: ${STORE.brandRed}; font-weight: 800; margin-left: 4px; }
   .footer-mid { min-height: 0; }
   .barcode-wrap { text-align: center; }
   .barcode-wrap svg { max-width: 120px; height: auto; transform: rotate(90deg); margin: 8px auto; display: block; }
-  .barcode-id { font-family: monospace; font-weight: 900; font-size: 13px; direction: ltr; color: #c41e3a; }
+  .barcode-id { font-family: monospace; font-weight: 900; font-size: 13px; direction: ltr; color: ${STORE.brandRed}; }
   .disclaimer { font-size: 10px; color: #555; margin-top: 8px; font-weight: 600; }
   .footer-website {
-    font-size: 11px; font-weight: 800; color: ${STORE.brandBlue};
+    font-size: 11px; font-weight: 800; color: ${STORE.brandRed};
     margin-top: 6px; direction: ltr; unicode-bidi: embed;
   }
   .footer-sign-row {
@@ -593,7 +593,7 @@ export async function renderInvoiceQrDataUrl(
     {
       width: 200,
       margin: 1,
-      color: { dark: STORE.brandBlue, light: "#ffffff" },
+      color: { dark: STORE.brandRed, light: "#ffffff" },
     },
   );
 }

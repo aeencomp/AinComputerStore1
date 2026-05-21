@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { playBarcodeScanBeep } from "@/lib/scanBeep";
-import { openA4InvoicePrint, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
+import { openA4InvoicePrint, STORE_BRAND_RED, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -905,7 +905,7 @@ export default function SalesPOS({
     <div style="font-weight:800;font-size:13px;">\u0634\u0643\u0631\u0627\u064b \u0644\u062a\u0633\u0648\u0642\u0643\u0645 \u0645\u0639\u0646\u0627</div>
     <div style="font-size:10px;font-weight:700;margin-top:4px;">\u064a\u0631\u062c\u0649 \u0627\u0644\u0627\u062d\u062a\u0641\u0627\u0638 \u0628\u0627\u0644\u0648\u0635\u0644 \u0644\u063a\u0631\u0636 \u0627\u0644\u0636\u0645\u0627\u0646</div>
     <div style="font-weight:900;font-size:14px;margin-top:6px;" dir="ltr">07850006977</div>
-    <div style="font-size:11px;font-weight:800;margin-top:6px;color:#1565c0;direction:ltr;">${STORE_WEBSITE}</div>
+    <div style="font-size:11px;font-weight:800;margin-top:6px;color:${STORE_BRAND_RED};direction:ltr;">${STORE_WEBSITE}</div>
   </div>
 
   <script>
