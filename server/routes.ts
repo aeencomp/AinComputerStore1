@@ -1205,6 +1205,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/sales/transfers/batch", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+
+      const salesUser = await storage.getSalesUser(salesUserId);
+      if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
+
+      if (salesUser.role !== "sales_admin" && !salesUser.canInventory) {
+        return res.status(403).json({ error: "ليس لديك صلاحية نقل المخزون" });
+      }
+
+      const {
+        items,
+        notes,
+        fromLocationId = LOCATION_MAIN_ID,
+        toLocationId = LOCATION_SHOP2_ID,
+      } = req.body;
+
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ error: "أضف صنفاً واحداً على الأقل للنقل" });
+      }
+
+      const fromLoc = parseInt(String(fromLocationId), 10);
+      const toLoc = parseInt(String(toLocationId), 10);
+      const transferIds: number[] = [];
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        const productSource = item?.productSource;
+        const productId = item?.productId;
+        const quantity = parseInt(String(item?.quantity ?? 1), 10);
+        if (!productSource || !productId) {
+          return res.status(400).json({ error: `صنف غير صالح في السطر ${i + 1}` });
+        }
+        const result = await executeStockTransfer({
+          fromLocationId: fromLoc,
+          toLocationId: toLoc,
+          productSource,
+          productId: String(productId),
+          quantity: quantity > 0 ? quantity : 1,
+          notes: i === 0 ? notes : null,
+          createdBy: salesUserId,
+          createdByName: salesUser.name,
+        });
+        transferIds.push(result.transferId);
+      }
+
+      return res.json({ success: true, count: items.length, transferIds });
+    } catch (error: any) {
+      console.error("Error batch transferring stock:", error);
+      return res.status(400).json({ error: error.message || "فشل نقل المخزون" });
+    }
+  });
+
   app.get("/api/sales/inventory/search-loc1", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;

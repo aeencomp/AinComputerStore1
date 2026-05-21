@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { ArrowRightLeft, Loader2, Search, Plus, Trash2 } from "lucide-react";
+import { ArrowRightLeft, Loader2, Search, Plus, Trash2, ShoppingCart } from "lucide-react";
 
 interface SearchHit {
   productSource: "instore" | "laptop" | "desktop";
@@ -38,8 +38,7 @@ export default function SalesTransferStock() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
-  const [selected, setSelected] = useState<SearchHit | null>(null);
-  const [quantity, setQuantity] = useState("1");
+  const [draftQty, setDraftQty] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<TransferLine[]>([]);
 
@@ -64,79 +63,89 @@ export default function SalesTransferStock() {
       if (search.trim().length < 2) return [];
       const res = await fetch(
         `/api/sales/inventory/search-loc1?q=${encodeURIComponent(search.trim())}`,
-        { credentials: "include" },
+        { credentials: "include",
+        },
       );
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      return (data as SearchHit[]).map((r) => ({
-        ...r,
-        stockQuantity: Number(r.stockQuantity) || 0,
-      })).filter((r) => r.stockQuantity > 0);
+      return (data as SearchHit[])
+        .map((r) => ({
+          ...r,
+          stockQuantity: Number(r.stockQuantity) || 0,
+        }))
+        .filter((r) => r.stockQuantity > 0);
     },
     enabled: search.trim().length >= 2,
   });
 
-  const transferMutation = useMutation({
-    mutationFn: async (payload: {
-      lines: TransferLine[];
-      notes: string;
-    }) => {
-      for (const line of payload.lines) {
-        const qty = parseQty(line.quantity, line.hit.stockQuantity);
-        await apiRequest("POST", "/api/sales/transfers", {
+  const transferBatchMutation = useMutation({
+    mutationFn: async (payload: { lines: TransferLine[]; notes: string }) => {
+      const res = await apiRequest("POST", "/api/sales/transfers/batch", {
+        fromLocationId: 1,
+        toLocationId: 2,
+        notes: payload.notes.trim() || null,
+        items: payload.lines.map((line) => ({
           productSource: line.hit.productSource,
           productId: line.hit.productId,
-          quantity: qty,
-          notes: payload.notes.trim() || null,
-          fromLocationId: 1,
-          toLocationId: 2,
-        });
-      }
+          quantity: parseQty(line.quantity, line.hit.stockQuantity),
+        })),
+      });
+      return res.json();
     },
     onSuccess: (_data, variables) => {
       toast({
         title: language === "ar" ? "تم النقل بنجاح" : "Transfer completed",
         description:
           language === "ar"
-            ? `تم نقل ${variables.lines.length} صنف`
-            : `${variables.lines.length} item(s) transferred`,
+            ? `تم نقل ${variables.lines.length} صنف دفعة واحدة`
+            : `${variables.lines.length} item(s) transferred in one go`,
       });
-      setSelected(null);
-      setSearch("");
-      setQuantity("1");
-      setNotes("");
       setLines([]);
+      setDraftQty({});
       invalidateTransferStockQueries();
     },
     onError: (e: Error) => {
-      toast({ title: e.message, variant: "destructive" });
+      const msg = e.message?.replace(/^\d+:\s*/, "") || e.message;
+      toast({ title: msg, variant: "destructive" });
     },
   });
 
-  const selectedAvailable = selected ? Number(selected.stockQuantity) || 0 : 0;
+  const getDraftQty = (hit: SearchHit) => draftQty[lineKey(hit)] ?? "1";
 
-  const addLineToList = () => {
-    if (!selected || selectedAvailable < 1) return;
-    const qty = parseQty(quantity, selectedAvailable);
-    const key = lineKey(selected);
+  const setHitDraftQty = (hit: SearchHit, value: string) => {
+    const key = lineKey(hit);
+    const max = hit.stockQuantity;
+    if (value === "") {
+      setDraftQty((prev) => ({ ...prev, [key]: "" }));
+      return;
+    }
+    const n = parseInt(value, 10);
+    if (!Number.isFinite(n)) return;
+    setDraftQty((prev) => ({
+      ...prev,
+      [key]: String(Math.max(1, Math.min(n, max))),
+    }));
+  };
+
+  const addHitToCart = (hit: SearchHit) => {
+    const qty = parseQty(getDraftQty(hit), hit.stockQuantity);
+    const key = lineKey(hit);
     setLines((prev) => {
       const existing = prev.find((l) => l.key === key);
       if (existing) {
         const merged = Math.min(
-          parseQty(String(parseInt(existing.quantity, 10) + qty), selectedAvailable),
-          selectedAvailable,
+          parseQty(String(parseInt(existing.quantity, 10) + qty), hit.stockQuantity),
+          hit.stockQuantity,
         );
         return prev.map((l) =>
           l.key === key ? { ...l, quantity: String(merged) } : l,
         );
       }
-      return [...prev, { key, hit: selected, quantity: String(qty) }];
+      return [...prev, { key, hit, quantity: String(qty) }];
     });
-    setSelected(null);
-    setSearch("");
-    setQuantity("1");
     toast({
-      title: language === "ar" ? "تمت الإضافة للقائمة" : "Added to list",
+      title: language === "ar" ? "تمت الإضافة" : "Added",
+      description: hit.label,
     });
   };
 
@@ -157,32 +166,28 @@ export default function SalesTransferStock() {
     setLines((prev) => prev.filter((l) => l.key !== key));
   };
 
-  const transferSingle = () => {
-    if (!selected) return;
-    const qty = parseQty(quantity, selectedAvailable);
-    transferMutation.mutate({
-      lines: [{ key: lineKey(selected), hit: selected, quantity: String(qty) }],
-      notes,
-    });
+  const clearCart = () => {
+    setLines([]);
+    toast({ title: language === "ar" ? "تم تفريغ القائمة" : "Cart cleared" });
   };
 
-  const transferAllLines = () => {
-    if (lines.length === 0) return;
-    transferMutation.mutate({ lines, notes });
-  };
+  const totalUnits = lines.reduce(
+    (sum, l) => sum + parseQty(l.quantity, l.hit.stockQuantity),
+    0,
+  );
 
   return (
-    <div className="space-y-6 max-w-2xl mx-auto">
+    <div className="space-y-4 max-w-3xl mx-auto pb-28">
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
+        <CardHeader className="pb-3">
+          <CardTitle className="flex items-center gap-2 text-lg">
             <ArrowRightLeft className="h-5 w-5" />
             {language === "ar" ? "نقل مخزون إلى الموقع 2" : "Transfer stock to Location 2"}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             {language === "ar"
-              ? "ابحث في مخزون الموقع 1، حدد الكمية لكل صنف، ثم انقل"
-              : "Search Location 1 stock, set quantity per item, then transfer"}
+              ? "ابحث وأضف عدة أصناف للقائمة، ثم انقلها كلها بضغطة واحدة"
+              : "Search, add multiple items to the cart, then transfer all with one click"}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -193,11 +198,8 @@ export default function SalesTransferStock() {
               <Input
                 className="ps-9"
                 value={search}
-                onChange={(e) => {
-                  setSearch(e.target.value);
-                  setSelected(null);
-                }}
-                placeholder={language === "ar" ? "ابحث..." : "Search..."}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder={language === "ar" ? "ابحث وأضف أصنافاً..." : "Search and add items..."}
                 data-testid="input-transfer-search"
               />
             </div>
@@ -206,156 +208,161 @@ export default function SalesTransferStock() {
                 <Loader2 className="inline h-3 w-3 animate-spin" />
               </p>
             )}
-            {results.length > 0 && !selected && (
-              <ul className="mt-2 border rounded-md divide-y max-h-48 overflow-y-auto">
-                {results.map((r) => (
-                  <li key={lineKey(r)}>
-                    <button
-                      type="button"
-                      className="w-full text-start px-3 py-2 hover:bg-muted text-sm"
-                      onClick={() => {
-                        setSelected(r);
-                        setQuantity("1");
-                      }}
-                    >
-                      <span className="font-medium">{r.label}</span>
-                      <span className="text-muted-foreground ms-2">
-                        ({language === "ar" ? "متوفر" : "avail"}: {r.stockQuantity})
-                      </span>
-                    </button>
-                  </li>
-                ))}
-              </ul>
+            {search.trim().length >= 2 && !isFetching && results.length === 0 && (
+              <p className="text-xs text-muted-foreground mt-2">
+                {language === "ar" ? "لا توجد نتائج" : "No results"}
+              </p>
             )}
-          </div>
-
-          {selected && (
-            <div className="space-y-4 p-3 border rounded-md bg-muted/30">
-              <div className="text-sm">
-                <strong>{selected.label}</strong>
-                <span className="text-muted-foreground block">
-                  {selected.productSource} ·{" "}
-                  {language === "ar" ? "متوفر في الموقع 1" : "Available at Location 1"}:{" "}
-                  <span className="font-bold text-foreground">{selectedAvailable}</span>
-                </span>
-              </div>
-              <div>
-                <Label>
-                  {language === "ar" ? "الكمية المراد نقلها" : "Quantity to transfer"}
-                </Label>
-                <Input
-                  type="number"
-                  min={1}
-                  max={selectedAvailable}
-                  value={quantity}
-                  onChange={(e) => setQuantity(e.target.value)}
-                  data-testid="input-transfer-quantity"
-                  className="mt-1"
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  {language === "ar"
-                    ? `أقصى كمية: ${selectedAvailable}`
-                    : `Maximum: ${selectedAvailable}`}
-                </p>
-              </div>
-              <div className="flex flex-col sm:flex-row gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 gap-2"
-                  onClick={addLineToList}
-                  disabled={selectedAvailable < 1}
-                  data-testid="button-add-transfer-line"
-                >
-                  <Plus className="h-4 w-4" />
-                  {language === "ar" ? "إضافة للقائمة" : "Add to list"}
-                </Button>
-                <Button
-                  type="button"
-                  className="flex-1"
-                  onClick={transferSingle}
-                  disabled={transferMutation.isPending || selectedAvailable < 1}
-                  data-testid="button-confirm-transfer"
-                >
-                  {transferMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : language === "ar" ? (
-                    "نقل الآن"
-                  ) : (
-                    "Transfer now"
-                  )}
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {lines.length > 0 && (
-            <div className="space-y-3">
-              <Label>
-                {language === "ar" ? "قائمة النقل" : "Transfer list"} ({lines.length})
-              </Label>
-              <ul className="border rounded-md divide-y">
-                {lines.map((line) => {
-                  const max = Number(line.hit.stockQuantity) || 0;
+            {results.length > 0 && (
+              <ul className="mt-2 border rounded-md divide-y max-h-64 overflow-y-auto">
+                {results.map((r) => {
+                  const inCart = lines.some((l) => l.key === lineKey(r));
                   return (
                     <li
-                      key={line.key}
-                      className="px-3 py-2 flex flex-wrap items-center gap-2 text-sm"
+                      key={lineKey(r)}
+                      className="px-3 py-2 flex flex-wrap items-center gap-2 text-sm bg-background"
                     >
-                      <span className="flex-1 min-w-[140px] font-medium">{line.hit.label}</span>
-                      <div className="flex items-center gap-2">
-                        <Label className="text-xs whitespace-nowrap">
-                          {language === "ar" ? "الكمية" : "Qty"}
-                        </Label>
+                      <div className="flex-1 min-w-[160px]">
+                        <span className="font-medium block">{r.label}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {language === "ar" ? "متوفر" : "Avail"}: {r.stockQuantity}
+                          {inCart && (
+                            <span className="text-primary ms-2">
+                              · {language === "ar" ? "في القائمة" : "In cart"}
+                            </span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-1">
                         <Input
                           type="number"
                           min={1}
-                          max={max}
-                          className="w-20 h-8"
-                          value={line.quantity}
-                          onChange={(e) => updateLineQty(line.key, e.target.value)}
-                          data-testid={`input-transfer-line-qty-${line.key}`}
+                          max={r.stockQuantity}
+                          className="w-16 h-8 text-center"
+                          value={getDraftQty(r)}
+                          onChange={(e) => setHitDraftQty(r, e.target.value)}
+                          data-testid={`input-draft-qty-${lineKey(r)}`}
                         />
-                        <span className="text-xs text-muted-foreground">/ {max}</span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={inCart ? "secondary" : "default"}
+                          className="h-8 gap-1"
+                          onClick={() => addHitToCart(r)}
+                          data-testid={`button-add-cart-${lineKey(r)}`}
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          {language === "ar" ? "إضافة" : "Add"}
+                        </Button>
                       </div>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 text-destructive"
-                        onClick={() => removeLine(line.key)}
-                        aria-label={language === "ar" ? "حذف" : "Remove"}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
                     </li>
                   );
                 })}
               </ul>
-            </div>
-          )}
+            )}
+          </div>
 
           <div>
             <Label>{language === "ar" ? "ملاحظات (اختياري)" : "Notes (optional)"}</Label>
             <Input value={notes} onChange={(e) => setNotes(e.target.value)} className="mt-1" />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Transfer cart — always visible */}
+      <Card className="border-primary/30 shadow-md">
+        <CardHeader className="pb-2">
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <ShoppingCart className="h-5 w-5 text-primary" />
+              {language === "ar" ? "قائمة النقل" : "Transfer cart"}
+              <span className="text-sm font-normal text-muted-foreground">
+                ({lines.length} {language === "ar" ? "صنف" : "items"})
+              </span>
+            </CardTitle>
+            {lines.length > 0 && (
+              <Button type="button" variant="ghost" size="sm" onClick={clearCart}>
+                {language === "ar" ? "تفريغ" : "Clear"}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {lines.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              {language === "ar"
+                ? "ابحث عن المنتجات واضغط «إضافة» لكل صنف. عند الانتهاء اضغط نقل الكل."
+                : "Search products and tap Add for each item. When done, press Transfer all."}
+            </p>
+          ) : (
+            <ul className="border rounded-md divide-y max-h-56 overflow-y-auto">
+              {lines.map((line) => {
+                const max = Number(line.hit.stockQuantity) || 0;
+                return (
+                  <li
+                    key={line.key}
+                    className="px-3 py-2 flex flex-wrap items-center gap-2 text-sm"
+                  >
+                    <span className="flex-1 min-w-[140px] font-medium">{line.hit.label}</span>
+                    <div className="flex items-center gap-2">
+                      <Label className="text-xs whitespace-nowrap">
+                        {language === "ar" ? "الكمية" : "Qty"}
+                      </Label>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={max}
+                        className="w-20 h-8"
+                        value={line.quantity}
+                        onChange={(e) => updateLineQty(line.key, e.target.value)}
+                        data-testid={`input-transfer-line-qty-${line.key}`}
+                      />
+                      <span className="text-xs text-muted-foreground">/ {max}</span>
+                    </div>
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-destructive shrink-0"
+                      onClick={() => removeLine(line.key)}
+                      aria-label={language === "ar" ? "حذف" : "Remove"}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
 
           {lines.length > 0 && (
-            <Button
-              className="w-full"
-              onClick={transferAllLines}
-              disabled={transferMutation.isPending}
-              data-testid="button-transfer-all-lines"
-            >
-              {transferMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : language === "ar" ? (
-                `نقل ${lines.length} صنف إلى الموقع 2`
-              ) : (
-                `Transfer ${lines.length} item(s) to Location 2`
-              )}
-            </Button>
+            <p className="text-xs text-muted-foreground text-center">
+              {language === "ar"
+                ? `إجمالي الوحدات المراد نقلها: ${totalUnits}`
+                : `Total units to transfer: ${totalUnits}`}
+            </p>
           )}
+
+          <Button
+            className="w-full h-12 text-base font-bold"
+            size="lg"
+            onClick={() => transferBatchMutation.mutate({ lines, notes })}
+            disabled={lines.length === 0 || transferBatchMutation.isPending}
+            data-testid="button-transfer-all-lines"
+          >
+            {transferBatchMutation.isPending ? (
+              <>
+                <Loader2 className="h-5 w-5 animate-spin me-2" />
+                {language === "ar" ? "جاري النقل..." : "Transferring..."}
+              </>
+            ) : lines.length === 0 ? (
+              language === "ar" ? "أضف أصنافاً للقائمة أولاً" : "Add items to cart first"
+            ) : language === "ar" ? (
+              `نقل الكل (${lines.length} صنف) إلى الموقع 2`
+            ) : (
+              `Transfer all (${lines.length} items) to Location 2`
+            )}
+          </Button>
         </CardContent>
       </Card>
     </div>
