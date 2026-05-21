@@ -410,9 +410,9 @@ export default function BatteryManage() {
       const res = await apiRequest('DELETE', `/api/battery/batteries/${id}`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/battery/batteries/low-stock'] });
       toast({ title: language === 'ar' ? 'تم حذف البطارية' : 'Battery deleted' });
       setDeleteConfirm(null);
     },
@@ -625,9 +625,9 @@ export default function BatteryManage() {
       const res = await apiRequest('DELETE', `/api/battery/laptops/${id}`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops/low-stock'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/battery/laptops/low-stock'] });
       toast({ title: language === 'ar' ? 'تم حذف اللابتوب' : 'Laptop deleted' });
       setLaptopDeleteConfirm(null);
     },
@@ -694,9 +694,9 @@ export default function BatteryManage() {
       const res = await apiRequest('DELETE', `/api/battery/desktops/${id}`);
       return res.json();
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops/low-stock'] });
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops'] });
+      await queryClient.invalidateQueries({ queryKey: ['/api/battery/desktops/low-stock'] });
       toast({ title: language === 'ar' ? 'تم حذف الديسكتوب' : 'Desktop deleted' });
       setDesktopDeleteConfirm(null);
     },
@@ -3355,8 +3355,70 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
         </Tabs>
       </main>
 
+      {/* Laptop Delete Confirmation Dialog */}
+      <Dialog open={!!laptopDeleteConfirm} onOpenChange={(open) => { if (!open) setLaptopDeleteConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}
+            </DialogTitle>
+          </DialogHeader>
+          <p>
+            {language === 'ar'
+              ? 'هل أنت متأكد من حذف هذا اللابتوب؟'
+              : 'Are you sure you want to delete this laptop?'
+            }
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLaptopDeleteConfirm(null)} data-testid="button-cancel-delete-laptop">
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => laptopDeleteConfirm && deleteLaptopMutation.mutate(laptopDeleteConfirm)}
+              disabled={deleteLaptopMutation.isPending}
+              data-testid="button-confirm-delete-laptop"
+            >
+              {deleteLaptopMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+              {language === 'ar' ? 'حذف' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Desktop Delete Confirmation Dialog */}
+      <Dialog open={!!desktopDeleteConfirm} onOpenChange={(open) => { if (!open) setDesktopDeleteConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'ar' ? 'تأكيد الحذف' : 'Confirm Delete'}
+            </DialogTitle>
+          </DialogHeader>
+          <p>
+            {language === 'ar'
+              ? 'هل أنت متأكد من حذف هذا الديسكتوب؟'
+              : 'Are you sure you want to delete this desktop?'
+            }
+          </p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDesktopDeleteConfirm(null)} data-testid="button-cancel-delete-desktop">
+              {language === 'ar' ? 'إلغاء' : 'Cancel'}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => desktopDeleteConfirm && deleteDesktopMutation.mutate(desktopDeleteConfirm)}
+              disabled={deleteDesktopMutation.isPending}
+              data-testid="button-confirm-delete-desktop"
+            >
+              {deleteDesktopMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+              {language === 'ar' ? 'حذف' : 'Delete'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Battery Delete Confirmation Dialog */}
-      <Dialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>
+      <Dialog open={!!deleteConfirm} onOpenChange={(open) => { if (!open) setDeleteConfirm(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -3387,7 +3449,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       </Dialog>
 
       {/* Adapter Delete Confirmation Dialog */}
-      <Dialog open={!!adapterDeleteConfirm} onOpenChange={() => setAdapterDeleteConfirm(null)}>
+      <Dialog open={!!adapterDeleteConfirm} onOpenChange={(open) => { if (!open) setAdapterDeleteConfirm(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -3418,7 +3480,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       </Dialog>
 
       {/* Keyboard Delete Confirmation Dialog */}
-      <Dialog open={!!keyboardDeleteConfirm} onOpenChange={() => setKeyboardDeleteConfirm(null)}>
+      <Dialog open={!!keyboardDeleteConfirm} onOpenChange={(open) => { if (!open) setKeyboardDeleteConfirm(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
@@ -3449,7 +3511,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       </Dialog>
 
       {/* LCD Delete Confirmation Dialog */}
-      <Dialog open={!!lcdDeleteConfirm} onOpenChange={() => setLcdDeleteConfirm(null)}>
+      <Dialog open={!!lcdDeleteConfirm} onOpenChange={(open) => { if (!open) setLcdDeleteConfirm(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
