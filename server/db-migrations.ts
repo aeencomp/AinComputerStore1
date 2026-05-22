@@ -45,9 +45,12 @@ const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE sales_users ADD COLUMN IF NOT EXISTS can_inventory_location2 INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE sales_users ADD COLUMN IF NOT EXISTS can_edit_receipt INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE sales_users ADD COLUMN IF NOT EXISTS can_view_withdrawals INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE sales_users ADD COLUMN IF NOT EXISTS can_transfer_to_loc1 INTEGER NOT NULL DEFAULT 0`,
   `UPDATE sales_users SET can_edit_receipt = 1 WHERE role = 'sales_admin' AND can_edit_receipt = 0`,
   `UPDATE sales_users SET can_view_withdrawals = 1 WHERE role = 'sales_admin' AND can_view_withdrawals = 0`,
   `UPDATE sales_users SET can_view_withdrawals = 1 WHERE can_pos = 1 AND can_view_withdrawals = 0`,
+  `UPDATE sales_users SET can_transfer_to_loc1 = 1 WHERE role = 'sales_admin' AND can_transfer_to_loc1 = 0`,
+  `UPDATE sales_users SET can_transfer_to_loc1 = 1 WHERE can_inventory_location2 = 1 AND can_transfer_to_loc1 = 0`,
 
   `UPDATE in_store_products SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
   `UPDATE laptops SET sales_location_id = 1 WHERE sales_location_id IS NULL`,

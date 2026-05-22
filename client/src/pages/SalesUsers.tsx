@@ -24,6 +24,7 @@ import {
   Percent,
   Receipt,
   TrendingDown,
+  ArrowRightLeft,
 } from "lucide-react";
 
 interface SalesUser {
@@ -38,6 +39,7 @@ interface SalesUser {
   canManageUsers: number;
   canViewReports: number;
   canViewWithdrawals: number;
+  canTransferToLoc1: number;
   canApplyDiscount: number;
   canEditReceipt: number;
   isActive: number;
@@ -74,6 +76,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
     canManageUsers: 0,
     canViewReports: 0,
     canViewWithdrawals: 0,
+    canTransferToLoc1: 0,
     canApplyDiscount: 0,
     canEditReceipt: 0,
     isActive: 1,
@@ -165,6 +168,7 @@ export default function SalesUsers({ user }: SalesUsersProps) {
       canManageUsers: u.canManageUsers,
       canViewReports: u.canViewReports,
       canViewWithdrawals: u.canViewWithdrawals ?? 0,
+      canTransferToLoc1: u.canTransferToLoc1 ?? 0,
       canApplyDiscount: u.canApplyDiscount,
       canEditReceipt: u.canEditReceipt,
       isActive: u.isActive,
@@ -398,6 +402,17 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                       data-testid="switch-can-view-withdrawals"
                     />
                   </div>
+                  <div className="flex items-center justify-between p-2 border rounded">
+                    <div className="flex items-center gap-2">
+                      <ArrowRightLeft className="h-4 w-4" />
+                      <span className="text-sm">{language === 'ar' ? 'نقل من الموقع 2 إلى 1' : 'Transfer Loc 2 → Loc 1'}</span>
+                    </div>
+                    <Switch
+                      checked={formData.canTransferToLoc1 === 1}
+                      onCheckedChange={(v) => setFormData(prev => ({ ...prev, canTransferToLoc1: v ? 1 : 0 }))}
+                      data-testid="switch-can-transfer-to-loc1"
+                    />
+                  </div>
                   <div className="flex items-center justify-between p-2 border rounded col-span-2">
                     <div className="flex items-center gap-2">
                       <Percent className="h-4 w-4" />
@@ -519,6 +534,12 @@ export default function SalesUsers({ user }: SalesUsersProps) {
                             <Badge variant="outline" className="text-xs">
                               <TrendingDown className="h-3 w-3 me-1" />
                               {language === 'ar' ? 'سحوبات' : 'Withdrawals'}
+                            </Badge>
+                          )}
+                          {(u.canTransferToLoc1 ?? 0) === 1 && (
+                            <Badge variant="outline" className="text-xs">
+                              <ArrowRightLeft className="h-3 w-3 me-1" />
+                              {language === 'ar' ? 'نقل 2→1' : 'Xfer 2→1'}
                             </Badge>
                           )}
                           {u.canApplyDiscount === 1 && (

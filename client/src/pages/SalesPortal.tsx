@@ -25,7 +25,8 @@ import {
   ChevronDown,
   Languages,
   FileText,
-  TrendingDown
+  TrendingDown,
+  ArrowRightLeft,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import {
@@ -68,6 +69,7 @@ interface SalesUser {
     canManageUsers: number;
     canViewReports: number;
     canViewWithdrawals: number;
+    canTransferToLoc1: number;
     canApplyDiscount: number;
     canEditReceipt?: number;
   };
@@ -234,9 +236,18 @@ export default function SalesPortal() {
       {
         path: "/sales/transfer-stock",
         label: language === 'ar' ? 'نقل إلى الموقع 2' : 'Transfer to Loc 2',
-        icon: Package,
-        permission: currentUser.permissions.canInventory || currentUser.role === 'sales_admin',
+        icon: ArrowRightLeft,
+        permission: currentUser.permissions.canInventory === 1 || currentUser.role === 'sales_admin',
         color: 'text-amber-500',
+      },
+    ] : []),
+    ...(canUseLoc2 ? [
+      {
+        path: "/sales/transfer-to-loc1",
+        label: language === 'ar' ? 'نقل إلى الموقع 1' : 'Transfer to Loc 1',
+        icon: ArrowRightLeft,
+        permission: currentUser.permissions.canTransferToLoc1 === 1 || currentUser.role === 'sales_admin',
+        color: 'text-teal-500',
       },
     ] : []),
     {
@@ -312,6 +323,7 @@ export default function SalesPortal() {
         "/sales/inventory-loc1",
         "/sales/inventory-loc2",
         "/sales/transfer-stock",
+        "/sales/transfer-to-loc1",
         "/sales/inventory",
       ].includes(item.path)),
     },
@@ -620,7 +632,12 @@ export default function SalesPortal() {
             readOnly={!(currentUser.permissions.canInventoryLocation2 || currentUser.role === 'sales_admin')}
           />
         )}
-        {location === "/sales/transfer-stock" && <SalesTransferStock />}
+        {location === "/sales/transfer-stock" && (
+          <SalesTransferStock direction="1-to-2" user={currentUser} />
+        )}
+        {location === "/sales/transfer-to-loc1" && (
+          <SalesTransferStock direction="2-to-1" user={currentUser} />
+        )}
         {location === "/sales/instore-inventory" && (
           <SalesInStoreInventory user={currentUser} salesLocationId={1} />
         )}

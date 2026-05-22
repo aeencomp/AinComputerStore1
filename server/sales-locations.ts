@@ -93,6 +93,115 @@ export async function setUserLocationAssignments(
 
 export type TransferProductSource = "instore" | "laptop" | "desktop";
 
+export type TransferInventoryHit = {
+  productSource: TransferProductSource;
+  productId: string;
+  label: string;
+  stockQuantity: number;
+  barcode?: string | null;
+};
+
+function isSalesAdminRole(role: string | null | undefined): boolean {
+  return String(role ?? "").trim().toLowerCase() === "sales_admin";
+}
+
+export function canSearchInventoryForTransfer(
+  role: string,
+  locationId: number,
+  perms: { canInventory?: number; canTransferToLoc1?: number },
+): boolean {
+  if (isSalesAdminRole(role)) return true;
+  if (locationId === LOCATION_MAIN_ID) return perms.canInventory === 1;
+  if (locationId === LOCATION_SHOP2_ID) return perms.canTransferToLoc1 === 1;
+  return false;
+}
+
+export function canTransferStockBetween(
+  role: string,
+  fromLocationId: number,
+  toLocationId: number,
+  perms: {
+    canInventory?: number;
+    canTransferToLoc1?: number;
+  },
+): boolean {
+  if (isSalesAdminRole(role)) return true;
+  if (fromLocationId === LOCATION_MAIN_ID && toLocationId === LOCATION_SHOP2_ID) {
+    return perms.canInventory === 1;
+  }
+  if (fromLocationId === LOCATION_SHOP2_ID && toLocationId === LOCATION_MAIN_ID) {
+    return perms.canTransferToLoc1 === 1;
+  }
+  return false;
+}
+
+export async function searchInventoryAtLocation(
+  locationId: number,
+  q: string,
+): Promise<TransferInventoryHit[]> {
+  const query = q.trim().toLowerCase();
+  if (!query) return [];
+
+  const [instore, laps, desks] = await Promise.all([
+    db.select().from(inStoreProducts).where(eq(inStoreProducts.salesLocationId, locationId)),
+    db
+      .select()
+      .from(laptops)
+      .where(and(eq(laptops.salesLocationId, locationId), eq(laptops.isActive, 1))),
+    db
+      .select()
+      .from(desktops)
+      .where(and(eq(desktops.salesLocationId, locationId), eq(desktops.isActive, 1))),
+  ]);
+
+  const results: TransferInventoryHit[] = [];
+
+  for (const p of instore) {
+    const qty = p.stockQuantity || 0;
+    if (qty < 1) continue;
+    const label = `${p.nameAr} ${p.sku || ""} ${p.barcode || ""}`.toLowerCase();
+    if (label.includes(query) || (p.barcode && p.barcode.toLowerCase() === query)) {
+      results.push({
+        productSource: "instore",
+        productId: String(p.id),
+        label: p.nameAr,
+        stockQuantity: qty,
+        barcode: p.barcode,
+      });
+    }
+  }
+  for (const l of laps) {
+    const qty = l.stockQuantity || 0;
+    if (qty < 1) continue;
+    const label = `${l.brand} ${l.model || ""} ${l.serialNumber} ${l.barcode || ""}`.toLowerCase();
+    if (label.includes(query) || l.serialNumber.toLowerCase() === query) {
+      results.push({
+        productSource: "laptop",
+        productId: l.id,
+        label: `${l.brand} ${l.model || ""} — ${l.serialNumber}`,
+        stockQuantity: qty,
+        barcode: l.barcode,
+      });
+    }
+  }
+  for (const d of desks) {
+    const qty = d.stockQuantity || 0;
+    if (qty < 1) continue;
+    const label = `${d.brand} ${d.model || ""} ${d.serialNumber} ${d.barcode || ""}`.toLowerCase();
+    if (label.includes(query) || d.serialNumber.toLowerCase() === query) {
+      results.push({
+        productSource: "desktop",
+        productId: d.id,
+        label: `${d.brand} ${d.model || ""} — ${d.serialNumber}`,
+        stockQuantity: qty,
+        barcode: d.barcode,
+      });
+    }
+  }
+
+  return results.slice(0, 40);
+}
+
 async function nextInventorySerial(
   prefix: string,
   table: typeof laptops | typeof desktops,

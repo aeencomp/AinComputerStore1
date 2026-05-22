@@ -699,6 +699,7 @@ export class DrizzleStorage implements IStorage {
           canManageUsers: 1,
           canViewReports: 1,
           canViewWithdrawals: 1,
+          canTransferToLoc1: 1,
           canApplyDiscount: 1,
           canEditReceipt: 1,
           isActive: 1,

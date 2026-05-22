@@ -28,6 +28,9 @@ import {
   userCanAccessLocation,
   setUserLocationAssignments,
   executeStockTransfer,
+  canTransferStockBetween,
+  canSearchInventoryForTransfer,
+  searchInventoryAtLocation,
   LOCATION_MAIN_ID,
   LOCATION_SHOP2_ID,
 } from "./sales-locations";
@@ -125,6 +128,7 @@ function salesPermissionsPayload(user: {
   canManageUsers: number;
   canViewReports: number;
   canViewWithdrawals?: number | null;
+  canTransferToLoc1?: number | null;
   canApplyDiscount: number;
   canEditReceipt?: number | null;
 }) {
@@ -135,6 +139,7 @@ function salesPermissionsPayload(user: {
     canManageUsers: user.canManageUsers,
     canViewReports: user.canViewReports,
     canViewWithdrawals: user.canViewWithdrawals ?? 0,
+    canTransferToLoc1: user.canTransferToLoc1 ?? 0,
     canApplyDiscount: user.canApplyDiscount,
     canEditReceipt: user.canEditReceipt ?? 0,
   };
@@ -142,7 +147,7 @@ function salesPermissionsPayload(user: {
 
 function isDbSchemaError(error: unknown): boolean {
   const msg = String((error as { message?: string })?.message ?? error ?? "");
-  return /does not exist|column .* does not|can_view_withdrawals/i.test(msg);
+  return /does not exist|column .* does not|can_view_withdrawals|can_transfer_to_loc1/i.test(msg);
 }
 
 /** Cost price (سعر الشراء): sales_admin on sales portal; admin panel when no sales session. */
@@ -1174,10 +1179,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUser = await storage.getSalesUser(salesUserId);
       if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
 
-      if (salesUser.role !== "sales_admin" && !salesUser.canInventory) {
-        return res.status(403).json({ error: "ليس لديك صلاحية نقل المخزون" });
-      }
-
       const {
         productSource,
         productId,
@@ -1187,9 +1188,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         toLocationId = LOCATION_SHOP2_ID,
       } = req.body;
 
+      const fromLoc = parseInt(String(fromLocationId), 10);
+      const toLoc = parseInt(String(toLocationId), 10);
+      if (
+        !canTransferStockBetween(salesUser.role, fromLoc, toLoc, salesUser)
+      ) {
+        return res.status(403).json({ error: "ليس لديك صلاحية هذا النقل" });
+      }
+
       const result = await executeStockTransfer({
-        fromLocationId: parseInt(String(fromLocationId), 10),
-        toLocationId: parseInt(String(toLocationId), 10),
+        fromLocationId: fromLoc,
+        toLocationId: toLoc,
         productSource,
         productId: String(productId),
         quantity: parseInt(String(quantity || 1), 10),
@@ -1213,10 +1222,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUser = await storage.getSalesUser(salesUserId);
       if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
 
-      if (salesUser.role !== "sales_admin" && !salesUser.canInventory) {
-        return res.status(403).json({ error: "ليس لديك صلاحية نقل المخزون" });
-      }
-
       const {
         items,
         notes,
@@ -1230,6 +1235,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const fromLoc = parseInt(String(fromLocationId), 10);
       const toLoc = parseInt(String(toLocationId), 10);
+      if (
+        !canTransferStockBetween(salesUser.role, fromLoc, toLoc, salesUser)
+      ) {
+        return res.status(403).json({ error: "ليس لديك صلاحية هذا النقل" });
+      }
+
       const transferIds: number[] = [];
 
       for (let i = 0; i < items.length; i++) {
@@ -1264,63 +1275,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
-
-      const q = String(req.query.q || "").trim().toLowerCase();
-      if (!q) return res.json([]);
-
-      const [instore, laps, desks] = await Promise.all([
-        db.select().from(inStoreProducts).where(eq(inStoreProducts.salesLocationId, LOCATION_MAIN_ID)),
-        db.select().from(laptops).where(and(eq(laptops.salesLocationId, LOCATION_MAIN_ID), eq(laptops.isActive, 1))),
-        db.select().from(desktops).where(and(eq(desktops.salesLocationId, LOCATION_MAIN_ID), eq(desktops.isActive, 1))),
-      ]);
-
-      const results: any[] = [];
-      for (const p of instore) {
-        const qty = p.stockQuantity || 0;
-        if (qty < 1) continue;
-        const label = `${p.nameAr} ${p.sku || ""} ${p.barcode || ""}`.toLowerCase();
-        if (label.includes(q) || (p.barcode && p.barcode.toLowerCase() === q)) {
-          results.push({
-            productSource: "instore",
-            productId: String(p.id),
-            label: p.nameAr,
-            stockQuantity: qty,
-            barcode: p.barcode,
-          });
-        }
+      const salesUser = await storage.getSalesUser(salesUserId);
+      if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
+      if (!canSearchInventoryForTransfer(salesUser.role, LOCATION_MAIN_ID, salesUser)) {
+        return res.status(403).json({ error: "ليس لديك صلاحية البحث في مخزون الموقع 1" });
       }
-      for (const l of laps) {
-        const qty = l.stockQuantity || 0;
-        if (qty < 1) continue;
-        const label = `${l.brand} ${l.model || ""} ${l.serialNumber} ${l.barcode || ""}`.toLowerCase();
-        if (label.includes(q) || l.serialNumber.toLowerCase() === q) {
-          results.push({
-            productSource: "laptop",
-            productId: l.id,
-            label: `${l.brand} ${l.model || ""} — ${l.serialNumber}`,
-            stockQuantity: qty,
-            barcode: l.barcode,
-          });
-        }
-      }
-      for (const d of desks) {
-        const qty = d.stockQuantity || 0;
-        if (qty < 1) continue;
-        const label = `${d.brand} ${d.model || ""} ${d.serialNumber} ${d.barcode || ""}`.toLowerCase();
-        if (label.includes(q) || d.serialNumber.toLowerCase() === q) {
-          results.push({
-            productSource: "desktop",
-            productId: d.id,
-            label: `${d.brand} ${d.model || ""} — ${d.serialNumber}`,
-            stockQuantity: qty,
-            barcode: d.barcode,
-          });
-        }
-      }
-
-      return res.json(results.slice(0, 40));
+      const q = String(req.query.q || "");
+      const results = await searchInventoryAtLocation(LOCATION_MAIN_ID, q);
+      return res.json(results);
     } catch (error) {
       console.error("Error searching loc1 inventory:", error);
+      return res.status(500).json({ error: "فشل البحث" });
+    }
+  });
+
+  app.get("/api/sales/inventory/search-loc2", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+      const salesUser = await storage.getSalesUser(salesUserId);
+      if (!salesUser) return res.status(401).json({ error: "غير مصرح" });
+      if (!canSearchInventoryForTransfer(salesUser.role, LOCATION_SHOP2_ID, salesUser)) {
+        return res.status(403).json({ error: "ليس لديك صلاحية البحث في مخزون الموقع 2" });
+      }
+      const q = String(req.query.q || "");
+      const results = await searchInventoryAtLocation(LOCATION_SHOP2_ID, q);
+      return res.json(results);
+    } catch (error) {
+      console.error("Error searching loc2 inventory:", error);
       return res.status(500).json({ error: "فشل البحث" });
     }
   });
@@ -1352,6 +1334,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           canManageUsers: u.canManageUsers,
           canViewReports: u.canViewReports,
           canViewWithdrawals: u.canViewWithdrawals ?? 0,
+          canTransferToLoc1: u.canTransferToLoc1 ?? 0,
           canApplyDiscount: u.canApplyDiscount,
           canEditReceipt: (u as any).canEditReceipt ?? 0,
           isActive: u.isActive,
@@ -1379,7 +1362,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية إنشاء مستخدمين" });
       }
       
-      const { username, password, name, email, role, canPos, canInventory, canInventoryLocation2, canManageUsers, canViewReports, canViewWithdrawals, canApplyDiscount, canEditReceipt, isActive, locationIds } = req.body;
+      const { username, password, name, email, role, canPos, canInventory, canInventoryLocation2, canManageUsers, canViewReports, canViewWithdrawals, canTransferToLoc1, canApplyDiscount, canEditReceipt, isActive, locationIds } = req.body;
       
       if (!username || !password || !name) {
         return res.status(400).json({ error: "اسم المستخدم وكلمة المرور والاسم مطلوبين" });
@@ -1403,6 +1386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         canManageUsers: canManageUsers ?? 0,
         canViewReports: canViewReports ?? 0,
         canViewWithdrawals: canViewWithdrawals ?? 0,
+        canTransferToLoc1: canTransferToLoc1 ?? 0,
         canApplyDiscount: canApplyDiscount ?? 0,
         canEditReceipt: canEditReceipt ?? 0,
         isActive: isActive ?? 1,

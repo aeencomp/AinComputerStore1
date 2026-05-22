@@ -33,14 +33,78 @@ function parseQty(value: string, max: number): number {
   return Math.min(n, max);
 }
 
-export default function SalesTransferStock() {
+export type StockTransferDirection = "1-to-2" | "2-to-1";
+
+const TRANSFER_CONFIG = {
+  "1-to-2": {
+    fromLocationId: 1,
+    toLocationId: 2,
+    searchPath: "/api/sales/inventory/search-loc1",
+    titleAr: "نقل مخزون إلى الموقع 2",
+    titleEn: "Transfer stock to Location 2",
+    subtitleAr: "ابحث في مخزون الموقع 1، أضف الأصناف، ثم انقلها دفعة واحدة إلى الموقع 2",
+    subtitleEn: "Search Location 1 stock, add items, then transfer all to Location 2",
+    sourceAr: "الموقع 1",
+    sourceEn: "Location 1",
+    destAr: "الموقع 2",
+    destEn: "Location 2",
+    transferAllAr: (n: number) => `نقل الكل (${n} صنف) إلى الموقع 2`,
+    transferAllEn: (n: number) => `Transfer all (${n} items) to Location 2`,
+  },
+  "2-to-1": {
+    fromLocationId: 2,
+    toLocationId: 1,
+    searchPath: "/api/sales/inventory/search-loc2",
+    titleAr: "نقل مخزون إلى الموقع 1",
+    titleEn: "Transfer stock to Location 1",
+    subtitleAr: "ابحث في مخزون الموقع 2، أضف الأصناف، ثم انقلها دفعة واحدة إلى الموقع 1",
+    subtitleEn: "Search Location 2 stock, add items, then transfer all to Location 1",
+    sourceAr: "الموقع 2",
+    sourceEn: "Location 2",
+    destAr: "الموقع 1",
+    destEn: "Location 1",
+    transferAllAr: (n: number) => `نقل الكل (${n} صنف) إلى الموقع 1`,
+    transferAllEn: (n: number) => `Transfer all (${n} items) to Location 1`,
+  },
+} as const;
+
+interface SalesTransferStockProps {
+  direction: StockTransferDirection;
+  user: {
+    role: string;
+    permissions: {
+      canInventory: number;
+      canTransferToLoc1: number;
+    };
+  };
+}
+
+export default function SalesTransferStock({ direction, user }: SalesTransferStockProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const cfg = TRANSFER_CONFIG[direction];
+  const isAr = language === "ar";
+
+  const canAccess =
+    user.role === "sales_admin" ||
+    (direction === "1-to-2" && user.permissions.canInventory === 1) ||
+    (direction === "2-to-1" && user.permissions.canTransferToLoc1 === 1);
+
   const [search, setSearch] = useState("");
   const [draftQty, setDraftQty] = useState<Record<string, string>>({});
   const [notes, setNotes] = useState("");
   const [lines, setLines] = useState<TransferLine[]>([]);
+
+  if (!canAccess) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <p className="text-muted-foreground">
+          {isAr ? "ليس لديك صلاحية هذا النقل" : "You do not have permission for this transfer"}
+        </p>
+      </div>
+    );
+  }
 
   const invalidateTransferStockQueries = () => {
     queryClient.invalidateQueries({
@@ -51,6 +115,7 @@ export default function SalesTransferStock() {
           key.startsWith("/api/battery/laptops") ||
           key.startsWith("/api/battery/desktops") ||
           key.startsWith("/api/sales/inventory/search-loc1") ||
+          key.startsWith("/api/sales/inventory/search-loc2") ||
           key.startsWith("/api/sales/transfers")
         );
       },
@@ -58,13 +123,12 @@ export default function SalesTransferStock() {
   };
 
   const { data: results = [], isFetching } = useQuery<SearchHit[]>({
-    queryKey: ["/api/sales/inventory/search-loc1", search],
+    queryKey: [cfg.searchPath, search],
     queryFn: async () => {
       if (search.trim().length < 2) return [];
       const res = await fetch(
-        `/api/sales/inventory/search-loc1?q=${encodeURIComponent(search.trim())}`,
-        { credentials: "include",
-        },
+        `${cfg.searchPath}?q=${encodeURIComponent(search.trim())}`,
+        { credentials: "include" },
       );
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
@@ -81,8 +145,8 @@ export default function SalesTransferStock() {
   const transferBatchMutation = useMutation({
     mutationFn: async (payload: { lines: TransferLine[]; notes: string }) => {
       const res = await apiRequest("POST", "/api/sales/transfers/batch", {
-        fromLocationId: 1,
-        toLocationId: 2,
+        fromLocationId: cfg.fromLocationId,
+        toLocationId: cfg.toLocationId,
         notes: payload.notes.trim() || null,
         items: payload.lines.map((line) => ({
           productSource: line.hit.productSource,
@@ -182,12 +246,15 @@ export default function SalesTransferStock() {
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-lg">
             <ArrowRightLeft className="h-5 w-5" />
-            {language === "ar" ? "نقل مخزون إلى الموقع 2" : "Transfer stock to Location 2"}
+            {isAr ? cfg.titleAr : cfg.titleEn}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            {language === "ar"
-              ? "ابحث وأضف عدة أصناف للقائمة، ثم انقلها كلها بضغطة واحدة"
-              : "Search, add multiple items to the cart, then transfer all with one click"}
+            {isAr ? cfg.subtitleAr : cfg.subtitleEn}
+          </p>
+          <p className="text-xs font-medium text-primary">
+            {isAr
+              ? `${cfg.sourceAr} → ${cfg.destAr}`
+              : `${cfg.sourceEn} → ${cfg.destEn}`}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -356,11 +423,11 @@ export default function SalesTransferStock() {
                 {language === "ar" ? "جاري النقل..." : "Transferring..."}
               </>
             ) : lines.length === 0 ? (
-              language === "ar" ? "أضف أصنافاً للقائمة أولاً" : "Add items to cart first"
-            ) : language === "ar" ? (
-              `نقل الكل (${lines.length} صنف) إلى الموقع 2`
+              isAr ? "أضف أصنافاً للقائمة أولاً" : "Add items to cart first"
+            ) : isAr ? (
+              cfg.transferAllAr(lines.length)
             ) : (
-              `Transfer all (${lines.length} items) to Location 2`
+              cfg.transferAllEn(lines.length)
             )}
           </Button>
         </CardContent>
