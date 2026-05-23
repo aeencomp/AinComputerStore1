@@ -13,7 +13,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -143,6 +143,7 @@ export default function SalesPOS({
   const [showCustomerLookup, setShowCustomerLookup] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
   const [receiptNote, setReceiptNote] = useState("");
+  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showReceiptEditor, setShowReceiptEditor] = useState(false);
   const [receiptDraft, setReceiptDraft] = useState<any>(null);
 
@@ -535,6 +536,8 @@ export default function SalesPOS({
       setCustomerPhone("");
       setDiscount("0");
       setDiscountReason("");
+      setReceiptNote("");
+      setShowCheckoutModal(false);
       
       setTimeout(() => {
         invalidatePosStockQueries();
@@ -688,6 +691,32 @@ export default function SalesPOS({
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(price);
   };
 
+  const buildOrderData = () => ({
+    items: cart.map(item => ({
+      productId: item.product.id,
+      nameAr: item.product.nameAr,
+      nameEn: item.product.nameEn,
+      price: getEffectivePrice(item),
+      quantity: item.quantity,
+      productSource: item.product.productSource || 'instore',
+      batteryId: item.product.productSource === 'battery' ? item.product.sourceId : undefined,
+      adapterId: item.product.productSource === 'adapter' ? item.product.sourceId : undefined,
+      keyboardId: item.product.productSource === 'keyboard' ? item.product.sourceId : undefined,
+      lcdId: item.product.productSource === 'lcd' ? item.product.sourceId : undefined,
+      laptopId: item.product.productSource === 'laptop' ? item.product.sourceId : undefined,
+      desktopId: item.product.productSource === 'desktop' ? item.product.sourceId : undefined,
+    })),
+    customerName: customerName || (language === 'ar' ? 'عميل في المتجر' : 'Walk-in Customer'),
+    customerPhone: customerPhone.trim(),
+    paymentMethod,
+    paymentStatus: paymentMethod === 'deferred' ? 'deferred' : 'success',
+    discount: calculatedDiscount.toString(),
+    discountReason,
+    notes: receiptNote || null,
+    orderType,
+    salesLocationId,
+  });
+
   const handleCheckout = () => {
     if (cart.length === 0) {
       toast({
@@ -696,34 +725,11 @@ export default function SalesPOS({
       });
       return;
     }
+    setShowCheckoutModal(true);
+  };
 
-    const orderData = {
-      items: cart.map(item => ({
-        productId: item.product.id,
-        nameAr: item.product.nameAr,
-        nameEn: item.product.nameEn,
-        price: getEffectivePrice(item),
-        quantity: item.quantity,
-        productSource: item.product.productSource || 'instore',
-        batteryId: item.product.productSource === 'battery' ? item.product.sourceId : undefined,
-        adapterId: item.product.productSource === 'adapter' ? item.product.sourceId : undefined,
-        keyboardId: item.product.productSource === 'keyboard' ? item.product.sourceId : undefined,
-        lcdId: item.product.productSource === 'lcd' ? item.product.sourceId : undefined,
-        laptopId: item.product.productSource === 'laptop' ? item.product.sourceId : undefined,
-        desktopId: item.product.productSource === 'desktop' ? item.product.sourceId : undefined,
-      })),
-      customerName: customerName || 'عميل في المتجر',
-      customerPhone,
-      paymentMethod,
-      paymentStatus: paymentMethod === 'deferred' ? 'deferred' : 'success',
-      discount: calculatedDiscount.toString(),
-      discountReason,
-      notes: receiptNote || null,
-      orderType,
-      salesLocationId,
-    };
-
-    createOrderMutation.mutate(orderData);
+  const confirmCheckout = () => {
+    createOrderMutation.mutate(buildOrderData());
   };
 
   const openReceiptEditor = () => {
@@ -1498,21 +1504,36 @@ export default function SalesPOS({
                         {language === 'ar' ? 'بحث' : 'Lookup'}
                       </Button>
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Input
-                        value={customerName}
-                        onChange={(e) => setCustomerName(e.target.value)}
-                        placeholder={language === 'ar' ? 'الاسم' : 'Name'}
-                        className="h-9"
-                        data-testid="input-customer-name"
-                      />
-                      <Input
-                        value={customerPhone}
-                        onChange={(e) => setCustomerPhone(e.target.value)}
-                        placeholder={language === 'ar' ? 'الهاتف' : 'Phone'}
-                        className="h-9"
-                        data-testid="input-customer-phone"
-                      />
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">{language === 'ar' ? 'الاسم' : 'Name'}</Label>
+                        <div className="relative">
+                          <User className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                            placeholder={language === 'ar' ? 'اختياري' : 'Optional'}
+                            className="h-9 ps-9"
+                            data-testid="input-customer-name"
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">{language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}</Label>
+                        <div className="relative">
+                          <Phone className="absolute start-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+                          <Input
+                            type="tel"
+                            inputMode="tel"
+                            dir="ltr"
+                            value={customerPhone}
+                            onChange={(e) => setCustomerPhone(e.target.value)}
+                            placeholder="07XX XXX XXXX"
+                            className="h-9 ps-9"
+                            data-testid="input-customer-phone"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
@@ -2063,6 +2084,94 @@ export default function SalesPOS({
                 );
               })
             )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Checkout Dialog */}
+      <Dialog open={showCheckoutModal} onOpenChange={setShowCheckoutModal}>
+        <DialogContent className="sm:max-w-md" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Receipt className="h-5 w-5" />
+              {language === 'ar' ? 'إتمام البيع' : 'Complete Sale'}
+            </DialogTitle>
+            <DialogDescription>
+              {language === 'ar'
+                ? 'أدخل معلومات العميل ثم أكّد البيع'
+                : 'Enter customer details and confirm the sale'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'اسم العميل' : 'Customer Name'}</Label>
+              <div className="relative">
+                <User className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  placeholder={language === 'ar' ? 'اختياري' : 'Optional'}
+                  className="ps-9"
+                  data-testid="input-checkout-customer-name"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>{language === 'ar' ? 'رقم الهاتف' : 'Phone Number'}</Label>
+              <div className="relative">
+                <Phone className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="tel"
+                  inputMode="tel"
+                  dir="ltr"
+                  value={customerPhone}
+                  onChange={(e) => setCustomerPhone(e.target.value)}
+                  placeholder="07XX XXX XXXX"
+                  className="ps-9"
+                  data-testid="input-checkout-customer-phone"
+                />
+              </div>
+            </div>
+
+            <div className="rounded-lg border bg-muted/40 p-3 space-y-1 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">{language === 'ar' ? 'الأصناف' : 'Items'}</span>
+                <span>{totalItems}</span>
+              </div>
+              <div className="flex justify-between font-bold text-base">
+                <span>{language === 'ar' ? 'الإجمالي' : 'Total'}</span>
+                <span className="text-primary">
+                  {formatPrice(total)} {language === 'ar' ? 'د.ع' : 'IQD'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setShowCheckoutModal(false)}
+              >
+                {language === 'ar' ? 'إلغاء' : 'Cancel'}
+              </Button>
+              <Button
+                type="button"
+                className="flex-1 gap-2"
+                onClick={confirmCheckout}
+                disabled={createOrderMutation.isPending}
+                data-testid="button-confirm-checkout"
+              >
+                {createOrderMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4" />
+                )}
+                {language === 'ar' ? 'تأكيد البيع' : 'Confirm Sale'}
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
