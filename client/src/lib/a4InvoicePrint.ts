@@ -262,9 +262,8 @@ export function buildA4InvoiceHtml(
     .join("");
 
   const customerName = escapeHtml(order.customerName || "");
-  const customerAddress = escapeHtml(
-    order.customerAddress || order.customerPhone || "",
-  );
+  const customerPhone = escapeHtml(order.customerPhone || "");
+  const customerAddress = escapeHtml(order.customerAddress || "");
   const invoiceNo = escapeHtml(order.orderNumber);
   const amountWords = escapeHtml(iqdToArabicWords(totalNum));
 
@@ -487,6 +486,7 @@ export function buildA4InvoiceHtml(
   <section class="meta-row">
     <div class="meta-customer">
       <div class="field"><span class="label">اسم العميل :</span> <span class="value">${customerName}</span></div>
+      <div class="field"><span class="label">الهاتف :</span> <span class="value" dir="ltr">${customerPhone}</span></div>
       <div class="field"><span class="label">العنوان :</span> <span class="value">${customerAddress}</span></div>
     </div>
     <div class="meta-invoice-info">
