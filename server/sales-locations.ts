@@ -2,6 +2,7 @@ import type { Request } from "express";
 import { and, eq, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { storage } from "./storage";
+import { syncAcAdapterById } from "./battery-instore-sync";
 import {
   salesLocations,
   salesUserLocations,
@@ -270,14 +271,6 @@ async function transferLaptopOrDesktopQuantity(params: {
         ? and(eq(table.brand, row.brand), eq(table.model, row.model))
         : eq(table.brand, row.brand);
 
-  if (quantity === available) {
-    await db
-      .update(table)
-      .set({ salesLocationId: toLocationId, updatedAt: new Date() })
-      .where(eq(table.id, productId));
-    return row.serialNumber;
-  }
-
   await db
     .update(table)
     .set({ stockQuantity: available - quantity, updatedAt: new Date() })
@@ -339,14 +332,6 @@ async function transferAdapterQuantity(params: {
         ? and(eq(acAdapters.brand, row.brand), eq(acAdapters.wattage, row.wattage))
         : eq(acAdapters.brand, row.brand);
 
-  if (quantity === available) {
-    await db
-      .update(acAdapters)
-      .set({ salesLocationId: toLocationId, updatedAt: new Date() })
-      .where(eq(acAdapters.id, productId));
-    return row.serialNumber;
-  }
-
   await db
     .update(acAdapters)
     .set({ stockQuantity: available - quantity, updatedAt: new Date() })
@@ -372,6 +357,8 @@ async function transferAdapterQuantity(params: {
         updatedAt: new Date(),
       })
       .where(eq(acAdapters.id, existingAtDest.id));
+    await syncAcAdapterById(productId);
+    await syncAcAdapterById(existingAtDest.id);
     return existingAtDest.serialNumber;
   }
 
@@ -385,14 +372,19 @@ async function transferAdapterQuantity(params: {
     salesLocationId: _loc,
     ...rest
   } = row;
-  await db.insert(acAdapters).values({
-    ...rest,
-    serialNumber: newSerial,
-    barcode: row.barcode || newSerial,
-    stockQuantity: quantity,
-    salesLocationId: toLocationId,
-    isActive: 1,
-  });
+  const [inserted] = await db
+    .insert(acAdapters)
+    .values({
+      ...rest,
+      serialNumber: newSerial,
+      barcode: row.barcode || newSerial,
+      stockQuantity: quantity,
+      salesLocationId: toLocationId,
+      isActive: 1,
+    })
+    .returning();
+  if (inserted) await syncAcAdapterById(inserted.id);
+  await syncAcAdapterById(productId);
   return newSerial;
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { playBarcodeScanBeep } from "@/lib/scanBeep";
+import {
+  appendScanKeystroke,
+  codesMatch,
+  emptyScanBuffer,
+  resolveScannedCode,
+  shouldSuppressScanInput,
+} from "@/lib/barcodeKeyboard";
 import { getCategoryName } from "@/lib/categoryNames";
 import { resolveAssetUrl } from "@/lib/assetUrl";
 import { 
@@ -78,6 +85,7 @@ export default function AdminPOS() {
   const { toast } = useToast();
   const { language } = useLanguage();
   const [searchQuery, setSearchQuery] = useState("");
+  const scanStateRef = useRef(emptyScanBuffer());
   const [cart, setCart] = useState<CartItemPOS[]>([]);
   const [showCheckout, setShowCheckout] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -217,34 +225,42 @@ export default function AdminPOS() {
   };
 
   const handleAdminPosSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter") return;
-    const code = searchQuery.trim();
-    if (!code) return;
-    const lc = code.toLowerCase();
-    const product = products.find((p: any) => {
-      const sku = (p.sku || "").toString().toLowerCase();
-      const bc = (p.barcode || "").toString().toLowerCase();
-      return (p.sku && sku === lc) || (!!p.barcode && bc === lc);
-    });
-    if (!product) return;
+    if (e.key === "Enter") {
+      const code = resolveScannedCode(scanStateRef.current, searchQuery);
+      scanStateRef.current = emptyScanBuffer();
+      if (!code) return;
 
-    const stockQty = (product as any).stockQuantity || 0;
-    const existing = cart.find(item => item.product.id === product.id);
-    const currentQty = existing ? existing.quantity : 0;
-    if (currentQty >= stockQty) {
+      const product = products.find(
+        (p: { sku?: string | null; barcode?: string | null }) =>
+          codesMatch(p.sku, code) || codesMatch(p.barcode, code),
+      );
+      if (!product) return;
+
+      const stockQty = (product as { stockQuantity?: number }).stockQuantity || 0;
+      const existing = cart.find(item => item.product.id === product.id);
+      const currentQty = existing ? existing.quantity : 0;
+      if (currentQty >= stockQty) {
+        e.preventDefault();
+        toast({
+          title: language === 'ar' ? 'المخزون غير كافٍ' : 'Insufficient Stock',
+          description: language === 'ar' ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       e.preventDefault();
-      toast({
-        title: language === 'ar' ? 'المخزون غير كافٍ' : 'Insufficient Stock',
-        description: language === 'ar' ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
-        variant: 'destructive',
-      });
+      playBarcodeScanBeep();
+      addToCart(product as Product);
+      setSearchQuery("");
       return;
     }
 
-    e.preventDefault();
-    playBarcodeScanBeep();
-    addToCart(product as Product);
-    setSearchQuery("");
+    const next = appendScanKeystroke(scanStateRef.current, e.nativeEvent);
+    scanStateRef.current = next;
+    if (shouldSuppressScanInput(next)) {
+      e.preventDefault();
+    }
   };
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -355,6 +371,10 @@ export default function AdminPOS() {
                       onChange={(e) => setSearchQuery(e.target.value)}
                       onKeyDown={handleAdminPosSearchKeyDown}
                       className="ps-9"
+                      lang="en"
+                      dir="ltr"
+                      autoComplete="off"
+                      spellCheck={false}
                       data-testid="input-pos-search"
                     />
                   </div>

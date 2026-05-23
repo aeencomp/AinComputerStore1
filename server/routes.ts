@@ -34,6 +34,14 @@ import {
   LOCATION_MAIN_ID,
   LOCATION_SHOP2_ID,
 } from "./sales-locations";
+import {
+  syncLaptopBatteryToInStore,
+  syncAcAdapterToInStore,
+  syncLaptopBatteryById,
+  syncAcAdapterById,
+  deactivateSyncedBatteryInStore,
+  deactivateSyncedAdapterInStore,
+} from "./battery-instore-sync";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -1581,10 +1589,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             await db.update(laptopBatteries)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
               .where(eq(laptopBatteries.id, item.batteryId));
+            await syncLaptopBatteryById(item.batteryId);
           } else if (item.productSource === 'adapter' && item.adapterId) {
             await db.update(acAdapters)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
               .where(eq(acAdapters.id, item.adapterId));
+            await syncAcAdapterById(item.adapterId);
           } else if (item.productSource === 'keyboard' && item.keyboardId) {
             await db.update(keyboards)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
@@ -5879,7 +5889,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (existing) {
             if (mode === 'merge') {
-              await storage.updateLaptopBattery(existing.id, {
+              const updated = await storage.updateLaptopBattery(existing.id, {
                 partNumber: item.partNumber,
                 barcode: item.barcode,
                 brand: item.brand,
@@ -5897,12 +5907,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 notes: item.notes,
                 isActive: item.isActive,
               });
+              if (updated) await syncLaptopBatteryToInStore(updated);
               results.batteriesUpdated++;
             } else {
               results.batteriesSkipped++;
             }
           } else {
-            await storage.createLaptopBattery({
+            const created = await storage.createLaptopBattery({
               serialNumber: item.serialNumber,
               partNumber: item.partNumber,
               barcode: item.barcode,
@@ -5921,6 +5932,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes: item.notes,
               isActive: item.isActive ?? 1,
             });
+            await syncLaptopBatteryToInStore(created);
             results.batteriesAdded++;
           }
         } catch (itemError: any) {
@@ -5942,7 +5954,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (existing) {
             if (mode === 'merge') {
-              await storage.updateAcAdapter(existing.id, {
+              const updated = await storage.updateAcAdapter(existing.id, {
                 partNumber: item.partNumber,
                 barcode: item.barcode,
                 brand: item.brand,
@@ -5964,12 +5976,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 notes: item.notes,
                 isActive: item.isActive,
               });
+              if (updated) await syncAcAdapterToInStore(updated);
               results.adaptersUpdated++;
             } else {
               results.adaptersSkipped++;
             }
           } else {
-            await storage.createAcAdapter({
+            const created = await storage.createAcAdapter({
               serialNumber: item.serialNumber,
               partNumber: item.partNumber,
               barcode: item.barcode || item.serialNumber,
@@ -5992,6 +6005,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               notes: item.notes,
               isActive: item.isActive ?? 1,
             });
+            await syncAcAdapterToInStore(created);
             results.adaptersAdded++;
           }
         } catch (itemError: any) {
@@ -6321,6 +6335,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
   
+  /** One-time / manual: mirror all active batteries & adapters into in_store_products. */
+  app.post("/api/battery/sync-instore", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const batteries = await storage.getLaptopBatteries();
+      const adapters = await storage.getAcAdapters();
+      let batteriesSynced = 0;
+      let adaptersSynced = 0;
+      for (const b of batteries) {
+        if ((b.isActive ?? 1) === 1) {
+          await syncLaptopBatteryToInStore(b);
+          batteriesSynced++;
+        }
+      }
+      for (const a of adapters) {
+        if ((a.isActive ?? 1) === 1) {
+          await syncAcAdapterToInStore(a);
+          adaptersSynced++;
+        }
+      }
+      return res.json({ batteriesSynced, adaptersSynced });
+    } catch (error) {
+      console.error("Error syncing battery catalog to instore:", error);
+      return res.status(500).json({ error: "خطأ في مزامنة المخزون مع نقطة البيع" });
+    }
+  });
+
   app.post("/api/battery/batteries", async (req, res) => {
     try {
       const batteryUserId = (req.session as any).batteryUserId;
@@ -6362,6 +6406,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         notes: notes || null,
         isActive: 1
       });
+
+      await syncLaptopBatteryToInStore(battery);
       
       return res.json(battery);
     } catch (error) {
@@ -6388,6 +6434,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!battery) {
         return res.status(404).json({ error: "البطارية غير موجودة" });
       }
+      await syncLaptopBatteryToInStore(battery);
       return res.json(battery);
     } catch (error) {
       console.error("Error updating battery:", error);
@@ -6403,6 +6450,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.deleteLaptopBattery(req.params.id);
+      await deactivateSyncedBatteryInStore(req.params.id);
       return res.json({ success: true });
     } catch (error) {
       console.error("Error deleting battery:", error);
@@ -6540,6 +6588,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         barcode,
         ...rest
       });
+
+      await syncAcAdapterToInStore(adapter);
       
       return res.status(201).json(adapter);
     } catch (error) {
@@ -6566,6 +6616,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!adapter) {
         return res.status(404).json({ error: "الشاحن غير موجود" });
       }
+      await syncAcAdapterToInStore(adapter);
       return res.json(adapter);
     } catch (error) {
       console.error("Error updating adapter:", error);
@@ -6581,6 +6632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       await storage.deleteAcAdapter(req.params.id);
+      await deactivateSyncedAdapterInStore(req.params.id);
       return res.json({ success: true });
     } catch (error) {
       console.error("Error deleting adapter:", error);

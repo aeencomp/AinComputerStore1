@@ -1,7 +1,15 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { playBarcodeScanBeep } from "@/lib/scanBeep";
+import {
+  appendScanKeystroke,
+  codesMatch,
+  emptyScanBuffer,
+  resolveScannedCode,
+  shouldSuppressScanInput,
+} from "@/lib/barcodeKeyboard";
+import { cn } from "@/lib/utils";
 import { openA4InvoicePrint, STORE_BRAND_RED, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -147,6 +155,7 @@ export default function SalesPOS({
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showReceiptEditor, setShowReceiptEditor] = useState(false);
   const [receiptDraft, setReceiptDraft] = useState<any>(null);
+  const scanStateRef = useRef(emptyScanBuffer());
 
   const { data: mainProducts = [], isLoading: mainLoading } = useQuery<any[]>({
     queryKey: ['/api/products'],
@@ -224,9 +233,17 @@ export default function SalesPOS({
     ? (inStoreLoading || batteriesLoading || adaptersLoading || keyboardsLoading || lcdsLoading || laptopsLoading || desktopsLoading)
     : mainLoading;
 
+  const skipSyncedBatteryMirrors =
+    includeSource('battery') || includeSource('adapter');
+
   const instoreProducts: POSProduct[] = orderType === 'in-store'
     ? inStoreRaw
         .filter(p => p.isActive !== 0)
+        .filter(
+          (p) =>
+            !skipSyncedBatteryMirrors ||
+            (!p.sku?.startsWith('SYNC-BAT:') && !p.sku?.startsWith('SYNC-ADP:')),
+        )
         .map(p => ({
           id: String(p.id),
           nameAr: p.nameAr,
@@ -592,36 +609,43 @@ export default function SalesPOS({
     });
   };
 
-  /** Barcode scanner: exact SKU/barcode + Enter adds to cart and plays beep (works during checkout flow). */
+  /** Barcode scanner: uses physical key codes so Arabic Windows layout does not break scans. */
   const handlePosSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== "Enter") return;
-    const code = searchQuery.trim();
-    if (!code) return;
-    const lc = code.toLowerCase();
-    const product = products.find(p => {
-      const sku = (p.sku || "").toLowerCase();
-      const bc = (p.barcode || "").toLowerCase();
-      return (p.sku && sku === lc) || (!!p.barcode && bc === lc);
-    });
-    if (!product) return;
+    if (e.key === "Enter") {
+      const code = resolveScannedCode(scanStateRef.current, searchQuery);
+      scanStateRef.current = emptyScanBuffer();
+      if (!code) return;
 
-    const stockQty = product.stockQuantity || 0;
-    const existing = cart.find(item => item.product.id === product.id);
-    const currentQty = existing ? existing.quantity : 0;
-    if (currentQty >= stockQty) {
+      const product = products.find(
+        (p) => codesMatch(p.sku, code) || codesMatch(p.barcode, code),
+      );
+      if (!product) return;
+
+      const stockQty = product.stockQuantity || 0;
+      const existing = cart.find(item => item.product.id === product.id);
+      const currentQty = existing ? existing.quantity : 0;
+      if (currentQty >= stockQty) {
+        e.preventDefault();
+        toast({
+          title: language === 'ar' ? 'المخزون غير كافٍ' : 'Insufficient Stock',
+          description: language === 'ar' ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       e.preventDefault();
-      toast({
-        title: language === 'ar' ? 'المخزون غير كافٍ' : 'Insufficient Stock',
-        description: language === 'ar' ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
-        variant: 'destructive',
-      });
+      playBarcodeScanBeep();
+      addToCart(product);
+      setSearchQuery("");
       return;
     }
 
-    e.preventDefault();
-    playBarcodeScanBeep();
-    addToCart(product);
-    setSearchQuery("");
+    const next = appendScanKeystroke(scanStateRef.current, e.nativeEvent);
+    scanStateRef.current = next;
+    if (shouldSuppressScanInput(next)) {
+      e.preventDefault();
+    }
   };
 
   const updateQuantity = (productId: string, delta: number) => {
@@ -691,6 +715,7 @@ export default function SalesPOS({
     : discountValue;
   const total = Math.max(0, subtotal - calculatedDiscount);
   const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const isInStoreCatalog = orderType === "in-store";
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(price);
@@ -1010,6 +1035,10 @@ export default function SalesPOS({
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handlePosSearchKeyDown}
                   className="ps-10 h-11 text-base"
+                  lang="en"
+                  dir="ltr"
+                  autoComplete="off"
+                  spellCheck={false}
                   data-testid="input-pos-search"
                 />
               </div>
@@ -1070,7 +1099,7 @@ export default function SalesPOS({
           </CardHeader>
           
           {/* Products Grid */}
-          <CardContent className="flex-1 p-4 overflow-auto">
+          <CardContent className={cn("flex-1 overflow-auto", isInStoreCatalog ? "p-2" : "p-4")}>
             {isLoading ? (
               <div className="flex items-center justify-center h-full">
                 <div className="text-center space-y-3">
@@ -1090,30 +1119,41 @@ export default function SalesPOS({
                 </div>
               </div>
             ) : viewMode === "grid" ? (
-              <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+              <div
+                className={cn(
+                  "grid gap-2",
+                  isInStoreCatalog
+                    ? "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6"
+                    : "grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3",
+                )}
+              >
                 {filteredProducts.map(product => {
                   const inCart = cart.find(item => item.product.id === product.id);
                   const isOutOfStock = (product.stockQuantity || 0) <= 0;
+                  const placeholderIconClass = isInStoreCatalog ? "h-6 w-6" : "h-10 w-10";
                   return (
                     <button
                       key={product.id}
                       onClick={() => addToCart(product)}
                       disabled={isOutOfStock}
-                      className={`relative p-4 border-2 rounded-xl transition-all text-start group ${
-                        inCart 
-                          ? 'border-primary bg-primary/5 shadow-md' 
-                          : 'border-transparent bg-card hover:border-primary/30 hover:shadow-md'
-                      } ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={cn(
+                        "relative border-2 transition-all text-start group",
+                        isInStoreCatalog ? "p-2 rounded-lg" : "p-4 rounded-xl",
+                        inCart
+                          ? "border-primary bg-primary/5 shadow-md"
+                          : "border-transparent bg-card hover:border-primary/30 hover:shadow-md",
+                        isOutOfStock && "opacity-50 cursor-not-allowed",
+                      )}
                       data-testid={`product-card-${product.id}`}
                     >
                       {/* Stock Badge */}
-                      <div className="absolute top-2 end-2 z-10">
+                      <div className={cn("absolute z-10", isInStoreCatalog ? "top-1 end-1" : "top-2 end-2")}>
                         {isOutOfStock ? (
-                          <Badge variant="destructive" className="text-xs">
+                          <Badge variant="destructive" className={isInStoreCatalog ? "text-[10px] px-1 py-0" : "text-xs"}>
                             {language === 'ar' ? 'نفذ' : 'Out'}
                           </Badge>
                         ) : (product.stockQuantity || 0) < 5 ? (
-                          <Badge className="text-xs bg-orange-500/20 text-orange-600">
+                          <Badge className={cn("bg-orange-500/20 text-orange-600", isInStoreCatalog ? "text-[10px] px-1 py-0" : "text-xs")}>
                             {product.stockQuantity}
                           </Badge>
                         ) : null}
@@ -1121,15 +1161,20 @@ export default function SalesPOS({
                       
                       {/* Cart Quantity Badge */}
                       {inCart && (
-                        <div className="absolute top-2 start-2 z-10">
-                          <Badge className="text-xs">
+                        <div className={cn("absolute z-10", isInStoreCatalog ? "top-1 start-1" : "top-2 start-2")}>
+                          <Badge className={isInStoreCatalog ? "text-[10px] px-1 py-0" : "text-xs"}>
                             {inCart.quantity}x
                           </Badge>
                         </div>
                       )}
                       
                       {/* Product Image */}
-                      <div className="aspect-square rounded-lg bg-muted mb-3 overflow-hidden">
+                      <div
+                        className={cn(
+                          "rounded-md bg-muted overflow-hidden",
+                          isInStoreCatalog ? "h-14 mb-1.5" : "aspect-square rounded-lg mb-3",
+                        )}
+                      >
                         {product.image ? (
                           <img 
                             src={product.image} 
@@ -1139,27 +1184,32 @@ export default function SalesPOS({
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             {product.productSource === 'battery' ? (
-                              <Battery className="h-10 w-10 text-primary/40" />
+                              <Battery className={cn(placeholderIconClass, "text-primary/40")} />
                             ) : product.productSource === 'adapter' ? (
-                              <Plug className="h-10 w-10 text-primary/40" />
+                              <Plug className={cn(placeholderIconClass, "text-primary/40")} />
                             ) : product.productSource === 'keyboard' ? (
-                              <Keyboard className="h-10 w-10 text-primary/40" />
+                              <Keyboard className={cn(placeholderIconClass, "text-primary/40")} />
                             ) : product.productSource === 'lcd' ? (
-                              <Monitor className="h-10 w-10 text-primary/40" />
+                              <Monitor className={cn(placeholderIconClass, "text-primary/40")} />
                             ) : product.productSource === 'laptop' ? (
-                              <LaptopIcon className="h-10 w-10 text-primary/40" />
+                              <LaptopIcon className={cn(placeholderIconClass, "text-primary/40")} />
                             ) : product.productSource === 'desktop' ? (
-                              <Computer className="h-10 w-10 text-primary/40" />
+                              <Computer className={cn(placeholderIconClass, "text-primary/40")} />
                             ) : (
-                              <Package className="h-10 w-10 text-muted-foreground/30" />
+                              <Package className={cn(placeholderIconClass, "text-muted-foreground/30")} />
                             )}
                           </div>
                         )}
                       </div>
                       
                       {/* Product Info */}
-                      <div className="space-y-1">
-                        <p className="font-semibold text-sm line-clamp-2 min-h-[2.5rem]">
+                      <div className={isInStoreCatalog ? "space-y-0.5" : "space-y-1"}>
+                        <p
+                          className={cn(
+                            "font-semibold line-clamp-2",
+                            isInStoreCatalog ? "text-[11px] leading-tight" : "text-sm min-h-[2.5rem]",
+                          )}
+                        >
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
                         {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd' || product.productSource === 'laptop' || product.productSource === 'desktop') && (
@@ -1177,15 +1227,20 @@ export default function SalesPOS({
                               : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                           </Badge>
                         )}
-                        {product.sku && (
+                        {product.sku && !isInStoreCatalog && (
                           <p className="text-xs text-muted-foreground flex items-center gap-1">
                             <Barcode className="h-3 w-3" />
                             {product.sku}
                           </p>
                         )}
-                        <p className="text-lg font-bold text-primary">
+                        <p
+                          className={cn(
+                            "font-bold text-primary",
+                            isInStoreCatalog ? "text-xs" : "text-lg",
+                          )}
+                        >
                           {formatPrice(parseFloat(product.price))}
-                          <span className="text-xs font-normal text-muted-foreground me-1">
+                          <span className={cn("font-normal text-muted-foreground me-1", isInStoreCatalog ? "text-[10px]" : "text-xs")}>
                             {language === 'ar' ? 'د.ع' : 'IQD'}
                           </span>
                         </p>
@@ -1195,24 +1250,33 @@ export default function SalesPOS({
                 })}
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className={isInStoreCatalog ? "space-y-1" : "space-y-2"}>
                 {filteredProducts.map(product => {
                   const inCart = cart.find(item => item.product.id === product.id);
                   const isOutOfStock = (product.stockQuantity || 0) <= 0;
+                  const listIconClass = isInStoreCatalog ? "h-5 w-5" : "h-6 w-6";
                   return (
                     <button
                       key={product.id}
                       onClick={() => addToCart(product)}
                       disabled={isOutOfStock}
-                      className={`w-full flex items-center gap-4 p-3 border-2 rounded-xl transition-all text-start ${
-                        inCart 
-                          ? 'border-primary bg-primary/5' 
-                          : 'border-transparent bg-card hover:border-primary/30'
-                      } ${isOutOfStock ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      className={cn(
+                        "w-full flex items-center border-2 transition-all text-start",
+                        isInStoreCatalog ? "gap-2 p-2 rounded-lg" : "gap-4 p-3 rounded-xl",
+                        inCart
+                          ? "border-primary bg-primary/5"
+                          : "border-transparent bg-card hover:border-primary/30",
+                        isOutOfStock && "opacity-50 cursor-not-allowed",
+                      )}
                       data-testid={`product-list-${product.id}`}
                     >
                       {/* Product Image */}
-                      <div className="h-16 w-16 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                      <div
+                        className={cn(
+                          "rounded-md bg-muted overflow-hidden flex-shrink-0",
+                          isInStoreCatalog ? "h-11 w-11" : "h-16 w-16 rounded-lg",
+                        )}
+                      >
                         {product.image ? (
                           <img 
                             src={product.image} 
@@ -1222,19 +1286,19 @@ export default function SalesPOS({
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
                             {product.productSource === 'battery' ? (
-                              <Battery className="h-6 w-6 text-primary/40" />
+                              <Battery className={cn(listIconClass, "text-primary/40")} />
                             ) : product.productSource === 'adapter' ? (
-                              <Plug className="h-6 w-6 text-primary/40" />
+                              <Plug className={cn(listIconClass, "text-primary/40")} />
                             ) : product.productSource === 'keyboard' ? (
-                              <Keyboard className="h-6 w-6 text-primary/40" />
+                              <Keyboard className={cn(listIconClass, "text-primary/40")} />
                             ) : product.productSource === 'lcd' ? (
-                              <Monitor className="h-6 w-6 text-primary/40" />
+                              <Monitor className={cn(listIconClass, "text-primary/40")} />
                             ) : product.productSource === 'laptop' ? (
-                              <LaptopIcon className="h-6 w-6 text-primary/40" />
+                              <LaptopIcon className={cn(listIconClass, "text-primary/40")} />
                             ) : product.productSource === 'desktop' ? (
-                              <Computer className="h-6 w-6 text-primary/40" />
+                              <Computer className={cn(listIconClass, "text-primary/40")} />
                             ) : (
-                              <Package className="h-6 w-6 text-muted-foreground/30" />
+                              <Package className={cn(listIconClass, "text-muted-foreground/30")} />
                             )}
                           </div>
                         )}
@@ -1242,7 +1306,7 @@ export default function SalesPOS({
                       
                       {/* Product Info */}
                       <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm truncate">
+                        <p className={cn("font-semibold truncate", isInStoreCatalog ? "text-xs" : "text-sm")}>
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
                         {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd' || product.productSource === 'laptop' || product.productSource === 'desktop') && (
@@ -1267,11 +1331,11 @@ export default function SalesPOS({
                       
                       {/* Price & Cart Badge */}
                       <div className="text-end flex-shrink-0">
-                        <p className="text-lg font-bold text-primary">
+                        <p className={cn("font-bold text-primary", isInStoreCatalog ? "text-sm" : "text-lg")}>
                           {formatPrice(parseFloat(product.price))}
                         </p>
                         {inCart && (
-                          <Badge className="text-xs">{inCart.quantity}x</Badge>
+                          <Badge className={isInStoreCatalog ? "text-[10px] px-1 py-0" : "text-xs"}>{inCart.quantity}x</Badge>
                         )}
                       </div>
                     </button>
@@ -1284,8 +1348,8 @@ export default function SalesPOS({
       </div>
 
       {/* Right Column - Cart & Payment */}
-      <div className="w-full lg:w-[420px] flex flex-col">
-        <Card className="flex-1 flex flex-col overflow-hidden">
+      <div className="w-full lg:w-[420px] flex flex-col min-h-0">
+        <Card className="flex-1 flex flex-col min-h-0 overflow-hidden">
           {/* Cart Header */}
           <CardHeader className="pb-3 border-b bg-muted/30">
             <div className="flex items-center justify-between">
@@ -1352,7 +1416,7 @@ export default function SalesPOS({
             </div>
           </CardHeader>
           
-          <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
+          <CardContent className="flex-1 flex flex-col min-h-0 p-0 overflow-hidden">
             {cart.length === 0 ? (
               <div className="flex-1 flex items-center justify-center p-6">
                 <div className="text-center space-y-3">
@@ -1369,16 +1433,24 @@ export default function SalesPOS({
               </div>
             ) : (
               <>
-                {/* Cart Items */}
-                <ScrollArea className="flex-1 p-4">
-                  <div className="space-y-3">
+                {/* Cart items + customer/payment — scrollable; totals stay pinned below */}
+                <ScrollArea className="flex-1 min-h-0">
+                  <div className={cn(isInStoreCatalog ? "p-2 space-y-2" : "p-4 space-y-3")}>
                     {cart.map(item => (
                       <div 
                         key={item.product.id} 
-                        className="flex items-start gap-3 p-3 rounded-xl bg-muted/50 border"
+                        className={cn(
+                          "flex items-start bg-muted/50 border",
+                          isInStoreCatalog ? "gap-2 p-2 rounded-lg" : "gap-3 p-3 rounded-xl",
+                        )}
                       >
                         {/* Product Image */}
-                        <div className="h-14 w-14 rounded-lg bg-background overflow-hidden flex-shrink-0">
+                        <div
+                          className={cn(
+                            "rounded-md bg-background overflow-hidden flex-shrink-0",
+                            isInStoreCatalog ? "h-10 w-10" : "h-14 w-14 rounded-lg",
+                          )}
+                        >
                           {item.product.image ? (
                             <img 
                               src={item.product.image} 
@@ -1408,11 +1480,11 @@ export default function SalesPOS({
                         
                         {/* Product Info */}
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-sm line-clamp-1">
+                          <p className={cn("font-medium line-clamp-1", isInStoreCatalog ? "text-xs" : "text-sm")}>
                             {language === 'ar' ? item.product.nameAr : (item.product.nameEn || item.product.nameAr)}
                           </p>
                           {(item.product.productSource === 'battery' || item.product.productSource === 'adapter' || item.product.productSource === 'keyboard' || item.product.productSource === 'lcd' || item.product.productSource === 'laptop' || item.product.productSource === 'desktop') && (
-                            <Badge variant="outline" className="text-[10px] mb-1">
+                            <Badge variant="outline" className="text-[10px] mb-0.5">
                               {item.product.productSource === 'battery'
                                 ? (language === 'ar' ? 'بطارية' : 'Battery')
                                 : item.product.productSource === 'adapter'
@@ -1427,7 +1499,7 @@ export default function SalesPOS({
                             </Badge>
                           )}
                           <div className="flex items-center gap-1 flex-wrap">
-                            <p className="text-sm text-primary font-bold">
+                            <p className={cn("text-primary font-bold", isInStoreCatalog ? "text-xs" : "text-sm")}>
                               {formatPrice(parseFloat(getEffectivePrice(item)))} × {item.quantity}
                             </p>
                             {item.product.wholesalePrice && (orderType === 'in-store' || item.product.productSource === 'battery' || item.product.productSource === 'adapter') && (
@@ -1444,26 +1516,29 @@ export default function SalesPOS({
                               </button>
                             )}
                           </div>
-                          <p className="text-xs text-muted-foreground">
+                          <p className={cn("text-muted-foreground", isInStoreCatalog ? "text-[10px]" : "text-xs")}>
                             = {formatPrice(parseFloat(getEffectivePrice(item)) * item.quantity)} {language === 'ar' ? 'د.ع' : 'IQD'}
                           </p>
                         </div>
                         
                         {/* Quantity Controls */}
-                        <div className="flex flex-col items-end gap-2">
+                        <div className={cn("flex flex-col items-end", isInStoreCatalog ? "gap-1" : "gap-2")}>
                           <Button
                             size="icon"
                             variant="ghost"
-                            className="h-6 w-6 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            className={cn(
+                              "text-destructive hover:text-destructive hover:bg-destructive/10",
+                              isInStoreCatalog ? "h-5 w-5" : "h-6 w-6",
+                            )}
                             onClick={() => removeFromCart(item.product.id)}
                           >
-                            <X className="h-4 w-4" />
+                            <X className={isInStoreCatalog ? "h-3 w-3" : "h-4 w-4"} />
                           </Button>
-                          <div className="flex items-center gap-1 bg-background rounded-lg border p-0.5">
+                          <div className="flex items-center gap-0.5 bg-background rounded-md border p-0.5">
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-7 w-7"
+                              className={isInStoreCatalog ? "h-6 w-6" : "h-7 w-7"}
                               onClick={() => updateQuantity(item.product.id, -1)}
                             >
                               <Minus className="h-3 w-3" />
@@ -1472,14 +1547,17 @@ export default function SalesPOS({
                               type="number"
                               value={item.quantity}
                               onChange={(e) => setQuantity(item.product.id, parseInt(e.target.value) || 1)}
-                              className="w-10 h-7 text-center p-0 border-0 text-sm"
+                              className={cn(
+                                "text-center p-0 border-0",
+                                isInStoreCatalog ? "w-8 h-6 text-xs" : "w-10 h-7 text-sm",
+                              )}
                               min="1"
                               max={item.product.stockQuantity || 99}
                             />
                             <Button
                               size="icon"
                               variant="ghost"
-                              className="h-7 w-7"
+                              className={isInStoreCatalog ? "h-6 w-6" : "h-7 w-7"}
                               onClick={() => updateQuantity(item.product.id, 1)}
                             >
                               <Plus className="h-3 w-3" />
@@ -1489,7 +1567,6 @@ export default function SalesPOS({
                       </div>
                     ))}
                   </div>
-                </ScrollArea>
 
                 {/* Customer & Payment Section */}
                 <div className="p-4 space-y-4 border-t bg-muted/30">
@@ -1645,9 +1722,10 @@ export default function SalesPOS({
                     />
                   </div>
                 </div>
+                </ScrollArea>
 
                 {/* Totals & Checkout */}
-                <div className="p-4 space-y-3 border-t bg-card">
+                <div className="flex-shrink-0 p-4 space-y-3 border-t bg-card">
                   <div className="space-y-1.5 text-sm">
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">{language === 'ar' ? 'المجموع الفرعي' : 'Subtotal'}</span>

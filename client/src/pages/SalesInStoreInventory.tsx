@@ -2,6 +2,14 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { playBarcodeScanBeep, playStockCountErrorBeep } from "@/lib/scanBeep";
+import {
+  appendScanKeystroke,
+  codesMatch,
+  emptyScanBuffer,
+  normalizeScannedBarcode,
+  resolveScannedCode,
+  shouldSuppressScanInput,
+} from "@/lib/barcodeKeyboard";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -147,6 +155,7 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
   const [showApplyConfirm, setShowApplyConfirm] = useState(false);
   const [doneStats, setDoneStats] = useState<{ updated: number; matched: number } | null>(null);
   const scanInputRef = useRef<HTMLInputElement>(null);
+  const scanStateRef = useRef(emptyScanBuffer());
 
   const productsUrl = `/api/instore/products?locationId=${salesLocationId}`;
   const otherSalesLocationId = salesLocationId === 1 ? 2 : 1;
@@ -596,50 +605,60 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   };
 
   const findProductByCode = useCallback((code: string): CountableProduct | null => {
-    const c = code.trim().toLowerCase();
+    const c = normalizeScannedBarcode(code).toLowerCase();
     if (!c) return null;
-    return countProducts.find(p =>
-      (p.barcode && p.barcode.toLowerCase() === c) ||
-      (p.sku && p.sku.toLowerCase() === c)
-    ) || null;
+    return (
+      countProducts.find(
+        (p) => codesMatch(p.barcode, c) || codesMatch(p.sku, c),
+      ) || null
+    );
   }, [countProducts]);
 
   const handleScanSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key !== 'Enter') return;
-    const code = scanInput.trim();
-    if (!code) return;
+    if (e.key === "Enter") {
+      const code = resolveScannedCode(scanStateRef.current, scanInput);
+      scanStateRef.current = emptyScanBuffer();
+      if (!code) return;
 
-    if (unknownCodes.length > 0) {
-      playStockCountErrorBeep();
-      toast({
-        title: language === 'ar' ? 'احذف الرموز غير المعروفة أولاً' : 'Remove unknown codes first',
-        description: language === 'ar'
-          ? 'لا يمكن متابعة المسح حتى حذف كل الرموز غير الموجودة في النظام.'
-          : 'Scanning is paused until every unknown code is removed from the list below.',
-        variant: 'destructive',
-      });
+      if (unknownCodes.length > 0) {
+        playStockCountErrorBeep();
+        toast({
+          title: language === 'ar' ? 'احذف الرموز غير المعروفة أولاً' : 'Remove unknown codes first',
+          description: language === 'ar'
+            ? 'لا يمكن متابعة المسح حتى حذف كل الرموز غير الموجودة في النظام.'
+            : 'Scanning is paused until every unknown code is removed from the list below.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      setScanInput("");
+      setTimeout(() => scanInputRef.current?.focus(), 50);
+
+      const product = findProductByCode(code);
+      if (product) {
+        playBarcodeScanBeep();
+        setScanEntries(prev => {
+          const productKey = makeEntryKey(product);
+          const existing = prev.find(e => makeEntryKey(e.product) === productKey);
+          if (existing) {
+            const rest = prev.filter(e => makeEntryKey(e.product) !== productKey);
+            return [{ ...existing, scanned: existing.scanned + 1 }, ...rest];
+          }
+          return [{ product, scanned: 1 }, ...prev];
+        });
+      } else {
+        playStockCountErrorBeep();
+        setUnknownCodes(prev => [...prev, code]);
+        setShowUnknown(true);
+      }
       return;
     }
 
-    setScanInput("");
-    setTimeout(() => scanInputRef.current?.focus(), 50);
-
-    const product = findProductByCode(code);
-    if (product) {
-      playBarcodeScanBeep();
-      setScanEntries(prev => {
-        const productKey = makeEntryKey(product);
-        const existing = prev.find(e => makeEntryKey(e.product) === productKey);
-        if (existing) {
-          const rest = prev.filter(e => makeEntryKey(e.product) !== productKey);
-          return [{ ...existing, scanned: existing.scanned + 1 }, ...rest];
-        }
-        return [{ product, scanned: 1 }, ...prev];
-      });
-    } else {
-      playStockCountErrorBeep();
-      setUnknownCodes(prev => [...prev, code]);
-      setShowUnknown(true);
+    const next = appendScanKeystroke(scanStateRef.current, e.nativeEvent);
+    scanStateRef.current = next;
+    if (shouldSuppressScanInput(next)) {
+      e.preventDefault();
     }
   };
 
@@ -1166,6 +1185,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     value={scanInput}
                     onChange={e => setScanInput(e.target.value)}
                     onKeyDown={handleScanSubmit}
+                    lang="en"
+                    dir="ltr"
+                    autoComplete="off"
+                    spellCheck={false}
                     placeholder={language === 'ar' ? 'في انتظار المسح...' : 'Waiting for scan...'}
                     className="text-lg font-mono h-12"
                     autoComplete="off"
