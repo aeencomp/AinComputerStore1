@@ -619,7 +619,7 @@ export default function SalesPortal() {
             user={currentUser}
             orderType="in-store"
             salesLocationId={2}
-            productSources={['laptop', 'desktop', 'instore']}
+            productSources={['laptop', 'desktop', 'instore', 'adapter']}
           />
         )}
         {location === "/sales/inventory-loc1" && (
