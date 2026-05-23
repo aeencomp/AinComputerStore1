@@ -1505,7 +1505,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { 
         items, 
         customerName, 
-        customerPhone, 
+        customerPhone,
+        customerAddress,
         customerEmail,
         paymentMethod, 
         paymentStatus,
@@ -1549,7 +1550,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerName: customerName || 'عميل في المتجر',
         customerEmail: customerEmail || '',
         customerPhone: customerPhone || '',
-        customerAddress: 'في المتجر',
+        customerAddress: customerAddress?.trim() || 'في المتجر',
         customerCity: 'بغداد',
         customerPostal: '',
         items,

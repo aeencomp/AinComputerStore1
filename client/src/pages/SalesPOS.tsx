@@ -131,6 +131,7 @@ export default function SalesPOS({
   const [cart, setCart] = useState<CartItem[]>([]);
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [discount, setDiscount] = useState("0");
   const [discountType, setDiscountType] = useState<"fixed" | "percent">("fixed");
@@ -444,6 +445,7 @@ export default function SalesPOS({
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
+      setCustomerAddress("");
       setDiscount("0");
       setHoldNote("");
       queryClient.invalidateQueries({ queryKey: ['/api/sales/held-orders'] });
@@ -506,6 +508,7 @@ export default function SalesPOS({
         createdAt: new Date().toISOString(),
         customerName: customerName || (language === 'ar' ? 'عميل في المتجر' : 'Walk-in Customer'),
         customerPhone: customerPhone || '',
+        customerAddress: orderType === 'in-store' ? customerAddress.trim() : '',
         items: cart.map(item => ({
           nameAr: item.product.nameAr,
           nameEn: item.product.nameEn,
@@ -534,6 +537,7 @@ export default function SalesPOS({
       setCart([]);
       setCustomerName("");
       setCustomerPhone("");
+      setCustomerAddress("");
       setDiscount("0");
       setDiscountReason("");
       setReceiptNote("");
@@ -671,6 +675,7 @@ export default function SalesPOS({
     setCart([]);
     setCustomerName("");
     setCustomerPhone("");
+    setCustomerAddress("");
     setDiscount("0");
     setDiscountReason("");
     setReceiptNote("");
@@ -708,6 +713,7 @@ export default function SalesPOS({
     })),
     customerName: customerName || (language === 'ar' ? 'عميل في المتجر' : 'Walk-in Customer'),
     customerPhone: customerPhone.trim(),
+    ...(orderType === 'in-store' ? { customerAddress: customerAddress.trim() } : {}),
     paymentMethod,
     paymentStatus: paymentMethod === 'deferred' ? 'deferred' : 'success',
     discount: calculatedDiscount.toString(),
@@ -828,10 +834,11 @@ export default function SalesPOS({
       </div>`;
     }).join('');
 
-    const customerHtml = (lastOrder.customerName || lastOrder.customerPhone) ? `
+    const customerHtml = (lastOrder.customerName || lastOrder.customerPhone || lastOrder.customerAddress) ? `
       <div style="border-bottom:1px solid #d1d5db;padding:8px 12px;font-size:12px;">
         ${lastOrder.customerName ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-weight:700;">\u0627\u0644\u0632\u0628\u0648\u0646:</span><span style="font-weight:800;">${lastOrder.customerName}</span></div>` : ''}
-        ${lastOrder.customerPhone ? `<div style="display:flex;justify-content:space-between;"><span style="font-weight:700;">\u0627\u0644\u0647\u0627\u062a\u0641:</span><span style="font-weight:800;" dir="ltr">${lastOrder.customerPhone}</span></div>` : ''}
+        ${lastOrder.customerPhone ? `<div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-weight:700;">\u0627\u0644\u0647\u0627\u062a\u0641:</span><span style="font-weight:800;" dir="ltr">${lastOrder.customerPhone}</span></div>` : ''}
+        ${lastOrder.customerAddress ? `<div style="display:flex;justify-content:space-between;gap:8px;"><span style="font-weight:700;flex-shrink:0;">\u0627\u0644\u0639\u0646\u0648\u0627\u0646:</span><span style="font-weight:800;text-align:left;">${lastOrder.customerAddress}</span></div>` : ''}
       </div>` : '';
 
     const discountHtml = discountNum > 0 ? `
@@ -1535,6 +1542,18 @@ export default function SalesPOS({
                         </div>
                       </div>
                     </div>
+                    {orderType === 'in-store' && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">{language === 'ar' ? 'العنوان' : 'Address'}</Label>
+                        <Textarea
+                          value={customerAddress}
+                          onChange={(e) => setCustomerAddress(e.target.value)}
+                          placeholder={language === 'ar' ? 'عنوان العميل (اختياري)' : 'Customer address (optional)'}
+                          className="min-h-[60px] text-sm resize-none"
+                          data-testid="input-customer-address"
+                        />
+                      </div>
+                    )}
                   </div>
                   
                   {/* Payment Method - Quick Buttons */}
@@ -1727,7 +1746,7 @@ export default function SalesPOS({
               </div>
 
               {/* Customer */}
-              {(lastOrder.customerName || lastOrder.customerPhone) && (
+              {(lastOrder.customerName || lastOrder.customerPhone || lastOrder.customerAddress) && (
                 <div className="border-b border-gray-300 pb-3 mb-3 text-sm space-y-1">
                   {lastOrder.customerName && (
                     <div className="flex justify-between">
@@ -1739,6 +1758,12 @@ export default function SalesPOS({
                     <div className="flex justify-between">
                       <span className="font-bold">الهاتف:</span>
                       <span className="font-extrabold" dir="ltr">{lastOrder.customerPhone}</span>
+                    </div>
+                  )}
+                  {lastOrder.customerAddress && (
+                    <div className="flex justify-between gap-2">
+                      <span className="font-bold shrink-0">العنوان:</span>
+                      <span className="font-extrabold text-end">{lastOrder.customerAddress}</span>
                     </div>
                   )}
                 </div>
@@ -1896,6 +1921,17 @@ export default function SalesPOS({
                     data-testid="input-edit-receipt-phone"
                   />
                 </div>
+                {orderType === 'in-store' && (
+                  <div className="space-y-1.5 md:col-span-2">
+                    <Label>{language === 'ar' ? 'العنوان' : 'Address'}</Label>
+                    <Textarea
+                      value={receiptDraft.customerAddress || ''}
+                      onChange={(e) => setReceiptDraft((prev: any) => ({ ...prev, customerAddress: e.target.value }))}
+                      className="min-h-[72px] resize-none"
+                      data-testid="input-edit-receipt-address"
+                    />
+                  </div>
+                )}
                 <div className="space-y-1.5">
                   <Label>{language === 'ar' ? 'طريقة الدفع' : 'Payment Method'}</Label>
                   <Select
@@ -2134,6 +2170,19 @@ export default function SalesPOS({
                 />
               </div>
             </div>
+
+            {orderType === 'in-store' && (
+              <div className="space-y-2">
+                <Label>{language === 'ar' ? 'العنوان' : 'Address'}</Label>
+                <Textarea
+                  value={customerAddress}
+                  onChange={(e) => setCustomerAddress(e.target.value)}
+                  placeholder={language === 'ar' ? 'عنوان العميل (اختياري)' : 'Customer address (optional)'}
+                  className="min-h-[72px] resize-none"
+                  data-testid="input-checkout-customer-address"
+                />
+              </div>
+            )}
 
             <div className="rounded-lg border bg-muted/40 p-3 space-y-1 text-sm">
               <div className="flex justify-between">
