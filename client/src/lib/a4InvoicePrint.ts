@@ -263,7 +263,12 @@ export function buildA4InvoiceHtml(
 
   const customerName = escapeHtml(order.customerName || "");
   const customerPhone = escapeHtml(order.customerPhone || "");
-  const customerAddress = escapeHtml(order.customerAddress || "");
+  const rawAddress = (order.customerAddress || "").trim();
+  const usefulAddress =
+    rawAddress && rawAddress !== "في المتجر" ? escapeHtml(rawAddress) : "";
+  const customerContact = [usefulAddress, customerPhone]
+    .filter(Boolean)
+    .join(" — ");
   const invoiceNo = escapeHtml(order.orderNumber);
   const amountWords = escapeHtml(iqdToArabicWords(totalNum));
 
@@ -352,10 +357,10 @@ export function buildA4InvoiceHtml(
   .contacts-strip .dept { color: #555; font-weight: 600; display: block; }
   .contacts-strip .phone { direction: ltr; color: #111; font-weight: 800; }
   .meta-row {
-    display: grid;
-    grid-template-columns: 1fr 1.35fr 1fr;
-    align-items: center;
-    gap: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
     padding: 12px 4px;
     font-size: 13px;
     font-weight: 700;
@@ -364,38 +369,18 @@ export function buildA4InvoiceHtml(
   .meta-row .field:last-child { margin-bottom: 0; }
   .meta-row .label { color: #333; }
   .meta-row .value { border-bottom: 1px dotted #999; min-height: 18px; padding: 0 4px; }
-  .meta-customer { min-width: 0; text-align: start; align-self: start; }
-  .meta-address {
-    min-width: 0;
-    text-align: center;
-    justify-self: center;
-    align-self: center;
-    padding: 0 10px;
-  }
-  .meta-address .address-field {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 0;
-  }
-  .meta-address .label { display: block; font-size: 12px; }
-  .meta-address .value {
-    display: block;
-    width: 100%;
-    max-width: 280px;
-    border-bottom: 1px dotted #999;
-    min-height: 18px;
-    padding: 0 8px 4px;
-    line-height: 1.55;
-    text-align: center;
+  .meta-row .value.contact-value {
+    display: inline-block;
+    min-width: 220px;
+    max-width: 360px;
+    line-height: 1.5;
     word-break: break-word;
   }
+  .meta-customer { flex: 1; min-width: 0; text-align: start; }
   .meta-invoice-info {
     flex-shrink: 0;
     text-align: left;
-    align-self: start;
-    justify-self: end;
+    align-self: flex-start;
     line-height: 1.65;
     padding-left: 2px;
   }
@@ -514,13 +499,7 @@ export function buildA4InvoiceHtml(
   <section class="meta-row">
     <div class="meta-customer">
       <div class="field"><span class="label">اسم العميل :</span> <span class="value">${customerName}</span></div>
-      <div class="field"><span class="label">الهاتف :</span> <span class="value" dir="ltr">${customerPhone}</span></div>
-    </div>
-    <div class="meta-address">
-      <div class="field address-field">
-        <span class="label">العنوان :</span>
-        <span class="value">${customerAddress || "—"}</span>
-      </div>
+      <div class="field"><span class="label">العنوان / رقم الهاتف :</span> <span class="value contact-value" dir="auto">${customerContact || "—"}</span></div>
     </div>
     <div class="meta-invoice-info">
       <div><span class="label">نوع الفاتورة :</span> ${payType}</div>
