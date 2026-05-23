@@ -800,6 +800,7 @@ export const acAdapters = pgTable("ac_adapters", {
   location: text("location"), // Storage location in warehouse
   notes: text("notes"),
   isActive: integer("is_active").notNull().default(1),
+  salesLocationId: integer("sales_location_id").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

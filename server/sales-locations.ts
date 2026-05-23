@@ -9,6 +9,7 @@ import {
   inStoreProducts,
   laptops,
   desktops,
+  acAdapters,
 } from "@shared/schema";
 
 export const LOCATION_MAIN_ID = 1;
@@ -91,7 +92,7 @@ export async function setUserLocationAssignments(
   }
 }
 
-export type TransferProductSource = "instore" | "laptop" | "desktop";
+export type TransferProductSource = "instore" | "laptop" | "desktop" | "adapter";
 
 export type TransferInventoryHit = {
   productSource: TransferProductSource;
@@ -142,7 +143,7 @@ export async function searchInventoryAtLocation(
   const query = q.trim().toLowerCase();
   if (!query) return [];
 
-  const [instore, laps, desks] = await Promise.all([
+  const [instore, laps, desks, adapterRows] = await Promise.all([
     db.select().from(inStoreProducts).where(eq(inStoreProducts.salesLocationId, locationId)),
     db
       .select()
@@ -152,6 +153,10 @@ export async function searchInventoryAtLocation(
       .select()
       .from(desktops)
       .where(and(eq(desktops.salesLocationId, locationId), eq(desktops.isActive, 1))),
+    db
+      .select()
+      .from(acAdapters)
+      .where(and(eq(acAdapters.salesLocationId, locationId), eq(acAdapters.isActive, 1))),
   ]);
 
   const results: TransferInventoryHit[] = [];
@@ -198,13 +203,32 @@ export async function searchInventoryAtLocation(
       });
     }
   }
+  for (const a of adapterRows) {
+    const qty = a.stockQuantity || 0;
+    if (qty < 1) continue;
+    const watt = a.wattage != null ? `${a.wattage}w` : "";
+    const label = `${a.brand} ${watt} ${a.serialNumber} ${a.barcode || ""} ${a.partNumber || ""}`.toLowerCase();
+    if (
+      label.includes(query) ||
+      a.serialNumber.toLowerCase() === query ||
+      (a.barcode && a.barcode.toLowerCase() === query)
+    ) {
+      results.push({
+        productSource: "adapter",
+        productId: a.id,
+        label: `${a.brand}${watt ? ` ${watt}` : ""} — ${a.serialNumber}`,
+        stockQuantity: qty,
+        barcode: a.barcode,
+      });
+    }
+  }
 
   return results.slice(0, 40);
 }
 
 async function nextInventorySerial(
   prefix: string,
-  table: typeof laptops | typeof desktops,
+  table: typeof laptops | typeof desktops | typeof acAdapters,
 ): Promise<string> {
   const rows = await db.select({ serialNumber: table.serialNumber }).from(table);
   const used = new Set(rows.map((r) => (r.serialNumber || "").trim().toUpperCase()));
@@ -294,6 +318,84 @@ async function transferLaptopOrDesktopQuantity(params: {
   return newSerial;
 }
 
+async function transferAdapterQuantity(params: {
+  row: typeof acAdapters.$inferSelect;
+  productId: string;
+  fromLocationId: number;
+  toLocationId: number;
+  quantity: number;
+}): Promise<string | null> {
+  const { row, productId, fromLocationId, toLocationId, quantity } = params;
+  const available = row.stockQuantity || 0;
+  if (available < quantity) {
+    throw new Error("لا يوجد مخزون كافٍ");
+  }
+
+  const matchClause = row.barcode
+    ? eq(acAdapters.barcode, row.barcode)
+    : row.partNumber
+      ? and(eq(acAdapters.brand, row.brand), eq(acAdapters.partNumber, row.partNumber))
+      : row.wattage != null
+        ? and(eq(acAdapters.brand, row.brand), eq(acAdapters.wattage, row.wattage))
+        : eq(acAdapters.brand, row.brand);
+
+  if (quantity === available) {
+    await db
+      .update(acAdapters)
+      .set({ salesLocationId: toLocationId, updatedAt: new Date() })
+      .where(eq(acAdapters.id, productId));
+    return row.serialNumber;
+  }
+
+  await db
+    .update(acAdapters)
+    .set({ stockQuantity: available - quantity, updatedAt: new Date() })
+    .where(eq(acAdapters.id, productId));
+
+  const [existingAtDest] = await db
+    .select()
+    .from(acAdapters)
+    .where(
+      and(
+        eq(acAdapters.salesLocationId, toLocationId),
+        eq(acAdapters.isActive, 1),
+        matchClause,
+      ),
+    )
+    .limit(1);
+
+  if (existingAtDest) {
+    await db
+      .update(acAdapters)
+      .set({
+        stockQuantity: (existingAtDest.stockQuantity || 0) + quantity,
+        updatedAt: new Date(),
+      })
+      .where(eq(acAdapters.id, existingAtDest.id));
+    return existingAtDest.serialNumber;
+  }
+
+  const newSerial = await nextInventorySerial("ADP", acAdapters);
+  const {
+    id: _id,
+    createdAt: _c,
+    updatedAt: _u,
+    serialNumber: _s,
+    stockQuantity: _q,
+    salesLocationId: _loc,
+    ...rest
+  } = row;
+  await db.insert(acAdapters).values({
+    ...rest,
+    serialNumber: newSerial,
+    barcode: row.barcode || newSerial,
+    stockQuantity: quantity,
+    salesLocationId: toLocationId,
+    isActive: 1,
+  });
+  return newSerial;
+}
+
 export async function executeStockTransfer(params: {
   fromLocationId: number;
   toLocationId: number;
@@ -348,6 +450,19 @@ export async function executeStockTransfer(params: {
     serialNumber = await transferLaptopOrDesktopQuantity({
       table: desktops,
       serialPrefix: "DES",
+      row,
+      productId,
+      fromLocationId,
+      toLocationId,
+      quantity,
+    });
+  } else if (productSource === "adapter") {
+    const [row] = await db.select().from(acAdapters).where(eq(acAdapters.id, productId));
+    if (!row) throw new Error("الشاحن غير موجود");
+    if (row.salesLocationId !== fromLocationId) {
+      throw new Error("المنتج ليس في المخزون المصدر");
+    }
+    serialNumber = await transferAdapterQuantity({
       row,
       productId,
       fromLocationId,

@@ -10,7 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { ArrowRightLeft, Loader2, Search, Plus, Trash2, ShoppingCart } from "lucide-react";
 
 interface SearchHit {
-  productSource: "instore" | "laptop" | "desktop";
+  productSource: "instore" | "laptop" | "desktop" | "adapter";
   productId: string;
   label: string;
   stockQuantity: number;
@@ -114,6 +114,7 @@ export default function SalesTransferStock({ direction, user }: SalesTransferSto
           key.startsWith("/api/instore/products") ||
           key.startsWith("/api/battery/laptops") ||
           key.startsWith("/api/battery/desktops") ||
+          key.startsWith("/api/battery/adapters") ||
           key.startsWith("/api/sales/inventory/search-loc1") ||
           key.startsWith("/api/sales/inventory/search-loc2") ||
           key.startsWith("/api/sales/transfers")

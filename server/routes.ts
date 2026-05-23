@@ -6417,7 +6417,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!batteryUserId && !salesUserId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
-      
+
+      const locationId = req.query.locationId != null
+        ? parseInt(String(req.query.locationId), 10)
+        : (salesUserId ? resolveRequestLocationId(req) : null);
+      if (locationId && !Number.isNaN(locationId)) {
+        const rows = await db
+          .select()
+          .from(acAdapters)
+          .where(and(eq(acAdapters.isActive, 1), eq(acAdapters.salesLocationId, locationId)))
+          .orderBy(desc(acAdapters.createdAt));
+        return res.json(rows);
+      }
+
       const adapters = await storage.getAcAdapters();
       return res.json(adapters);
     } catch (error) {
