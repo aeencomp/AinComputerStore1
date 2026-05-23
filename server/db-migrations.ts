@@ -61,6 +61,10 @@ const STARTUP_MIGRATIONS: string[] = [
   `UPDATE sales_shifts SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
   `UPDATE cash_withdrawals SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
   `UPDATE staff_advances SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
+
+  `UPDATE orders SET payment_status = 'deferred'
+     WHERE payment_method = 'deferred'
+       AND COALESCE(payment_status, '') <> 'deferred'`,
 ];
 
 export async function runDbMigrations(): Promise<void> {

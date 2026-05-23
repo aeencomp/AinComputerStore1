@@ -128,8 +128,12 @@ function fmtNum(n: number) {
   return n.toLocaleString("ar-IQ") + " د.ع";
 }
 
+function isDeferredPayment(method: string | undefined, status: string | undefined): boolean {
+  return status === "deferred" || method === "deferred";
+}
+
 function paymentLabel(method: string | undefined, status: string | undefined): string {
-  if (status === "deferred") return "آجل";
+  if (isDeferredPayment(method, status)) return "آجل";
   if (!method || method === "cash") return "نقداً";
   if (method === "zaincash") return "ZainCash";
   if (method === "qicard") return "QiCard";
@@ -137,7 +141,7 @@ function paymentLabel(method: string | undefined, status: string | undefined): s
 }
 
 function paymentBadge(method: string | undefined, status: string | undefined) {
-  if (status === "deferred") return <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>;
+  if (isDeferredPayment(method, status)) return <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>;
   if (!method || method === "cash") return <Badge variant="outline" className="text-green-700 border-green-400">نقداً</Badge>;
   if (method === "zaincash") return <Badge variant="outline" className="text-blue-700 border-blue-400">ZainCash</Badge>;
   if (method === "qicard") return <Badge variant="outline" className="text-purple-700 border-purple-400">QiCard</Badge>;
@@ -156,7 +160,7 @@ function buildPrintHTML(data: ShiftReportData): string {
 
   const inStoreRows = inStoreSales.map((o, i) => {
     const pay = paymentLabel(o.paymentMethod, o.paymentStatus);
-    const isDeferred = o.paymentStatus === "deferred";
+    const isDeferred = isDeferredPayment(o.paymentMethod, o.paymentStatus);
     const parsedItems: { nameAr?: string; nameEn?: string; price: string; quantity: number }[] =
       (o.items || []).map((it: any) => {
         try { return typeof it === "string" ? JSON.parse(it) : it; }
@@ -1314,7 +1318,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                                   <td className="py-2 px-4">
                                     {paymentBadge(order.paymentMethod, order.paymentStatus)}
                                   </td>
-                                  <td className={`py-2 px-4 text-end font-semibold ${order.paymentStatus === "deferred" ? "text-orange-600" : ""}`}>
+                                  <td className={`py-2 px-4 text-end font-semibold ${isDeferredPayment(order.paymentMethod, order.paymentStatus) ? "text-orange-600" : ""}`}>
                                     {fmtNum(parseFloat(order.total))}
                                   </td>
                                 </tr>

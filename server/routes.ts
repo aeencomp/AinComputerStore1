@@ -42,6 +42,14 @@ import {
   deactivateSyncedBatteryInStore,
   deactivateSyncedAdapterInStore,
 } from "./battery-instore-sync";
+import {
+  isOrderDeferred,
+  isInStoreCash,
+  isInStoreCard,
+  isInStoreZainCash,
+  isInStoreQiCard,
+  paymentFieldsFromMethod,
+} from "./order-payment";
 
 const uploadDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadDir)) {
@@ -1938,7 +1946,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Cash-only amounts for expected cash calculation
       const cashSalesOrders = shiftOrders
-        .filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred')
+        .filter(o => isInStoreCash(o))
         .reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
       const cashRepairs = shiftRepairs
         .filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod))
@@ -1947,7 +1955,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Total sales across all payment methods (excluding deferred)
       const totalOrderSales = shiftOrders
-        .filter(o => o.paymentStatus !== 'deferred')
+        .filter(o => !isOrderDeferred(o))
         .reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
       const totalRepairSales = shiftRepairs
         .filter(t => t.paymentStatus !== 'deferred')
@@ -2052,12 +2060,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ))
       .orderBy(desc(staffAdvances.createdAt));
 
-    const inStoreTotalCash = inStoreOrders.filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotalCard = inStoreOrders.filter(o => o.paymentMethod === 'card' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotalZain = inStoreOrders.filter(o => o.paymentMethod === 'zaincash' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotalQi = inStoreOrders.filter(o => o.paymentMethod === 'qicard' && o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotalDeferred = inStoreOrders.filter(o => o.paymentStatus === 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotal = inStoreOrders.filter(o => o.paymentStatus !== 'deferred').reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalCash = inStoreOrders.filter(o => isInStoreCash(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalCard = inStoreOrders.filter(o => isInStoreCard(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalZain = inStoreOrders.filter(o => isInStoreZainCash(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalQi = inStoreOrders.filter(o => isInStoreQiCard(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalDeferred = inStoreOrders.filter(o => isOrderDeferred(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotal = inStoreOrders.filter(o => !isOrderDeferred(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const totalWithdrawals = dailyWithdrawals.reduce((s, w) => s + parseFloat(w.amount), 0);
     const totalAdvances = dailyAdvances.reduce((s, a) => s + parseFloat(a.amount), 0);
     const repairTotalDeferred = paidRepairTickets.filter(t => t.paymentStatus === 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
@@ -3460,12 +3468,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const discount = Math.min(Math.max(0, parseFloat(String(data.discount || "0")) || 0), subtotal);
       const total = Math.max(0, subtotal - discount);
 
+      const payment = paymentFieldsFromMethod(data.paymentMethod);
+
       const [updated] = await db
         .update(orders)
         .set({
           customerName: data.customerName || "عميل في المتجر",
           customerPhone: data.customerPhone || "",
-          paymentMethod: data.paymentMethod || "cash",
+          paymentMethod: payment.paymentMethod,
+          paymentStatus: payment.paymentStatus,
           items: sanitizedItems.map((item) => JSON.stringify(item)),
           subtotal: subtotal.toString(),
           discount: discount.toString(),
@@ -10008,22 +10019,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) : [];
 
       const inStoreTotalCash = inStoreOrders
-        .filter(o => o.paymentMethod === 'cash' && o.paymentStatus !== 'deferred')
+        .filter(o => isInStoreCash(o))
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
       const inStoreTotalCard = inStoreOrders
-        .filter(o => o.paymentMethod === 'card' && o.paymentStatus !== 'deferred')
+        .filter(o => isInStoreCard(o))
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
       const inStoreTotalZain = inStoreOrders
-        .filter(o => o.paymentMethod === 'zaincash' && o.paymentStatus !== 'deferred')
+        .filter(o => isInStoreZainCash(o))
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
       const inStoreTotalQi = inStoreOrders
-        .filter(o => o.paymentMethod === 'qicard' && o.paymentStatus !== 'deferred')
+        .filter(o => isInStoreQiCard(o))
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
       const inStoreTotalDeferred = inStoreOrders
-        .filter(o => o.paymentStatus === 'deferred')
+        .filter(o => isOrderDeferred(o))
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
       const inStoreTotal = inStoreOrders
-        .filter(o => o.paymentStatus !== 'deferred')
+        .filter(o => !isOrderDeferred(o))
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
 
       // Withdrawals — use the effective (extended) window

@@ -44,6 +44,7 @@ interface Order {
   subtotal?: string;
   discount?: string;
   paymentMethod: string;
+  paymentStatus?: string;
   orderType: string | null;
   status: string;
   createdAt: string;
@@ -168,6 +169,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const invalidateOrderQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
     queryClient.invalidateQueries({ queryKey: ['/api/orders', salesLocationId] });
+    queryClient.invalidateQueries({ queryKey: ['/api/daily-report'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts'] });
   };
 
   const deleteOrderMutation = useMutation({
@@ -342,7 +345,11 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     return new Intl.NumberFormat('ar-IQ').format(price);
   };
 
-  const getPaymentMethodLabel = (method: string) => {
+  const getPaymentMethodLabel = (order: Order) => {
+    if (order.paymentStatus === 'deferred' || order.paymentMethod === 'deferred') {
+      return language === 'ar' ? 'أجل' : 'Deferred';
+    }
+    const method = order.paymentMethod || 'cash';
     const labels: Record<string, { ar: string; en: string }> = {
       'cash': { ar: 'نقداً', en: 'Cash' },
       'card': { ar: 'بطاقة', en: 'Card' },
@@ -1003,7 +1010,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                           <Badge variant="outline" className="text-xs">{order.status}</Badge>
                         )}
                       </td>
-                      <td className="p-3">{getPaymentMethodLabel(order.paymentMethod)}</td>
+                      <td className="p-3">{getPaymentMethodLabel(order)}</td>
                       <td className="p-3 text-end font-bold">{formatPrice(parseFloat(order.total))} IQD</td>
                       <td className="p-3 text-muted-foreground">
                         {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
