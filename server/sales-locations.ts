@@ -227,6 +227,84 @@ export async function searchInventoryAtLocation(
   return results.slice(0, 40);
 }
 
+/** Scan code that must stay the same when stock moves between locations. */
+function getStableBarcode(row: { barcode?: string | null; serialNumber: string }): string {
+  const barcode = (row.barcode || "").trim();
+  if (barcode) return barcode;
+  return (row.serialNumber || "").trim();
+}
+
+async function findInventoryRowAtLocation(
+  table: typeof laptops | typeof desktops | typeof acAdapters,
+  locationId: number,
+  row: { barcode?: string | null; serialNumber: string; brand: string; partNumber?: string | null; model?: string | null; wattage?: number | null },
+): Promise<(typeof laptops.$inferSelect | typeof desktops.$inferSelect | typeof acAdapters.$inferSelect) | undefined> {
+  const stableBarcode = getStableBarcode(row);
+
+  if (stableBarcode) {
+    const [byBarcode] = await db
+      .select()
+      .from(table)
+      .where(
+        and(
+          eq(table.salesLocationId, locationId),
+          eq(table.isActive, 1),
+          eq(table.barcode, stableBarcode),
+        ),
+      )
+      .limit(1);
+    if (byBarcode) return byBarcode;
+
+    const [bySerialAsScanCode] = await db
+      .select()
+      .from(table)
+      .where(
+        and(
+          eq(table.salesLocationId, locationId),
+          eq(table.isActive, 1),
+          eq(table.serialNumber, stableBarcode),
+        ),
+      )
+      .limit(1);
+    if (bySerialAsScanCode) return bySerialAsScanCode;
+  }
+
+  let identityClause;
+  if (table === acAdapters) {
+    const adapterRow = row as {
+      brand: string;
+      partNumber?: string | null;
+      wattage?: number | null;
+    };
+    identityClause =
+      adapterRow.partNumber != null && adapterRow.partNumber !== ""
+        ? and(eq(acAdapters.brand, adapterRow.brand), eq(acAdapters.partNumber, adapterRow.partNumber))
+        : adapterRow.wattage != null
+          ? and(eq(acAdapters.brand, adapterRow.brand), eq(acAdapters.wattage, adapterRow.wattage))
+          : eq(acAdapters.brand, adapterRow.brand);
+  } else {
+    identityClause =
+      row.partNumber != null && row.partNumber !== ""
+        ? and(eq(table.brand, row.brand), eq(table.partNumber, row.partNumber))
+        : row.model
+          ? and(eq(table.brand, row.brand), eq(table.model, row.model))
+          : eq(table.brand, row.brand);
+  }
+
+  const [byIdentity] = await db
+    .select()
+    .from(table)
+    .where(
+      and(
+        eq(table.salesLocationId, locationId),
+        eq(table.isActive, 1),
+        identityClause,
+      ),
+    )
+    .limit(1);
+  return byIdentity;
+}
+
 async function nextInventorySerial(
   prefix: string,
   table: typeof laptops | typeof desktops | typeof acAdapters,
@@ -263,36 +341,25 @@ async function transferLaptopOrDesktopQuantity(params: {
     throw new Error("لا يوجد مخزون كافٍ");
   }
 
-  const matchClause = row.barcode
-    ? eq(table.barcode, row.barcode)
-    : row.partNumber
-      ? and(eq(table.brand, row.brand), eq(table.partNumber, row.partNumber))
-      : row.model
-        ? and(eq(table.brand, row.brand), eq(table.model, row.model))
-        : eq(table.brand, row.brand);
+  const stableBarcode = getStableBarcode(row);
 
   await db
     .update(table)
-    .set({ stockQuantity: available - quantity, updatedAt: new Date() })
+    .set({
+      stockQuantity: available - quantity,
+      ...(row.barcode ? {} : { barcode: stableBarcode }),
+      updatedAt: new Date(),
+    })
     .where(eq(table.id, productId));
 
-  const [existingAtDest] = await db
-    .select()
-    .from(table)
-    .where(
-      and(
-        eq(table.salesLocationId, toLocationId),
-        eq(table.isActive, 1),
-        matchClause,
-      ),
-    )
-    .limit(1);
+  const existingAtDest = await findInventoryRowAtLocation(table, toLocationId, row);
 
   if (existingAtDest) {
     await db
       .update(table)
       .set({
         stockQuantity: (existingAtDest.stockQuantity || 0) + quantity,
+        barcode: stableBarcode,
         updatedAt: new Date(),
       })
       .where(eq(table.id, existingAtDest.id));
@@ -300,10 +367,20 @@ async function transferLaptopOrDesktopQuantity(params: {
   }
 
   const newSerial = await nextInventorySerial(serialPrefix, table);
-  const { id: _id, createdAt: _c, updatedAt: _u, serialNumber: _s, stockQuantity: _q, salesLocationId: _loc, ...rest } = row;
+  const {
+    id: _id,
+    createdAt: _c,
+    updatedAt: _u,
+    serialNumber: _s,
+    stockQuantity: _q,
+    salesLocationId: _loc,
+    barcode: _b,
+    ...rest
+  } = row;
   await db.insert(table).values({
     ...rest,
     serialNumber: newSerial,
+    barcode: stableBarcode,
     stockQuantity: quantity,
     salesLocationId: toLocationId,
     isActive: 1,
@@ -324,36 +401,25 @@ async function transferAdapterQuantity(params: {
     throw new Error("لا يوجد مخزون كافٍ");
   }
 
-  const matchClause = row.barcode
-    ? eq(acAdapters.barcode, row.barcode)
-    : row.partNumber
-      ? and(eq(acAdapters.brand, row.brand), eq(acAdapters.partNumber, row.partNumber))
-      : row.wattage != null
-        ? and(eq(acAdapters.brand, row.brand), eq(acAdapters.wattage, row.wattage))
-        : eq(acAdapters.brand, row.brand);
+  const stableBarcode = getStableBarcode(row);
 
   await db
     .update(acAdapters)
-    .set({ stockQuantity: available - quantity, updatedAt: new Date() })
+    .set({
+      stockQuantity: available - quantity,
+      ...(row.barcode ? {} : { barcode: stableBarcode }),
+      updatedAt: new Date(),
+    })
     .where(eq(acAdapters.id, productId));
 
-  const [existingAtDest] = await db
-    .select()
-    .from(acAdapters)
-    .where(
-      and(
-        eq(acAdapters.salesLocationId, toLocationId),
-        eq(acAdapters.isActive, 1),
-        matchClause,
-      ),
-    )
-    .limit(1);
+  const existingAtDest = await findInventoryRowAtLocation(acAdapters, toLocationId, row);
 
   if (existingAtDest) {
     await db
       .update(acAdapters)
       .set({
         stockQuantity: (existingAtDest.stockQuantity || 0) + quantity,
+        barcode: stableBarcode,
         updatedAt: new Date(),
       })
       .where(eq(acAdapters.id, existingAtDest.id));
@@ -370,6 +436,7 @@ async function transferAdapterQuantity(params: {
     serialNumber: _s,
     stockQuantity: _q,
     salesLocationId: _loc,
+    barcode: _b,
     ...rest
   } = row;
   const [inserted] = await db
@@ -377,7 +444,7 @@ async function transferAdapterQuantity(params: {
     .values({
       ...rest,
       serialNumber: newSerial,
-      barcode: row.barcode || newSerial,
+      barcode: stableBarcode,
       stockQuantity: quantity,
       salesLocationId: toLocationId,
       isActive: 1,
@@ -529,4 +596,145 @@ export async function executeStockTransfer(params: {
     .returning();
 
   return { transferId: transfer.id };
+}
+
+async function alignProductGroupBarcodes(
+  table: typeof laptops | typeof desktops | typeof acAdapters,
+): Promise<void> {
+  const rows = await db.select().from(table).where(eq(table.isActive, 1));
+  const groups = new Map<string, Array<(typeof rows)[number]>>();
+
+  for (const row of rows) {
+    const part = (row.partNumber || "").toLowerCase();
+    const model = "model" in row ? String(row.model || "").toLowerCase() : "";
+    const wattage = "wattage" in row && row.wattage != null ? String(row.wattage) : "";
+    const key = `${row.salesLocationId}::${(row.brand || "").toLowerCase()}::${part}::${model}::${wattage}`;
+    const group = groups.get(key) || [];
+    group.push(row);
+    groups.set(key, group);
+  }
+
+  for (const [, group] of groups) {
+    if (group.length < 2) continue;
+
+    let stable: string | null = null;
+    for (const row of group) {
+      const barcode = (row.barcode || "").trim();
+      const serial = (row.serialNumber || "").trim();
+      if (barcode && barcode !== serial) {
+        stable = barcode;
+        break;
+      }
+    }
+    if (!stable) {
+      for (const row of group) {
+        const barcode = (row.barcode || "").trim();
+        if (barcode) {
+          stable = barcode;
+          break;
+        }
+      }
+    }
+    if (!stable) continue;
+
+    for (const row of group) {
+      const current = (row.barcode || "").trim();
+      if (current === stable) continue;
+      const serial = (row.serialNumber || "").trim();
+      if (!current || current === serial) {
+        await db
+          .update(table)
+          .set({ barcode: stable, updatedAt: new Date() })
+          .where(eq(table.id, row.id));
+      }
+    }
+  }
+}
+
+async function mergeDuplicateInventoryRows(
+  table: typeof laptops | typeof desktops | typeof acAdapters,
+): Promise<number> {
+  const rows = await db.select().from(table).where(eq(table.isActive, 1));
+  const groups = new Map<string, Array<(typeof rows)[number]>>();
+
+  for (const row of rows) {
+    const scanCode = getStableBarcode(row);
+    if (!scanCode) continue;
+    const key = `${row.salesLocationId}::${scanCode.toUpperCase()}`;
+    const group = groups.get(key) || [];
+    group.push(row);
+    groups.set(key, group);
+  }
+
+  let mergedCount = 0;
+  for (const [, group] of groups) {
+    if (group.length < 2) continue;
+
+    const scanCodeUpper = getStableBarcode(group[0]).toUpperCase();
+    group.sort((a, b) => {
+      const aMatch = (a.serialNumber || "").trim().toUpperCase() === scanCodeUpper ? 0 : 1;
+      const bMatch = (b.serialNumber || "").trim().toUpperCase() === scanCodeUpper ? 0 : 1;
+      if (aMatch !== bMatch) return aMatch - bMatch;
+      return (b.stockQuantity || 0) - (a.stockQuantity || 0);
+    });
+
+    const keep = group[0];
+    const stableBarcode = getStableBarcode(keep);
+    let totalQty = 0;
+    for (const row of group) totalQty += row.stockQuantity || 0;
+
+    await db
+      .update(table)
+      .set({ stockQuantity: totalQty, barcode: stableBarcode, updatedAt: new Date() })
+      .where(eq(table.id, keep.id));
+
+    for (let i = 1; i < group.length; i++) {
+      await db
+        .update(table)
+        .set({ isActive: 0, stockQuantity: 0, updatedAt: new Date() })
+        .where(eq(table.id, group[i].id));
+      mergedCount++;
+      if (table === acAdapters) {
+        await syncAcAdapterById(group[i].id);
+      }
+    }
+
+    if (table === acAdapters) {
+      await syncAcAdapterById(keep.id);
+    }
+  }
+
+  return mergedCount;
+}
+
+async function backfillMissingInventoryBarcodes(
+  table: typeof laptops | typeof desktops | typeof acAdapters,
+): Promise<number> {
+  const rows = await db.select().from(table).where(eq(table.isActive, 1));
+  let updated = 0;
+  for (const row of rows) {
+    const stable = getStableBarcode(row);
+    if (!stable || (row.barcode || "").trim()) continue;
+    await db
+      .update(table)
+      .set({ barcode: stable, updatedAt: new Date() })
+      .where(eq(table.id, row.id));
+    updated++;
+  }
+  return updated;
+}
+
+/** Merge split transfer rows that share the same scan barcode at one location. */
+export async function repairTransferInventoryDuplicates(): Promise<void> {
+  for (const table of [laptops, desktops, acAdapters] as const) {
+    await alignProductGroupBarcodes(table);
+    await backfillMissingInventoryBarcodes(table);
+  }
+  const laptopMerged = await mergeDuplicateInventoryRows(laptops);
+  const desktopMerged = await mergeDuplicateInventoryRows(desktops);
+  const adapterMerged = await mergeDuplicateInventoryRows(acAdapters);
+  const total = laptopMerged + desktopMerged + adapterMerged;
+  if (total > 0) {
+    console.log(`[sales-locations] merged ${total} duplicate inventory row(s) from transfers`);
+  }
 }

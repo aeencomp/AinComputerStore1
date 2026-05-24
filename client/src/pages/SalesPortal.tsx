@@ -29,6 +29,8 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { cn } from "@/lib/utils";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -307,6 +309,7 @@ export default function SalesPortal() {
   const dashboardItem = navItems.find(item => item.path === "/sales");
   const navGroups = [
     {
+      id: "sales",
       label: language === 'ar' ? 'المبيعات' : 'Sales',
       icon: ShoppingCart,
       items: navItems.filter(item => [
@@ -317,6 +320,7 @@ export default function SalesPortal() {
       ].includes(item.path)),
     },
     {
+      id: "inventory",
       label: language === 'ar' ? 'المخزون' : 'Inventory',
       icon: Warehouse,
       items: navItems.filter(item => [
@@ -328,6 +332,7 @@ export default function SalesPortal() {
       ].includes(item.path)),
     },
     {
+      id: "reports",
       label: language === 'ar' ? 'التقارير' : 'Reports',
       icon: BarChart3,
       items: navItems.filter(item => [
@@ -336,6 +341,7 @@ export default function SalesPortal() {
       ].includes(item.path)),
     },
     {
+      id: "admin",
       label: language === 'ar' ? 'الإدارة' : 'Admin',
       icon: Settings,
       items: navItems.filter(item => [
@@ -344,12 +350,37 @@ export default function SalesPortal() {
     },
   ].filter(group => group.items.length > 0);
 
+  const activeSection = (() => {
+    if (dashboardItem && isActive(dashboardItem.path, dashboardItem.exactMatch)) {
+      return "dashboard";
+    }
+    const group = navGroups.find((g) =>
+      g.items.some((item) => isActive(item.path, item.exactMatch)),
+    );
+    return group?.id ?? "dashboard";
+  })();
+
+  const activeGroup = navGroups.find((g) => g.id === activeSection);
+
+  const handleSectionChange = (section: string) => {
+    if (section === "dashboard") {
+      setLocation("/sales");
+      return;
+    }
+    const group = navGroups.find((g) => g.id === section);
+    if (!group?.items.length) return;
+    const alreadyHere = group.items.some((item) => isActive(item.path, item.exactMatch));
+    if (!alreadyHere) {
+      setLocation(group.items[0].path);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-muted/30" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       {/* Enhanced Header */}
       <header className="sticky top-0 z-50 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm">
-        <div className="container mx-auto px-4">
-          <div className="flex items-center justify-between h-16">
+        <div className="container mx-auto px-3 sm:px-4">
+          <div className="flex items-center justify-between gap-2 h-12">
             {/* Logo & Mobile Menu */}
             <div className="flex items-center gap-3">
               <Button
@@ -363,72 +394,20 @@ export default function SalesPortal() {
               </Button>
               <Link href="/sales">
                 <div className="flex items-center gap-3 cursor-pointer group">
-                  <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-md group-hover:shadow-lg transition-shadow">
-                    <Store className="h-5 w-5 text-primary-foreground" />
+                  <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg bg-gradient-to-br from-primary to-primary/70 flex items-center justify-center shadow-sm shrink-0">
+                    <Store className="h-4 w-4 text-primary-foreground" />
                   </div>
-                  <div className="hidden sm:block">
-                    <h1 className="font-bold text-lg leading-tight">
+                  <div className="hidden sm:block min-w-0">
+                    <h1 className="font-bold text-sm sm:text-base leading-tight truncate">
                       {language === 'ar' ? 'بوابة المبيعات' : 'Sales Portal'}
                     </h1>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
                       {language === 'ar' ? 'العين لتجارة الحاسبات' : 'Al-Ain Computers'}
                     </p>
                   </div>
                 </div>
               </Link>
             </div>
-
-            {/* Desktop Navigation */}
-            <nav className="hidden md:flex items-center gap-1 bg-muted/50 rounded-lg p-1">
-              {dashboardItem && (
-                <Link href={dashboardItem.path}>
-                  <Button
-                    variant={isActive(dashboardItem.path, dashboardItem.exactMatch) ? "default" : "ghost"}
-                    size="sm"
-                    className={`gap-2 transition-all ${
-                      isActive(dashboardItem.path, dashboardItem.exactMatch)
-                        ? 'shadow-sm' 
-                        : 'hover:bg-background'
-                    }`}
-                    data-testid="nav-dashboard"
-                  >
-                    <dashboardItem.icon className={`h-4 w-4 ${!isActive(dashboardItem.path, dashboardItem.exactMatch) ? dashboardItem.color : ''}`} />
-                    <span className="hidden lg:inline">{dashboardItem.label}</span>
-                  </Button>
-                </Link>
-              )}
-              {navGroups.map((group) => {
-                const groupActive = group.items.some(item => isActive(item.path, item.exactMatch));
-                return (
-                  <DropdownMenu key={group.label}>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant={groupActive ? "default" : "ghost"}
-                        size="sm"
-                        className={`gap-2 transition-all ${groupActive ? 'shadow-sm' : 'hover:bg-background'}`}
-                        data-testid={`nav-group-${group.label}`}
-                      >
-                        <group.icon className="h-4 w-4" />
-                        <span className="hidden lg:inline">{group.label}</span>
-                        <ChevronDown className="h-3 w-3 opacity-70" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align={language === 'ar' ? 'end' : 'start'} className="w-56">
-                      {group.items.map((item) => (
-                        <DropdownMenuItem
-                          key={item.path}
-                          className="gap-2 cursor-pointer"
-                          onSelect={() => setLocation(item.path)}
-                        >
-                          <item.icon className={`h-4 w-4 ${item.color}`} />
-                          <span>{item.label}</span>
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                );
-              })}
-            </nav>
 
             {/* User Menu & Actions */}
             <div className="flex items-center gap-2">
@@ -565,27 +544,88 @@ export default function SalesPortal() {
               </DropdownMenu>
             </div>
           </div>
+
+          {/* Desktop: main section tabs + page sub-tabs */}
+          <div className="hidden md:block border-t border-border/50 pb-2 pt-1.5">
+            <Tabs value={activeSection} onValueChange={handleSectionChange}>
+              <TabsList className="h-9 w-full justify-start overflow-x-auto bg-muted/40 p-1 gap-0.5">
+                <TabsTrigger
+                  value="dashboard"
+                  className="h-7 px-3 text-xs sm:text-sm gap-1.5 data-[state=active]:shadow-sm"
+                  data-testid="nav-dashboard"
+                >
+                  <LayoutDashboard className="h-3.5 w-3.5" />
+                  {dashboardItem?.label}
+                </TabsTrigger>
+                {navGroups.map((group) => (
+                  <TabsTrigger
+                    key={group.id}
+                    value={group.id}
+                    className="h-7 px-3 text-xs sm:text-sm gap-1.5 data-[state=active]:shadow-sm"
+                    data-testid={`nav-group-${group.id}`}
+                  >
+                    <group.icon className="h-3.5 w-3.5" />
+                    {group.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+            {activeGroup && activeGroup.items.length > 0 && (
+              <nav className="flex items-center gap-1 mt-1.5 overflow-x-auto">
+                {activeGroup.items.map((item) => (
+                  <Link key={item.path} href={item.path}>
+                    <Button
+                      variant={isActive(item.path, item.exactMatch) ? "secondary" : "ghost"}
+                      size="sm"
+                      className={cn(
+                        "h-8 shrink-0 text-xs gap-1.5 px-2.5",
+                        isActive(item.path, item.exactMatch) && "font-semibold",
+                      )}
+                    >
+                      <item.icon className={cn("h-3.5 w-3.5", !isActive(item.path, item.exactMatch) && item.color)} />
+                      <span className="whitespace-nowrap">{item.label}</span>
+                    </Button>
+                  </Link>
+                ))}
+              </nav>
+            )}
+          </div>
         </div>
 
         {/* Mobile Navigation Menu */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t bg-background animate-in slide-in-from-top-2">
-            <nav className="container mx-auto px-4 py-3 space-y-1">
-              {navItems.map((item) => (
-                <Link key={item.path} href={item.path}>
+          <div className="md:hidden border-t bg-background animate-in slide-in-from-top-2 max-h-[70vh] overflow-y-auto">
+            <nav className="container mx-auto px-3 py-2 space-y-3">
+              {dashboardItem && (
+                <Link href={dashboardItem.path}>
                   <Button
-                    variant={isActive(item.path, item.exactMatch) ? "secondary" : "ghost"}
-                    className="w-full justify-start gap-3"
+                    variant={isActive(dashboardItem.path, dashboardItem.exactMatch) ? "secondary" : "ghost"}
+                    className="w-full justify-start gap-2 h-9 text-sm"
                     onClick={() => setMobileMenuOpen(false)}
                   >
-                    <div className={`h-8 w-8 rounded-lg flex items-center justify-center ${
-                      isActive(item.path, item.exactMatch) ? 'bg-primary/10' : 'bg-muted'
-                    }`}>
-                      <item.icon className={`h-4 w-4 ${item.color}`} />
-                    </div>
-                    <span>{item.label}</span>
+                    <dashboardItem.icon className={`h-4 w-4 ${dashboardItem.color}`} />
+                    {dashboardItem.label}
                   </Button>
                 </Link>
+              )}
+              {navGroups.map((group) => (
+                <div key={group.id} className="space-y-1">
+                  <p className="text-[11px] font-semibold text-muted-foreground px-2 uppercase tracking-wide">
+                    {group.label}
+                  </p>
+                  {group.items.map((item) => (
+                    <Link key={item.path} href={item.path}>
+                      <Button
+                        variant={isActive(item.path, item.exactMatch) ? "secondary" : "ghost"}
+                        className="w-full justify-start gap-2 h-9 text-sm"
+                        onClick={() => setMobileMenuOpen(false)}
+                      >
+                        <item.icon className={`h-4 w-4 ${item.color}`} />
+                        {item.label}
+                      </Button>
+                    </Link>
+                  ))}
+                </div>
               ))}
             </nav>
           </div>
@@ -593,19 +633,10 @@ export default function SalesPortal() {
       </header>
 
       {/* Page Content */}
-      <main className="container mx-auto px-4 py-6">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 text-sm text-muted-foreground mb-6">
-          <Link href="/sales">
-            <span className="hover:text-primary transition-colors cursor-pointer">
-              {language === 'ar' ? 'بوابة المبيعات' : 'Sales Portal'}
-            </span>
-          </Link>
-          <span>/</span>
-          <span className="text-foreground font-medium flex items-center gap-1.5">
-            <currentPage.icon className={`h-4 w-4 ${currentPage.color}`} />
-            {currentPage.label}
-          </span>
+      <main className="container mx-auto px-3 sm:px-4 py-4 sm:py-5">
+        <div className="flex items-center gap-2 mb-4">
+          <currentPage.icon className={cn("h-5 w-5", currentPage.color)} />
+          <h2 className="text-lg font-semibold">{currentPage.label}</h2>
         </div>
 
         {/* Render Active Page */}

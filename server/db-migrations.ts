@@ -1,5 +1,5 @@
 import { pool } from "./db";
-import { seedSalesLocations } from "./sales-locations";
+import { seedSalesLocations, repairTransferInventoryDuplicates } from "./sales-locations";
 
 /** Idempotent SQL run on startup so deploy does not require manual ALTER TABLE. */
 const STARTUP_MIGRATIONS: string[] = [
@@ -72,5 +72,6 @@ export async function runDbMigrations(): Promise<void> {
     await pool.query(statement);
   }
   await seedSalesLocations();
+  await repairTransferInventoryDuplicates();
   console.log("[db-migrations] startup migrations applied");
 }

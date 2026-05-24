@@ -55,6 +55,10 @@ import { BrandSelect } from "@/components/BrandSelect";
 
 type SerialSource = { serialNumber?: string | null; barcode?: string | null };
 
+function getInventoryScanCode(item: SerialSource): string {
+  return (item.barcode || item.serialNumber || "").trim();
+}
+
 function getNextSerial(prefix: string, items: SerialSource[], padLength = 4): string {
   const pattern = new RegExp(`^${prefix}-(\\d+)$`, "i");
   let max = 0;
@@ -2522,7 +2526,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                       {l.brand} {l.model || ""}{l.sizeInch ? ` ${l.sizeInch}"` : ""}
                                     </div>
                                     <div className="text-xs text-muted-foreground truncate">
-                                      {l.serialNumber} {l.barcode ? `| ${l.barcode}` : ''}
+                                      {getInventoryScanCode(l)}
                                     </div>
                                     <div className="flex flex-wrap gap-1.5">
                                       {l.cpu && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><Cpu className="h-3 w-3" />{l.cpu}</Badge>}
@@ -2825,7 +2829,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                 <div className="flex items-start justify-between gap-3">
                                   <div className="min-w-0 space-y-2">
                                     <div className="font-semibold text-base truncate">{d.brand} {d.model || ""}</div>
-                                    <div className="text-xs text-muted-foreground truncate">{d.serialNumber} {d.barcode ? `| ${d.barcode}` : ''}</div>
+                                    <div className="text-xs text-muted-foreground truncate">{getInventoryScanCode(d)}</div>
                                     <div className="flex flex-wrap gap-1.5">
                                       {d.cpu && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><Cpu className="h-3 w-3" />{d.cpu}</Badge>}
                                       {d.ram && <Badge variant="outline" className="gap-1 transition-all duration-200 hover:-translate-y-0.5 hover:ring-1 hover:ring-primary/30"><MemoryStick className="h-3 w-3" />{d.ram}</Badge>}

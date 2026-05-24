@@ -7465,7 +7465,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
       if (updateData.serialNumber && !updateData.barcode) {
-        updateData.barcode = updateData.serialNumber;
+        const [existing] = await db
+          .select({ serialNumber: laptops.serialNumber, barcode: laptops.barcode })
+          .from(laptops)
+          .where(eq(laptops.id, req.params.id))
+          .limit(1);
+        const oldBarcode = (existing?.barcode || "").trim();
+        const oldSerial = (existing?.serialNumber || "").trim();
+        if (!existing || !oldBarcode || oldBarcode === oldSerial) {
+          updateData.barcode = updateData.serialNumber;
+        }
       }
       const [row] = await db.update(laptops).set({ ...updateData, updatedAt: new Date() }).where(eq(laptops.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "اللابتوب غير موجود" });
@@ -7600,7 +7609,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
       if (updateData.serialNumber && !updateData.barcode) {
-        updateData.barcode = updateData.serialNumber;
+        const [existing] = await db
+          .select({ serialNumber: desktops.serialNumber, barcode: desktops.barcode })
+          .from(desktops)
+          .where(eq(desktops.id, req.params.id))
+          .limit(1);
+        const oldBarcode = (existing?.barcode || "").trim();
+        const oldSerial = (existing?.serialNumber || "").trim();
+        if (!existing || !oldBarcode || oldBarcode === oldSerial) {
+          updateData.barcode = updateData.serialNumber;
+        }
       }
       const [row] = await db.update(desktops).set({ ...updateData, updatedAt: new Date() }).where(eq(desktops.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "الديسكتوب غير موجود" });
