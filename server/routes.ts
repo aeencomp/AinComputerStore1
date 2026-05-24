@@ -33,6 +33,7 @@ import {
   searchInventoryAtLocation,
   LOCATION_MAIN_ID,
   LOCATION_SHOP2_ID,
+  resolveInventoryBarcodeUpdate,
 } from "./sales-locations";
 import {
   syncLaptopBatteryToInStore,
@@ -6435,16 +6436,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updateData = { ...req.body };
-      
-      // Auto-regenerate barcode when serial number changes
-      if (updateData.serialNumber) {
-        updateData.barcode = `BAT-${updateData.serialNumber.replace(/[^A-Za-z0-9]/g, '').toUpperCase()}`;
-      }
-      
-      const battery = await storage.updateLaptopBattery(req.params.id, updateData);
-      if (!battery) {
+      const existing = await storage.getLaptopBattery(req.params.id);
+      if (!existing) {
         return res.status(404).json({ error: "البطارية غير موجودة" });
       }
+      resolveInventoryBarcodeUpdate(updateData, existing, { batteryAutoPrefix: true });
+      
+      const battery = await storage.updateLaptopBattery(req.params.id, updateData);
       await syncLaptopBatteryToInStore(battery);
       return res.json(battery);
     } catch (error) {
@@ -6617,11 +6615,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const updateData = { ...req.body };
-      
-      // If serial changes and barcode not explicitly provided, keep barcode synced to serial
-      if (updateData.serialNumber && !updateData.barcode) {
-        updateData.barcode = updateData.serialNumber;
+      const existing = await storage.getAcAdapter(req.params.id);
+      if (!existing) {
+        return res.status(404).json({ error: "الشاحن غير موجود" });
       }
+      resolveInventoryBarcodeUpdate(updateData, existing);
       
       const adapter = await storage.updateAcAdapter(req.params.id, updateData);
       if (!adapter) {
@@ -7219,9 +7217,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
-      if (updateData.serialNumber) {
-        updateData.barcode = updateData.serialNumber;
-      }
+      const [existing] = await db
+        .select({ serialNumber: keyboards.serialNumber, barcode: keyboards.barcode })
+        .from(keyboards)
+        .where(eq(keyboards.id, req.params.id))
+        .limit(1);
+      if (!existing) return res.status(404).json({ error: "لوحة المفاتيح غير موجودة" });
+      resolveInventoryBarcodeUpdate(updateData, existing);
       const [row] = await db.update(keyboards).set({ ...updateData, updatedAt: new Date() }).where(eq(keyboards.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "لوحة المفاتيح غير موجودة" });
       return res.json(row);
@@ -7328,9 +7330,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
-      if (updateData.serialNumber) {
-        updateData.barcode = updateData.serialNumber;
-      }
+      const [existing] = await db
+        .select({ serialNumber: lcds.serialNumber, barcode: lcds.barcode })
+        .from(lcds)
+        .where(eq(lcds.id, req.params.id))
+        .limit(1);
+      if (!existing) return res.status(404).json({ error: "شاشة LCD غير موجودة" });
+      resolveInventoryBarcodeUpdate(updateData, existing);
       const [row] = await db.update(lcds).set({ ...updateData, updatedAt: new Date() }).where(eq(lcds.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "شاشة LCD غير موجودة" });
       return res.json(row);
@@ -7464,18 +7470,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
-      if (updateData.serialNumber && !updateData.barcode) {
-        const [existing] = await db
-          .select({ serialNumber: laptops.serialNumber, barcode: laptops.barcode })
-          .from(laptops)
-          .where(eq(laptops.id, req.params.id))
-          .limit(1);
-        const oldBarcode = (existing?.barcode || "").trim();
-        const oldSerial = (existing?.serialNumber || "").trim();
-        if (!existing || !oldBarcode || oldBarcode === oldSerial) {
-          updateData.barcode = updateData.serialNumber;
-        }
-      }
+      const [existing] = await db
+        .select({ serialNumber: laptops.serialNumber, barcode: laptops.barcode })
+        .from(laptops)
+        .where(eq(laptops.id, req.params.id))
+        .limit(1);
+      if (!existing) return res.status(404).json({ error: "اللابتوب غير موجود" });
+      resolveInventoryBarcodeUpdate(updateData, existing);
       const [row] = await db.update(laptops).set({ ...updateData, updatedAt: new Date() }).where(eq(laptops.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "اللابتوب غير موجود" });
       return res.json(row);
@@ -7608,18 +7609,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const batteryUserId = (req.session as any).batteryUserId;
       if (!batteryUserId) return res.status(401).json({ error: "غير مصرح" });
       const updateData = { ...req.body };
-      if (updateData.serialNumber && !updateData.barcode) {
-        const [existing] = await db
-          .select({ serialNumber: desktops.serialNumber, barcode: desktops.barcode })
-          .from(desktops)
-          .where(eq(desktops.id, req.params.id))
-          .limit(1);
-        const oldBarcode = (existing?.barcode || "").trim();
-        const oldSerial = (existing?.serialNumber || "").trim();
-        if (!existing || !oldBarcode || oldBarcode === oldSerial) {
-          updateData.barcode = updateData.serialNumber;
-        }
-      }
+      const [existing] = await db
+        .select({ serialNumber: desktops.serialNumber, barcode: desktops.barcode })
+        .from(desktops)
+        .where(eq(desktops.id, req.params.id))
+        .limit(1);
+      if (!existing) return res.status(404).json({ error: "الديسكتوب غير موجود" });
+      resolveInventoryBarcodeUpdate(updateData, existing);
       const [row] = await db.update(desktops).set({ ...updateData, updatedAt: new Date() }).where(eq(desktops.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "الديسكتوب غير موجود" });
       return res.json(row);

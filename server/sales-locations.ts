@@ -234,6 +234,33 @@ function getStableBarcode(row: { barcode?: string | null; serialNumber: string }
   return (row.serialNumber || "").trim();
 }
 
+/** Keep a stable scan barcode when internal serial changes unless the client sends a new barcode. */
+export function resolveInventoryBarcodeUpdate(
+  updateData: { serialNumber?: string; barcode?: string | null },
+  existing: { serialNumber: string; barcode?: string | null },
+  options?: { batteryAutoPrefix?: boolean },
+): void {
+  const explicit = (updateData.barcode ?? "").trim();
+  if (explicit) {
+    updateData.barcode = explicit;
+    return;
+  }
+
+  if (!updateData.serialNumber) return;
+
+  const oldBarcode = (existing.barcode || "").trim();
+  const oldSerial = (existing.serialNumber || "").trim();
+  if (!oldBarcode || oldBarcode === oldSerial) {
+    if (options?.batteryAutoPrefix) {
+      updateData.barcode = `BAT-${String(updateData.serialNumber).replace(/[^A-Za-z0-9]/g, "").toUpperCase()}`;
+    } else {
+      updateData.barcode = String(updateData.serialNumber);
+    }
+  } else {
+    delete updateData.barcode;
+  }
+}
+
 async function findInventoryRowAtLocation(
   table: typeof laptops | typeof desktops | typeof acAdapters,
   locationId: number,

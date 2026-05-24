@@ -59,6 +59,44 @@ function getInventoryScanCode(item: SerialSource): string {
   return (item.barcode || item.serialNumber || "").trim();
 }
 
+function normalizedBarcode(barcode: string, serialNumber: string): string {
+  const value = barcode.trim();
+  if (value) return value;
+  return serialNumber.trim();
+}
+
+function BarcodeField({
+  label,
+  value,
+  onChange,
+  placeholder,
+  testId,
+  language,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  testId?: string;
+  language: string;
+}) {
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      <Input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        className="font-mono text-sm"
+        data-testid={testId}
+      />
+      <p className="text-xs text-muted-foreground">
+        {language === "ar" ? "يُستخدم للمسح والطباعة" : "Used for scanning and printing"}
+      </p>
+    </div>
+  );
+}
+
 function getNextSerial(prefix: string, items: SerialSource[], padLength = 4): string {
   const pattern = new RegExp(`^${prefix}-(\\d+)$`, "i");
   let max = 0;
@@ -163,6 +201,7 @@ export default function BatteryManage() {
   
   const [formData, setFormData] = useState({
     serialNumber: "",
+    barcode: "",
     partNumber: "",
     brand: "",
     compatibleLaptops: [] as string[],
@@ -209,6 +248,7 @@ export default function BatteryManage() {
   
   const [adapterFormData, setAdapterFormData] = useState({
     serialNumber: "",
+    barcode: "",
     partNumber: "",
     brand: "",
     compatibleLaptops: [] as string[],
@@ -232,6 +272,7 @@ export default function BatteryManage() {
 
   const [keyboardFormData, setKeyboardFormData] = useState({
     serialNumber: "",
+    barcode: "",
     partNumber: "",
     brand: "",
     layout: "",
@@ -249,6 +290,7 @@ export default function BatteryManage() {
 
   const [lcdFormData, setLcdFormData] = useState({
     serialNumber: "",
+    barcode: "",
     partNumber: "",
     brand: "",
     sizeInch: "",
@@ -269,6 +311,7 @@ export default function BatteryManage() {
 
   const [laptopFormData, setLaptopFormData] = useState({
     serialNumber: "",
+    barcode: "",
     partNumber: "",
     brand: "",
     model: "",
@@ -289,6 +332,7 @@ export default function BatteryManage() {
 
   const [desktopFormData, setDesktopFormData] = useState({
     serialNumber: "",
+    barcode: "",
     partNumber: "",
     brand: "",
     model: "",
@@ -355,6 +399,7 @@ export default function BatteryManage() {
         setEditingBattery(battery);
         setFormData({
           serialNumber: battery.serialNumber,
+          barcode: getInventoryScanCode(battery),
           partNumber: battery.partNumber || "",
           brand: battery.brand,
           compatibleLaptops: battery.compatibleLaptops,
@@ -584,6 +629,7 @@ export default function BatteryManage() {
       setEditingLaptop(null);
       setLaptopFormData({
         serialNumber: "",
+        barcode: "",
         partNumber: "",
         brand: "",
         model: "",
@@ -654,6 +700,7 @@ export default function BatteryManage() {
       setEditingDesktop(null);
       setDesktopFormData({
         serialNumber: "",
+        barcode: "",
         partNumber: "",
         brand: "",
         model: "",
@@ -876,6 +923,7 @@ export default function BatteryManage() {
   const resetForm = () => {
     setFormData({
       serialNumber: "",
+      barcode: "",
       partNumber: "",
       brand: "",
       compatibleLaptops: [],
@@ -900,6 +948,7 @@ export default function BatteryManage() {
   const resetAdapterForm = () => {
     setAdapterFormData({
       serialNumber: "",
+      barcode: "",
       partNumber: "",
       brand: "",
       compatibleLaptops: [],
@@ -927,6 +976,7 @@ export default function BatteryManage() {
   const resetKeyboardForm = () => {
     setKeyboardFormData({
       serialNumber: "",
+      barcode: "",
       partNumber: "",
       brand: "",
       layout: "",
@@ -948,6 +998,7 @@ export default function BatteryManage() {
   const resetLcdForm = () => {
     setLcdFormData({
       serialNumber: "",
+      barcode: "",
       partNumber: "",
       brand: "",
       sizeInch: "",
@@ -1017,6 +1068,7 @@ export default function BatteryManage() {
 
     const data = {
       serialNumber: formData.serialNumber,
+      barcode: normalizedBarcode(formData.barcode, formData.serialNumber),
       partNumber: formData.partNumber || null,
       brand: formData.brand,
       compatibleLaptops: formData.compatibleLaptops,
@@ -1046,6 +1098,7 @@ export default function BatteryManage() {
 
     const data = {
       serialNumber,
+      barcode: normalizedBarcode(adapterFormData.barcode, serialNumber),
       partNumber: null,
       brand: adapterFormData.brand,
       compatibleLaptops: adapterFormData.compatibleLaptops,
@@ -1077,6 +1130,7 @@ export default function BatteryManage() {
     setEditingAdapter(adapter);
     setAdapterFormData({
       serialNumber: adapter.serialNumber,
+      barcode: getInventoryScanCode(adapter),
       partNumber: adapter.partNumber || "",
       brand: adapter.brand,
       compatibleLaptops: adapter.compatibleLaptops,
@@ -1104,6 +1158,7 @@ export default function BatteryManage() {
     e.preventDefault();
     const data = {
       serialNumber: keyboardFormData.serialNumber,
+      barcode: normalizedBarcode(keyboardFormData.barcode, keyboardFormData.serialNumber),
       partNumber: keyboardFormData.partNumber || null,
       brand: keyboardFormData.brand,
       layout: keyboardFormData.layout || null,
@@ -1130,6 +1185,7 @@ export default function BatteryManage() {
     setEditingKeyboard(keyboard);
     setKeyboardFormData({
       serialNumber: keyboard.serialNumber,
+      barcode: getInventoryScanCode(keyboard),
       partNumber: keyboard.partNumber || "",
       brand: keyboard.brand,
       layout: keyboard.layout || "",
@@ -1151,6 +1207,7 @@ export default function BatteryManage() {
     e.preventDefault();
     const data = {
       serialNumber: lcdFormData.serialNumber,
+      barcode: normalizedBarcode(lcdFormData.barcode, lcdFormData.serialNumber),
       partNumber: lcdFormData.partNumber || null,
       brand: lcdFormData.brand,
       sizeInch: lcdFormData.sizeInch ? parseFloat(lcdFormData.sizeInch) : null,
@@ -1180,6 +1237,7 @@ export default function BatteryManage() {
     setEditingLcd(lcd);
     setLcdFormData({
       serialNumber: lcd.serialNumber,
+      barcode: getInventoryScanCode(lcd),
       partNumber: lcd.partNumber || "",
       brand: lcd.brand,
       sizeInch: lcd.sizeInch ? String(parseFloat(lcd.sizeInch)) : "",
@@ -1271,7 +1329,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 <img class="qr" src="${qrDataURL}" width="60" height="60" />
 <div class="info">
 <div class="title">${battery.brand}</div>
-<div class="serial">${battery.serialNumber}</div>
+<div class="serial">${qrValue}</div>
 <div class="price">${price}</div>
 </div>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
@@ -1311,7 +1369,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 <img class="qr" src="${qrDataURL}" width="60" height="60" />
 <div class="info">
 <div class="title">${keyboard.brand}</div>
-<div class="serial">${keyboard.serialNumber}</div>
+<div class="serial">${qrValue}</div>
 <div class="price">${price}</div>
 </div>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
@@ -1353,7 +1411,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 <img class="qr" src="${qrDataURL}" width="60" height="60" />
 <div class="info">
 <div class="title">${lcd.brand}</div>
-<div class="serial">${lcd.serialNumber}</div>
+<div class="serial">${qrValue}</div>
 <div class="specs">${specLine || (lcd.resolution || '')}</div>
 <div class="price">${price}</div>
 </div>
@@ -1395,7 +1453,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 <img class="qr" src="${qrDataURL}" width="60" height="60" />
 <div class="info">
 <div class="title">${modelLine || laptop.brand}</div>
-<div class="serial">${laptop.serialNumber}</div>
+<div class="serial">${qrValue}</div>
 <div class="price">${price}</div>
 </div>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
@@ -1436,7 +1494,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
 <img class="qr" src="${qrDataURL}" width="60" height="60" />
 <div class="info">
 <div class="title">${modelLine || desktop.brand}</div>
-<div class="serial">${desktop.serialNumber}</div>
+<div class="serial">${qrValue}</div>
 <div class="price">${price}</div>
 </div>
 <script>window.onload=function(){window.print();window.onafterprint=function(){window.close();}}</script>
@@ -1807,7 +1865,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                               data-testid={`battery-item-${battery.id}`}
                             >
                               <div>
-                                <p className="font-mono font-bold">{battery.serialNumber}</p>
+                                <p className="font-mono font-bold">{getInventoryScanCode(battery)}</p>
                                 <p className="text-sm text-muted-foreground">{battery.brand}</p>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {battery.compatibleLaptops.slice(0, 3).map((laptop, idx) => (
@@ -1847,6 +1905,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                     setEditingBattery(battery);
                                     setFormData({
                                       serialNumber: battery.serialNumber,
+                                      barcode: getInventoryScanCode(battery),
                                       partNumber: battery.partNumber || "",
                                       brand: battery.brand,
                                       compatibleLaptops: battery.compatibleLaptops,
@@ -1904,11 +1963,22 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <BarcodeField
+                        label={language === 'ar' ? 'الباركود (للمسح والطباعة)' : 'Barcode (scan & print)'}
+                        value={formData.barcode}
+                        onChange={(barcode) => setFormData({ ...formData, barcode })}
+                        placeholder="BAT-0001"
+                        testId="input-battery-barcode"
+                        language={language}
+                      />
                       <SerialNumberField
-                        label={language === 'ar' ? 'الرقم التسلسلي / SKU *' : 'Serial Number / SKU *'}
+                        label={language === 'ar' ? 'الرقم التسلسلي الداخلي *' : 'Internal Serial *'}
                         value={formData.serialNumber}
                         onChange={(serialNumber) => setFormData({ ...formData, serialNumber })}
-                        onGenerate={() => setFormData((f) => ({ ...f, serialNumber: generateBatterySerial() }))}
+                        onGenerate={() => {
+                          const serialNumber = generateBatterySerial();
+                          setFormData((f) => ({ ...f, serialNumber, barcode: f.barcode.trim() || serialNumber }));
+                        }}
                         placeholder="BAT-0001"
                         required
                         testId="input-battery-serial-number"
@@ -2270,11 +2340,22 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleAdapterSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <BarcodeField
+                        label={language === 'ar' ? 'الباركود (للمسح والطباعة)' : 'Barcode (scan & print)'}
+                        value={adapterFormData.barcode}
+                        onChange={(barcode) => setAdapterFormData({ ...adapterFormData, barcode })}
+                        placeholder="ADP-0001"
+                        testId="input-adapter-barcode"
+                        language={language}
+                      />
                       <SerialNumberField
-                        label={language === 'ar' ? 'الرقم التسلسلي / SKU (تلقائي إذا فارغ)' : 'Serial Number / SKU (auto if empty)'}
+                        label={language === 'ar' ? 'الرقم التسلسلي الداخلي (تلقائي إذا فارغ)' : 'Internal Serial (auto if empty)'}
                         value={adapterFormData.serialNumber}
                         onChange={(serialNumber) => setAdapterFormData({ ...adapterFormData, serialNumber })}
-                        onGenerate={() => setAdapterFormData((f) => ({ ...f, serialNumber: generateAdapterSerial() }))}
+                        onGenerate={() => {
+                          const serialNumber = generateAdapterSerial();
+                          setAdapterFormData((f) => ({ ...f, serialNumber, barcode: f.barcode.trim() || serialNumber }));
+                        }}
                         placeholder="ADP-0001"
                         testId="input-adapter-serial-number"
                         generateTestId="button-generate-adapter-serial"
@@ -2584,6 +2665,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                       setEditingLaptop(l);
                                       setLaptopFormData({
                                         serialNumber: l.serialNumber || "",
+                                        barcode: getInventoryScanCode(l),
                                         partNumber: l.partNumber || "",
                                         brand: l.brand || "",
                                         model: l.model || "",
@@ -2636,7 +2718,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       const data = {
                         serialNumber: laptopFormData.serialNumber || undefined,
                         partNumber: laptopFormData.partNumber || null,
-                        barcode: undefined,
+                        barcode: normalizedBarcode(laptopFormData.barcode, laptopFormData.serialNumber),
                         brand: laptopFormData.brand,
                         model: laptopFormData.model || null,
                         sizeInch: laptopFormData.sizeInch ? parseFloat(laptopFormData.sizeInch) : null,
@@ -2660,11 +2742,22 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     data-testid="form-laptop"
                   >
                     <div className="grid sm:grid-cols-2 gap-4">
+                      <BarcodeField
+                        label={language === 'ar' ? 'الباركود (للمسح والطباعة)' : 'Barcode (scan & print)'}
+                        value={laptopFormData.barcode}
+                        onChange={(barcode) => setLaptopFormData((v) => ({ ...v, barcode }))}
+                        placeholder="LAP-0001"
+                        testId="input-laptop-barcode"
+                        language={language}
+                      />
                       <SerialNumberField
-                        label={language === 'ar' ? 'الرقم التسلسلي / SKU' : 'Serial Number / SKU'}
+                        label={language === 'ar' ? 'الرقم التسلسلي الداخلي' : 'Internal Serial'}
                         value={laptopFormData.serialNumber}
                         onChange={(serialNumber) => setLaptopFormData((v) => ({ ...v, serialNumber }))}
-                        onGenerate={() => setLaptopFormData((v) => ({ ...v, serialNumber: generateLaptopSerial() }))}
+                        onGenerate={() => {
+                          const serialNumber = generateLaptopSerial();
+                          setLaptopFormData((v) => ({ ...v, serialNumber, barcode: v.barcode.trim() || serialNumber }));
+                        }}
                         placeholder="LAP-0001"
                         testId="input-laptop-serial"
                         generateTestId="button-generate-laptop-serial"
@@ -2886,6 +2979,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                       setEditingDesktop(d);
                                       setDesktopFormData({
                                         serialNumber: d.serialNumber || "",
+                                        barcode: getInventoryScanCode(d),
                                         partNumber: d.partNumber || "",
                                         brand: d.brand || "",
                                         model: d.model || "",
@@ -2937,7 +3031,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       const data = {
                         serialNumber: desktopFormData.serialNumber || undefined,
                         partNumber: desktopFormData.partNumber || null,
-                        barcode: undefined,
+                        barcode: normalizedBarcode(desktopFormData.barcode, desktopFormData.serialNumber),
                         brand: desktopFormData.brand,
                         model: desktopFormData.model || null,
                         cpu: desktopFormData.cpu || null,
@@ -2960,11 +3054,22 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     data-testid="form-desktop"
                   >
                     <div className="grid sm:grid-cols-2 gap-4">
+                      <BarcodeField
+                        label={language === 'ar' ? 'الباركود (للمسح والطباعة)' : 'Barcode (scan & print)'}
+                        value={desktopFormData.barcode}
+                        onChange={(barcode) => setDesktopFormData((v) => ({ ...v, barcode }))}
+                        placeholder="DES-0001"
+                        testId="input-desktop-barcode"
+                        language={language}
+                      />
                       <SerialNumberField
-                        label={language === 'ar' ? 'الرقم التسلسلي / SKU' : 'Serial Number / SKU'}
+                        label={language === 'ar' ? 'الرقم التسلسلي الداخلي' : 'Internal Serial'}
                         value={desktopFormData.serialNumber}
                         onChange={(serialNumber) => setDesktopFormData((v) => ({ ...v, serialNumber }))}
-                        onGenerate={() => setDesktopFormData((v) => ({ ...v, serialNumber: generateDesktopSerial() }))}
+                        onGenerate={() => {
+                          const serialNumber = generateDesktopSerial();
+                          setDesktopFormData((v) => ({ ...v, serialNumber, barcode: v.barcode.trim() || serialNumber }));
+                        }}
                         placeholder="DES-0001"
                         testId="input-desktop-serial"
                         generateTestId="button-generate-desktop-serial"
@@ -3106,7 +3211,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                 {k.keyboardType && <Badge variant="outline" className="text-xs">{k.keyboardType}</Badge>}
                                 {k.backlight ? <Badge variant="secondary" className="text-xs">{language === 'ar' ? 'مضئ' : 'Backlit'}</Badge> : null}
                               </div>
-                              <p className="text-sm text-muted-foreground">{k.serialNumber}</p>
+                              <p className="text-sm text-muted-foreground font-mono">{getInventoryScanCode(k)}</p>
                               <p className="text-xs text-muted-foreground">{k.layout || '-'}</p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -3148,11 +3253,22 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleKeyboardSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <BarcodeField
+                        label={language === 'ar' ? 'الباركود (للمسح والطباعة)' : 'Barcode (scan & print)'}
+                        value={keyboardFormData.barcode}
+                        onChange={(barcode) => setKeyboardFormData({ ...keyboardFormData, barcode })}
+                        placeholder="KBD-0001"
+                        testId="input-keyboard-barcode"
+                        language={language}
+                      />
                       <SerialNumberField
-                        label={language === 'ar' ? 'الرقم التسلسلي / SKU (تلقائي إذا فارغ)' : 'Serial Number / SKU (auto if empty)'}
+                        label={language === 'ar' ? 'الرقم التسلسلي الداخلي (تلقائي إذا فارغ)' : 'Internal Serial (auto if empty)'}
                         value={keyboardFormData.serialNumber}
                         onChange={(serialNumber) => setKeyboardFormData({ ...keyboardFormData, serialNumber })}
-                        onGenerate={() => setKeyboardFormData((f) => ({ ...f, serialNumber: generateKeyboardSerial() }))}
+                        onGenerate={() => {
+                          const serialNumber = generateKeyboardSerial();
+                          setKeyboardFormData((f) => ({ ...f, serialNumber, barcode: f.barcode.trim() || serialNumber }));
+                        }}
                         placeholder="KBD-0001"
                         testId="input-keyboard-serial"
                         generateTestId="button-generate-keyboard-serial"
@@ -3256,7 +3372,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                                 {l.resolution ? <Badge variant="secondary" className="text-xs">{l.resolution}</Badge> : null}
                                 {l.refreshRateHz ? <Badge variant="secondary" className="text-xs">{`${l.refreshRateHz}Hz`}</Badge> : null}
                               </div>
-                              <p className="text-sm text-muted-foreground">{l.serialNumber}</p>
+                              <p className="text-sm text-muted-foreground font-mono">{getInventoryScanCode(l)}</p>
                               <p className="text-xs text-muted-foreground">{`${l.connectorType || '-'}${l.brightnessNits ? ` • ${l.brightnessNits} nits` : ''}`}</p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -3298,11 +3414,22 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                 <CardContent>
                   <form onSubmit={handleLcdSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <BarcodeField
+                        label={language === 'ar' ? 'الباركود (للمسح والطباعة)' : 'Barcode (scan & print)'}
+                        value={lcdFormData.barcode}
+                        onChange={(barcode) => setLcdFormData({ ...lcdFormData, barcode })}
+                        placeholder="LCD-0001"
+                        testId="input-lcd-barcode"
+                        language={language}
+                      />
                       <SerialNumberField
-                        label={language === 'ar' ? 'الرقم التسلسلي / SKU (تلقائي إذا فارغ)' : 'Serial Number / SKU (auto if empty)'}
+                        label={language === 'ar' ? 'الرقم التسلسلي الداخلي (تلقائي إذا فارغ)' : 'Internal Serial (auto if empty)'}
                         value={lcdFormData.serialNumber}
                         onChange={(serialNumber) => setLcdFormData({ ...lcdFormData, serialNumber })}
-                        onGenerate={() => setLcdFormData((f) => ({ ...f, serialNumber: generateLcdSerial() }))}
+                        onGenerate={() => {
+                          const serialNumber = generateLcdSerial();
+                          setLcdFormData((f) => ({ ...f, serialNumber, barcode: f.barcode.trim() || serialNumber }));
+                        }}
                         placeholder="LCD-0001"
                         testId="input-lcd-serial"
                         generateTestId="button-generate-lcd-serial"
