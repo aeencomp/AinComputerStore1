@@ -104,10 +104,15 @@ export function resolveScannedCode(
   return normalizeScannedBarcode(raw);
 }
 
-/** Hide garbled Arabic layout characters while a scanner burst is in progress. */
-export function shouldSuppressScanInput(state: ScanBufferState, now = Date.now()): boolean {
-  if (!state.buffer) return false;
-  return now - state.firstKeyAt <= SCAN_BURST_MAX_MS;
+/** Hide garbled Arabic layout characters only during a fast scanner burst. */
+export function looksLikeScannerBurst(state: ScanBufferState): boolean {
+  if (!state.buffer || state.buffer.length < 3) return false;
+  const duration = state.lastKeyAt - state.firstKeyAt;
+  return duration <= SCAN_BURST_MAX_MS || state.buffer.length >= 6;
+}
+
+export function shouldSuppressScanInput(state: ScanBufferState): boolean {
+  return looksLikeScannerBurst(state);
 }
 
 export function codesMatch(

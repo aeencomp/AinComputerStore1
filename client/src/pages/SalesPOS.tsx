@@ -576,8 +576,11 @@ export default function SalesPOS({
   const filteredProducts = products.filter(p => {
     const name = language === 'ar' ? p.nameAr : (p.nameEn || p.nameAr);
     const sku = p.sku || '';
-    const matchesSearch = name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          sku.toLowerCase().includes(searchQuery.toLowerCase());
+    const barcode = p.barcode || '';
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = name.toLowerCase().includes(q) ||
+                          sku.toLowerCase().includes(q) ||
+                          barcode.toLowerCase().includes(q);
     const matchesCategory = selectedCategory === "all" || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -616,9 +619,32 @@ export default function SalesPOS({
       scanStateRef.current = emptyScanBuffer();
       if (!code) return;
 
-      const product = products.find(
+      let product = products.find(
         (p) => codesMatch(p.sku, code) || codesMatch(p.barcode, code),
       );
+
+      if (!product) {
+        if (filteredProducts.length === 1) {
+          product = filteredProducts[0];
+        } else {
+          const q = code.toLowerCase();
+          product = filteredProducts.find((p) => {
+            const name = (language === 'ar' ? p.nameAr : (p.nameEn || p.nameAr)).toLowerCase();
+            return name === q || (p.sku || "").toLowerCase() === q || (p.barcode || "").toLowerCase() === q;
+          });
+          if (!product && filteredProducts.length > 1) {
+            e.preventDefault();
+            toast({
+              title: language === 'ar' ? 'أكثر من منتج' : 'Multiple products',
+              description: language === 'ar'
+                ? 'اختر المنتج من القائمة أو اكتب اسماً أدق'
+                : 'Select from the list or type a more specific name',
+            });
+            return;
+          }
+        }
+      }
+
       if (!product) return;
 
       const stockQty = product.stockQuantity || 0;
@@ -1032,7 +1058,10 @@ export default function SalesPOS({
                 <Input
                   placeholder={language === 'ar' ? 'بحث بالاسم أو الباركود...' : 'Search by name or barcode...'}
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    scanStateRef.current = emptyScanBuffer();
+                  }}
                   onKeyDown={handlePosSearchKeyDown}
                   className="ps-10 h-11 text-base"
                   lang="en"
