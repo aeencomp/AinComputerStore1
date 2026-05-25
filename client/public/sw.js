@@ -105,9 +105,23 @@ async function cacheFirst(request) {
   }
 }
 
-async function networkFirst(request) {
+const API_FETCH_TIMEOUT_MS = 20000;
+
+async function fetchWithTimeout(request, timeoutMs) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const networkResponse = await fetch(request);
+    return await fetch(request, { signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function networkFirst(request) {
+  const isApi = new URL(request.url).pathname.startsWith('/api/');
+  const timeoutMs = isApi ? API_FETCH_TIMEOUT_MS : 15000;
+  try {
+    const networkResponse = await fetchWithTimeout(request, timeoutMs);
     if (networkResponse.ok) {
       const cache = await caches.open(DYNAMIC_CACHE);
       cache.put(request, networkResponse.clone());

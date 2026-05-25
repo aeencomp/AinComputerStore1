@@ -68,10 +68,17 @@ const STARTUP_MIGRATIONS: string[] = [
 ];
 
 export async function runDbMigrations(): Promise<void> {
+  const started = Date.now();
   for (const statement of STARTUP_MIGRATIONS) {
     await pool.query(statement);
   }
   await seedSalesLocations();
-  await repairTransferInventoryDuplicates();
-  console.log("[db-migrations] startup migrations applied");
+  console.log(`[db-migrations] startup migrations applied in ${Date.now() - started}ms`);
+
+  // Run heavy inventory repair in background so the server accepts requests immediately.
+  void repairTransferInventoryDuplicates()
+    .then(() => console.log("[db-migrations] background barcode repair finished"))
+    .catch((err) => {
+      console.error("[db-migrations] background barcode repair failed:", err);
+    });
 }

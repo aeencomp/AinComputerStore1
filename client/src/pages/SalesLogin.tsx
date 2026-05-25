@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -21,10 +21,15 @@ export default function SalesLogin() {
   const [otp, setOtp] = useState("");
   const [maskedEmail, setMaskedEmail] = useState("");
 
-  const { data: currentUser, isLoading: authLoading } = useQuery({
+  const { data: currentUser, isLoading: authLoading, isFetched: authFetched } = useQuery({
     queryKey: ['/api/sales/auth/me'],
-    retry: false,
   });
+
+  useEffect(() => {
+    if (authFetched && !authLoading && currentUser) {
+      setLocation("/sales");
+    }
+  }, [authFetched, authLoading, currentUser, setLocation]);
 
   const loginMutation = useMutation({
     mutationFn: async (data: { username: string; password: string }) => {
@@ -62,12 +67,11 @@ export default function SalesLogin() {
     },
   });
 
-  if (authLoading) {
+  if (!authFetched || authLoading) {
     return <div className="min-h-screen flex items-center justify-center"><Loader2 className="h-8 w-8 animate-spin" /></div>;
   }
 
   if (currentUser) {
-    setLocation("/sales");
     return null;
   }
 

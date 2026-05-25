@@ -1,6 +1,32 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 import type { User } from "@shared/schema";
 
+export const DEFAULT_FETCH_TIMEOUT_MS = 25_000;
+
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  timeoutMs = DEFAULT_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(
+        "Request timed out. Check your connection and try again.",
+      );
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
@@ -13,7 +39,7 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const res = await fetchWithTimeout(url, {
     method,
     headers: data ? { "Content-Type": "application/json" } : {},
     body: data ? JSON.stringify(data) : undefined,
@@ -30,7 +56,7 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const res = await fetchWithTimeout(queryKey.join("/") as string, {
       credentials: "include",
     });
 
@@ -46,14 +72,18 @@ export const getQueryFn: <T>(options: {
 export const customerAuthMeQueryKey = ["/api/auth/me"] as const;
 export const customerAuthMeQueryFn = getQueryFn<User | null>({ on401: "returnNull" });
 
+export const salesAuthMeQueryFn = getQueryFn({ on401: "returnNull" });
+export const batteryAuthMeQueryFn = getQueryFn({ on401: "returnNull" });
+export const adminAuthMeQueryFn = getQueryFn({ on401: "returnNull" });
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      queryFn: getQueryFn({ on401: "throw" }),
+      queryFn: getQueryFn({ on401: "returnNull" }),
       refetchInterval: false,
       refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      staleTime: 5 * 60 * 1000,
+      retry: 1,
     },
     mutations: {
       retry: false,

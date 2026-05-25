@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -83,10 +83,15 @@ export default function BatteryDashboard() {
     location: "",
   });
 
-  const { data: currentUser, isLoading: authLoading } = useQuery<BatteryUserAuth>({
+  const { data: currentUser, isLoading: authLoading, isFetched: authFetched } = useQuery<BatteryUserAuth | null>({
     queryKey: ['/api/battery/auth/me'],
-    retry: false,
   });
+
+  useEffect(() => {
+    if (authFetched && !authLoading && !currentUser) {
+      setLocation("/battery/login");
+    }
+  }, [authFetched, authLoading, currentUser, setLocation]);
 
   const { data: batteries = [], isLoading: batteriesLoading } = useQuery<LaptopBattery[]>({
     queryKey: ['/api/battery/batteries'],
@@ -307,7 +312,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     });
   };
 
-  if (authLoading) {
+  if (!authFetched || authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -316,7 +321,6 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   }
 
   if (!currentUser) {
-    setLocation("/battery/login");
     return null;
   }
 

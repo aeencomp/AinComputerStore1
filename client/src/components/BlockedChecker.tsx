@@ -1,14 +1,17 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useQuery } from '@tanstack/react-query';
-import { Shield, Phone, MessageCircle, Mail } from 'lucide-react';
+import { Shield, Phone, MessageCircle, Mail, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { fetchWithTimeout } from '@/lib/queryClient';
 
 interface StoreSettings {
   phone?: string;
   whatsapp?: string;
   email?: string;
 }
+
+const BLOCK_CHECK_TIMEOUT_MS = 8_000;
 
 export function BlockedChecker({ children }: { children: React.ReactNode }) {
   const { language, isRTL } = useLanguage();
@@ -23,26 +26,54 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
+    let finished = false;
+    const done = () => {
+      if (!finished) {
+        finished = true;
+        setChecked(true);
+      }
+    };
+
+    const timeoutId = setTimeout(done, BLOCK_CHECK_TIMEOUT_MS);
+
     const checkBlocked = async () => {
       try {
-        const response = await fetch('/api/check-blocked');
+        const response = await fetchWithTimeout(
+          '/api/check-blocked',
+          { credentials: 'include' },
+          BLOCK_CHECK_TIMEOUT_MS - 500,
+        );
         const data = await response.json();
-        
+
         if (data.blocked) {
           setIsBlocked(true);
           setReason(data.reason || '');
         }
-      } catch (error) {
-        // If check fails, allow access
+      } catch {
+        // Fail open: allow access if the server is slow or unreachable
+      } finally {
+        clearTimeout(timeoutId);
+        done();
       }
-      setChecked(true);
     };
 
     checkBlocked();
+
+    return () => {
+      finished = true;
+      clearTimeout(timeoutId);
+    };
   }, []);
 
   if (!checked) {
-    return null;
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="text-sm text-muted-foreground">
+          {language === 'ar' ? 'جاري التحميل...' : 'Loading...'}
+        </p>
+      </div>
+    );
   }
 
   if (isBlocked) {

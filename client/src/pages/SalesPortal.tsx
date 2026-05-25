@@ -88,9 +88,8 @@ export default function SalesPortal() {
     catch { return new Set<string>(); }
   });
 
-  const { data: currentUser, isLoading, error } = useQuery<SalesUser>({
+  const { data: currentUser, isLoading, isFetched, error } = useQuery<SalesUser | null>({
     queryKey: ['/api/sales/auth/me'],
-    retry: false,
   });
 
   const { notifications: wsNotifications } = useAdminNotifications('/ws/sales');
@@ -144,10 +143,10 @@ export default function SalesPortal() {
   });
 
   useEffect(() => {
-    if (!isLoading && (error || !currentUser)) {
+    if (isFetched && !isLoading && (error || !currentUser)) {
       setLocation("/sales/login");
     }
-  }, [isLoading, error, currentUser, setLocation]);
+  }, [isFetched, isLoading, error, currentUser, setLocation]);
 
   useEffect(() => {
     if (!currentUser || isLoading) return;
@@ -160,7 +159,7 @@ export default function SalesPortal() {
     return <SalesLocationPick />;
   }
 
-  if (isLoading) {
+  if (!isFetched || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10">
         <div className="text-center space-y-4">
