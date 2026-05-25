@@ -209,12 +209,12 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
   });
 
   const { data: laptops = [] } = useQuery<LaptopItem[]>({
-    queryKey: ['/api/battery/laptops'],
+    queryKey: [`/api/battery/laptops?locationId=${salesLocationId}`],
     enabled: activeTab === "stockcount",
   });
 
   const { data: desktops = [] } = useQuery<DesktopItem[]>({
-    queryKey: ['/api/battery/desktops'],
+    queryKey: [`/api/battery/desktops?locationId=${salesLocationId}`],
     enabled: activeTab === "stockcount",
   });
 

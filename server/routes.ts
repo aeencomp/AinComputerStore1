@@ -35,6 +35,10 @@ import {
   LOCATION_SHOP2_ID,
   resolveInventoryBarcodeUpdate,
   getInventoryScanCode,
+  resolveInventorySalesLocationId,
+  normalizeSalesLocationId,
+  inferSalesLocationIdFromLegacyLocationText,
+  repairTransferInventoryDuplicates,
 } from "./sales-locations";
 import {
   syncLaptopBatteryToInStore,
@@ -1271,6 +1275,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       console.error("Error transferring stock:", error);
       return res.status(400).json({ error: error.message || "فشل نقل المخزون" });
+    }
+  });
+
+  app.post("/api/sales/repair-inventory-locations", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!salesUserId && !batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      if (salesUserId) {
+        const salesUser = await storage.getSalesUser(salesUserId);
+        if (!salesUser || salesUser.role !== "sales_admin") {
+          return res.status(403).json({ error: "صلاحية المدير مطلوبة" });
+        }
+      }
+      await repairTransferInventoryDuplicates();
+      return res.json({
+        success: true,
+        message: "تم إصلاح مواقع المخزون والباركود للأجهزة القديمة",
+      });
+    } catch (error) {
+      console.error("Error repairing inventory locations:", error);
+      return res.status(500).json({ error: "فشل إصلاح مواقع المخزون" });
     }
   });
 
@@ -7523,6 +7551,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplier: typeof rest.supplier === "string" && rest.supplier.trim() ? rest.supplier.trim() : null,
         location: typeof rest.location === "string" && rest.location.trim() ? rest.location.trim() : null,
         notes: typeof rest.notes === "string" && rest.notes.trim() ? rest.notes.trim() : null,
+        salesLocationId: resolveInventorySalesLocationId({
+          salesLocationId: rest.salesLocationId,
+          location: typeof rest.location === "string" ? rest.location : null,
+        }),
       };
       const [row] = await db.insert(laptops).values(cleanValues).returning();
       return res.status(201).json(row);
@@ -7544,6 +7576,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
       if (!existing) return res.status(404).json({ error: "اللابتوب غير موجود" });
       resolveInventoryBarcodeUpdate(updateData, existing);
+      const locFromBody = normalizeSalesLocationId(updateData.salesLocationId);
+      if (locFromBody != null) {
+        updateData.salesLocationId = locFromBody;
+      } else if (updateData.salesLocationId != null) {
+        delete updateData.salesLocationId;
+      } else if (typeof updateData.location === "string") {
+        const inferred = inferSalesLocationIdFromLegacyLocationText(updateData.location);
+        if (inferred != null) updateData.salesLocationId = inferred;
+      }
       const [row] = await db.update(laptops).set({ ...updateData, updatedAt: new Date() }).where(eq(laptops.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "اللابتوب غير موجود" });
       return res.json(row);
@@ -7667,6 +7708,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         supplier: typeof rest.supplier === "string" && rest.supplier.trim() ? rest.supplier.trim() : null,
         location: typeof rest.location === "string" && rest.location.trim() ? rest.location.trim() : null,
         notes: typeof rest.notes === "string" && rest.notes.trim() ? rest.notes.trim() : null,
+        salesLocationId: resolveInventorySalesLocationId({
+          salesLocationId: rest.salesLocationId,
+          location: typeof rest.location === "string" ? rest.location : null,
+        }),
       };
       const [row] = await db.insert(desktops).values(cleanValues).returning();
       return res.status(201).json(row);
@@ -7688,6 +7733,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .limit(1);
       if (!existing) return res.status(404).json({ error: "الديسكتوب غير موجود" });
       resolveInventoryBarcodeUpdate(updateData, existing);
+      const locFromBody = normalizeSalesLocationId(updateData.salesLocationId);
+      if (locFromBody != null) {
+        updateData.salesLocationId = locFromBody;
+      } else if (updateData.salesLocationId != null) {
+        delete updateData.salesLocationId;
+      } else if (typeof updateData.location === "string") {
+        const inferred = inferSalesLocationIdFromLegacyLocationText(updateData.location);
+        if (inferred != null) updateData.salesLocationId = inferred;
+      }
       const [row] = await db.update(desktops).set({ ...updateData, updatedAt: new Date() }).where(eq(desktops.id, req.params.id)).returning();
       if (!row) return res.status(404).json({ error: "الديسكتوب غير موجود" });
       return res.json(row);

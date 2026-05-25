@@ -16,6 +16,69 @@ import {
 export const LOCATION_MAIN_ID = 1;
 export const LOCATION_SHOP2_ID = 2;
 
+/** Parse API/body sales location id (only loc 1 or 2). */
+export function normalizeSalesLocationId(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = parseInt(String(value), 10);
+  if (n === LOCATION_MAIN_ID || n === LOCATION_SHOP2_ID) return n;
+  return null;
+}
+
+/**
+ * Older laptop/desktop rows used the free-text `location` shelf field while
+ * `sales_location_id` stayed at default 1. Map common "location 2" labels.
+ */
+export function inferSalesLocationIdFromLegacyLocationText(
+  location: string | null | undefined,
+): number | null {
+  const t = (location || "").trim().toLowerCase();
+  if (!t) return null;
+
+  const exactLoc2 = new Set([
+    "2",
+    "loc2",
+    "location2",
+    "location 2",
+    "shop2",
+    "shop 2",
+    "store2",
+    "store 2",
+    "site2",
+    "site 2",
+    "الموقع 2",
+    "موقع 2",
+    "فرع 2",
+    "محل 2",
+    "مخزن 2",
+  ]);
+  if (exactLoc2.has(t)) return LOCATION_SHOP2_ID;
+
+  if (
+    /^loc(ation)?\s*2$/i.test(t)
+    || /^shop\s*2$/i.test(t)
+    || /^موقع\s*2$/i.test(t)
+    || t.includes("location 2")
+    || t.includes("loc 2")
+    || t.includes("موقع 2")
+    || t.includes("فرع 2")
+  ) {
+    return LOCATION_SHOP2_ID;
+  }
+
+  return null;
+}
+
+export function resolveInventorySalesLocationId(options: {
+  salesLocationId?: unknown;
+  location?: string | null;
+}): number {
+  return (
+    normalizeSalesLocationId(options.salesLocationId)
+    ?? inferSalesLocationIdFromLegacyLocationText(options.location)
+    ?? LOCATION_MAIN_ID
+  );
+}
+
 export async function seedSalesLocations(): Promise<void> {
   await db
     .insert(salesLocations)
@@ -756,6 +819,138 @@ async function backfillMissingInventoryBarcodes(
   return updated;
 }
 
+async function moveLegacyInventoryRowToLocation(
+  table: typeof laptops | typeof desktops,
+  row: (typeof laptops.$inferSelect | typeof desktops.$inferSelect) & {
+    id: string;
+    stockQuantity: number | null;
+  },
+  targetLocationId: number,
+): Promise<void> {
+  const qty = row.stockQuantity || 0;
+  if (qty < 1) return;
+
+  const existingAtDest = await findInventoryRowAtLocation(table, targetLocationId, row);
+
+  if (existingAtDest && existingAtDest.id !== row.id) {
+    await db
+      .update(table)
+      .set({
+        stockQuantity: (existingAtDest.stockQuantity || 0) + qty,
+        barcode: getInventoryScanCode(row),
+        updatedAt: new Date(),
+      })
+      .where(eq(table.id, existingAtDest.id));
+    await db
+      .update(table)
+      .set({ isActive: 0, stockQuantity: 0, updatedAt: new Date() })
+      .where(eq(table.id, row.id));
+    return;
+  }
+
+  await db
+    .update(table)
+    .set({ salesLocationId: targetLocationId, updatedAt: new Date() })
+    .where(eq(table.id, row.id));
+}
+
+/**
+ * Assign laptops/desktops that were saved at location 1 but labeled as shop 2
+ * in the legacy text `location` field (pre–sales_location_id UI).
+ */
+export async function repairLegacyInventorySalesLocations(): Promise<{
+  laptopsMoved: number;
+  desktopsMoved: number;
+}> {
+  let laptopsMoved = 0;
+  let desktopsMoved = 0;
+
+  const laptopRows = await db
+    .select()
+    .from(laptops)
+    .where(
+      and(
+        eq(laptops.isActive, 1),
+        eq(laptops.salesLocationId, LOCATION_MAIN_ID),
+        sql`${laptops.stockQuantity} > 0`,
+      ),
+    );
+
+  for (const row of laptopRows) {
+    const inferred = inferSalesLocationIdFromLegacyLocationText(row.location);
+    if (inferred !== LOCATION_SHOP2_ID) continue;
+    await moveLegacyInventoryRowToLocation(laptops, row, LOCATION_SHOP2_ID);
+    laptopsMoved++;
+  }
+
+  const desktopRows = await db
+    .select()
+    .from(desktops)
+    .where(
+      and(
+        eq(desktops.isActive, 1),
+        eq(desktops.salesLocationId, LOCATION_MAIN_ID),
+        sql`${desktops.stockQuantity} > 0`,
+      ),
+    );
+
+  for (const row of desktopRows) {
+    const inferred = inferSalesLocationIdFromLegacyLocationText(row.location);
+    if (inferred !== LOCATION_SHOP2_ID) continue;
+    await moveLegacyInventoryRowToLocation(desktops, row, LOCATION_SHOP2_ID);
+    desktopsMoved++;
+  }
+
+  if (laptopsMoved > 0 || desktopsMoved > 0) {
+    console.log(
+      `[sales-locations] legacy location repair: ${laptopsMoved} laptop(s), ${desktopsMoved} desktop(s) → location 2`,
+    );
+  }
+
+  return { laptopsMoved, desktopsMoved };
+}
+
+/** Reactivate / merge loc-2 rows that were deactivated while stock remained on loc-1 rows. */
+async function repairStuckInventoryAfterTransfers(
+  table: typeof laptops | typeof desktops,
+): Promise<number> {
+  let fixed = 0;
+  const inactiveAtDest = await db
+    .select()
+    .from(table)
+    .where(
+      and(
+        eq(table.salesLocationId, LOCATION_SHOP2_ID),
+        eq(table.isActive, 0),
+      ),
+    );
+
+  for (const deadRow of inactiveAtDest) {
+    const scan = getInventoryScanCode(deadRow);
+    if (!scan) continue;
+
+    const [activeAtMain] = await db
+      .select()
+      .from(table)
+      .where(
+        and(
+          eq(table.salesLocationId, LOCATION_MAIN_ID),
+          eq(table.isActive, 1),
+          sql`${table.stockQuantity} > 0`,
+          or(eq(table.barcode, scan), eq(table.serialNumber, scan)),
+        ),
+      )
+      .limit(1);
+
+    if (!activeAtMain) continue;
+
+    await moveLegacyInventoryRowToLocation(table, activeAtMain, LOCATION_SHOP2_ID);
+    fixed++;
+  }
+
+  return fixed;
+}
+
 /** Merge split transfer rows that share the same scan barcode at one location. */
 export async function repairTransferInventoryDuplicates(): Promise<void> {
   for (const table of [laptops, desktops, acAdapters] as const) {
@@ -768,5 +963,17 @@ export async function repairTransferInventoryDuplicates(): Promise<void> {
   const total = laptopMerged + desktopMerged + adapterMerged;
   if (total > 0) {
     console.log(`[sales-locations] merged ${total} duplicate inventory row(s) from transfers`);
+  }
+  const legacy = await repairLegacyInventorySalesLocations();
+  const laptopsStuck = await repairStuckInventoryAfterTransfers(laptops);
+  const desktopsStuck = await repairStuckInventoryAfterTransfers(desktops);
+  if (laptopsStuck > 0 || desktopsStuck > 0) {
+    console.log(
+      `[sales-locations] transfer stuck repair: ${laptopsStuck} laptop(s), ${desktopsStuck} desktop(s)`,
+    );
+  }
+  if (legacy.laptopsMoved > 0 || legacy.desktopsMoved > 0) {
+    await mergeDuplicateInventoryRows(laptops);
+    await mergeDuplicateInventoryRows(desktops);
   }
 }
