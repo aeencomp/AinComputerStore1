@@ -10,6 +10,7 @@ import {
   resolveScannedCode,
   shouldSuppressScanInput,
 } from "@/lib/barcodeKeyboard";
+import { getInventoryScanCode, inventoryItemMatchesScan } from "@/lib/inventoryScanCode";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -107,6 +108,7 @@ interface CountableProduct {
   sku?: string | null;
   barcode?: string | null;
   stockQuantity: number;
+  salesLocationId?: number;
 }
 
 interface ScanEntry {
@@ -213,8 +215,18 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
     enabled: activeTab === "stockcount",
   });
 
+  const { data: laptopsAll = [] } = useQuery<LaptopItem[]>({
+    queryKey: ["/api/battery/laptops"],
+    enabled: activeTab === "stockcount",
+  });
+
   const { data: desktops = [] } = useQuery<DesktopItem[]>({
     queryKey: [`/api/battery/desktops?locationId=${salesLocationId}`],
+    enabled: activeTab === "stockcount",
+  });
+
+  const { data: desktopsAll = [] } = useQuery<DesktopItem[]>({
+    queryKey: ["/api/battery/desktops"],
     enabled: activeTab === "stockcount",
   });
 
@@ -529,6 +541,67 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     win.document.close();
   }, [formatPrice]);
 
+  const toCountableBattery = (b: LaptopBattery): CountableProduct => {
+    const scanCode = getInventoryScanCode(b);
+    return {
+      id: b.id,
+      source: "battery",
+      nameAr: `${b.brand} ${b.serialNumber}`,
+      nameEn: `${b.brand} ${b.serialNumber}`,
+      serialNumber: b.serialNumber,
+      sku: scanCode,
+      barcode: scanCode,
+      stockQuantity: b.stockQuantity || 0,
+      salesLocationId: (b as { salesLocationId?: number }).salesLocationId,
+    };
+  };
+
+  const toCountableAdapter = (a: AcAdapter): CountableProduct => {
+    const scanCode = getInventoryScanCode(a);
+    return {
+      id: a.id,
+      source: "adapter",
+      nameAr: `${a.brand} ${a.serialNumber}`,
+      nameEn: `${a.brand} ${a.serialNumber}`,
+      serialNumber: a.serialNumber,
+      sku: scanCode,
+      barcode: scanCode,
+      stockQuantity: a.stockQuantity || 0,
+      salesLocationId: (a as { salesLocationId?: number }).salesLocationId,
+    };
+  };
+
+  const toCountableLaptop = (l: LaptopItem): CountableProduct => {
+    const scanCode = getInventoryScanCode(l);
+    const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
+    return {
+      id: l.id,
+      source: "laptop",
+      nameAr: `${l.brand} ${l.model || ""}${sizeLabel}`.trim(),
+      nameEn: `${l.brand} ${l.model || ""}${sizeLabel}`.trim(),
+      serialNumber: l.serialNumber,
+      sku: scanCode,
+      barcode: scanCode,
+      stockQuantity: l.stockQuantity || 0,
+      salesLocationId: l.salesLocationId,
+    };
+  };
+
+  const toCountableDesktop = (d: DesktopItem): CountableProduct => {
+    const scanCode = getInventoryScanCode(d);
+    return {
+      id: d.id,
+      source: "desktop",
+      nameAr: `${d.brand} ${d.model || ""}`.trim(),
+      nameEn: `${d.brand} ${d.model || ""}`.trim(),
+      serialNumber: d.serialNumber,
+      sku: scanCode,
+      barcode: scanCode,
+      stockQuantity: d.stockQuantity || 0,
+      salesLocationId: d.salesLocationId,
+    };
+  };
+
   const countProducts: CountableProduct[] = [
     ...products.map(p => ({
       id: p.id,
@@ -539,67 +612,48 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       sku: p.sku,
       barcode: p.barcode,
       stockQuantity: p.stockQuantity,
+      salesLocationId: p.salesLocationId,
     })),
-    ...batteries.map(b => ({
-      id: b.id,
-      source: "battery" as const,
-      nameAr: `${b.brand} ${b.serialNumber}`,
-      nameEn: `${b.brand} ${b.serialNumber}`,
-      serialNumber: b.serialNumber,
-      sku: b.barcode || b.serialNumber,
-      barcode: b.barcode,
-      stockQuantity: b.stockQuantity || 0,
-    })),
-    ...adapters.map(a => ({
-      id: a.id,
-      source: "adapter" as const,
-      nameAr: `${a.brand} ${a.serialNumber}`,
-      nameEn: `${a.brand} ${a.serialNumber}`,
-      serialNumber: a.serialNumber,
-      sku: a.barcode || a.serialNumber,
-      barcode: a.barcode,
-      stockQuantity: a.stockQuantity || 0,
-    })),
-    ...laptops.map(l => ({
-      id: l.id,
-      source: "laptop" as const,
-      nameAr: `${l.brand} ${l.serialNumber}${l.model ? ` ${l.model}` : ""}`,
-      nameEn: `${l.brand} ${l.serialNumber}${l.model ? ` ${l.model}` : ""}`,
-      serialNumber: l.serialNumber,
-      sku: l.barcode || l.serialNumber,
-      barcode: l.barcode,
-      stockQuantity: l.stockQuantity || 0,
-    })),
-    ...desktops.map(d => ({
-      id: d.id,
-      source: "desktop" as const,
-      nameAr: `${d.brand} ${d.serialNumber}${d.model ? ` ${d.model}` : ""}`,
-      nameEn: `${d.brand} ${d.serialNumber}${d.model ? ` ${d.model}` : ""}`,
-      serialNumber: d.serialNumber,
-      sku: d.barcode || d.serialNumber,
-      barcode: d.barcode,
-      stockQuantity: d.stockQuantity || 0,
-    })),
-    ...keyboards.map(k => ({
-      id: k.id,
-      source: "keyboard" as const,
-      nameAr: `${k.brand} ${k.serialNumber}`,
-      nameEn: `${k.brand} ${k.serialNumber}`,
-      serialNumber: k.serialNumber,
-      sku: k.barcode || k.serialNumber,
-      barcode: k.barcode,
-      stockQuantity: k.stockQuantity || 0,
-    })),
-    ...lcds.map(l => ({
-      id: l.id,
-      source: "lcd" as const,
-      nameAr: `${l.brand} ${l.serialNumber}`,
-      nameEn: `${l.brand} ${l.serialNumber}`,
-      serialNumber: l.serialNumber,
-      sku: l.barcode || l.serialNumber,
-      barcode: l.barcode,
-      stockQuantity: l.stockQuantity || 0,
-    })),
+    ...batteries.map(toCountableBattery),
+    ...adapters.map(toCountableAdapter),
+    ...laptops.map(toCountableLaptop),
+    ...desktops.map(toCountableDesktop),
+    ...keyboards.map(k => {
+      const scanCode = getInventoryScanCode(k);
+      return {
+        id: k.id,
+        source: "keyboard" as const,
+        nameAr: `${k.brand} ${k.serialNumber}`,
+        nameEn: `${k.brand} ${k.serialNumber}`,
+        serialNumber: k.serialNumber,
+        sku: scanCode,
+        barcode: scanCode,
+        stockQuantity: k.stockQuantity || 0,
+      };
+    }),
+    ...lcds.map(l => {
+      const scanCode = getInventoryScanCode(l);
+      return {
+        id: l.id,
+        source: "lcd" as const,
+        nameAr: `${l.brand} ${l.serialNumber}`,
+        nameEn: `${l.brand} ${l.serialNumber}`,
+        serialNumber: l.serialNumber,
+        sku: scanCode,
+        barcode: scanCode,
+        stockQuantity: l.stockQuantity || 0,
+      };
+    }),
+  ];
+
+  const globalLookupProducts: CountableProduct[] = [
+    ...countProducts,
+    ...laptopsAll
+      .filter((l) => !laptops.some((x) => x.id === l.id))
+      .map(toCountableLaptop),
+    ...desktopsAll
+      .filter((d) => !desktops.some((x) => x.id === d.id))
+      .map(toCountableDesktop),
   ];
 
   const countScopeStats = {
@@ -613,14 +667,39 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   };
 
   const findProductByCode = useCallback((code: string): CountableProduct | null => {
-    const c = normalizeScannedBarcode(code).toLowerCase();
-    if (!c) return null;
+    if (!normalizeScannedBarcode(code)) return null;
     return (
-      countProducts.find(
-        (p) => codesMatch(p.barcode, c) || codesMatch(p.sku, c),
+      countProducts.find((p) =>
+        inventoryItemMatchesScan(
+          {
+            scanCode: p.sku,
+            barcode: p.barcode,
+            serialNumber: p.serialNumber,
+          },
+          code,
+        ),
       ) || null
     );
   }, [countProducts]);
+
+  const findProductByCodeGlobal = useCallback(
+    (code: string): CountableProduct | null => {
+      if (!normalizeScannedBarcode(code)) return null;
+      return (
+        globalLookupProducts.find((p) =>
+          inventoryItemMatchesScan(
+            {
+              scanCode: p.sku,
+              barcode: p.barcode,
+              serialNumber: p.serialNumber,
+            },
+            code,
+          ),
+        ) || null
+      );
+    },
+    [globalLookupProducts],
+  );
 
   const handleScanSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -643,7 +722,23 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       setScanInput("");
       setTimeout(() => scanInputRef.current?.focus(), 50);
 
-      const product = findProductByCode(code);
+      let product = findProductByCode(code);
+      if (!product) {
+        const elsewhere = findProductByCodeGlobal(code);
+        if (elsewhere && elsewhere.salesLocationId != null && elsewhere.salesLocationId !== salesLocationId) {
+          playStockCountErrorBeep();
+          toast({
+            title: language === "ar" ? "الجهاز في موقع آخر" : "Item at another location",
+            description:
+              language === "ar"
+                ? `هذا الرمز مسجل في الموقع ${elsewhere.salesLocationId} وليس الموقع ${salesLocationId}. انقل المخزون أو عدّل الموقع في إدارة اللابتوبات.`
+                : `This code belongs to location ${elsewhere.salesLocationId}, not location ${salesLocationId}. Transfer stock or update the item location.`,
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       if (product) {
         playBarcodeScanBeep();
         setScanEntries(prev => {

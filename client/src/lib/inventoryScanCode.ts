@@ -1,4 +1,4 @@
-import { codesMatch } from "@/lib/barcodeKeyboard";
+import { codesMatch, normalizeScannedBarcode } from "@/lib/barcodeKeyboard";
 
 export type InventoryCodeSource = {
   barcode?: string | null;
@@ -16,15 +16,33 @@ export function getInventoryScanCode(item: InventoryCodeSource): string {
   return (item.serialNumber ?? "").trim();
 }
 
+/** Loose key for LAP-0008 vs "lap 0008" vs "LAP0008". */
+export function normalizeInventoryCodeKey(code: string): string {
+  return normalizeScannedBarcode(code).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+export function inventoryCodesMatch(
+  stored: string | null | undefined,
+  scanned: string,
+): boolean {
+  if (!stored?.trim() || !scanned.trim()) return false;
+  if (codesMatch(stored, scanned)) return true;
+  const a = normalizeInventoryCodeKey(stored);
+  const b = normalizeInventoryCodeKey(scanned);
+  return !!a && !!b && a === b;
+}
+
 export function inventoryItemMatchesScan(
   item: InventoryCodeSource,
   scanned: string,
 ): boolean {
   const scanCode = getInventoryScanCode(item);
-  if (codesMatch(scanCode, scanned)) return true;
+  if (inventoryCodesMatch(scanCode, scanned)) return true;
   const serial = (item.serialNumber ?? "").trim();
-  if (serial && codesMatch(serial, scanned)) return true;
+  if (serial && inventoryCodesMatch(serial, scanned)) return true;
   const part = (item.partNumber ?? "").trim();
-  if (part && codesMatch(part, scanned)) return true;
+  if (part && inventoryCodesMatch(part, scanned)) return true;
+  const barcode = (item.barcode ?? "").trim();
+  if (barcode && inventoryCodesMatch(barcode, scanned)) return true;
   return false;
 }

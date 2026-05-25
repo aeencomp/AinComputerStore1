@@ -101,8 +101,9 @@ function isSerialInventoryProduct(product: POSProduct): boolean {
 }
 
 function productMatchesScanCode(product: POSProduct, code: string): boolean {
-  if (codesMatch(product.sku, code) || codesMatch(product.barcode, code)) return true;
-  if (!isSerialInventoryProduct(product)) return false;
+  if (!isSerialInventoryProduct(product)) {
+    return codesMatch(product.sku, code) || codesMatch(product.barcode, code);
+  }
   return inventoryItemMatchesScan(
     {
       scanCode: product.scanCode ?? product.sku,

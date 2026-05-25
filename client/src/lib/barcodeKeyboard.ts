@@ -121,5 +121,9 @@ export function codesMatch(
 ): boolean {
   const a = normalizeScannedBarcode(stored || "").toLowerCase();
   const b = normalizeScannedBarcode(scanned).toLowerCase();
-  return !!a && a === b;
+  if (!a || !b) return false;
+  if (a === b) return true;
+  // LAP-0008 vs lap 0008 (inventory serials)
+  const compact = (s: string) => s.replace(/[^a-z0-9]/g, "");
+  return compact(a) === compact(b);
 }
