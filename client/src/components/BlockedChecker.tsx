@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useQuery } from '@tanstack/react-query';
-import { Shield, Phone, MessageCircle, Mail, Loader2 } from 'lucide-react';
+import { Shield, Phone, MessageCircle, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { fetchWithTimeout } from '@/lib/queryClient';
 
@@ -11,13 +11,37 @@ interface StoreSettings {
   email?: string;
 }
 
-const BLOCK_CHECK_TIMEOUT_MS = 8_000;
+const BLOCK_CHECK_TIMEOUT_MS = 4_000;
+const BLOCK_CACHE_KEY = 'ain-ip-block-check';
+const BLOCK_CACHE_TTL_MS = 10 * 60 * 1000;
+
+type BlockCache = { blocked: boolean; reason?: string; at: number };
+
+function readBlockCache(): BlockCache | null {
+  try {
+    const raw = sessionStorage.getItem(BLOCK_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as BlockCache;
+    if (Date.now() - parsed.at > BLOCK_CACHE_TTL_MS) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function writeBlockCache(data: BlockCache) {
+  try {
+    sessionStorage.setItem(BLOCK_CACHE_KEY, JSON.stringify(data));
+  } catch {
+    /* ignore quota */
+  }
+}
 
 export function BlockedChecker({ children }: { children: React.ReactNode }) {
   const { language, isRTL } = useLanguage();
-  const [isBlocked, setIsBlocked] = useState(false);
-  const [reason, setReason] = useState<string>('');
-  const [checked, setChecked] = useState(false);
+  const initialCache = readBlockCache();
+  const [isBlocked, setIsBlocked] = useState(initialCache?.blocked ?? false);
+  const [reason, setReason] = useState(initialCache?.reason ?? '');
   const [rayId] = useState(() => Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
 
   const { data: storeSettings } = useQuery<StoreSettings>({
@@ -26,55 +50,35 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    let finished = false;
-    const done = () => {
-      if (!finished) {
-        finished = true;
-        setChecked(true);
-      }
-    };
-
-    const timeoutId = setTimeout(done, BLOCK_CHECK_TIMEOUT_MS);
-
     const checkBlocked = async () => {
       try {
         const response = await fetchWithTimeout(
           '/api/check-blocked',
           { credentials: 'include' },
-          BLOCK_CHECK_TIMEOUT_MS - 500,
+          BLOCK_CHECK_TIMEOUT_MS,
         );
         const data = await response.json();
 
         if (data.blocked) {
           setIsBlocked(true);
           setReason(data.reason || '');
+          writeBlockCache({ blocked: true, reason: data.reason || '', at: Date.now() });
+        } else {
+          setIsBlocked(false);
+          setReason('');
+          writeBlockCache({ blocked: false, at: Date.now() });
         }
       } catch {
         // Fail open: allow access if the server is slow or unreachable
-      } finally {
-        clearTimeout(timeoutId);
-        done();
       }
     };
 
-    checkBlocked();
-
-    return () => {
-      finished = true;
-      clearTimeout(timeoutId);
-    };
+    const startCache = readBlockCache();
+    if (startCache?.blocked) {
+      return;
+    }
+    void checkBlocked();
   }, []);
-
-  if (!checked) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-3 bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">
-          {language === 'ar' ? 'جاري التحميل...' : 'Loading...'}
-        </p>
-      </div>
-    );
-  }
 
   if (isBlocked) {
     const whatsappNumber = storeSettings?.whatsapp || '9647700000000';
@@ -86,7 +90,6 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
         className="min-h-screen bg-[#1a1a2e] flex flex-col"
         dir={isRTL ? 'rtl' : 'ltr'}
       >
-        {/* Cloudflare-style header */}
         <div className="bg-[#f38020] py-3 px-4">
           <div className="max-w-4xl mx-auto flex items-center gap-2">
             <Shield className="h-6 w-6 text-white" />
@@ -96,9 +99,7 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 flex items-center justify-center p-4">
           <div className="max-w-xl w-full">
-            {/* Main error box */}
             <div className="bg-white rounded-lg shadow-2xl overflow-hidden">
-              {/* Error header */}
               <div className="bg-[#c41e3a] px-6 py-4">
                 <h1 className="text-white text-xl font-bold flex items-center gap-2">
                   <Shield className="h-6 w-6" />
@@ -109,7 +110,6 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
                 </p>
               </div>
 
-              {/* Error content */}
               <div className="p-6">
                 <div className="mb-6">
                   <h2 className="text-gray-800 font-semibold text-lg mb-2">
@@ -135,7 +135,6 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
                   </div>
                 </div>
 
-                {/* Contact section */}
                 <div className="border-t pt-6">
                   <h3 className="text-gray-800 font-semibold mb-3">
                     {language === 'ar' 
@@ -175,7 +174,6 @@ export function BlockedChecker({ children }: { children: React.ReactNode }) {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="text-center mt-6">
               <p className="text-gray-400 text-sm">
                 {language === 'ar' ? 'الأداء والأمان بواسطة' : 'Performance & security by'}{' '}

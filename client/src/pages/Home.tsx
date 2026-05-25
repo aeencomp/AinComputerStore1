@@ -38,7 +38,26 @@ export default function Home() {
   const searchFromUrl = urlParams.get('search') || "";
   
   const [selectedCategory, setSelectedCategory] = useState(categoryFromUrl);
-  
+  const [loadCart, setLoadCart] = useState(cartOpen);
+
+  useEffect(() => {
+    if (cartOpen) {
+      setLoadCart(true);
+      return;
+    }
+    const id =
+      typeof requestIdleCallback === "function"
+        ? requestIdleCallback(() => setLoadCart(true), { timeout: 3000 })
+        : window.setTimeout(() => setLoadCart(true), 1500);
+    return () => {
+      if (typeof requestIdleCallback === "function" && typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(id as number);
+      } else {
+        clearTimeout(id as number);
+      }
+    };
+  }, [cartOpen]);
+
   useEffect(() => {
     setSelectedCategory(categoryFromUrl);
     if (searchFromUrl) {
@@ -61,6 +80,7 @@ export default function Home() {
 
   const { data: cartItems = [], isLoading: cartLoading, isError: cartError } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
+    enabled: loadCart,
   });
 
   const { data: storeSettings } = useQuery<StoreSettings>({

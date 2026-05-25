@@ -218,16 +218,13 @@ async function getOnlineInventoryMatches(product: any) {
     );
 }
 
-async function getOnlineStockInfo(product: any) {
-  const matches = await getOnlineInventoryMatches(product);
+function onlineStockInfoFromMatches(product: any, matches: Awaited<ReturnType<typeof getOnlineInventoryMatches>>) {
   if (matches.length === 0) {
     const fallbackQty = product?.stockQuantity || 0;
     return {
       hasLocationStock: false,
       totalStock: fallbackQty,
-      byLocation: [
-        { locationId: LOCATION_MAIN_ID, quantity: fallbackQty },
-      ],
+      byLocation: [{ locationId: LOCATION_MAIN_ID, quantity: fallbackQty }],
       matches,
     };
   }
@@ -250,8 +247,11 @@ async function getOnlineStockInfo(product: any) {
   };
 }
 
-async function withOnlineStock(product: any) {
-  const stock = await getOnlineStockInfo(product);
+function attachOnlineStock(
+  product: any,
+  matches: Awaited<ReturnType<typeof getOnlineInventoryMatches>>,
+) {
+  const stock = onlineStockInfoFromMatches(product, matches);
   return {
     ...product,
     stockQuantity: stock.totalStock,
@@ -259,6 +259,45 @@ async function withOnlineStock(product: any) {
     onlineStockByLocation: stock.byLocation,
     onlineStockSource: stock.hasLocationStock ? "locations" : "products",
   };
+}
+
+async function loadOnlineInventoryRowsForSkus(skus: string[]) {
+  if (skus.length === 0) return [];
+  return db
+    .select()
+    .from(inStoreProducts)
+    .where(
+      and(
+        inArray(inStoreProducts.salesLocationId, [LOCATION_MAIN_ID, LOCATION_SHOP2_ID]),
+        or(inArray(inStoreProducts.sku, skus), inArray(inStoreProducts.barcode, skus)),
+      ),
+    );
+}
+
+function matchesForProductSku(
+  product: any,
+  rows: Awaited<ReturnType<typeof loadOnlineInventoryRowsForSkus>>,
+) {
+  const sku = String(product?.sku || "").trim();
+  if (!sku) return [];
+  return rows.filter((row) => row.sku === sku || row.barcode === sku);
+}
+
+async function batchWithOnlineStock(products: any[]) {
+  const skus = [
+    ...new Set(products.map((p) => String(p?.sku || "").trim()).filter(Boolean)),
+  ];
+  const rows = await loadOnlineInventoryRowsForSkus(skus);
+  return products.map((p) => attachOnlineStock(p, matchesForProductSku(p, rows)));
+}
+
+async function getOnlineStockInfo(product: any) {
+  const matches = await getOnlineInventoryMatches(product);
+  return onlineStockInfoFromMatches(product, matches);
+}
+
+async function withOnlineStock(product: any) {
+  return attachOnlineStock(product, await getOnlineInventoryMatches(product));
 }
 
 async function findInStoreCodeDuplicate(
@@ -2476,16 +2515,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (componentType && typeof componentType === 'string') {
         const products = await storage.getProductsByComponentType(componentType);
-        return res.json(await Promise.all(products.map(withOnlineStock)));
+        return res.json(await batchWithOnlineStock(products));
       }
       
       if (category && typeof category === 'string') {
         const products = await storage.getProductsByCategory(category);
-        return res.json(await Promise.all(products.map(withOnlineStock)));
+        return res.json(await batchWithOnlineStock(products));
       }
       
       const products = await storage.getProducts();
-      return res.json(await Promise.all(products.map(withOnlineStock)));
+      return res.json(await batchWithOnlineStock(products));
     } catch (error) {
       console.error("Error fetching products:", error);
       return res.status(500).json({ error: "Failed to fetch products" });
@@ -2950,14 +2989,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionId = req.session.id;
       const cartItems = await storage.getCartItems(sessionId);
-      const itemsWithProducts = await Promise.all(
-        cartItems.map(async (item) => {
-          const product = await storage.getProduct(item.productId);
-          return product ? { product: await withOnlineStock(product), quantity: item.quantity, id: item.id } : null;
-        })
+      if (cartItems.length === 0) {
+        return res.json([]);
+      }
+
+      const productIds = [...new Set(cartItems.map((item) => item.productId))];
+      const productRows = await db
+        .select()
+        .from(products)
+        .where(inArray(products.id, productIds));
+      const stockedById = new Map(
+        (await batchWithOnlineStock(productRows)).map((p) => [p.id, p]),
       );
-      
-      const validItems = itemsWithProducts.filter((item): item is { product: any; quantity: number; id: string } => item !== null);
+
+      const validItems = cartItems
+        .map((item) => {
+          const product = stockedById.get(item.productId);
+          return product
+            ? { product, quantity: item.quantity, id: item.id }
+            : null;
+        })
+        .filter((item): item is { product: any; quantity: number; id: string } => item !== null);
+
       return res.json(validItems);
     } catch (error) {
       console.error("Error fetching cart:", error);

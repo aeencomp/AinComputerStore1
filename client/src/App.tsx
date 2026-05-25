@@ -1,4 +1,6 @@
+import { Suspense } from "react";
 import { Switch, Route } from "wouter";
+import { Loader2 } from "lucide-react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -17,119 +19,90 @@ import ChangePassword from "@/pages/ChangePassword";
 import ProductDetail from "@/pages/ProductDetail";
 import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
-import AdminLogin from "@/pages/AdminLogin";
-import AdminDashboard from "@/pages/AdminDashboard";
-import AdminProducts from "@/pages/AdminProducts";
-import AdminPrograms from "@/pages/AdminPrograms";
-import AdminCustomers from "@/pages/AdminCustomers";
-import AdminAttendance from "@/pages/AdminAttendance";
-import AdminSettings from "@/pages/AdminSettings";
-import AdminMarketPrices from "@/pages/AdminMarketPrices";
-import AdminExternalPrices from "@/pages/AdminExternalPrices";
-import AdminInventory from "@/pages/AdminInventory";
-import AdminPOS from "@/pages/AdminPOS";
-import AdminSales from "@/pages/AdminSales";
-import AdminReviews from "@/pages/AdminReviews";
-import AdminDiscountCodes from "@/pages/AdminDiscountCodes";
-import AdminAnalytics from "@/pages/AdminAnalytics";
-import PlatformAdmin from "@/pages/admin/PlatformAdmin";
-import AdminWhatsApp from "@/pages/AdminWhatsApp";
-import RecycleBin from "@/pages/RecycleBin";
-import AdminUsers from "@/pages/AdminUsers";
-import ShopLogin from "@/pages/shop/ShopLogin";
-import ShopDashboard from "@/pages/shop/ShopDashboard";
-import ShopNewRepair from "@/pages/shop/ShopNewRepair";
-import ShopCustomerProfile from "@/pages/shop/ShopCustomerProfile";
-import { VisitorTracker } from "@/components/VisitorTracker";
-import { BlockedChecker } from "@/components/BlockedChecker";
-import SalesLogin from "@/pages/SalesLogin";
-import SalesPortal from "@/pages/SalesPortal";
-import TechnicianLogin from "@/pages/technician/TechnicianLogin";
-import TechnicianDashboard from "@/pages/technician/TechnicianDashboard";
-import TechnicianManagement from "@/pages/technician/TechnicianManagement";
-import TicketDetail from "@/pages/technician/TicketDetail";
-import NewRepairRequest from "@/pages/technician/NewRepairRequest";
-import CustomerProfile from "@/pages/technician/CustomerProfile";
 import RepairRequest from "@/pages/RepairRequest";
 import TrackRepair from "@/pages/TrackRepair";
 import TrackOrder from "@/pages/TrackOrder";
-import PCBuilder from "@/pages/PCBuilder";
-import MarketAnalysis from "@/pages/MarketAnalysis";
-import CustomerDashboard from "@/pages/CustomerDashboard";
 import ZainCashCallback from "@/pages/ZainCashCallback";
 import QiCardCallback from "@/pages/QiCardCallback";
-import BatteryLogin from "@/pages/BatteryLogin";
-import BatteryDashboard from "@/pages/BatteryDashboard";
-import BatteryManage from "@/pages/BatteryManage";
-import BatteryPOS from "@/pages/BatteryPOS";
-import BatterySalesReport from "@/pages/BatterySalesReport";
-import BatteryReceiptPrint from "@/pages/BatteryReceiptPrint";
 import Portals from "@/pages/Portals";
 import NotFound from "@/pages/not-found";
+import { VisitorTracker } from "@/components/VisitorTracker";
+import { BlockedChecker } from "@/components/BlockedChecker";
+import * as Lazy from "@/lazyPages";
+
+function RouteFallback() {
+  return (
+    <div className="min-h-[40vh] flex items-center justify-center">
+      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+    </div>
+  );
+}
 
 function Router() {
   return (
-    <Switch>
-      <Route path="/" component={Home}/>
-      <Route path="/products" component={AllProducts}/>
-      <Route path="/login" component={Login}/>
-      <Route path="/register" component={Register}/>
-      <Route path="/forgot-password" component={ForgotPassword}/>
-      <Route path="/account/password" component={ChangePassword}/>
-      <Route path="/product/:id" component={ProductDetail}/>
-      <Route path="/checkout" component={Checkout}/>
-      <Route path="/order-confirmation/:orderNumber" component={OrderConfirmation}/>
-      <Route path="/admin/login" component={AdminLogin}/>
-      <Route path="/admin/dashboard" component={AdminDashboard}/>
-      <Route path="/admin/products" component={AdminProducts}/>
-      <Route path="/admin/programs" component={AdminPrograms}/>
-      <Route path="/admin/customers" component={AdminCustomers}/>
-      <Route path="/admin/attendance" component={AdminAttendance}/>
-      <Route path="/admin/settings" component={AdminSettings}/>
-      <Route path="/admin/market-prices" component={AdminMarketPrices}/>
-      <Route path="/admin/external-prices" component={AdminExternalPrices}/>
-      <Route path="/admin/inventory" component={AdminInventory}/>
-      <Route path="/admin/pos" component={AdminPOS}/>
-      <Route path="/admin/sales" component={AdminSales}/>
-      <Route path="/admin/reviews" component={AdminReviews}/>
-      <Route path="/admin/discount-codes" component={AdminDiscountCodes}/>
-      <Route path="/admin/analytics" component={AdminAnalytics}/>
-      <Route path="/admin/whatsapp" component={AdminWhatsApp}/>
-      <Route path="/admin/platform" component={PlatformAdmin}/>
-      <Route path="/admin/recycle-bin" component={RecycleBin}/>
-      <Route path="/admin/users" component={AdminUsers}/>
-      <Route path="/sales/login" component={SalesLogin}/>
-      <Route path="/sales" component={SalesPortal}/>
-      <Route path="/sales/:rest*" component={SalesPortal}/>
-      <Route path="/technician/login" component={TechnicianLogin}/>
-      <Route path="/technician/dashboard" component={TechnicianDashboard}/>
-      <Route path="/technician" component={TechnicianDashboard}/>
-      <Route path="/technician/manage" component={TechnicianManagement}/>
-      <Route path="/technician/tickets/:id" component={TicketDetail}/>
-      <Route path="/technician/new-request" component={NewRepairRequest}/>
-      <Route path="/technician/customer/:customerId" component={CustomerProfile}/>
-      <Route path="/repair-request" component={RepairRequest}/>
-      <Route path="/track-repair" component={TrackRepair}/>
-      <Route path="/track-order" component={TrackOrder}/>
-      <Route path="/pc-builder" component={PCBuilder}/>
-      <Route path="/market-analysis" component={MarketAnalysis}/>
-      <Route path="/my-orders" component={CustomerDashboard}/>
-      <Route path="/payment/zaincash/callback" component={ZainCashCallback}/>
-      <Route path="/payment/qicard/callback" component={QiCardCallback}/>
-      <Route path="/battery/login" component={BatteryLogin}/>
-      <Route path="/battery" component={BatteryDashboard}/>
-      <Route path="/battery/manage" component={BatteryManage}/>
-      <Route path="/battery/pos" component={BatteryPOS}/>
-      <Route path="/battery/pos/print" component={BatteryReceiptPrint}/>
-      <Route path="/battery/reports" component={BatterySalesReport}/>
-      <Route path="/portals" component={Portals}/>
-      <Route path="/shop/login" component={ShopLogin}/>
-      <Route path="/shop/new-request" component={ShopNewRepair}/>
-      <Route path="/shop/customer/:customerId" component={ShopCustomerProfile}/>
-      <Route path="/shop/dashboard" component={ShopDashboard}/>
-      <Route path="/shop" component={ShopDashboard}/>
-      <Route component={NotFound} />
-    </Switch>
+    <Suspense fallback={<RouteFallback />}>
+      <Switch>
+        <Route path="/" component={Home} />
+        <Route path="/products" component={AllProducts} />
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/forgot-password" component={ForgotPassword} />
+        <Route path="/account/password" component={ChangePassword} />
+        <Route path="/product/:id" component={ProductDetail} />
+        <Route path="/checkout" component={Checkout} />
+        <Route path="/order-confirmation/:orderNumber" component={OrderConfirmation} />
+        <Route path="/admin/login" component={Lazy.AdminLogin} />
+        <Route path="/admin/dashboard" component={Lazy.AdminDashboard} />
+        <Route path="/admin/products" component={Lazy.AdminProducts} />
+        <Route path="/admin/programs" component={Lazy.AdminPrograms} />
+        <Route path="/admin/customers" component={Lazy.AdminCustomers} />
+        <Route path="/admin/attendance" component={Lazy.AdminAttendance} />
+        <Route path="/admin/settings" component={Lazy.AdminSettings} />
+        <Route path="/admin/market-prices" component={Lazy.AdminMarketPrices} />
+        <Route path="/admin/external-prices" component={Lazy.AdminExternalPrices} />
+        <Route path="/admin/inventory" component={Lazy.AdminInventory} />
+        <Route path="/admin/pos" component={Lazy.AdminPOS} />
+        <Route path="/admin/sales" component={Lazy.AdminSales} />
+        <Route path="/admin/reviews" component={Lazy.AdminReviews} />
+        <Route path="/admin/discount-codes" component={Lazy.AdminDiscountCodes} />
+        <Route path="/admin/analytics" component={Lazy.AdminAnalytics} />
+        <Route path="/admin/whatsapp" component={Lazy.AdminWhatsApp} />
+        <Route path="/admin/platform" component={Lazy.PlatformAdmin} />
+        <Route path="/admin/recycle-bin" component={Lazy.RecycleBin} />
+        <Route path="/admin/users" component={Lazy.AdminUsers} />
+        <Route path="/sales/login" component={Lazy.SalesLogin} />
+        <Route path="/sales" component={Lazy.SalesPortal} />
+        <Route path="/sales/:rest*" component={Lazy.SalesPortal} />
+        <Route path="/technician/login" component={Lazy.TechnicianLogin} />
+        <Route path="/technician/dashboard" component={Lazy.TechnicianDashboard} />
+        <Route path="/technician" component={Lazy.TechnicianDashboard} />
+        <Route path="/technician/manage" component={Lazy.TechnicianManagement} />
+        <Route path="/technician/tickets/:id" component={Lazy.TicketDetail} />
+        <Route path="/technician/new-request" component={Lazy.NewRepairRequest} />
+        <Route path="/technician/customer/:customerId" component={Lazy.CustomerProfile} />
+        <Route path="/repair-request" component={RepairRequest} />
+        <Route path="/track-repair" component={TrackRepair} />
+        <Route path="/track-order" component={TrackOrder} />
+        <Route path="/pc-builder" component={Lazy.PCBuilder} />
+        <Route path="/market-analysis" component={Lazy.MarketAnalysis} />
+        <Route path="/my-orders" component={Lazy.CustomerDashboard} />
+        <Route path="/payment/zaincash/callback" component={ZainCashCallback} />
+        <Route path="/payment/qicard/callback" component={QiCardCallback} />
+        <Route path="/battery/login" component={Lazy.BatteryLogin} />
+        <Route path="/battery" component={Lazy.BatteryDashboard} />
+        <Route path="/battery/manage" component={Lazy.BatteryManage} />
+        <Route path="/battery/pos" component={Lazy.BatteryPOS} />
+        <Route path="/battery/pos/print" component={Lazy.BatteryReceiptPrint} />
+        <Route path="/battery/reports" component={Lazy.BatterySalesReport} />
+        <Route path="/portals" component={Portals} />
+        <Route path="/shop/login" component={Lazy.ShopLogin} />
+        <Route path="/shop/new-request" component={Lazy.ShopNewRepair} />
+        <Route path="/shop/customer/:customerId" component={Lazy.ShopCustomerProfile} />
+        <Route path="/shop/dashboard" component={Lazy.ShopDashboard} />
+        <Route path="/shop" component={Lazy.ShopDashboard} />
+        <Route component={NotFound} />
+      </Switch>
+    </Suspense>
   );
 }
 
@@ -137,19 +110,19 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
-      <LanguageProvider>
-        <CartProvider>
-          <TooltipProvider>
-            <Toaster />
-            <VisitorTracker />
-            <BlockedChecker>
-              <Router />
-              <PWAInstallPrompt />
-              <WhatsAppButton />
-            </BlockedChecker>
-          </TooltipProvider>
-        </CartProvider>
-      </LanguageProvider>
+        <LanguageProvider>
+          <CartProvider>
+            <TooltipProvider>
+              <Toaster />
+              <VisitorTracker />
+              <BlockedChecker>
+                <Router />
+                <PWAInstallPrompt />
+                <WhatsAppButton />
+              </BlockedChecker>
+            </TooltipProvider>
+          </CartProvider>
+        </LanguageProvider>
       </ThemeProvider>
     </QueryClientProvider>
   );

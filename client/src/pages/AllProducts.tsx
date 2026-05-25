@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "@/components/Header";
 import { Footer } from "@/components/Footer";
 import { ProductCard } from "@/components/ProductCard";
@@ -20,7 +20,26 @@ interface CartItemWithId extends CartItem {
 
 export default function AllProducts() {
   const { cartOpen, setCartOpen } = useCart();
+  const [loadCart, setLoadCart] = useState(cartOpen);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    if (cartOpen) {
+      setLoadCart(true);
+      return;
+    }
+    const id =
+      typeof requestIdleCallback === "function"
+        ? requestIdleCallback(() => setLoadCart(true), { timeout: 3000 })
+        : window.setTimeout(() => setLoadCart(true), 1500);
+    return () => {
+      if (typeof requestIdleCallback === "function" && typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(id as number);
+      } else {
+        clearTimeout(id as number);
+      }
+    };
+  }, [cartOpen]);
   const { toast } = useToast();
   const { language, t } = useLanguage();
   const [, setLocation] = useLocation();
@@ -31,6 +50,7 @@ export default function AllProducts() {
 
   const { data: cartItems = [] } = useQuery<CartItemWithId[]>({
     queryKey: ['/api/cart'],
+    enabled: loadCart,
   });
 
   const addToCartMutation = useMutation({

@@ -33,12 +33,20 @@ export function VisitorTracker() {
             userAgent: navigator.userAgent,
           }),
         });
-      } catch (error) {
+      } catch {
         // Silently fail
       }
     };
 
-    initSession();
+    const scheduleInit = () => {
+      if (typeof requestIdleCallback === 'function') {
+        requestIdleCallback(() => void initSession(), { timeout: 4000 });
+      } else {
+        setTimeout(() => void initSession(), 2000);
+      }
+    };
+
+    scheduleInit();
 
     const heartbeatInterval = setInterval(async () => {
       const duration = Math.floor((Date.now() - startTime.current) / 1000);
