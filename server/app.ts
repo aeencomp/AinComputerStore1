@@ -120,6 +120,10 @@ app.use(express.json({
 }));
 app.use(express.urlencoded({ extended: false }));
 
+app.get("/api/health", (_req, res) => {
+  res.json({ ok: true });
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;

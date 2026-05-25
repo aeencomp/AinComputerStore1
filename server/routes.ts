@@ -355,9 +355,12 @@ async function allocateOnlineOrderItem(item: any): Promise<{
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  await runDbMigrations();
-
   const httpServer = createServer(app);
+
+  // Do not block HTTP listen on migrations (Neon cold start / slow ALTER can cause 502 via nginx).
+  void runDbMigrations().catch((err) => {
+    console.error("[db-migrations] startup migrations failed:", err);
+  });
   
   adminNotifications.initialize(httpServer);
   intercomService.initialize(httpServer);

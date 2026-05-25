@@ -20,7 +20,13 @@ function pgSslOption():
 
 export const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
+  connectionTimeoutMillis: 20000,
+  idleTimeoutMillis: 60000,
   ssl: pgSslOption(),
+});
+
+pool.on("error", (err) => {
+  console.error("[db-pool] idle client error:", err.message);
 });
 
 export const db = drizzle(pool);
