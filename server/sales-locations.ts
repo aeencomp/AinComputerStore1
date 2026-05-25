@@ -228,10 +228,15 @@ export async function searchInventoryAtLocation(
 }
 
 /** Scan code that must stay the same when stock moves between locations. */
-function getStableBarcode(row: { barcode?: string | null; serialNumber: string }): string {
+export function getInventoryScanCode(row: { barcode?: string | null; serialNumber: string }): string {
   const barcode = (row.barcode || "").trim();
   if (barcode) return barcode;
   return (row.serialNumber || "").trim();
+}
+
+/** @deprecated Use getInventoryScanCode */
+function getStableBarcode(row: { barcode?: string | null; serialNumber: string }): string {
+  return getInventoryScanCode(row);
 }
 
 /** Keep a stable scan barcode when internal serial changes unless the client sends a new barcode. */

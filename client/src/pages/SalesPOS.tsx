@@ -9,6 +9,7 @@ import {
   resolveScannedCode,
   shouldSuppressScanInput,
 } from "@/lib/barcodeKeyboard";
+import { getInventoryScanCode, inventoryItemMatchesScan } from "@/lib/inventoryScanCode";
 import { cn } from "@/lib/utils";
 import { openA4InvoicePrint, STORE_BRAND_RED, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -78,9 +79,39 @@ interface POSProduct {
   image: string | null;
   category: string | null;
   barcode?: string | null;
+  scanCode?: string | null;
+  serialNumber?: string | null;
+  partNumber?: string | null;
   productSource?: 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd' | 'laptop' | 'desktop';
   sourceId?: string;
   printSpecs?: string[];
+}
+
+const SERIAL_INVENTORY_SOURCES = new Set<POSProduct["productSource"]>([
+  "battery",
+  "adapter",
+  "keyboard",
+  "lcd",
+  "laptop",
+  "desktop",
+]);
+
+function isSerialInventoryProduct(product: POSProduct): boolean {
+  return !!product.productSource && SERIAL_INVENTORY_SOURCES.has(product.productSource);
+}
+
+function productMatchesScanCode(product: POSProduct, code: string): boolean {
+  if (codesMatch(product.sku, code) || codesMatch(product.barcode, code)) return true;
+  if (!isSerialInventoryProduct(product)) return false;
+  return inventoryItemMatchesScan(
+    {
+      scanCode: product.scanCode ?? product.sku,
+      barcode: product.barcode,
+      serialNumber: product.serialNumber,
+      partNumber: product.partNumber,
+    },
+    code,
+  );
 }
 
 interface Category {
@@ -262,96 +293,128 @@ export default function SalesPOS({
   const batteryProducts: POSProduct[] = orderType === 'in-store'
     ? batteriesRaw
         .filter(b => (b.stockQuantity || 0) >= 0)
-        .map(b => ({
+        .map(b => {
+          const scanCode = getInventoryScanCode(b);
+          return {
           id: `bat-${b.id}`,
           nameAr: `${b.brand} ${b.serialNumber}`,
           nameEn: `${b.brand} ${b.serialNumber}`,
           price: String(b.sellingPrice || '0'),
           wholesalePrice: b.wholesalePrice ? String(b.wholesalePrice) : null,
           stockQuantity: b.stockQuantity,
-          sku: b.barcode || b.serialNumber,
-          barcode: b.barcode ?? null,
+          sku: scanCode,
+          barcode: scanCode,
+          scanCode,
+          serialNumber: b.serialNumber,
+          partNumber: b.partNumber ?? null,
           image: null,
           category: language === 'ar' ? 'بطاريات' : 'Batteries',
           productSource: 'battery' as const,
           sourceId: b.id,
-        }))
+        };
+        })
     : [];
 
   const adapterProducts: POSProduct[] = orderType === 'in-store'
     ? adaptersRaw
         .filter(a => (a.stockQuantity || 0) >= 0)
-        .map(a => ({
+        .map(a => {
+          const scanCode = getInventoryScanCode(a);
+          return {
           id: `ada-${a.id}`,
           nameAr: `${a.brand} ${a.serialNumber}${a.wattage ? ` ${a.wattage}W` : ''}`,
           nameEn: `${a.brand} ${a.serialNumber}${a.wattage ? ` ${a.wattage}W` : ''}`,
           price: String(a.sellingPrice || '0'),
           wholesalePrice: a.wholesalePrice ? String(a.wholesalePrice) : null,
           stockQuantity: a.stockQuantity,
-          sku: a.barcode || a.serialNumber,
-          barcode: a.barcode ?? null,
+          sku: scanCode,
+          barcode: scanCode,
+          scanCode,
+          serialNumber: a.serialNumber,
+          partNumber: a.partNumber ?? null,
           image: null,
           category: language === 'ar' ? 'شواحن' : 'Chargers',
           productSource: 'adapter' as const,
           sourceId: a.id,
-        }))
+        };
+        })
     : [];
 
   const keyboardProducts: POSProduct[] = orderType === 'in-store'
     ? keyboardsRaw
         .filter(k => (k.stockQuantity || 0) >= 0)
-        .map(k => ({
+        .map(k => {
+          const scanCode = getInventoryScanCode(k);
+          return {
           id: `kbd-${k.id}`,
           nameAr: `${k.brand} ${k.serialNumber}`,
           nameEn: `${k.brand} ${k.serialNumber}`,
           price: String(k.sellingPrice || '0'),
           wholesalePrice: k.wholesalePrice ? String(k.wholesalePrice) : null,
           stockQuantity: k.stockQuantity,
-          sku: k.barcode || k.serialNumber,
-          barcode: k.barcode ?? null,
+          sku: scanCode,
+          barcode: scanCode,
+          scanCode,
+          serialNumber: k.serialNumber,
+          partNumber: k.partNumber ?? null,
           image: null,
           category: language === 'ar' ? 'كيبورد' : 'Keyboards',
           productSource: 'keyboard' as const,
           sourceId: k.id,
-        }))
+        };
+        })
     : [];
 
   const lcdProducts: POSProduct[] = orderType === 'in-store'
     ? lcdsRaw
         .filter(l => (l.stockQuantity || 0) >= 0)
-        .map(l => ({
+        .map(l => {
+          const scanCode = getInventoryScanCode(l);
+          return {
           id: `lcd-${l.id}`,
           nameAr: `${l.brand} ${l.serialNumber}`,
           nameEn: `${l.brand} ${l.serialNumber}`,
           price: String(l.sellingPrice || '0'),
           wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
           stockQuantity: l.stockQuantity,
-          sku: l.barcode || l.serialNumber,
-          barcode: l.barcode ?? null,
+          sku: scanCode,
+          barcode: scanCode,
+          scanCode,
+          serialNumber: l.serialNumber,
+          partNumber: l.partNumber ?? null,
           image: null,
           category: language === 'ar' ? 'شاشات LCD' : 'LCDs',
           productSource: 'lcd' as const,
           sourceId: l.id,
-        }))
+        };
+        })
     : [];
 
   const laptopProducts: POSProduct[] = orderType === 'in-store'
     ? laptopsRaw
         .filter(l => (l.stockQuantity || 0) >= 0 && l.isActive !== 0)
-        .map(l => ({
+        .map(l => {
+          const scanCode = getInventoryScanCode(l);
+          const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
+          return {
           id: `lap-${l.id}`,
-          nameAr: `${l.brand} ${l.model || ''} ${l.serialNumber}`.trim(),
-          nameEn: `${l.brand} ${l.model || ''} ${l.serialNumber}`.trim(),
+          nameAr: `${l.brand} ${l.model || ''}${sizeLabel}`.trim(),
+          nameEn: `${l.brand} ${l.model || ''}${sizeLabel}`.trim(),
           price: String(l.sellingPrice || '0'),
           wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
           stockQuantity: l.stockQuantity,
-          sku: l.barcode || l.serialNumber,
-          barcode: l.barcode ?? null,
+          sku: scanCode,
+          barcode: scanCode,
+          scanCode,
+          serialNumber: l.serialNumber,
+          partNumber: l.partNumber ?? null,
           image: null,
           category: language === 'ar' ? 'لابتوبات' : 'Laptops',
           productSource: 'laptop' as const,
           sourceId: l.id,
           printSpecs: [
+            scanCode ? `Barcode: ${scanCode}` : null,
+            l.serialNumber && l.serialNumber !== scanCode ? `Serial: ${l.serialNumber}` : null,
             l.cpu ? `CPU: ${l.cpu}` : null,
             l.ram ? `RAM: ${l.ram}` : null,
             l.storage ? `Storage: ${l.storage}` : null,
@@ -359,33 +422,42 @@ export default function SalesPOS({
             l.sizeInch ? `Screen: ${l.sizeInch}"` : null,
             l.partNumber ? `Part No: ${l.partNumber}` : null,
           ].filter(Boolean) as string[],
-        }))
+        };
+        })
     : [];
 
   const desktopProducts: POSProduct[] = orderType === 'in-store'
     ? desktopsRaw
         .filter(d => (d.stockQuantity || 0) >= 0 && d.isActive !== 0)
-        .map(d => ({
+        .map(d => {
+          const scanCode = getInventoryScanCode(d);
+          return {
           id: `des-${d.id}`,
-          nameAr: `${d.brand} ${d.model || ''} ${d.serialNumber}`.trim(),
-          nameEn: `${d.brand} ${d.model || ''} ${d.serialNumber}`.trim(),
+          nameAr: `${d.brand} ${d.model || ''}`.trim(),
+          nameEn: `${d.brand} ${d.model || ''}`.trim(),
           price: String(d.sellingPrice || '0'),
           wholesalePrice: d.wholesalePrice ? String(d.wholesalePrice) : null,
           stockQuantity: d.stockQuantity,
-          sku: d.barcode || d.serialNumber,
-          barcode: d.barcode ?? null,
+          sku: scanCode,
+          barcode: scanCode,
+          scanCode,
+          serialNumber: d.serialNumber,
+          partNumber: d.partNumber ?? null,
           image: null,
           category: language === 'ar' ? 'ديسكتوب' : 'Desktops',
           productSource: 'desktop' as const,
           sourceId: d.id,
           printSpecs: [
+            scanCode ? `Barcode: ${scanCode}` : null,
+            d.serialNumber && d.serialNumber !== scanCode ? `Serial: ${d.serialNumber}` : null,
             d.cpu ? `CPU: ${d.cpu}` : null,
             d.ram ? `RAM: ${d.ram}` : null,
             d.storage ? `Storage: ${d.storage}` : null,
             d.gpu ? `GPU: ${d.gpu}` : null,
             d.partNumber ? `Part No: ${d.partNumber}` : null,
           ].filter(Boolean) as string[],
-        }))
+        };
+        })
     : [];
 
   const products: POSProduct[] = orderType === 'in-store'
@@ -577,10 +649,14 @@ export default function SalesPOS({
     const name = language === 'ar' ? p.nameAr : (p.nameEn || p.nameAr);
     const sku = p.sku || '';
     const barcode = p.barcode || '';
+    const serial = p.serialNumber || '';
+    const part = p.partNumber || '';
     const q = searchQuery.toLowerCase();
     const matchesSearch = name.toLowerCase().includes(q) ||
                           sku.toLowerCase().includes(q) ||
-                          barcode.toLowerCase().includes(q);
+                          barcode.toLowerCase().includes(q) ||
+                          serial.toLowerCase().includes(q) ||
+                          part.toLowerCase().includes(q);
     const matchesCategory = selectedCategory === "all" || p.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
@@ -619,9 +695,7 @@ export default function SalesPOS({
       scanStateRef.current = emptyScanBuffer();
       if (!code) return;
 
-      let product = products.find(
-        (p) => codesMatch(p.sku, code) || codesMatch(p.barcode, code),
-      );
+      let product = products.find((p) => productMatchesScanCode(p, code));
 
       if (!product) {
         if (filteredProducts.length === 1) {
@@ -630,7 +704,10 @@ export default function SalesPOS({
           const q = code.toLowerCase();
           product = filteredProducts.find((p) => {
             const name = (language === 'ar' ? p.nameAr : (p.nameEn || p.nameAr)).toLowerCase();
-            return name === q || (p.sku || "").toLowerCase() === q || (p.barcode || "").toLowerCase() === q;
+            return (
+              name === q
+              || productMatchesScanCode(p, code)
+            );
           });
           if (!product && filteredProducts.length > 1) {
             e.preventDefault();
@@ -1257,9 +1334,17 @@ export default function SalesPOS({
                           </Badge>
                         )}
                         {product.sku && !isInStoreCatalog && (
-                          <p className="text-xs text-muted-foreground flex items-center gap-1">
-                            <Barcode className="h-3 w-3" />
-                            {product.sku}
+                          <p className="text-xs text-muted-foreground flex items-center gap-1 font-mono">
+                            <Barcode className="h-3 w-3 shrink-0" />
+                            <span>
+                              {language === 'ar' ? 'باركود:' : 'Barcode:'} {product.sku}
+                              {product.serialNumber && product.serialNumber !== product.sku && (
+                                <span className="text-muted-foreground/80">
+                                  {' '}
+                                  · {language === 'ar' ? 'سيريال:' : 'Serial:'} {product.serialNumber}
+                                </span>
+                              )}
+                            </span>
                           </p>
                         )}
                         <p
@@ -1353,8 +1438,19 @@ export default function SalesPOS({
                               : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                           </Badge>
                         )}
-                        <p className="text-xs text-muted-foreground">
-                          {product.sku} • {language === 'ar' ? 'متوفر:' : 'Stock:'} {product.stockQuantity || 0}
+                        <p className="text-xs text-muted-foreground font-mono">
+                          {isSerialInventoryProduct(product) ? (
+                            <>
+                              {language === 'ar' ? 'باركود:' : 'Barcode:'} {product.sku}
+                              {product.serialNumber && product.serialNumber !== product.sku && (
+                                <> · {language === 'ar' ? 'سيريال:' : 'Serial:'} {product.serialNumber}</>
+                              )}
+                              {' · '}
+                            </>
+                          ) : (
+                            <>{product.sku} · </>
+                          )}
+                          {language === 'ar' ? 'متوفر:' : 'Stock:'} {product.stockQuantity || 0}
                         </p>
                       </div>
                       
@@ -1899,7 +1995,11 @@ export default function SalesPOS({
                           <div className="font-extrabold text-black">{itemName}</div>
                           {itemNameEn && <div className="text-xs font-bold text-gray-600">{itemNameEn}</div>}
                           {item.category && <div className="text-xs font-bold text-gray-600">{item.category}</div>}
-                          {item.sku && <div className="text-xs font-bold text-gray-600">SKU: {item.sku}</div>}
+                          {item.sku && (
+                            <div className="text-xs font-bold text-gray-600 font-mono">
+                              {language === 'ar' ? 'باركود:' : 'Barcode:'} {item.sku}
+                            </div>
+                          )}
                           {itemSpecs.length > 0 && (
                             <div className="mt-1 flex flex-wrap gap-1">
                               {itemSpecs.map((spec: string, specIdx: number) => (
