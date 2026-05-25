@@ -16,9 +16,32 @@ export function getInventoryScanCode(item: InventoryCodeSource): string {
   return (item.serialNumber ?? "").trim();
 }
 
-/** Loose key for LAP-0008 vs "lap 0008" vs "LAP0008". */
+/** Loose key: LAP-0008, lap-008, lap 0008 → same letters+digits only. */
 export function normalizeInventoryCodeKey(code: string): string {
   return normalizeScannedBarcode(code).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** LAP-0008 / lap-008 / lap008 → { prefix: "lap", num: 8 } */
+export function parseInventorySerialToken(code: string): { prefix: string; num: number } | null {
+  const raw = normalizeScannedBarcode(code).trim();
+  const labeled = raw.match(/^(LAP|DES|ADP|BAT)[\s._-]*(\d+)$/i);
+  if (labeled) {
+    const num = parseInt(labeled[2], 10);
+    if (!Number.isNaN(num)) {
+      return { prefix: labeled[1].toLowerCase(), num };
+    }
+  }
+
+  const compact = normalizeInventoryCodeKey(code);
+  const compactMatch = compact.match(/^(lap|des|adp|bat)(\d+)$/);
+  if (compactMatch) {
+    const num = parseInt(compactMatch[2], 10);
+    if (!Number.isNaN(num)) {
+      return { prefix: compactMatch[1], num };
+    }
+  }
+
+  return null;
 }
 
 export function inventoryCodesMatch(
@@ -27,9 +50,23 @@ export function inventoryCodesMatch(
 ): boolean {
   if (!stored?.trim() || !scanned.trim()) return false;
   if (codesMatch(stored, scanned)) return true;
+
   const a = normalizeInventoryCodeKey(stored);
   const b = normalizeInventoryCodeKey(scanned);
-  return !!a && !!b && a === b;
+  if (a && b && a === b) return true;
+
+  const storedToken = parseInventorySerialToken(stored);
+  const scannedToken = parseInventorySerialToken(scanned);
+  if (
+    storedToken &&
+    scannedToken &&
+    storedToken.prefix === scannedToken.prefix &&
+    storedToken.num === scannedToken.num
+  ) {
+    return true;
+  }
+
+  return false;
 }
 
 export function inventoryItemMatchesScan(
