@@ -294,7 +294,15 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
       setShowApplyConfirm(false);
     },
     onError: (e: any) => {
-      toast({ title: e.message, variant: 'destructive' });
+      let message = e.message || (language === 'ar' ? 'فشل تطبيق الجرد' : 'Failed to apply stock count');
+      try {
+        const jsonPart = String(e.message).replace(/^\d+:\s*/, "");
+        const parsed = JSON.parse(jsonPart);
+        if (parsed?.error) message = parsed.error;
+      } catch {
+        /* keep raw message */
+      }
+      toast({ title: message, variant: 'destructive' });
       setShowApplyConfirm(false);
     },
   });

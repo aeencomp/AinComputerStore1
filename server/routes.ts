@@ -2403,11 +2403,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!Array.isArray(updates) || updates.length === 0) {
         return res.status(400).json({ error: "لا توجد تحديثات" });
       }
+      const allowedSources = ["instore", "battery", "adapter", "laptop", "desktop", "keyboard", "lcd"];
       const valid = updates.every((u: any) => {
         const source = u?.source || "instore";
-        const sourceValid = ["instore", "battery", "adapter", "keyboard", "lcd"].includes(source);
-        const idValid = typeof u?.id === "number" || typeof u?.id === "string";
-        return sourceValid && idValid && typeof u?.quantity === "number" && u.quantity >= 0;
+        const sourceValid = allowedSources.includes(source);
+        const idValid =
+          typeof u?.id === "number" ||
+          (typeof u?.id === "string" && String(u.id).trim() !== "");
+        const qty = Number(u?.quantity);
+        return sourceValid && idValid && Number.isFinite(qty) && qty >= 0 && Math.floor(qty) === qty;
       });
       if (!valid) return res.status(400).json({ error: "بيانات غير صالحة" });
 
@@ -2416,37 +2420,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       for (const u of updates) {
         const source = u.source || "instore";
+        const quantity = Math.max(0, Math.floor(Number(u.quantity)));
         if (source === "instore") {
-          if (typeof u.id === "number") inStoreUpdates.push({ id: u.id, quantity: u.quantity });
+          if (typeof u.id === "number") inStoreUpdates.push({ id: u.id, quantity });
           continue;
         }
         if (source === "battery") {
-          const row = await storage.updateLaptopBattery(String(u.id), { stockQuantity: u.quantity });
+          const row = await storage.updateLaptopBattery(String(u.id), { stockQuantity: quantity });
           if (row) updated++;
           continue;
         }
         if (source === "adapter") {
-          const row = await storage.updateAcAdapter(String(u.id), { stockQuantity: u.quantity });
+          const row = await storage.updateAcAdapter(String(u.id), { stockQuantity: quantity });
           if (row) updated++;
           continue;
         }
         if (source === "laptop") {
-          const result = await db.update(laptops).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(laptops.id, String(u.id))).returning();
+          const result = await db.update(laptops).set({ stockQuantity: quantity, updatedAt: new Date() }).where(eq(laptops.id, String(u.id))).returning();
           if (result.length > 0) updated++;
           continue;
         }
         if (source === "desktop") {
-          const result = await db.update(desktops).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(desktops.id, String(u.id))).returning();
+          const result = await db.update(desktops).set({ stockQuantity: quantity, updatedAt: new Date() }).where(eq(desktops.id, String(u.id))).returning();
           if (result.length > 0) updated++;
           continue;
         }
         if (source === "keyboard") {
-          const result = await db.update(keyboards).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(keyboards.id, String(u.id))).returning();
+          const result = await db.update(keyboards).set({ stockQuantity: quantity, updatedAt: new Date() }).where(eq(keyboards.id, String(u.id))).returning();
           if (result.length > 0) updated++;
           continue;
         }
         if (source === "lcd") {
-          const result = await db.update(lcds).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(lcds.id, String(u.id))).returning();
+          const result = await db.update(lcds).set({ stockQuantity: quantity, updatedAt: new Date() }).where(eq(lcds.id, String(u.id))).returning();
           if (result.length > 0) updated++;
         }
       }
