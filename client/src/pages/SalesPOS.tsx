@@ -411,7 +411,9 @@ export default function SalesPOS({
     ? laptopsRaw
         .filter(l => (l.stockQuantity || 0) >= 0 && l.isActive !== 0)
         .map(l => {
-          const scanCode = resolveUniquePosScanCode(l, laptopDuplicateScans);
+          const storedScan = getInventoryScanCode(l);
+          const posSku = resolveUniquePosScanCode(l, laptopDuplicateScans);
+          const storedBarcode = (l.barcode || "").trim() || storedScan;
           const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
           const ramLabel = l.ram && !(l.model || "").toLowerCase().includes((l.ram || "").toLowerCase())
             ? ` ${l.ram}`
@@ -423,9 +425,9 @@ export default function SalesPOS({
           price: String(l.sellingPrice || '0'),
           wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
           stockQuantity: l.stockQuantity,
-          sku: scanCode,
-          barcode: scanCode,
-          scanCode,
+          sku: posSku,
+          barcode: storedBarcode,
+          scanCode: posSku,
           serialNumber: l.serialNumber,
           partNumber: l.partNumber ?? null,
           image: null,
@@ -433,8 +435,9 @@ export default function SalesPOS({
           productSource: 'laptop' as const,
           sourceId: l.id,
           printSpecs: [
-            scanCode ? `Barcode: ${scanCode}` : null,
-            l.serialNumber && l.serialNumber !== scanCode ? `Serial: ${l.serialNumber}` : null,
+            posSku ? `Barcode: ${posSku}` : null,
+            l.serialNumber && l.serialNumber !== posSku ? `Serial: ${l.serialNumber}` : null,
+            storedBarcode !== posSku ? `Scan: ${storedBarcode}` : null,
             l.cpu ? `CPU: ${l.cpu}` : null,
             l.ram ? `RAM: ${l.ram}` : null,
             l.storage ? `Storage: ${l.storage}` : null,
@@ -454,7 +457,9 @@ export default function SalesPOS({
     ? desktopsRaw
         .filter(d => (d.stockQuantity || 0) >= 0 && d.isActive !== 0)
         .map(d => {
-          const scanCode = resolveUniquePosScanCode(d, desktopDuplicateScans);
+          const storedScan = getInventoryScanCode(d);
+          const posSku = resolveUniquePosScanCode(d, desktopDuplicateScans);
+          const storedBarcode = (d.barcode || "").trim() || storedScan;
           return {
           id: `des-${d.id}`,
           nameAr: `${d.brand} ${d.model || ''}`.trim(),
@@ -462,9 +467,9 @@ export default function SalesPOS({
           price: String(d.sellingPrice || '0'),
           wholesalePrice: d.wholesalePrice ? String(d.wholesalePrice) : null,
           stockQuantity: d.stockQuantity,
-          sku: scanCode,
-          barcode: scanCode,
-          scanCode,
+          sku: posSku,
+          barcode: storedBarcode,
+          scanCode: posSku,
           serialNumber: d.serialNumber,
           partNumber: d.partNumber ?? null,
           image: null,
@@ -472,8 +477,9 @@ export default function SalesPOS({
           productSource: 'desktop' as const,
           sourceId: d.id,
           printSpecs: [
-            scanCode ? `Barcode: ${scanCode}` : null,
-            d.serialNumber && d.serialNumber !== scanCode ? `Serial: ${d.serialNumber}` : null,
+            posSku ? `Barcode: ${posSku}` : null,
+            d.serialNumber && d.serialNumber !== posSku ? `Serial: ${d.serialNumber}` : null,
+            storedBarcode !== posSku ? `Scan: ${storedBarcode}` : null,
             d.cpu ? `CPU: ${d.cpu}` : null,
             d.ram ? `RAM: ${d.ram}` : null,
             d.storage ? `Storage: ${d.storage}` : null,
@@ -729,7 +735,7 @@ export default function SalesPOS({
         (p) =>
           isSerialInventoryProduct(p) &&
           !!p.serialNumber?.trim() &&
-          inventoryCodesMatch(p.serialNumber, code),
+          codesMatch(p.serialNumber, code),
       );
 
       if (serialExactMatches.length === 1) {

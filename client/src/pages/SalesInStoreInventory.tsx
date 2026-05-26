@@ -580,7 +580,9 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   const desktopDuplicateScans = countDuplicateInventoryScanCodes(desktops);
 
   const toCountableLaptop = (l: LaptopItem): CountableProduct => {
-    const scanCode = resolveUniquePosScanCode(l, laptopDuplicateScans);
+    const storedScan = getInventoryScanCode(l);
+    const posSku = resolveUniquePosScanCode(l, laptopDuplicateScans);
+    const storedBarcode = (l.barcode || "").trim() || storedScan;
     const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
     return {
       id: l.id,
@@ -588,23 +590,25 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       nameAr: `${l.brand} ${l.model || ""}${sizeLabel}`.trim(),
       nameEn: `${l.brand} ${l.model || ""}${sizeLabel}`.trim(),
       serialNumber: l.serialNumber,
-      sku: scanCode,
-      barcode: scanCode,
+      sku: posSku,
+      barcode: storedBarcode,
       stockQuantity: l.stockQuantity || 0,
       salesLocationId: l.salesLocationId,
     };
   };
 
   const toCountableDesktop = (d: DesktopItem): CountableProduct => {
-    const scanCode = resolveUniquePosScanCode(d, desktopDuplicateScans);
+    const storedScan = getInventoryScanCode(d);
+    const posSku = resolveUniquePosScanCode(d, desktopDuplicateScans);
+    const storedBarcode = (d.barcode || "").trim() || storedScan;
     return {
       id: d.id,
       source: "desktop",
       nameAr: `${d.brand} ${d.model || ""}`.trim(),
       nameEn: `${d.brand} ${d.model || ""}`.trim(),
       serialNumber: d.serialNumber,
-      sku: scanCode,
-      barcode: scanCode,
+      sku: posSku,
+      barcode: storedBarcode,
       stockQuantity: d.stockQuantity || 0,
       salesLocationId: d.salesLocationId,
     };

@@ -364,35 +364,45 @@ async function findInventoryRowAtLocation(
     if (bySerialAsScanCode) return bySerialAsScanCode;
   }
 
-  let identityClause;
-  if (table === acAdapters) {
-    const adapterRow = row as {
-      brand: string;
-      partNumber?: string | null;
-      wattage?: number | null;
-    };
-    identityClause =
-      adapterRow.partNumber != null && adapterRow.partNumber !== ""
-        ? and(eq(acAdapters.brand, adapterRow.brand), eq(acAdapters.partNumber, adapterRow.partNumber))
-        : adapterRow.wattage != null
-          ? and(eq(acAdapters.brand, adapterRow.brand), eq(acAdapters.wattage, adapterRow.wattage))
-          : eq(acAdapters.brand, adapterRow.brand);
-  } else {
-    identityClause =
-      row.partNumber != null && row.partNumber !== ""
-        ? and(eq(table.brand, row.brand), eq(table.partNumber, row.partNumber))
-        : row.model
-          ? and(eq(table.brand, row.brand), eq(table.model, row.model))
-          : eq(table.brand, row.brand);
+  if (table === laptops || table === desktops) {
+    const serial = (row.serialNumber || "").trim();
+    if (serial) {
+      const [bySerial] = await db
+        .select()
+        .from(table)
+        .where(
+          and(
+            eq(table.salesLocationId, locationId),
+            eq(table.isActive, 1),
+            eq(table.serialNumber, serial),
+          ),
+        )
+        .limit(1);
+      if (bySerial) return bySerial;
+    }
+    return undefined;
   }
+
+  let identityClause;
+  const adapterRow = row as {
+    brand: string;
+    partNumber?: string | null;
+    wattage?: number | null;
+  };
+  identityClause =
+    adapterRow.partNumber != null && adapterRow.partNumber !== ""
+      ? and(eq(acAdapters.brand, adapterRow.brand), eq(acAdapters.partNumber, adapterRow.partNumber))
+      : adapterRow.wattage != null
+        ? and(eq(acAdapters.brand, adapterRow.brand), eq(acAdapters.wattage, adapterRow.wattage))
+        : eq(acAdapters.brand, adapterRow.brand);
 
   const [byIdentity] = await db
     .select()
-    .from(table)
+    .from(acAdapters)
     .where(
       and(
-        eq(table.salesLocationId, locationId),
-        eq(table.isActive, 1),
+        eq(acAdapters.salesLocationId, locationId),
+        eq(acAdapters.isActive, 1),
         identityClause,
       ),
     )
@@ -450,15 +460,20 @@ async function transferLaptopOrDesktopQuantity(params: {
   const existingAtDest = await findInventoryRowAtLocation(table, toLocationId, row);
 
   if (existingAtDest) {
-    await db
-      .update(table)
-      .set({
-        stockQuantity: (existingAtDest.stockQuantity || 0) + quantity,
-        barcode: stableBarcode,
-        updatedAt: new Date(),
-      })
-      .where(eq(table.id, existingAtDest.id));
-    return existingAtDest.serialNumber;
+    const sameSku =
+      inventoryRowGroupKey(table, existingAtDest as (typeof laptops.$inferSelect)) ===
+      inventoryRowGroupKey(table, row as (typeof laptops.$inferSelect));
+    if (sameSku) {
+      await db
+        .update(table)
+        .set({
+          stockQuantity: (existingAtDest.stockQuantity || 0) + quantity,
+          barcode: stableBarcode,
+          updatedAt: new Date(),
+        })
+        .where(eq(table.id, existingAtDest.id));
+      return existingAtDest.serialNumber;
+    }
   }
 
   const newSerial = await nextInventorySerial(serialPrefix, table);
@@ -941,6 +956,16 @@ async function moveLegacyInventoryRowToLocation(
   const existingAtDest = await findInventoryRowAtLocation(table, targetLocationId, row);
 
   if (existingAtDest && existingAtDest.id !== row.id) {
+    const sameSku =
+      inventoryRowGroupKey(table, existingAtDest as (typeof laptops.$inferSelect)) ===
+      inventoryRowGroupKey(table, row as (typeof laptops.$inferSelect));
+    if (!sameSku) {
+      await db
+        .update(table)
+        .set({ salesLocationId: targetLocationId, updatedAt: new Date() })
+        .where(eq(table.id, row.id));
+      return;
+    }
     await db
       .update(table)
       .set({
@@ -1059,6 +1084,68 @@ async function repairStuckInventoryAfterTransfers(
   return fixed;
 }
 
+/**
+ * Location 2 (and others): reactivate laptops that were wrongly merged into one
+ * brand/model row while a different-SKU unit was deactivated.
+ */
+async function repairWronglyMergedSerialUnits(
+  table: typeof laptops | typeof desktops,
+  locationId: number,
+): Promise<number> {
+  const actives = await db
+    .select()
+    .from(table)
+    .where(and(eq(table.isActive, 1), eq(table.salesLocationId, locationId)));
+
+  const inactives = await db.select().from(table).where(eq(table.isActive, 0));
+
+  let fixed = 0;
+  for (const dead of inactives) {
+    if ((dead.stockQuantity || 0) > 0) continue;
+    const deadSerial = (dead.serialNumber || "").trim();
+    if (!deadSerial) continue;
+
+    const mergedInto = actives.find((active) => {
+      if (active.id === dead.id) return false;
+      const sameScan =
+        getInventoryScanCode(active).toUpperCase() === getInventoryScanCode(dead).toUpperCase();
+      if (!sameScan) return false;
+      return inventoryRowGroupKey(table, active) !== inventoryRowGroupKey(table, dead);
+    });
+
+    if (!mergedInto) continue;
+
+    await db
+      .update(table)
+      .set({
+        isActive: 1,
+        stockQuantity: 1,
+        barcode: deadSerial,
+        salesLocationId: locationId,
+        updatedAt: new Date(),
+      })
+      .where(eq(table.id, dead.id));
+
+    const keepSerial = (mergedInto.serialNumber || "").trim();
+    if (keepSerial) {
+      await db
+        .update(table)
+        .set({ barcode: keepSerial, updatedAt: new Date() })
+        .where(eq(table.id, mergedInto.id));
+    }
+
+    actives.push({ ...dead, isActive: 1, stockQuantity: 1, barcode: deadSerial });
+    fixed++;
+  }
+
+  if (fixed > 0) {
+    console.log(
+      `[sales-locations] reactivated ${fixed} wrongly merged ${table === laptops ? "laptop" : "desktop"} unit(s) at location ${locationId}`,
+    );
+  }
+  return fixed;
+}
+
 /** Merge split transfer rows that share the same scan barcode at one location. */
 export async function repairTransferInventoryDuplicates(): Promise<void> {
   for (const table of [laptops, desktops, acAdapters] as const) {
@@ -1090,5 +1177,18 @@ export async function repairTransferInventoryDuplicates(): Promise<void> {
   if (legacy.laptopsMoved > 0 || legacy.desktopsMoved > 0) {
     await mergeDuplicateInventoryRows(laptops);
     await mergeDuplicateInventoryRows(desktops);
+  }
+
+  await repairWronglyMergedSerialUnits(laptops, LOCATION_SHOP2_ID);
+  await repairWronglyMergedSerialUnits(desktops, LOCATION_SHOP2_ID);
+  await repairWronglyMergedSerialUnits(laptops, LOCATION_MAIN_ID);
+  await repairWronglyMergedSerialUnits(desktops, LOCATION_MAIN_ID);
+
+  const laptopBarcodesFinal = await repairDistinctBarcodesForDifferentSkus(laptops);
+  const desktopBarcodesFinal = await repairDistinctBarcodesForDifferentSkus(desktops);
+  if (laptopBarcodesFinal > 0 || desktopBarcodesFinal > 0) {
+    console.log(
+      `[sales-locations] post-repair unique barcodes: ${laptopBarcodesFinal} laptop(s), ${desktopBarcodesFinal} desktop(s)`,
+    );
   }
 }
