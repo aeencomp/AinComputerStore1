@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { posOrderCardAmount, posOrderCashAmount } from "@/lib/posPayment";
 import { 
   ShoppingCart, 
   Package, 
@@ -773,8 +774,17 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
           ) : (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {['cash', 'card', 'zaincash', 'qicard'].map((method) => {
-                const methodOrders = myWalkInOrders.filter(o => o.paymentMethod === method);
-                const methodTotal = methodOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
+                const methodTotal = myWalkInOrders.reduce((sum, o) => {
+                  if (method === "cash") return sum + posOrderCashAmount(o);
+                  if (method === "card") return sum + posOrderCardAmount(o);
+                  if (o.paymentMethod !== method) return sum;
+                  return sum + parseFloat(o.total || "0");
+                }, 0);
+                const methodOrders = myWalkInOrders.filter((o) => {
+                  if (method === "cash") return posOrderCashAmount(o) > 0;
+                  if (method === "card") return posOrderCardAmount(o) > 0;
+                  return o.paymentMethod === method;
+                });
                 const methodLabels: Record<string, { ar: string; en: string }> = {
                   cash: { ar: 'نقداً', en: 'Cash' },
                   card: { ar: 'بطاقة', en: 'Card' },

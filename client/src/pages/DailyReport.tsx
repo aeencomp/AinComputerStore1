@@ -132,17 +132,35 @@ function isDeferredPayment(method: string | undefined, status: string | undefine
   return status === "deferred" || method === "deferred";
 }
 
-function paymentLabel(method: string | undefined, status: string | undefined): string {
+function paymentLabel(
+  method: string | undefined,
+  status: string | undefined,
+  order?: { cashPaidAmount?: string | null; cardPaidAmount?: string | null },
+): string {
   if (isDeferredPayment(method, status)) return "آجل";
+  if (method === "split" && order) {
+    const cash = parseFloat(order.cashPaidAmount || "0") || 0;
+    const card = parseFloat(order.cardPaidAmount || "0") || 0;
+    return `نقد ${cash.toLocaleString("en-US")} + بطاقة ${card.toLocaleString("en-US")}`;
+  }
   if (!method || method === "cash") return "نقداً";
+  if (method === "card") return "بطاقة";
   if (method === "zaincash") return "ZainCash";
   if (method === "qicard") return "QiCard";
   return method;
 }
 
-function paymentBadge(method: string | undefined, status: string | undefined) {
+function paymentBadge(
+  method: string | undefined,
+  status: string | undefined,
+  order?: { cashPaidAmount?: string | null; cardPaidAmount?: string | null },
+) {
   if (isDeferredPayment(method, status)) return <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>;
+  if (method === "split") {
+    return <Badge variant="outline" className="text-teal-700 border-teal-400">{paymentLabel(method, status, order)}</Badge>;
+  }
   if (!method || method === "cash") return <Badge variant="outline" className="text-green-700 border-green-400">نقداً</Badge>;
+  if (method === "card") return <Badge variant="outline" className="text-indigo-700 border-indigo-400">بطاقة</Badge>;
   if (method === "zaincash") return <Badge variant="outline" className="text-blue-700 border-blue-400">ZainCash</Badge>;
   if (method === "qicard") return <Badge variant="outline" className="text-purple-700 border-purple-400">QiCard</Badge>;
   return <Badge variant="outline">{method}</Badge>;
@@ -159,7 +177,7 @@ function buildPrintHTML(data: ShiftReportData): string {
   const displayRange = formatShiftRange(shift);
 
   const inStoreRows = inStoreSales.map((o, i) => {
-    const pay = paymentLabel(o.paymentMethod, o.paymentStatus);
+    const pay = paymentLabel(o.paymentMethod, o.paymentStatus, o);
     const isDeferred = isDeferredPayment(o.paymentMethod, o.paymentStatus);
     const parsedItems: { nameAr?: string; nameEn?: string; price: string; quantity: number }[] =
       (o.items || []).map((it: any) => {
@@ -1316,7 +1334,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                                     {format(new Date(order.createdAt), "HH:mm")}
                                   </td>
                                   <td className="py-2 px-4">
-                                    {paymentBadge(order.paymentMethod, order.paymentStatus)}
+                                    {paymentBadge(order.paymentMethod, order.paymentStatus, order)}
                                   </td>
                                   <td className={`py-2 px-4 text-end font-semibold ${isDeferredPayment(order.paymentMethod, order.paymentStatus) ? "text-orange-600" : ""}`}>
                                     {fmtNum(parseFloat(order.total))}

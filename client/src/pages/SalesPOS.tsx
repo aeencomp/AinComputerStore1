@@ -10,6 +10,7 @@ import {
   shouldSuppressScanInput,
 } from "@/lib/barcodeKeyboard";
 import { getInventoryScanCode, inventoryItemMatchesScan } from "@/lib/inventoryScanCode";
+import { formatPosPaymentLabel } from "@/lib/posPayment";
 import { cn } from "@/lib/utils";
 import { openA4InvoicePrint, STORE_BRAND_RED, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -63,7 +64,8 @@ import {
   Computer,
   FileText,
   Edit3,
-  Save
+  Save,
+  Split,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { InStoreProduct, LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem, Laptop, Desktop } from "@shared/schema";
@@ -173,6 +175,8 @@ export default function SalesPOS({
   const [customerPhone, setCustomerPhone] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
   const [paymentMethod, setPaymentMethod] = useState("cash");
+  const [splitCashAmount, setSplitCashAmount] = useState("");
+  const [splitCardAmount, setSplitCardAmount] = useState("");
   const [discount, setDiscount] = useState("0");
   const [discountType, setDiscountType] = useState<"fixed" | "percent">("fixed");
   const [discountReason, setDiscountReason] = useState("");
@@ -617,6 +621,8 @@ export default function SalesPOS({
         discount: calculatedDiscount.toString(),
         total: total.toString(),
         paymentMethod: paymentMethod,
+        cashPaidAmount: paymentMethod === "split" ? splitCashAmount : undefined,
+        cardPaidAmount: paymentMethod === "split" ? splitCardAmount : undefined,
         notes: receiptNote || null,
         issuedBy: user.name,
       };
@@ -636,6 +642,9 @@ export default function SalesPOS({
       setDiscount("0");
       setDiscountReason("");
       setReceiptNote("");
+      setPaymentMethod("cash");
+      setSplitCashAmount("");
+      setSplitCardAmount("");
       setShowCheckoutModal(false);
       
       setTimeout(() => {
@@ -864,6 +873,12 @@ export default function SalesPOS({
     ...(orderType === 'in-store' ? { customerAddress: customerAddress.trim() } : {}),
     paymentMethod,
     paymentStatus: paymentMethod === 'deferred' ? 'deferred' : 'success',
+    ...(paymentMethod === 'split'
+      ? {
+          cashPaidAmount: String(parseFloat(splitCashAmount) || 0),
+          cardPaidAmount: String(parseFloat(splitCardAmount) || 0),
+        }
+      : {}),
     discount: calculatedDiscount.toString(),
     discountReason,
     notes: receiptNote || null,
@@ -883,7 +898,48 @@ export default function SalesPOS({
   };
 
   const confirmCheckout = () => {
+    if (paymentMethod === "split") {
+      const cash = parseFloat(splitCashAmount) || 0;
+      const card = parseFloat(splitCardAmount) || 0;
+      if (cash <= 0 || card <= 0) {
+        toast({
+          title: language === "ar" ? "مبالغ الدفع" : "Payment amounts",
+          description: language === "ar"
+            ? "أدخل مبلغ النقد ومبلغ البطاقة"
+            : "Enter both cash and card amounts",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (Math.abs(cash + card - total) > 0.5) {
+        toast({
+          title: language === "ar" ? "مجموع غير صحيح" : "Invalid total",
+          description: language === "ar"
+            ? `يجب أن يساوي النقد + البطاقة الإجمالي (${formatPrice(total)} د.ع)`
+            : `Cash + card must equal total (${formatPrice(total)} IQD)`,
+          variant: "destructive",
+        });
+        return;
+      }
+    }
     createOrderMutation.mutate(buildOrderData());
+  };
+
+  const splitPaidTotal =
+    (parseFloat(splitCashAmount) || 0) + (parseFloat(splitCardAmount) || 0);
+  const splitRemaining = total - splitPaidTotal;
+
+  const selectPaymentMethod = (value: string) => {
+    setPaymentMethod(value);
+    if (value === "split") {
+      if (!splitCashAmount && !splitCardAmount) {
+        setSplitCashAmount(String(Math.round(total)));
+        setSplitCardAmount("0");
+      }
+    } else {
+      setSplitCashAmount("");
+      setSplitCardAmount("");
+    }
   };
 
   const openReceiptEditor = () => {
@@ -945,11 +1001,7 @@ export default function SalesPOS({
     const totalNum = parseFloat(lastOrder.total || '0');
     const saleDate = new Date(lastOrder.createdAt);
 
-    const payLabel = lastOrder.paymentMethod === 'cash' ? '\u0646\u0642\u062f\u064a'
-      : lastOrder.paymentMethod === 'card' ? '\u0628\u0637\u0627\u0642\u0629'
-      : lastOrder.paymentMethod === 'zaincash' ? '\u0632\u064a\u0646 \u0643\u0627\u0634'
-      : lastOrder.paymentMethod === 'qicard' ? '\u0643\u064a \u0643\u0627\u0631\u062f'
-      : '\u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645';
+    const payLabel = formatPosPaymentLabel(lastOrder, "ar");
 
     const items: any[] = lastOrder.items || [];
 
@@ -1784,10 +1836,11 @@ export default function SalesPOS({
                       <Wallet className="h-3 w-3" />
                       {language === 'ar' ? 'طريقة الدفع' : 'Payment'}
                     </Label>
-                    <div className="grid grid-cols-5 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       {[
                         { value: 'cash', label: language === 'ar' ? 'نقداً' : 'Cash', icon: Banknote },
                         { value: 'card', label: language === 'ar' ? 'بطاقة' : 'Card', icon: CreditCard },
+                        { value: 'split', label: language === 'ar' ? 'نقد+بطاقة' : 'Cash+Card', icon: Split },
                         { value: 'zaincash', label: 'ZainCash', icon: Wallet },
                         { value: 'qicard', label: 'QiCard', icon: CreditCard },
                         { value: 'deferred', label: 'أجل', icon: Clock },
@@ -1797,13 +1850,55 @@ export default function SalesPOS({
                           variant={paymentMethod === method.value ? "default" : "outline"}
                           size="sm"
                           className="h-auto py-2 px-2 flex-col gap-1"
-                          onClick={() => setPaymentMethod(method.value)}
+                          onClick={() => selectPaymentMethod(method.value)}
                         >
                           <method.icon className="h-4 w-4" />
                           <span className="text-xs">{method.label}</span>
                         </Button>
                       ))}
                     </div>
+                    {paymentMethod === "split" && (
+                      <div className="grid grid-cols-2 gap-2 pt-1">
+                        <div className="space-y-1">
+                          <Label className="text-xs">
+                            {language === "ar" ? "مبلغ النقد" : "Cash amount"}
+                          </Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={splitCashAmount}
+                            onChange={(e) => setSplitCashAmount(e.target.value)}
+                            className="h-9"
+                            data-testid="input-split-cash"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">
+                            {language === "ar" ? "مبلغ البطاقة" : "Card amount"}
+                          </Label>
+                          <Input
+                            type="number"
+                            min={0}
+                            value={splitCardAmount}
+                            onChange={(e) => setSplitCardAmount(e.target.value)}
+                            className="h-9"
+                            data-testid="input-split-card"
+                          />
+                        </div>
+                        <p
+                          className={cn(
+                            "col-span-2 text-xs",
+                            Math.abs(splitRemaining) <= 0.5
+                              ? "text-green-600"
+                              : "text-destructive",
+                          )}
+                        >
+                          {language === "ar"
+                            ? `المتبقي: ${formatPrice(Math.max(0, splitRemaining))} د.ع (الإجمالي ${formatPrice(total)} د.ع)`
+                            : `Remaining: ${formatPrice(Math.max(0, splitRemaining))} IQD (total ${formatPrice(total)} IQD)`}
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   {/* Discount */}
@@ -2111,12 +2206,7 @@ export default function SalesPOS({
               <div className="text-center py-2 border-y border-gray-300 text-sm mb-3">
                 <span className="font-bold">طريقة الدفع: </span>
                 <span className="font-extrabold">
-                  {lastOrder.paymentMethod === 'cash' ? 'نقدي'
-                    : lastOrder.paymentMethod === 'card' ? 'بطاقة'
-                    : lastOrder.paymentMethod === 'zaincash' ? 'زين كاش'
-                    : lastOrder.paymentMethod === 'qicard' ? 'كي كارد'
-                    : lastOrder.paymentMethod === 'deferred' ? 'أجل - غير مدفوع'
-                    : 'عند الاستلام'}
+                  {formatPosPaymentLabel(lastOrder, "ar")}
                 </span>
               </div>
 
@@ -2218,6 +2308,7 @@ export default function SalesPOS({
                       <SelectItem value="card">{language === 'ar' ? 'بطاقة' : 'Card'}</SelectItem>
                       <SelectItem value="zaincash">{language === 'ar' ? 'زين كاش' : 'ZainCash'}</SelectItem>
                       <SelectItem value="qicard">{language === 'ar' ? 'كي كارد' : 'QiCard'}</SelectItem>
+                      <SelectItem value="split">{language === 'ar' ? 'نقد + بطاقة' : 'Cash + Card'}</SelectItem>
                       <SelectItem value="deferred">{language === 'ar' ? 'أجل' : 'Deferred'}</SelectItem>
                     </SelectContent>
                   </Select>

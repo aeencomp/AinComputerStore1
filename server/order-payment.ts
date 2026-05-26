@@ -3,6 +3,9 @@
 export type OrderPaymentRow = {
   paymentMethod?: string | null;
   paymentStatus?: string | null;
+  total?: string | null;
+  cashPaidAmount?: string | null;
+  cardPaidAmount?: string | null;
 };
 
 export function isOrderDeferred(order: OrderPaymentRow): boolean {
@@ -21,12 +24,34 @@ export function paymentFieldsFromMethod(paymentMethod?: string | null): {
   return { paymentMethod: method, paymentStatus: "success" };
 }
 
+export function orderCashAmount(order: OrderPaymentRow): number {
+  if (isOrderDeferred(order)) return 0;
+  if (order.paymentMethod === "split") {
+    return parseFloat(order.cashPaidAmount || "0") || 0;
+  }
+  if (order.paymentMethod === "cash" || !order.paymentMethod) {
+    return parseFloat(order.total || "0") || 0;
+  }
+  return 0;
+}
+
+export function orderCardAmount(order: OrderPaymentRow): number {
+  if (isOrderDeferred(order)) return 0;
+  if (order.paymentMethod === "split") {
+    return parseFloat(order.cardPaidAmount || "0") || 0;
+  }
+  if (order.paymentMethod === "card") {
+    return parseFloat(order.total || "0") || 0;
+  }
+  return 0;
+}
+
 export function isInStoreCash(order: OrderPaymentRow): boolean {
-  return !isOrderDeferred(order) && (order.paymentMethod === "cash" || !order.paymentMethod);
+  return orderCashAmount(order) > 0;
 }
 
 export function isInStoreCard(order: OrderPaymentRow): boolean {
-  return !isOrderDeferred(order) && order.paymentMethod === "card";
+  return orderCardAmount(order) > 0;
 }
 
 export function isInStoreZainCash(order: OrderPaymentRow): boolean {

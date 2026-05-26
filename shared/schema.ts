@@ -258,6 +258,8 @@ export const orders = pgTable("orders", {
   customerPostal: text("customer_postal").notNull(),
   paymentMethod: text("payment_method").notNull().default("cash_on_delivery"),
   paymentStatus: text("payment_status").default("pending"),
+  cashPaidAmount: decimal("cash_paid_amount", { precision: 10, scale: 2 }),
+  cardPaidAmount: decimal("card_paid_amount", { precision: 10, scale: 2 }),
   zaincashTransactionId: text("zaincash_transaction_id"),
   qicardTransactionId: text("qicard_transaction_id"),
   items: text("items").array().notNull(),

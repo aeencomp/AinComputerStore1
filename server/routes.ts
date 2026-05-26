@@ -52,6 +52,8 @@ import {
   isOrderDeferred,
   isInStoreCash,
   isInStoreCard,
+  orderCashAmount,
+  orderCardAmount,
   isInStoreZainCash,
   isInStoreQiCard,
   paymentFieldsFromMethod,
@@ -1598,6 +1600,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         customerEmail,
         paymentMethod, 
         paymentStatus,
+        cashPaidAmount,
+        cardPaidAmount,
         discount,
         discountReason,
         notes,
@@ -1634,6 +1638,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const discountAmount = parseFloat(discount || '0');
       const total = subtotal - discountAmount;
 
+      const resolvedPayment = String(paymentMethod || "cash").trim() || "cash";
+      let cashPaid: string | null = null;
+      let cardPaid: string | null = null;
+      if (resolvedPayment === "split") {
+        const cashNum = parseFloat(String(cashPaidAmount ?? "0")) || 0;
+        const cardNum = parseFloat(String(cardPaidAmount ?? "0")) || 0;
+        if (cashNum <= 0 || cardNum <= 0) {
+          return res.status(400).json({ error: "أدخل مبلغ النقد ومبلغ البطاقة" });
+        }
+        if (Math.abs(cashNum + cardNum - total) > 0.5) {
+          return res.status(400).json({ error: "مجموع النقد والبطاقة يجب أن يساوي إجمالي الفاتورة" });
+        }
+        cashPaid = cashNum.toString();
+        cardPaid = cardNum.toString();
+      }
+
       const orderData = {
         customerName: customerName || 'عميل في المتجر',
         customerEmail: customerEmail || '',
@@ -1645,8 +1665,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         subtotal: subtotal.toString(),
         shipping: '0',
         total: total.toString(),
-        paymentMethod: paymentMethod || 'cash',
-        paymentStatus: paymentStatus || 'success',
+        paymentMethod: resolvedPayment === "split" ? "split" : (resolvedPayment || 'cash'),
+        paymentStatus: paymentStatus || (resolvedPayment === 'deferred' ? 'deferred' : 'success'),
         status: 'completed',
       };
 
@@ -1660,6 +1680,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         salespersonId: salesUserId,
         salesLocationId,
         notes: notes || null,
+        ...(cashPaid != null ? { cashPaidAmount: cashPaid, cardPaidAmount: cardPaid } : {}),
       }).where(eq(orders.id, order.id));
 
       // Update inventory for each item sold
@@ -2018,8 +2039,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Cash-only amounts for expected cash calculation
       const cashSalesOrders = shiftOrders
-        .filter(o => isInStoreCash(o))
-        .reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
+        .reduce((sum, o) => sum + orderCashAmount(o), 0);
       const cashRepairs = shiftRepairs
         .filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod))
         .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
@@ -2132,8 +2152,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ))
       .orderBy(desc(staffAdvances.createdAt));
 
-    const inStoreTotalCash = inStoreOrders.filter(o => isInStoreCash(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotalCard = inStoreOrders.filter(o => isInStoreCard(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
+    const inStoreTotalCash = inStoreOrders.reduce((s, o) => s + orderCashAmount(o), 0);
+    const inStoreTotalCard = inStoreOrders.reduce((s, o) => s + orderCardAmount(o), 0);
     const inStoreTotalZain = inStoreOrders.filter(o => isInStoreZainCash(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalQi = inStoreOrders.filter(o => isInStoreQiCard(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
     const inStoreTotalDeferred = inStoreOrders.filter(o => isOrderDeferred(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
@@ -10159,11 +10179,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) : [];
 
       const inStoreTotalCash = inStoreOrders
-        .filter(o => isInStoreCash(o))
-        .reduce((sum, o) => sum + parseFloat(o.total), 0);
+        .reduce((sum, o) => sum + orderCashAmount(o), 0);
       const inStoreTotalCard = inStoreOrders
-        .filter(o => isInStoreCard(o))
-        .reduce((sum, o) => sum + parseFloat(o.total), 0);
+        .reduce((sum, o) => sum + orderCardAmount(o), 0);
       const inStoreTotalZain = inStoreOrders
         .filter(o => isInStoreZainCash(o))
         .reduce((sum, o) => sum + parseFloat(o.total), 0);
