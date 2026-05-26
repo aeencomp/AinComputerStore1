@@ -4,9 +4,16 @@ export type OrderPaymentRow = {
   paymentMethod?: string | null;
   paymentStatus?: string | null;
   total?: string | null;
+  finalCost?: string | null;
+  costEstimate?: string | null;
   cashPaidAmount?: string | null;
   cardPaidAmount?: string | null;
 };
+
+function paymentRowTotal(row: OrderPaymentRow): number {
+  const raw = row.total ?? row.finalCost ?? row.costEstimate ?? "0";
+  return parseFloat(String(raw)) || 0;
+}
 
 export function isOrderDeferred(order: OrderPaymentRow): boolean {
   return order.paymentStatus === "deferred" || order.paymentMethod === "deferred";
@@ -30,7 +37,7 @@ export function orderCashAmount(order: OrderPaymentRow): number {
     return parseFloat(order.cashPaidAmount || "0") || 0;
   }
   if (order.paymentMethod === "cash" || !order.paymentMethod) {
-    return parseFloat(order.total || "0") || 0;
+    return paymentRowTotal(order);
   }
   return 0;
 }
@@ -41,9 +48,23 @@ export function orderCardAmount(order: OrderPaymentRow): number {
     return parseFloat(order.cardPaidAmount || "0") || 0;
   }
   if (order.paymentMethod === "card") {
-    return parseFloat(order.total || "0") || 0;
+    return paymentRowTotal(order);
   }
   return 0;
+}
+
+/** Repair ticket cash portion (paid, non-deferred). */
+export function repairCashAmount(ticket: OrderPaymentRow): number {
+  if (ticket.paymentStatus === "deferred") return 0;
+  if (ticket.paymentStatus !== "paid") return 0;
+  return orderCashAmount({ ...ticket, paymentStatus: "success" });
+}
+
+/** Repair ticket card portion (paid, non-deferred). */
+export function repairCardAmount(ticket: OrderPaymentRow): number {
+  if (ticket.paymentStatus === "deferred") return 0;
+  if (ticket.paymentStatus !== "paid") return 0;
+  return orderCardAmount({ ...ticket, paymentStatus: "success" });
 }
 
 export function isInStoreCash(order: OrderPaymentRow): boolean {

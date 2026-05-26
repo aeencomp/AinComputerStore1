@@ -10,7 +10,12 @@ import {
   resolveScannedCode,
   shouldSuppressScanInput,
 } from "@/lib/barcodeKeyboard";
-import { getInventoryScanCode, inventoryItemMatchesScan } from "@/lib/inventoryScanCode";
+import {
+  countDuplicateInventoryScanCodes,
+  getInventoryScanCode,
+  inventoryItemMatchesScan,
+  resolveUniquePosScanCode,
+} from "@/lib/inventoryScanCode";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -571,8 +576,11 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     };
   };
 
+  const laptopDuplicateScans = countDuplicateInventoryScanCodes(laptops);
+  const desktopDuplicateScans = countDuplicateInventoryScanCodes(desktops);
+
   const toCountableLaptop = (l: LaptopItem): CountableProduct => {
-    const scanCode = getInventoryScanCode(l);
+    const scanCode = resolveUniquePosScanCode(l, laptopDuplicateScans);
     const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
     return {
       id: l.id,
@@ -588,7 +596,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
   };
 
   const toCountableDesktop = (d: DesktopItem): CountableProduct => {
-    const scanCode = getInventoryScanCode(d);
+    const scanCode = resolveUniquePosScanCode(d, desktopDuplicateScans);
     return {
       id: d.id,
       source: "desktop",

@@ -9,7 +9,13 @@ import {
   resolveScannedCode,
   shouldSuppressScanInput,
 } from "@/lib/barcodeKeyboard";
-import { getInventoryScanCode, inventoryItemMatchesScan } from "@/lib/inventoryScanCode";
+import {
+  countDuplicateInventoryScanCodes,
+  getInventoryScanCode,
+  inventoryCodesMatch,
+  inventoryItemMatchesScan,
+  resolveUniquePosScanCode,
+} from "@/lib/inventoryScanCode";
 import { formatPosPaymentLabel } from "@/lib/posPayment";
 import { cn } from "@/lib/utils";
 import { openA4InvoicePrint, STORE_BRAND_RED, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
@@ -397,11 +403,15 @@ export default function SalesPOS({
         })
     : [];
 
+  const laptopDuplicateScans = countDuplicateInventoryScanCodes(
+    laptopsRaw.filter((l) => (l.stockQuantity || 0) >= 0 && l.isActive !== 0),
+  );
+
   const laptopProducts: POSProduct[] = orderType === 'in-store'
     ? laptopsRaw
         .filter(l => (l.stockQuantity || 0) >= 0 && l.isActive !== 0)
         .map(l => {
-          const scanCode = getInventoryScanCode(l);
+          const scanCode = resolveUniquePosScanCode(l, laptopDuplicateScans);
           const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
           const ramLabel = l.ram && !(l.model || "").toLowerCase().includes((l.ram || "").toLowerCase())
             ? ` ${l.ram}`
@@ -436,11 +446,15 @@ export default function SalesPOS({
         })
     : [];
 
+  const desktopDuplicateScans = countDuplicateInventoryScanCodes(
+    desktopsRaw.filter((d) => (d.stockQuantity || 0) >= 0 && d.isActive !== 0),
+  );
+
   const desktopProducts: POSProduct[] = orderType === 'in-store'
     ? desktopsRaw
         .filter(d => (d.stockQuantity || 0) >= 0 && d.isActive !== 0)
         .map(d => {
-          const scanCode = getInventoryScanCode(d);
+          const scanCode = resolveUniquePosScanCode(d, desktopDuplicateScans);
           return {
           id: `des-${d.id}`,
           nameAr: `${d.brand} ${d.model || ''}`.trim(),
@@ -711,6 +725,20 @@ export default function SalesPOS({
       if (!code) return;
 
       const scanMatches = products.filter((p) => productMatchesScanCode(p, code));
+      const serialExactMatches = scanMatches.filter(
+        (p) =>
+          isSerialInventoryProduct(p) &&
+          !!p.serialNumber?.trim() &&
+          inventoryCodesMatch(p.serialNumber, code),
+      );
+
+      if (serialExactMatches.length === 1) {
+        e.preventDefault();
+        addToCart(serialExactMatches[0]);
+        setSearchQuery("");
+        return;
+      }
+
       let product: POSProduct | undefined = scanMatches.length === 1 ? scanMatches[0] : undefined;
 
       if (scanMatches.length > 1) {

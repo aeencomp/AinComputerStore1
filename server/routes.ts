@@ -54,6 +54,8 @@ import {
   isInStoreCard,
   orderCashAmount,
   orderCardAmount,
+  repairCashAmount,
+  repairCardAmount,
   isInStoreZainCash,
   isInStoreQiCard,
   paymentFieldsFromMethod,
@@ -2041,8 +2043,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const cashSalesOrders = shiftOrders
         .reduce((sum, o) => sum + orderCashAmount(o), 0);
       const cashRepairs = shiftRepairs
-        .filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod))
-        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+        .reduce((sum, t) => sum + repairCashAmount(t), 0);
       const totalCash = cashSalesOrders + cashRepairs;
 
       // Total sales across all payment methods (excluding deferred)
@@ -2162,8 +2163,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const totalAdvances = dailyAdvances.reduce((s, a) => s + parseFloat(a.amount), 0);
     const repairTotalDeferred = paidRepairTickets.filter(t => t.paymentStatus === 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
     const repairTotal = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
-    const repairTotalCash = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod)).reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
-    const repairTotalCard = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred' && t.paymentMethod === 'card').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+    const repairTotalCash = paidRepairTickets.reduce((s, t) => s + repairCashAmount(t), 0);
+    const repairTotalCard = paidRepairTickets.reduce((s, t) => s + repairCardAmount(t), 0);
 
     const baseGrandTotal = inStoreTotal + repairTotal;
     const grandTotal = baseGrandTotal + totalAdvances;
@@ -4454,6 +4455,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       if (req.body.paymentMethod !== undefined) {
         updateData.paymentMethod = req.body.paymentMethod;
+      }
+      if (req.body.cashPaidAmount !== undefined) {
+        updateData.cashPaidAmount =
+          req.body.cashPaidAmount != null && req.body.cashPaidAmount !== ""
+            ? String(req.body.cashPaidAmount)
+            : null;
+      }
+      if (req.body.cardPaidAmount !== undefined) {
+        updateData.cardPaidAmount =
+          req.body.cardPaidAmount != null && req.body.cardPaidAmount !== ""
+            ? String(req.body.cardPaidAmount)
+            : null;
+      }
+
+      const effectiveMethod = updateData.paymentMethod ?? existing?.paymentMethod;
+      const effectiveStatus = updateData.paymentStatus ?? existing?.paymentStatus;
+      if (effectiveMethod === "split" && effectiveStatus === "paid") {
+        const amount = parseFloat(
+          String(
+            updateData.finalCost ??
+              existing?.finalCost ??
+              updateData.costEstimate ??
+              existing?.costEstimate ??
+              "0",
+          ),
+        ) || 0;
+        const cashNum = parseFloat(String(updateData.cashPaidAmount ?? existing?.cashPaidAmount ?? "0")) || 0;
+        const cardNum = parseFloat(String(updateData.cardPaidAmount ?? existing?.cardPaidAmount ?? "0")) || 0;
+        if (cashNum <= 0 || cardNum <= 0) {
+          return res.status(400).json({ error: "أدخل مبلغ النقد ومبلغ البطاقة" });
+        }
+        if (Math.abs(cashNum + cardNum - amount) > 0.5) {
+          return res.status(400).json({ error: "مجموع النقد والبطاقة يجب أن يساوي التكلفة النهائية" });
+        }
+        updateData.cashPaidAmount = cashNum.toString();
+        updateData.cardPaidAmount = cardNum.toString();
+      } else if (effectiveMethod !== "split") {
+        updateData.cashPaidAmount = null;
+        updateData.cardPaidAmount = null;
       }
       
       const ticket = await storage.updateRepairTicket(id, updateData);
@@ -10213,11 +10253,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .filter(t => t.paymentStatus !== 'deferred')
         .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
       const repairTotalCash = paidRepairTickets
-        .filter(t => t.paymentStatus !== 'deferred' && (t.paymentMethod === 'cash' || !t.paymentMethod))
-        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+        .reduce((sum, t) => sum + repairCashAmount(t), 0);
       const repairTotalCard = paidRepairTickets
-        .filter(t => t.paymentStatus !== 'deferred' && t.paymentMethod === 'card')
-        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
+        .reduce((sum, t) => sum + repairCardAmount(t), 0);
       const repairTotalZain = 0;
       const repairTotalQi = 0;
 

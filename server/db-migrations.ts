@@ -42,6 +42,8 @@ const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE orders ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
   `ALTER TABLE orders ADD COLUMN IF NOT EXISTS cash_paid_amount NUMERIC(10, 2)`,
   `ALTER TABLE orders ADD COLUMN IF NOT EXISTS card_paid_amount NUMERIC(10, 2)`,
+  `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS cash_paid_amount NUMERIC(10, 2)`,
+  `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS card_paid_amount NUMERIC(10, 2)`,
   `ALTER TABLE sales_shifts ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
   `ALTER TABLE cash_withdrawals ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,
   `ALTER TABLE staff_advances ADD COLUMN IF NOT EXISTS sales_location_id INTEGER NOT NULL DEFAULT 1`,

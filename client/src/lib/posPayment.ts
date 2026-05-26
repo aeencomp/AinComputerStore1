@@ -4,9 +4,16 @@ export type PosPaymentOrder = {
   paymentMethod?: string | null;
   paymentStatus?: string | null;
   total?: string | null;
+  finalCost?: string | null;
+  costEstimate?: string | null;
   cashPaidAmount?: string | null;
   cardPaidAmount?: string | null;
 };
+
+function rowTotal(order: PosPaymentOrder): number {
+  const raw = order.total ?? order.finalCost ?? order.costEstimate ?? "0";
+  return parseFloat(String(raw)) || 0;
+}
 
 export function posOrderCashAmount(order: PosPaymentOrder): number {
   if (order.paymentStatus === "deferred" || order.paymentMethod === "deferred") return 0;
@@ -14,7 +21,7 @@ export function posOrderCashAmount(order: PosPaymentOrder): number {
     return parseFloat(order.cashPaidAmount || "0") || 0;
   }
   if (order.paymentMethod === "cash" || !order.paymentMethod) {
-    return parseFloat(order.total || "0") || 0;
+    return rowTotal(order);
   }
   return 0;
 }
@@ -25,9 +32,21 @@ export function posOrderCardAmount(order: PosPaymentOrder): number {
     return parseFloat(order.cardPaidAmount || "0") || 0;
   }
   if (order.paymentMethod === "card") {
-    return parseFloat(order.total || "0") || 0;
+    return rowTotal(order);
   }
   return 0;
+}
+
+/** Repair ticket: cash portion when status is paid. */
+export function repairTicketCashAmount(ticket: PosPaymentOrder): number {
+  if (ticket.paymentStatus !== "paid") return 0;
+  return posOrderCashAmount(ticket);
+}
+
+/** Repair ticket: card portion when status is paid. */
+export function repairTicketCardAmount(ticket: PosPaymentOrder): number {
+  if (ticket.paymentStatus !== "paid") return 0;
+  return posOrderCardAmount(ticket);
 }
 
 export function formatPosPaymentLabel(

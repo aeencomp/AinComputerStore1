@@ -761,7 +761,8 @@ async function repairDistinctBarcodesForDifferentSkus(
     for (const row of group) {
       const serial = (row.serialNumber || "").trim();
       if (!serial) continue;
-      if ((row.barcode || "").trim() === serial) continue;
+      const current = (row.barcode || "").trim();
+      if (current === serial) continue;
       await db
         .update(table)
         .set({ barcode: serial, updatedAt: new Date() })
@@ -776,6 +777,19 @@ async function repairDistinctBarcodesForDifferentSkus(
   return fixed;
 }
 
+function alignBarcodeGroupKey(
+  table: typeof laptops | typeof desktops | typeof acAdapters,
+  row: (typeof laptops.$inferSelect | typeof desktops.$inferSelect | typeof acAdapters.$inferSelect),
+): string {
+  const base = inventoryRowGroupKey(table, row);
+  // Each laptop/desktop unit has its own serial — never share one barcode across units.
+  if (table === laptops || table === desktops) {
+    const serial = (row.serialNumber || "").trim().toUpperCase();
+    return `${base}::${serial || row.id}`;
+  }
+  return base;
+}
+
 async function alignProductGroupBarcodes(
   table: typeof laptops | typeof desktops | typeof acAdapters,
 ): Promise<void> {
@@ -783,7 +797,7 @@ async function alignProductGroupBarcodes(
   const groups = new Map<string, Array<(typeof rows)[number]>>();
 
   for (const row of rows) {
-    const key = inventoryRowGroupKey(table, row);
+    const key = alignBarcodeGroupKey(table, row);
     const group = groups.get(key) || [];
     group.push(row);
     groups.set(key, group);
@@ -851,6 +865,13 @@ async function mergeDuplicateInventoryRows(
   let mergedCount = 0;
   for (const [, group] of groups) {
     if (group.length < 2) continue;
+
+    if (table === laptops || table === desktops) {
+      const serials = new Set(
+        group.map((r) => (r.serialNumber || "").trim().toUpperCase()).filter(Boolean),
+      );
+      if (serials.size > 1) continue;
+    }
 
     const scanCodeUpper = getStableBarcode(group[0]).toUpperCase();
     group.sort((a, b) => {
@@ -1040,8 +1061,6 @@ async function repairStuckInventoryAfterTransfers(
 
 /** Merge split transfer rows that share the same scan barcode at one location. */
 export async function repairTransferInventoryDuplicates(): Promise<void> {
-  await repairDistinctBarcodesForDifferentSkus(laptops);
-  await repairDistinctBarcodesForDifferentSkus(desktops);
   for (const table of [laptops, desktops, acAdapters] as const) {
     await alignProductGroupBarcodes(table);
     await backfillMissingInventoryBarcodes(table);
@@ -1049,6 +1068,13 @@ export async function repairTransferInventoryDuplicates(): Promise<void> {
   const laptopMerged = await mergeDuplicateInventoryRows(laptops);
   const desktopMerged = await mergeDuplicateInventoryRows(desktops);
   const adapterMerged = await mergeDuplicateInventoryRows(acAdapters);
+  const laptopBarcodes = await repairDistinctBarcodesForDifferentSkus(laptops);
+  const desktopBarcodes = await repairDistinctBarcodesForDifferentSkus(desktops);
+  if (laptopBarcodes > 0 || desktopBarcodes > 0) {
+    console.log(
+      `[sales-locations] unique serial barcodes: ${laptopBarcodes} laptop(s), ${desktopBarcodes} desktop(s)`,
+    );
+  }
   const total = laptopMerged + desktopMerged + adapterMerged;
   if (total > 0) {
     console.log(`[sales-locations] merged ${total} duplicate inventory row(s) from transfers`);

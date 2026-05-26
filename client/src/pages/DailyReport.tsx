@@ -223,7 +223,11 @@ function buildPrintHTML(data: ShiftReportData): string {
     const isDelivered = t.status === 'delivered';
     const badgeCls = isDeferred ? 'badge-orange' : isDelivered ? 'badge-delivered' : 'badge-green';
     const badgeTxt = isDeferred ? 'آجل' : isDelivered ? 'مُسلَّم' : 'مدفوع';
-    const methodTxt = !isDeferred ? (t.paymentMethod === 'card' ? ' — بطاقة' : ' — نقداً') : '';
+    const methodTxt = !isDeferred && t.paymentStatus === 'paid'
+      ? (t.paymentMethod === 'split'
+        ? ` — نقد ${(parseFloat((t as any).cashPaidAmount || '0') || 0).toLocaleString('en-US')} + بطاقة ${(parseFloat((t as any).cardPaidAmount || '0') || 0).toLocaleString('en-US')}`
+        : t.paymentMethod === 'card' ? ' — بطاقة' : ' — نقداً')
+      : '';
     const deviceStr = [t.deviceBrand, t.deviceModel, t.deviceType].filter(Boolean).join(" ");
     const detailParts = [
       t.issueDescriptionAr ? `<strong>المشكلة:</strong> ${t.issueDescriptionAr}` : "",
@@ -1447,7 +1451,9 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                                       }
                                       {ticket.paymentStatus !== 'deferred' && (
                                         <Badge variant="outline" className="text-xs">
-                                          {ticket.paymentMethod === 'card' ? 'بطاقة' : 'نقداً'}
+                                          {ticket.paymentMethod === 'split'
+                                            ? `نقد ${(parseFloat((ticket as any).cashPaidAmount || '0') || 0).toLocaleString('en-US')} + بطاقة ${(parseFloat((ticket as any).cardPaidAmount || '0') || 0).toLocaleString('en-US')}`
+                                            : ticket.paymentMethod === 'card' ? 'بطاقة' : 'نقداً'}
                                         </Badge>
                                       )}
                                     </div>

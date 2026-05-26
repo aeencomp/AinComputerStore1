@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useLanguage } from '@/contexts/LanguageContext';
+import { formatPosPaymentLabel } from '@/lib/posPayment';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
@@ -925,9 +926,17 @@ export default function TechnicianDashboard() {
                           {t('repair.payment.paid')}
                         </Badge>
                         <Badge variant="outline" className="text-xs">
-                          {(ticket as any).paymentMethod === 'card'
-                            ? (language === 'ar' ? 'بطاقة' : 'Card')
-                            : (language === 'ar' ? 'نقداً' : 'Cash')}
+                          {formatPosPaymentLabel(
+                            {
+                              paymentMethod: (ticket as any).paymentMethod,
+                              paymentStatus: ticket.paymentStatus,
+                              finalCost: ticket.finalCost,
+                              costEstimate: ticket.costEstimate,
+                              cashPaidAmount: (ticket as any).cashPaidAmount,
+                              cardPaidAmount: (ticket as any).cardPaidAmount,
+                            },
+                            language === 'ar' ? 'ar' : 'en',
+                          )}
                         </Badge>
                       </>
                     ) : ticket.paymentStatus === 'deferred' ? (
