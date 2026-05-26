@@ -187,6 +187,8 @@ export default function SalesPOS({
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showReceiptEditor, setShowReceiptEditor] = useState(false);
   const [receiptDraft, setReceiptDraft] = useState<any>(null);
+  const [scanPickOpen, setScanPickOpen] = useState(false);
+  const [scanPickOptions, setScanPickOptions] = useState<POSProduct[]>([]);
   const scanStateRef = useRef(emptyScanBuffer());
 
   const { data: mainProducts = [], isLoading: mainLoading } = useQuery<any[]>({
@@ -397,10 +399,13 @@ export default function SalesPOS({
         .map(l => {
           const scanCode = getInventoryScanCode(l);
           const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
+          const ramLabel = l.ram && !(l.model || "").toLowerCase().includes((l.ram || "").toLowerCase())
+            ? ` ${l.ram}`
+            : "";
           return {
           id: `lap-${l.id}`,
-          nameAr: `${l.brand} ${l.model || ''}${sizeLabel}`.trim(),
-          nameEn: `${l.brand} ${l.model || ''}${sizeLabel}`.trim(),
+          nameAr: `${l.brand} ${l.model || ''}${ramLabel}${sizeLabel}`.trim(),
+          nameEn: `${l.brand} ${l.model || ''}${ramLabel}${sizeLabel}`.trim(),
           price: String(l.sellingPrice || '0'),
           wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
           stockQuantity: l.stockQuantity,
@@ -696,21 +701,35 @@ export default function SalesPOS({
       scanStateRef.current = emptyScanBuffer();
       if (!code) return;
 
-      let product = products.find((p) => productMatchesScanCode(p, code));
+      const scanMatches = products.filter((p) => productMatchesScanCode(p, code));
+      let product: POSProduct | undefined = scanMatches.length === 1 ? scanMatches[0] : undefined;
+
+      if (scanMatches.length > 1) {
+        e.preventDefault();
+        setScanPickOptions(scanMatches);
+        setScanPickOpen(true);
+        setSearchQuery("");
+        return;
+      }
 
       if (!product) {
         if (filteredProducts.length === 1) {
           product = filteredProducts[0];
         } else {
           const q = code.toLowerCase();
-          product = filteredProducts.find((p) => {
+          const nameMatches = filteredProducts.filter((p) => {
             const name = (language === 'ar' ? p.nameAr : (p.nameEn || p.nameAr)).toLowerCase();
-            return (
-              name === q
-              || productMatchesScanCode(p, code)
-            );
+            return name === q || productMatchesScanCode(p, code);
           });
-          if (!product && filteredProducts.length > 1) {
+          if (nameMatches.length === 1) {
+            product = nameMatches[0];
+          } else if (nameMatches.length > 1) {
+            e.preventDefault();
+            setScanPickOptions(nameMatches);
+            setScanPickOpen(true);
+            setSearchQuery("");
+            return;
+          } else if (filteredProducts.length > 1) {
             e.preventDefault();
             toast({
               title: language === 'ar' ? 'أكثر من منتج' : 'Multiple products',
@@ -1897,6 +1916,51 @@ export default function SalesPOS({
           </CardContent>
         </Card>
       </div>
+
+      {/* Barcode scan: multiple products share same code */}
+      <Dialog open={scanPickOpen} onOpenChange={setScanPickOpen}>
+        <DialogContent className="max-w-lg" dir={language === "ar" ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle>
+              {language === "ar" ? "اختر المنتج" : "Choose product"}
+            </DialogTitle>
+            <DialogDescription>
+              {language === "ar"
+                ? "نفس الباركود مرتبط بأكثر من جهاز. اختر الموديل الصحيح."
+                : "This barcode matches more than one item. Pick the correct one."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {scanPickOptions.map((p) => (
+              <Button
+                key={p.id}
+                variant="outline"
+                className="w-full h-auto py-3 flex flex-col items-start gap-1 text-start"
+                onClick={() => {
+                  setScanPickOpen(false);
+                  setScanPickOptions([]);
+                  addToCart(p);
+                }}
+              >
+                <span className="font-semibold">
+                  {language === "ar" ? p.nameAr : (p.nameEn || p.nameAr)}
+                </span>
+                <span className="text-xs font-mono text-muted-foreground">
+                  {language === "ar" ? "باركود:" : "Barcode:"} {p.sku}
+                  {p.serialNumber && p.serialNumber !== p.sku
+                    ? ` · ${language === "ar" ? "سيريال:" : "Serial:"} ${p.serialNumber}`
+                    : ""}
+                </span>
+                <span className="text-sm text-primary font-bold">
+                  {formatPrice(parseFloat(p.price))} {language === "ar" ? "د.ع" : "IQD"}
+                  {" · "}
+                  {language === "ar" ? "متوفر:" : "Stock:"} {p.stockQuantity ?? 0}
+                </span>
+              </Button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Receipt Dialog */}
       <Dialog open={showReceipt} onOpenChange={setShowReceipt} modal={true}>

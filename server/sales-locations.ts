@@ -693,6 +693,89 @@ export async function executeStockTransfer(params: {
   return { transferId: transfer.id };
 }
 
+function laptopInventorySkuKey(row: typeof laptops.$inferSelect): string {
+  return [
+    row.salesLocationId,
+    (row.brand || "").toLowerCase(),
+    (row.model || "").toLowerCase(),
+    (row.partNumber || "").toLowerCase(),
+    (row.cpu || "").toLowerCase(),
+    (row.ram || "").toLowerCase(),
+    (row.storage || "").toLowerCase(),
+    (row.gpu || "").toLowerCase(),
+    String(row.sizeInch ?? ""),
+  ].join("::");
+}
+
+function desktopInventorySkuKey(row: typeof desktops.$inferSelect): string {
+  return [
+    row.salesLocationId,
+    (row.brand || "").toLowerCase(),
+    (row.model || "").toLowerCase(),
+    (row.partNumber || "").toLowerCase(),
+    (row.cpu || "").toLowerCase(),
+    (row.ram || "").toLowerCase(),
+    (row.storage || "").toLowerCase(),
+    (row.gpu || "").toLowerCase(),
+  ].join("::");
+}
+
+function inventoryRowGroupKey(
+  table: typeof laptops | typeof desktops | typeof acAdapters,
+  row: (typeof laptops.$inferSelect | typeof desktops.$inferSelect | typeof acAdapters.$inferSelect),
+): string {
+  if (table === laptops) {
+    return laptopInventorySkuKey(row as typeof laptops.$inferSelect);
+  }
+  if (table === desktops) {
+    return desktopInventorySkuKey(row as typeof desktops.$inferSelect);
+  }
+  const part = (row.partNumber || "").toLowerCase();
+  const model = "model" in row ? String(row.model || "").toLowerCase() : "";
+  const wattage = "wattage" in row && row.wattage != null ? String(row.wattage) : "";
+  return `${row.salesLocationId}::${(row.brand || "").toLowerCase()}::${part}::${model}::${wattage}`;
+}
+
+/** Different SKUs must not share one barcode (e.g. T14 8GB vs 16GB). */
+async function repairDistinctBarcodesForDifferentSkus(
+  table: typeof laptops | typeof desktops,
+): Promise<number> {
+  const rows = await db.select().from(table).where(eq(table.isActive, 1));
+  const byLocAndScan = new Map<string, Array<(typeof rows)[number]>>();
+
+  for (const row of rows) {
+    const scan = getInventoryScanCode(row).toUpperCase();
+    if (!scan) continue;
+    const bucketKey = `${row.salesLocationId}::${scan}`;
+    const group = byLocAndScan.get(bucketKey) || [];
+    group.push(row);
+    byLocAndScan.set(bucketKey, group);
+  }
+
+  let fixed = 0;
+  for (const [, group] of byLocAndScan) {
+    if (group.length < 2) continue;
+    const skuKeys = new Set(group.map((row) => inventoryRowGroupKey(table, row)));
+    if (skuKeys.size <= 1) continue;
+
+    for (const row of group) {
+      const serial = (row.serialNumber || "").trim();
+      if (!serial) continue;
+      if ((row.barcode || "").trim() === serial) continue;
+      await db
+        .update(table)
+        .set({ barcode: serial, updatedAt: new Date() })
+        .where(eq(table.id, row.id));
+      fixed++;
+    }
+  }
+
+  if (fixed > 0) {
+    console.log(`[sales-locations] assigned unique serial barcodes to ${fixed} ${table === laptops ? "laptop" : "desktop"} row(s)`);
+  }
+  return fixed;
+}
+
 async function alignProductGroupBarcodes(
   table: typeof laptops | typeof desktops | typeof acAdapters,
 ): Promise<void> {
@@ -700,10 +783,7 @@ async function alignProductGroupBarcodes(
   const groups = new Map<string, Array<(typeof rows)[number]>>();
 
   for (const row of rows) {
-    const part = (row.partNumber || "").toLowerCase();
-    const model = "model" in row ? String(row.model || "").toLowerCase() : "";
-    const wattage = "wattage" in row && row.wattage != null ? String(row.wattage) : "";
-    const key = `${row.salesLocationId}::${(row.brand || "").toLowerCase()}::${part}::${model}::${wattage}`;
+    const key = inventoryRowGroupKey(table, row);
     const group = groups.get(key) || [];
     group.push(row);
     groups.set(key, group);
@@ -755,7 +835,14 @@ async function mergeDuplicateInventoryRows(
   for (const row of rows) {
     const scanCode = getStableBarcode(row);
     if (!scanCode) continue;
-    const key = `${row.salesLocationId}::${scanCode.toUpperCase()}`;
+    const skuKey =
+      table === laptops || table === desktops
+        ? inventoryRowGroupKey(table, row)
+        : "";
+    const key =
+      table === laptops || table === desktops
+        ? `${row.salesLocationId}::${scanCode.toUpperCase()}::${skuKey}`
+        : `${row.salesLocationId}::${scanCode.toUpperCase()}`;
     const group = groups.get(key) || [];
     group.push(row);
     groups.set(key, group);
@@ -953,6 +1040,8 @@ async function repairStuckInventoryAfterTransfers(
 
 /** Merge split transfer rows that share the same scan barcode at one location. */
 export async function repairTransferInventoryDuplicates(): Promise<void> {
+  await repairDistinctBarcodesForDifferentSkus(laptops);
+  await repairDistinctBarcodesForDifferentSkus(desktops);
   for (const table of [laptops, desktops, acAdapters] as const) {
     await alignProductGroupBarcodes(table);
     await backfillMissingInventoryBarcodes(table);
