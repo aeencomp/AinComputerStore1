@@ -6,6 +6,7 @@ import {
   appendScanKeystroke,
   codesMatch,
   emptyScanBuffer,
+  looksLikeScannerBurst,
   resolveScannedCode,
   shouldSuppressScanInput,
 } from "@/lib/barcodeKeyboard";
@@ -122,9 +123,23 @@ function productMatchesScanCode(product: POSProduct, code: string): boolean {
     partNumber: product.partNumber,
   };
   if (product.productSource === "laptop" || product.productSource === "desktop") {
-    return serializedUnitMatchesScan(item, code, product.legacyScanCodes ?? []);
+    if (serializedUnitMatchesScan(item, code, product.legacyScanCodes ?? [])) {
+      return true;
+    }
+    if (product.sku && inventoryCodesMatch(product.sku, code)) return true;
+    return false;
   }
   return inventoryItemMatchesScan(item, code);
+}
+
+/** Scanner burst or inventory serial/barcode shape — not a name search. */
+function isBarcodeScanIntent(code: string, hadScanBuffer: boolean): boolean {
+  if (hadScanBuffer) return true;
+  const c = code.trim();
+  if (!c) return false;
+  if (/^(LAP|DES|BAT|ADP|MAC)[\s._-]*\d+/i.test(c)) return true;
+  if (/^\d{8,}$/.test(c)) return true;
+  return c.length >= 6 && /^[A-Za-z0-9._-]+$/.test(c) && !/\s/.test(c);
 }
 
 interface Category {
@@ -419,9 +434,9 @@ export default function SalesPOS({
           const dbBarcode = (l.barcode || "").trim();
           const apiScan = ((l as Laptop & { scanCode?: string }).scanCode || "").trim();
           const posSku = serial || resolveUniquePosScanCode(l, laptopDuplicateScans);
-          const storedBarcode = serial || dbBarcode || apiScan;
-          const legacyScanCodes = [dbBarcode, apiScan].filter(
-            (c) => c && c !== serial && c !== posSku,
+          const storedBarcode = dbBarcode || apiScan || serial;
+          const legacyScanCodes = Array.from(
+            new Set([dbBarcode, apiScan, serial, posSku].filter((c) => c && c.length > 0)),
           );
           const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
           const ramLabel = l.ram && !(l.model || "").toLowerCase().includes((l.ram || "").toLowerCase())
@@ -471,9 +486,9 @@ export default function SalesPOS({
           const dbBarcode = (d.barcode || "").trim();
           const apiScan = ((d as Desktop & { scanCode?: string }).scanCode || "").trim();
           const posSku = serial || resolveUniquePosScanCode(d, desktopDuplicateScans);
-          const storedBarcode = serial || dbBarcode || apiScan;
-          const legacyScanCodes = [dbBarcode, apiScan].filter(
-            (c) => c && c !== serial && c !== posSku,
+          const storedBarcode = dbBarcode || apiScan || serial;
+          const legacyScanCodes = Array.from(
+            new Set([dbBarcode, apiScan, serial, posSku].filter((c) => c && c.length > 0)),
           );
           return {
           id: `des-${d.id}`,
@@ -742,11 +757,42 @@ export default function SalesPOS({
   /** Barcode scanner: uses physical key codes so Arabic Windows layout does not break scans. */
   const handlePosSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
+      const hadScanBuffer = scanStateRef.current.buffer.length > 0;
       const code = resolveScannedCode(scanStateRef.current, searchQuery);
       scanStateRef.current = emptyScanBuffer();
       if (!code) return;
 
-      const scanMatches = products.filter((p) => productMatchesScanCode(p, code));
+      const scanIntent = isBarcodeScanIntent(code, hadScanBuffer);
+      if (scanIntent) {
+        setSearchQuery("");
+      }
+
+      let scanMatches = products.filter((p) => productMatchesScanCode(p, code));
+
+      if (scanMatches.length === 0 && scanIntent) {
+        const looseMatches = products.filter((p) => {
+          if (p.productSource !== "laptop" && p.productSource !== "desktop") return false;
+          return inventoryItemMatchesScan(
+            {
+              scanCode: p.scanCode ?? p.sku,
+              barcode: p.barcode,
+              serialNumber: p.serialNumber,
+              partNumber: p.partNumber,
+            },
+            code,
+          );
+        });
+        if (looseMatches.length === 1) {
+          scanMatches = looseMatches;
+        } else if (looseMatches.length > 1) {
+          e.preventDefault();
+          setScanPickOptions(looseMatches);
+          setScanPickOpen(true);
+          setSearchQuery("");
+          return;
+        }
+      }
+
       const serialExactMatches = scanMatches.filter(
         (p) =>
           isSerialInventoryProduct(p) &&
@@ -771,38 +817,15 @@ export default function SalesPOS({
         return;
       }
 
-      if (!product) {
+      if (!product && !scanIntent) {
         if (filteredProducts.length === 1) {
           product = filteredProducts[0];
-        } else {
-          const q = code.toLowerCase();
-          const nameMatches = filteredProducts.filter((p) => {
-            const name = (language === 'ar' ? p.nameAr : (p.nameEn || p.nameAr)).toLowerCase();
-            return name === q || productMatchesScanCode(p, code);
-          });
-          if (nameMatches.length === 1) {
-            product = nameMatches[0];
-          } else if (nameMatches.length > 1) {
-            e.preventDefault();
-            setScanPickOptions(nameMatches);
-            setScanPickOpen(true);
-            setSearchQuery("");
-            return;
-          } else if (filteredProducts.length > 1) {
-            e.preventDefault();
-            toast({
-              title: language === 'ar' ? 'أكثر من منتج' : 'Multiple products',
-              description: language === 'ar'
-                ? 'اختر المنتج من القائمة أو اكتب اسماً أدق'
-                : 'Select from the list or type a more specific name',
-            });
-            return;
-          }
         }
       }
 
       if (!product) {
         e.preventDefault();
+        setSearchQuery("");
         toast({
           title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
           description:
@@ -1270,7 +1293,9 @@ export default function SalesPOS({
                   value={searchQuery}
                   onChange={(e) => {
                     setSearchQuery(e.target.value);
-                    scanStateRef.current = emptyScanBuffer();
+                    if (!looksLikeScannerBurst(scanStateRef.current)) {
+                      scanStateRef.current = emptyScanBuffer();
+                    }
                   }}
                   onKeyDown={handlePosSearchKeyDown}
                   className="ps-10 h-11 text-base"
