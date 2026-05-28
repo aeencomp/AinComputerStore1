@@ -98,19 +98,22 @@ export function inventoryCodesMatch(
   return false;
 }
 
-/** Strict match for serialized laptops/desktops (one scan → one unit). */
+/** Match one serialized laptop/desktop unit (supports LAP-0081 vs lap81). */
 export function serializedUnitMatchesScan(
   item: InventoryCodeSource,
   scanned: string,
+  extraCodes: string[] = [],
 ): boolean {
   const fields = [
     item.serialNumber,
     item.barcode,
     item.scanCode,
+    item.partNumber,
+    ...extraCodes,
   ];
   return fields.some((f) => {
     const v = (f ?? "").trim();
-    return v.length > 0 && codesMatch(v, scanned);
+    return v.length > 0 && inventoryCodesMatch(v, scanned);
   });
 }
 

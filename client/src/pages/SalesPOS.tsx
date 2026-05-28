@@ -94,6 +94,8 @@ interface POSProduct {
   productSource?: 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd' | 'laptop' | 'desktop';
   sourceId?: string;
   printSpecs?: string[];
+  /** Older sticker / DB barcode when it differs from serial */
+  legacyScanCodes?: string[];
 }
 
 const SERIAL_INVENTORY_SOURCES = new Set<POSProduct["productSource"]>([
@@ -120,7 +122,7 @@ function productMatchesScanCode(product: POSProduct, code: string): boolean {
     partNumber: product.partNumber,
   };
   if (product.productSource === "laptop" || product.productSource === "desktop") {
-    return serializedUnitMatchesScan(item, code);
+    return serializedUnitMatchesScan(item, code, product.legacyScanCodes ?? []);
   }
   return inventoryItemMatchesScan(item, code);
 }
@@ -414,8 +416,13 @@ export default function SalesPOS({
         .filter(l => (l.stockQuantity || 0) >= 0 && l.isActive !== 0)
         .map(l => {
           const serial = (l.serialNumber || "").trim();
+          const dbBarcode = (l.barcode || "").trim();
+          const apiScan = ((l as Laptop & { scanCode?: string }).scanCode || "").trim();
           const posSku = serial || resolveUniquePosScanCode(l, laptopDuplicateScans);
-          const storedBarcode = serial || (l.barcode || "").trim() || getInventoryScanCode(l);
+          const storedBarcode = serial || dbBarcode || apiScan;
+          const legacyScanCodes = [dbBarcode, apiScan].filter(
+            (c) => c && c !== serial && c !== posSku,
+          );
           const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
           const ramLabel = l.ram && !(l.model || "").toLowerCase().includes((l.ram || "").toLowerCase())
             ? ` ${l.ram}`
@@ -436,6 +443,7 @@ export default function SalesPOS({
           category: language === 'ar' ? 'لابتوبات' : 'Laptops',
           productSource: 'laptop' as const,
           sourceId: l.id,
+          legacyScanCodes,
           printSpecs: [
             posSku ? `Barcode: ${posSku}` : null,
             l.serialNumber && l.serialNumber !== posSku ? `Serial: ${l.serialNumber}` : null,
@@ -460,8 +468,13 @@ export default function SalesPOS({
         .filter(d => (d.stockQuantity || 0) >= 0 && d.isActive !== 0)
         .map(d => {
           const serial = (d.serialNumber || "").trim();
+          const dbBarcode = (d.barcode || "").trim();
+          const apiScan = ((d as Desktop & { scanCode?: string }).scanCode || "").trim();
           const posSku = serial || resolveUniquePosScanCode(d, desktopDuplicateScans);
-          const storedBarcode = serial || (d.barcode || "").trim() || getInventoryScanCode(d);
+          const storedBarcode = serial || dbBarcode || apiScan;
+          const legacyScanCodes = [dbBarcode, apiScan].filter(
+            (c) => c && c !== serial && c !== posSku,
+          );
           return {
           id: `des-${d.id}`,
           nameAr: `${d.brand} ${d.model || ''}`.trim(),
@@ -478,6 +491,7 @@ export default function SalesPOS({
           category: language === 'ar' ? 'ديسكتوب' : 'Desktops',
           productSource: 'desktop' as const,
           sourceId: d.id,
+          legacyScanCodes,
           printSpecs: [
             posSku ? `Barcode: ${posSku}` : null,
             d.serialNumber && d.serialNumber !== posSku ? `Serial: ${d.serialNumber}` : null,
@@ -737,7 +751,7 @@ export default function SalesPOS({
         (p) =>
           isSerialInventoryProduct(p) &&
           !!p.serialNumber?.trim() &&
-          codesMatch(p.serialNumber, code),
+          inventoryCodesMatch(p.serialNumber, code),
       );
 
       if (serialExactMatches.length === 1) {
@@ -787,7 +801,18 @@ export default function SalesPOS({
         }
       }
 
-      if (!product) return;
+      if (!product) {
+        e.preventDefault();
+        toast({
+          title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
+          description:
+            language === "ar"
+              ? `لا يوجد منتج لهذا الرمز: ${code}. امسح سيريال الجهاز (مثل LAP-0081) أو اختره من القائمة.`
+              : `No product for code: ${code}. Scan the unit serial (e.g. LAP-0081) or pick from the list.`,
+          variant: "destructive",
+        });
+        return;
+      }
 
       const stockQty = product.stockQuantity || 0;
       const existing = cart.find(item => item.product.id === product.id);
