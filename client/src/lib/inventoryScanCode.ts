@@ -98,6 +98,22 @@ export function inventoryCodesMatch(
   return false;
 }
 
+/** Strict match for serialized laptops/desktops (one scan → one unit). */
+export function serializedUnitMatchesScan(
+  item: InventoryCodeSource,
+  scanned: string,
+): boolean {
+  const fields = [
+    item.serialNumber,
+    item.barcode,
+    item.scanCode,
+  ];
+  return fields.some((f) => {
+    const v = (f ?? "").trim();
+    return v.length > 0 && codesMatch(v, scanned);
+  });
+}
+
 export function inventoryItemMatchesScan(
   item: InventoryCodeSource,
   scanned: string,

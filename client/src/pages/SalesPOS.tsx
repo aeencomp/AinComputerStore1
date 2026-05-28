@@ -15,6 +15,7 @@ import {
   inventoryCodesMatch,
   inventoryItemMatchesScan,
   resolveUniquePosScanCode,
+  serializedUnitMatchesScan,
 } from "@/lib/inventoryScanCode";
 import { formatPosPaymentLabel } from "@/lib/posPayment";
 import { cn } from "@/lib/utils";
@@ -112,15 +113,16 @@ function productMatchesScanCode(product: POSProduct, code: string): boolean {
   if (!isSerialInventoryProduct(product)) {
     return codesMatch(product.sku, code) || codesMatch(product.barcode, code);
   }
-  return inventoryItemMatchesScan(
-    {
-      scanCode: product.scanCode ?? product.sku,
-      barcode: product.barcode,
-      serialNumber: product.serialNumber,
-      partNumber: product.partNumber,
-    },
-    code,
-  );
+  const item = {
+    scanCode: product.scanCode ?? product.sku,
+    barcode: product.barcode,
+    serialNumber: product.serialNumber,
+    partNumber: product.partNumber,
+  };
+  if (product.productSource === "laptop" || product.productSource === "desktop") {
+    return serializedUnitMatchesScan(item, code);
+  }
+  return inventoryItemMatchesScan(item, code);
 }
 
 interface Category {
@@ -411,9 +413,9 @@ export default function SalesPOS({
     ? laptopsRaw
         .filter(l => (l.stockQuantity || 0) >= 0 && l.isActive !== 0)
         .map(l => {
-          const storedScan = getInventoryScanCode(l);
-          const posSku = resolveUniquePosScanCode(l, laptopDuplicateScans);
-          const storedBarcode = (l.barcode || "").trim() || storedScan;
+          const serial = (l.serialNumber || "").trim();
+          const posSku = serial || resolveUniquePosScanCode(l, laptopDuplicateScans);
+          const storedBarcode = serial || (l.barcode || "").trim() || getInventoryScanCode(l);
           const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
           const ramLabel = l.ram && !(l.model || "").toLowerCase().includes((l.ram || "").toLowerCase())
             ? ` ${l.ram}`
@@ -457,9 +459,9 @@ export default function SalesPOS({
     ? desktopsRaw
         .filter(d => (d.stockQuantity || 0) >= 0 && d.isActive !== 0)
         .map(d => {
-          const storedScan = getInventoryScanCode(d);
-          const posSku = resolveUniquePosScanCode(d, desktopDuplicateScans);
-          const storedBarcode = (d.barcode || "").trim() || storedScan;
+          const serial = (d.serialNumber || "").trim();
+          const posSku = serial || resolveUniquePosScanCode(d, desktopDuplicateScans);
+          const storedBarcode = serial || (d.barcode || "").trim() || getInventoryScanCode(d);
           return {
           id: `des-${d.id}`,
           nameAr: `${d.brand} ${d.model || ''}`.trim(),

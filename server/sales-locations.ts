@@ -751,43 +751,31 @@ function inventoryRowGroupKey(
   return `${row.salesLocationId}::${(row.brand || "").toLowerCase()}::${part}::${model}::${wattage}`;
 }
 
-/** Different SKUs must not share one barcode (e.g. T14 8GB vs 16GB). */
-async function repairDistinctBarcodesForDifferentSkus(
+/**
+ * Each laptop/desktop row is one physical unit — barcode must equal serial so
+ * POS scans do not match every unit that shared a model-level group barcode.
+ */
+async function repairSerializedUnitBarcodes(
   table: typeof laptops | typeof desktops,
 ): Promise<number> {
   const rows = await db.select().from(table).where(eq(table.isActive, 1));
-  const byLocAndScan = new Map<string, Array<(typeof rows)[number]>>();
+  let fixed = 0;
 
   for (const row of rows) {
-    const scan = getInventoryScanCode(row).toUpperCase();
-    if (!scan) continue;
-    const bucketKey = `${row.salesLocationId}::${scan}`;
-    const group = byLocAndScan.get(bucketKey) || [];
-    group.push(row);
-    byLocAndScan.set(bucketKey, group);
-  }
-
-  let fixed = 0;
-  for (const [, group] of byLocAndScan) {
-    if (group.length < 2) continue;
-    const skuKeys = new Set(group.map((row) => inventoryRowGroupKey(table, row)));
-    if (skuKeys.size <= 1) continue;
-
-    for (const row of group) {
-      const serial = (row.serialNumber || "").trim();
-      if (!serial) continue;
-      const current = (row.barcode || "").trim();
-      if (current === serial) continue;
-      await db
-        .update(table)
-        .set({ barcode: serial, updatedAt: new Date() })
-        .where(eq(table.id, row.id));
-      fixed++;
-    }
+    const serial = (row.serialNumber || "").trim();
+    if (!serial) continue;
+    if ((row.barcode || "").trim() === serial) continue;
+    await db
+      .update(table)
+      .set({ barcode: serial, updatedAt: new Date() })
+      .where(eq(table.id, row.id));
+    fixed++;
   }
 
   if (fixed > 0) {
-    console.log(`[sales-locations] assigned unique serial barcodes to ${fixed} ${table === laptops ? "laptop" : "desktop"} row(s)`);
+    console.log(
+      `[sales-locations] set serial barcodes on ${fixed} ${table === laptops ? "laptop" : "desktop"} unit(s)`,
+    );
   }
   return fixed;
 }
@@ -1148,18 +1136,21 @@ async function repairWronglyMergedSerialUnits(
 
 /** Merge split transfer rows that share the same scan barcode at one location. */
 export async function repairTransferInventoryDuplicates(): Promise<void> {
-  for (const table of [laptops, desktops, acAdapters] as const) {
+  for (const table of [acAdapters] as const) {
     await alignProductGroupBarcodes(table);
+    await backfillMissingInventoryBarcodes(table);
+  }
+  for (const table of [laptops, desktops] as const) {
     await backfillMissingInventoryBarcodes(table);
   }
   const laptopMerged = await mergeDuplicateInventoryRows(laptops);
   const desktopMerged = await mergeDuplicateInventoryRows(desktops);
   const adapterMerged = await mergeDuplicateInventoryRows(acAdapters);
-  const laptopBarcodes = await repairDistinctBarcodesForDifferentSkus(laptops);
-  const desktopBarcodes = await repairDistinctBarcodesForDifferentSkus(desktops);
+  const laptopBarcodes = await repairSerializedUnitBarcodes(laptops);
+  const desktopBarcodes = await repairSerializedUnitBarcodes(desktops);
   if (laptopBarcodes > 0 || desktopBarcodes > 0) {
     console.log(
-      `[sales-locations] unique serial barcodes: ${laptopBarcodes} laptop(s), ${desktopBarcodes} desktop(s)`,
+      `[sales-locations] serial unit barcodes: ${laptopBarcodes} laptop(s), ${desktopBarcodes} desktop(s)`,
     );
   }
   const total = laptopMerged + desktopMerged + adapterMerged;
@@ -1184,11 +1175,11 @@ export async function repairTransferInventoryDuplicates(): Promise<void> {
   await repairWronglyMergedSerialUnits(laptops, LOCATION_MAIN_ID);
   await repairWronglyMergedSerialUnits(desktops, LOCATION_MAIN_ID);
 
-  const laptopBarcodesFinal = await repairDistinctBarcodesForDifferentSkus(laptops);
-  const desktopBarcodesFinal = await repairDistinctBarcodesForDifferentSkus(desktops);
+  const laptopBarcodesFinal = await repairSerializedUnitBarcodes(laptops);
+  const desktopBarcodesFinal = await repairSerializedUnitBarcodes(desktops);
   if (laptopBarcodesFinal > 0 || desktopBarcodesFinal > 0) {
     console.log(
-      `[sales-locations] post-repair unique barcodes: ${laptopBarcodesFinal} laptop(s), ${desktopBarcodesFinal} desktop(s)`,
+      `[sales-locations] final serial unit barcodes: ${laptopBarcodesFinal} laptop(s), ${desktopBarcodesFinal} desktop(s)`,
     );
   }
 }
