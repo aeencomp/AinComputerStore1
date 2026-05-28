@@ -39,6 +39,8 @@ import {
   normalizeSalesLocationId,
   inferSalesLocationIdFromLegacyLocationText,
   repairTransferInventoryDuplicates,
+  listActiveLaptopsForSalesLocation,
+  listActiveDesktopsForSalesLocation,
 } from "./sales-locations";
 import {
   syncLaptopBatteryToInStore,
@@ -7517,9 +7519,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
         : (salesUserId ? resolveRequestLocationId(req) : null);
-      const rows = locationId && !Number.isNaN(locationId)
-        ? await db.select().from(laptops).where(and(eq(laptops.isActive, 1), eq(laptops.salesLocationId, locationId))).orderBy(desc(laptops.createdAt))
-        : await db.select().from(laptops).where(eq(laptops.isActive, 1)).orderBy(desc(laptops.createdAt));
+      const rows =
+        locationId && !Number.isNaN(locationId)
+          ? await listActiveLaptopsForSalesLocation(locationId)
+          : await db.select().from(laptops).where(eq(laptops.isActive, 1)).orderBy(desc(laptops.createdAt));
       return res.json(
         rows.map((row) => ({
           ...row,
@@ -7675,9 +7678,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
         : (salesUserId ? resolveRequestLocationId(req) : null);
-      const rows = locationId && !Number.isNaN(locationId)
-        ? await db.select().from(desktops).where(and(eq(desktops.isActive, 1), eq(desktops.salesLocationId, locationId))).orderBy(desc(desktops.createdAt))
-        : await db.select().from(desktops).where(eq(desktops.isActive, 1)).orderBy(desc(desktops.createdAt));
+      const rows =
+        locationId && !Number.isNaN(locationId)
+          ? await listActiveDesktopsForSalesLocation(locationId)
+          : await db.select().from(desktops).where(eq(desktops.isActive, 1)).orderBy(desc(desktops.createdAt));
       return res.json(
         rows.map((row) => ({
           ...row,

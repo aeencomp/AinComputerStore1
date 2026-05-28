@@ -1,5 +1,5 @@
 import type { Request } from "express";
-import { and, eq, or, sql } from "drizzle-orm";
+import { and, desc, eq, or, sql } from "drizzle-orm";
 import { db } from "./db";
 import { storage } from "./storage";
 import { syncAcAdapterById } from "./battery-instore-sync";
@@ -47,9 +47,13 @@ export function inferSalesLocationIdFromLegacyLocationText(
     "site 2",
     "الموقع 2",
     "موقع 2",
+    "موقع٢",
     "فرع 2",
     "محل 2",
     "مخزن 2",
+    "main 2",
+    "pos 2",
+    "pos2",
   ]);
   if (exactLoc2.has(t)) return LOCATION_SHOP2_ID;
 
@@ -66,6 +70,17 @@ export function inferSalesLocationIdFromLegacyLocationText(
   }
 
   return null;
+}
+
+/** Shelf label or internal notes that indicate shop 2 (pre–sales_location_id). */
+export function inferInventorySalesLocationHint(row: {
+  location?: string | null;
+  notes?: string | null;
+}): number | null {
+  return (
+    inferSalesLocationIdFromLegacyLocationText(row.location)
+    ?? inferSalesLocationIdFromLegacyLocationText(row.notes)
+  );
 }
 
 export function resolveInventorySalesLocationId(options: {
@@ -447,6 +462,19 @@ async function transferLaptopOrDesktopQuantity(params: {
   }
 
   const stableBarcode = getStableBarcode(row);
+
+  // One serialized unit (e.g. LAP-0064): move the row instead of merging by model at destination.
+  if (quantity === 1 && available === 1 && (row.serialNumber || "").trim()) {
+    await db
+      .update(table)
+      .set({
+        salesLocationId: toLocationId,
+        ...(row.barcode ? {} : { barcode: stableBarcode }),
+        updatedAt: new Date(),
+      })
+      .where(eq(table.id, productId));
+    return row.serialNumber;
+  }
 
   await db
     .update(table)
@@ -930,6 +958,116 @@ async function backfillMissingInventoryBarcodes(
   return updated;
 }
 
+/** Assign row to a sales location without merging into another unit. */
+async function promoteInventoryRowToLocation(
+  table: typeof laptops | typeof desktops,
+  rowId: string,
+  targetLocationId: number,
+): Promise<void> {
+  await db
+    .update(table)
+    .set({ salesLocationId: targetLocationId, updatedAt: new Date() })
+    .where(eq(table.id, rowId));
+}
+
+export async function listActiveLaptopsForSalesLocation(
+  locationId: number,
+): Promise<Array<typeof laptops.$inferSelect>> {
+  if (locationId === LOCATION_SHOP2_ID) {
+    await reactivateInactiveUnitsWithStock(laptops, LOCATION_SHOP2_ID);
+  }
+
+  const primary = await db
+    .select()
+    .from(laptops)
+    .where(and(eq(laptops.isActive, 1), eq(laptops.salesLocationId, locationId)))
+    .orderBy(desc(laptops.createdAt));
+
+  if (locationId !== LOCATION_SHOP2_ID) {
+    return primary;
+  }
+
+  const atMain = await db
+    .select()
+    .from(laptops)
+    .where(and(eq(laptops.isActive, 1), eq(laptops.salesLocationId, LOCATION_MAIN_ID)));
+
+  const seen = new Set(primary.map((r) => r.id));
+  const merged = [...primary];
+  for (const row of atMain) {
+    if (seen.has(row.id)) continue;
+    if (inferInventorySalesLocationHint(row) === LOCATION_SHOP2_ID) {
+      merged.push(row);
+      seen.add(row.id);
+    }
+  }
+  return merged;
+}
+
+export async function listActiveDesktopsForSalesLocation(
+  locationId: number,
+): Promise<Array<typeof desktops.$inferSelect>> {
+  if (locationId === LOCATION_SHOP2_ID) {
+    await reactivateInactiveUnitsWithStock(desktops, LOCATION_SHOP2_ID);
+  }
+
+  const primary = await db
+    .select()
+    .from(desktops)
+    .where(and(eq(desktops.isActive, 1), eq(desktops.salesLocationId, locationId)))
+    .orderBy(desc(desktops.createdAt));
+
+  if (locationId !== LOCATION_SHOP2_ID) {
+    return primary;
+  }
+
+  const atMain = await db
+    .select()
+    .from(desktops)
+    .where(and(eq(desktops.isActive, 1), eq(desktops.salesLocationId, LOCATION_MAIN_ID)));
+
+  const seen = new Set(primary.map((r) => r.id));
+  const merged = [...primary];
+  for (const row of atMain) {
+    if (seen.has(row.id)) continue;
+    if (inferInventorySalesLocationHint(row) === LOCATION_SHOP2_ID) {
+      merged.push(row);
+      seen.add(row.id);
+    }
+  }
+  return merged;
+}
+
+async function reactivateInactiveUnitsWithStock(
+  table: typeof laptops | typeof desktops,
+  locationId: number,
+): Promise<number> {
+  const rows = await db
+    .select()
+    .from(table)
+    .where(
+      and(
+        eq(table.salesLocationId, locationId),
+        eq(table.isActive, 0),
+        sql`${table.stockQuantity} > 0`,
+      ),
+    );
+  let fixed = 0;
+  for (const row of rows) {
+    await db
+      .update(table)
+      .set({ isActive: 1, updatedAt: new Date() })
+      .where(eq(table.id, row.id));
+    fixed++;
+  }
+  if (fixed > 0) {
+    console.log(
+      `[sales-locations] reactivated ${fixed} inactive ${table === laptops ? "laptop" : "desktop"} unit(s) at location ${locationId}`,
+    );
+  }
+  return fixed;
+}
+
 async function moveLegacyInventoryRowToLocation(
   table: typeof laptops | typeof desktops,
   row: (typeof laptops.$inferSelect | typeof desktops.$inferSelect) & {
@@ -998,9 +1136,9 @@ export async function repairLegacyInventorySalesLocations(): Promise<{
     );
 
   for (const row of laptopRows) {
-    const inferred = inferSalesLocationIdFromLegacyLocationText(row.location);
+    const inferred = inferInventorySalesLocationHint(row);
     if (inferred !== LOCATION_SHOP2_ID) continue;
-    await moveLegacyInventoryRowToLocation(laptops, row, LOCATION_SHOP2_ID);
+    await promoteInventoryRowToLocation(laptops, row.id, LOCATION_SHOP2_ID);
     laptopsMoved++;
   }
 
@@ -1016,9 +1154,9 @@ export async function repairLegacyInventorySalesLocations(): Promise<{
     );
 
   for (const row of desktopRows) {
-    const inferred = inferSalesLocationIdFromLegacyLocationText(row.location);
+    const inferred = inferInventorySalesLocationHint(row);
     if (inferred !== LOCATION_SHOP2_ID) continue;
-    await moveLegacyInventoryRowToLocation(desktops, row, LOCATION_SHOP2_ID);
+    await promoteInventoryRowToLocation(desktops, row.id, LOCATION_SHOP2_ID);
     desktopsMoved++;
   }
 
@@ -1029,6 +1167,80 @@ export async function repairLegacyInventorySalesLocations(): Promise<{
   }
 
   return { laptopsMoved, desktopsMoved };
+}
+
+/** Ensure laptops/desktops recorded on transfers to shop 2 are active at location 2. */
+async function repairTransferredUnitsAtShop2(
+  table: typeof laptops | typeof desktops,
+): Promise<number> {
+  const productSource = table === laptops ? "laptop" : "desktop";
+  const transfers = await db
+    .select()
+    .from(stockTransfers)
+    .where(
+      and(
+        eq(stockTransfers.toLocationId, LOCATION_SHOP2_ID),
+        eq(stockTransfers.productSource, productSource),
+      ),
+    );
+
+  let fixed = 0;
+  const touched = new Set<string>();
+
+  for (const transfer of transfers) {
+    const serial = (transfer.serialNumber || "").trim();
+    const candidates: Array<typeof laptops.$inferSelect | typeof desktops.$inferSelect> = [];
+
+    if (transfer.productId) {
+      const [byId] = await db
+        .select()
+        .from(table)
+        .where(eq(table.id, transfer.productId))
+        .limit(1);
+      if (byId) candidates.push(byId);
+    }
+
+    if (serial) {
+      const [bySerial] = await db
+        .select()
+        .from(table)
+        .where(eq(table.serialNumber, serial))
+        .limit(1);
+      if (bySerial && !candidates.some((c) => c.id === bySerial.id)) {
+        candidates.push(bySerial);
+      }
+    }
+
+    for (const row of candidates) {
+      if (touched.has(row.id)) continue;
+      touched.add(row.id);
+
+      const needsLocation = row.salesLocationId !== LOCATION_SHOP2_ID;
+      const needsStock = (row.stockQuantity || 0) < 1;
+      const needsActive = row.isActive !== 1;
+      if (!needsLocation && !needsStock && !needsActive) continue;
+
+      const serialLabel = (row.serialNumber || serial || "").trim();
+      await db
+        .update(table)
+        .set({
+          salesLocationId: LOCATION_SHOP2_ID,
+          isActive: 1,
+          ...(needsStock ? { stockQuantity: 1 } : {}),
+          ...(serialLabel ? { barcode: serialLabel } : {}),
+          updatedAt: new Date(),
+        })
+        .where(eq(table.id, row.id));
+      fixed++;
+    }
+  }
+
+  if (fixed > 0) {
+    console.log(
+      `[sales-locations] transfer destination repair: ${fixed} ${table === laptops ? "laptop" : "desktop"} unit(s) at location 2`,
+    );
+  }
+  return fixed;
 }
 
 /** Reactivate / merge loc-2 rows that were deactivated while stock remained on loc-1 rows. */
@@ -1065,7 +1277,7 @@ async function repairStuckInventoryAfterTransfers(
 
     if (!activeAtMain) continue;
 
-    await moveLegacyInventoryRowToLocation(table, activeAtMain, LOCATION_SHOP2_ID);
+    await promoteInventoryRowToLocation(table, activeAtMain.id, LOCATION_SHOP2_ID);
     fixed++;
   }
 
@@ -1143,8 +1355,6 @@ export async function repairTransferInventoryDuplicates(): Promise<void> {
   for (const table of [laptops, desktops] as const) {
     await backfillMissingInventoryBarcodes(table);
   }
-  const laptopMerged = await mergeDuplicateInventoryRows(laptops);
-  const desktopMerged = await mergeDuplicateInventoryRows(desktops);
   const adapterMerged = await mergeDuplicateInventoryRows(acAdapters);
   const laptopBarcodes = await repairSerializedUnitBarcodes(laptops);
   const desktopBarcodes = await repairSerializedUnitBarcodes(desktops);
@@ -1153,11 +1363,19 @@ export async function repairTransferInventoryDuplicates(): Promise<void> {
       `[sales-locations] serial unit barcodes: ${laptopBarcodes} laptop(s), ${desktopBarcodes} desktop(s)`,
     );
   }
-  const total = laptopMerged + desktopMerged + adapterMerged;
-  if (total > 0) {
-    console.log(`[sales-locations] merged ${total} duplicate inventory row(s) from transfers`);
+  if (adapterMerged > 0) {
+    console.log(`[sales-locations] merged ${adapterMerged} duplicate adapter row(s) from transfers`);
   }
+  await reactivateInactiveUnitsWithStock(laptops, LOCATION_SHOP2_ID);
+  await reactivateInactiveUnitsWithStock(desktops, LOCATION_SHOP2_ID);
   const legacy = await repairLegacyInventorySalesLocations();
+  const laptopsFromTransfers = await repairTransferredUnitsAtShop2(laptops);
+  const desktopsFromTransfers = await repairTransferredUnitsAtShop2(desktops);
+  if (laptopsFromTransfers > 0 || desktopsFromTransfers > 0) {
+    console.log(
+      `[sales-locations] shop-2 transfer rows: ${laptopsFromTransfers} laptop(s), ${desktopsFromTransfers} desktop(s)`,
+    );
+  }
   const laptopsStuck = await repairStuckInventoryAfterTransfers(laptops);
   const desktopsStuck = await repairStuckInventoryAfterTransfers(desktops);
   if (laptopsStuck > 0 || desktopsStuck > 0) {
@@ -1165,11 +1383,6 @@ export async function repairTransferInventoryDuplicates(): Promise<void> {
       `[sales-locations] transfer stuck repair: ${laptopsStuck} laptop(s), ${desktopsStuck} desktop(s)`,
     );
   }
-  if (legacy.laptopsMoved > 0 || legacy.desktopsMoved > 0) {
-    await mergeDuplicateInventoryRows(laptops);
-    await mergeDuplicateInventoryRows(desktops);
-  }
-
   await repairWronglyMergedSerialUnits(laptops, LOCATION_SHOP2_ID);
   await repairWronglyMergedSerialUnits(desktops, LOCATION_SHOP2_ID);
   await repairWronglyMergedSerialUnits(laptops, LOCATION_MAIN_ID);
