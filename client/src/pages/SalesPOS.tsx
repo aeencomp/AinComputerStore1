@@ -843,6 +843,35 @@ export default function SalesPOS({
     });
   };
 
+  const tryAddResolvedScanProduct = (resolved: POSProduct, scannedCode: string): boolean => {
+    const stockQty = resolved.stockQuantity || 0;
+    const existing = cart.find((item) => item.product.id === resolved.id);
+    const currentQty = existing ? existing.quantity : 0;
+    if (stockQty < 1) {
+      toast({
+        title: language === "ar" ? "المخزون صفر" : "Zero stock",
+        description:
+          language === "ar"
+            ? `تم التعرف على: ${resolved.nameAr} — الكمية في النظام 0. حدّث المخزون في إدارة الشواحن ثم أعد المسح.`
+            : `Found: ${resolved.nameAr} — stock is 0. Update quantity in charger inventory, then scan again.`,
+        variant: "destructive",
+      });
+      return false;
+    }
+    if (currentQty + 1 > stockQty) {
+      toast({
+        title: language === "ar" ? "المخزون غير كافٍ" : "Insufficient Stock",
+        description:
+          language === "ar" ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
+        variant: "destructive",
+      });
+      return false;
+    }
+    playBarcodeScanBeep();
+    addToCart(resolved);
+    return true;
+  };
+
   /** Barcode scanner: uses physical key codes so Arabic Windows layout does not break scans. */
   const handlePosSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
@@ -856,6 +885,46 @@ export default function SalesPOS({
         setSearchQuery("");
       }
 
+      if (scanIntent && orderType === "in-store") {
+        e.preventDefault();
+        void (async () => {
+          try {
+            const res = await fetchWithTimeout(
+              `/api/sales/pos/resolve-scan?locationId=${salesLocationId}&code=${encodeURIComponent(code)}`,
+              { credentials: "include" },
+            );
+            if (res.ok) {
+              const data = (await res.json()) as { product?: ServerPosScanProduct };
+              if (data.product && tryAddResolvedScanProduct(posProductFromServerScan(data.product), code)) {
+                setSearchQuery("");
+                return;
+              }
+              if (data.product) return;
+            }
+          } catch {
+            /* fall through to local matching */
+          }
+          runLocalPosScanMatch(code, scanIntent, e);
+        })();
+        return;
+      }
+
+      e.preventDefault();
+      runLocalPosScanMatch(code, scanIntent, e);
+    }
+
+    const next = appendScanKeystroke(scanStateRef.current, e.nativeEvent);
+    scanStateRef.current = next;
+    if (shouldSuppressScanInput(next)) {
+      e.preventDefault();
+    }
+  };
+
+  const runLocalPosScanMatch = (
+    code: string,
+    scanIntent: boolean,
+    e: React.KeyboardEvent<HTMLInputElement>,
+  ) => {
       let scanMatches = productsForScan.filter((p) => productMatchesScanCode(p, code));
 
       if (scanMatches.length === 0 && scanIntent) {
@@ -891,8 +960,8 @@ export default function SalesPOS({
 
       if (serialExactMatches.length === 1) {
         e.preventDefault();
-        addToCart(serialExactMatches[0]);
         setSearchQuery("");
+        tryAddResolvedScanProduct(serialExactMatches[0], code);
         return;
       }
 
@@ -915,48 +984,6 @@ export default function SalesPOS({
       if (!product) {
         e.preventDefault();
         setSearchQuery("");
-        if (scanIntent && orderType === "in-store") {
-          void (async () => {
-            const res = await fetchWithTimeout(
-              `/api/sales/pos/resolve-scan?locationId=${salesLocationId}&code=${encodeURIComponent(code)}`,
-              { credentials: "include" },
-            );
-            if (res.ok) {
-              const data = (await res.json()) as { product?: ServerPosScanProduct };
-              const resolved = data.product
-                ? posProductFromServerScan(data.product)
-                : null;
-              if (resolved) {
-                const stockQty = resolved.stockQuantity || 0;
-                const existing = cart.find((item) => item.product.id === resolved.id);
-                const currentQty = existing ? existing.quantity : 0;
-                if (currentQty >= stockQty) {
-                  toast({
-                    title: language === "ar" ? "المخزون غير كافٍ" : "Insufficient Stock",
-                    description:
-                      language === "ar"
-                        ? `الكمية المتوفرة: ${stockQty}`
-                        : `Available: ${stockQty}`,
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                playBarcodeScanBeep();
-                addToCart(resolved);
-                return;
-              }
-            }
-            toast({
-              title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
-              description:
-                language === "ar"
-                  ? `لا يوجد منتج لهذا الرمز: ${code}. تأكد أن الشاحن مسجّل في الموقع ${salesLocationId} وأن الباركود في النظام يطابق الملصق.`
-                  : `No product for code: ${code}. Ensure the item is registered at location ${salesLocationId} and the system barcode matches the label.`,
-              variant: "destructive",
-            });
-          })();
-          return;
-        }
         toast({
           title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
           description:
@@ -968,31 +995,9 @@ export default function SalesPOS({
         return;
       }
 
-      const stockQty = product.stockQuantity || 0;
-      const existing = cart.find(item => item.product.id === product.id);
-      const currentQty = existing ? existing.quantity : 0;
-      if (currentQty >= stockQty) {
-        e.preventDefault();
-        toast({
-          title: language === 'ar' ? 'المخزون غير كافٍ' : 'Insufficient Stock',
-          description: language === 'ar' ? `الكمية المتوفرة: ${stockQty}` : `Available: ${stockQty}`,
-          variant: 'destructive',
-        });
-        return;
-      }
-
       e.preventDefault();
-      playBarcodeScanBeep();
-      addToCart(product);
       setSearchQuery("");
-      return;
-    }
-
-    const next = appendScanKeystroke(scanStateRef.current, e.nativeEvent);
-    scanStateRef.current = next;
-    if (shouldSuppressScanInput(next)) {
-      e.preventDefault();
-    }
+      tryAddResolvedScanProduct(product, code);
   };
 
   const updateQuantity = (productId: string, delta: number) => {

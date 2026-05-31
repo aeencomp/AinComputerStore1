@@ -113,10 +113,30 @@ export function inventoryCodesMatch(
       ) {
         return true;
       }
+
+      const leadA = extractLeadingInventorySerial(s);
+      const leadB = extractLeadingInventorySerial(b);
+      if (leadA && leadB && leadA === leadB) return true;
+
+      if (a.length >= 7 && c.length >= 7) {
+        if (a.startsWith(c) || c.startsWith(a)) return true;
+      }
     }
   }
 
   return false;
+}
+
+/** Short ADP-0003 style serial when DB has a long label in serial/barcode fields. */
+export function canonicalAdpSerial(
+  serialNumber?: string | null,
+  barcode?: string | null,
+): string | null {
+  for (const raw of [serialNumber, barcode]) {
+    const token = extractLeadingInventorySerial((raw ?? "").trim());
+    if (token?.match(/^ADP-\d+$/i)) return token.toUpperCase();
+  }
+  return null;
 }
 
 export function inventoryItemMatchesScan(

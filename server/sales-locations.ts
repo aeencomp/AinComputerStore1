@@ -16,6 +16,7 @@ import {
   lcds,
 } from "@shared/schema";
 import {
+  canonicalAdpSerial,
   extractLeadingInventorySerial,
   getInventoryScanCode,
   inventoryCodesMatch,
@@ -351,8 +352,10 @@ function inventoryRowMatchesScan(row: InventoryCodeSource, code: string): boolea
 
 function mapAdapterToPosScan(a: typeof acAdapters.$inferSelect): PosScanResolvedProduct {
   const scanCode = getInventoryScanCode(a);
+  const canonicalSerial =
+    canonicalAdpSerial(a.serialNumber, a.barcode) || (a.serialNumber || "").trim();
   const watt = a.wattage != null ? ` ${a.wattage}W` : "";
-  const name = `${a.brand} ${a.serialNumber}${watt}`;
+  const name = `${a.brand} ${canonicalSerial}${watt}`;
   return {
     productSource: "adapter",
     id: `ada-${a.id}`,
@@ -365,7 +368,7 @@ function mapAdapterToPosScan(a: typeof acAdapters.$inferSelect): PosScanResolved
     sku: scanCode,
     barcode: scanCode,
     scanCode,
-    serialNumber: a.serialNumber,
+    serialNumber: canonicalSerial,
     partNumber: a.partNumber ?? null,
     category: "شواحن",
   };
@@ -435,18 +438,17 @@ async function finalizeAdapterAtLocation(
     )
     .limit(1);
 
+  const adapterStock = adapter.stockQuantity ?? 0;
+  const mirrorStock = mirror?.stockQuantity ?? 0;
+  mapped.stockQuantity = Math.max(adapterStock, mirrorStock);
+
   if (mirror) {
-    mapped.stockQuantity = mirror.stockQuantity ?? 0;
     const mirrorBarcode = (mirror.barcode || "").trim();
     if (mirrorBarcode) {
       mapped.barcode = mirrorBarcode;
       mapped.scanCode = mirrorBarcode;
       mapped.sku = mirrorBarcode;
     }
-  } else if (adapter.salesLocationId === locationId) {
-    mapped.stockQuantity = adapter.stockQuantity ?? 0;
-  } else {
-    mapped.stockQuantity = 0;
   }
 
   return mapped;

@@ -21,6 +21,7 @@ import fs from "fs";
 import { startPriceSync, syncPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
 import { normalizeCustomerEmail } from "./auth-email";
 import { runDbMigrations } from "./db-migrations";
+import { canonicalAdpSerial } from "@shared/inventoryScanCode";
 import {
   resolveRequestLocationId,
   getSessionLocationId,
@@ -6756,6 +6757,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           finalSerial = `ADP-${String(next).padStart(4, "0")}`;
           next++;
         } while (used.has(finalSerial.toUpperCase()));
+      } else {
+        const canonical = canonicalAdpSerial(finalSerial, rest.barcode);
+        if (canonical) finalSerial = canonical;
       }
 
       const existing = await storage.getAcAdapterBySerial(finalSerial);
@@ -7102,6 +7106,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error regenerating sequence barcodes:", error);
       return res.status(500).json({ error: "فشل في إعادة توليد الباركود التسلسلي" });
+    }
+  });
+
+  // Fix adapters whose serial_number is a long label instead of ADP-0003
+  app.post("/api/battery/migrations/normalize-adapter-serials", async (req, res) => {
+    try {
+      const batteryUserId = (req.session as any).batteryUserId;
+      if (!batteryUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const currentUser = await storage.getBatteryUser(batteryUserId);
+      if (!currentUser || currentUser.role !== "admin") {
+        return res.status(403).json({ error: "غير مسموح" });
+      }
+
+      const rows = await storage.getAcAdapters();
+      let fixed = 0;
+      for (const a of rows) {
+        const canonical = canonicalAdpSerial(a.serialNumber, a.barcode);
+        if (!canonical) continue;
+        const serial = (a.serialNumber || "").trim();
+        if (serial.toUpperCase() === canonical.toUpperCase()) continue;
+        await storage.updateAcAdapter(a.id, { serialNumber: canonical });
+        await syncAcAdapterById(a.id);
+        fixed++;
+      }
+      return res.json({
+        success: true,
+        message: `Normalized ${fixed} adapter serial numbers to ADP-#### format.`,
+        fixed,
+      });
+    } catch (error) {
+      console.error("Error normalizing adapter serials:", error);
+      return res.status(500).json({ error: "فشل في تصحيح أرقام الشواحن" });
     }
   });
 
