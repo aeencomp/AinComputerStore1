@@ -76,7 +76,12 @@ import {
   Split,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
-import type { InStoreProduct, LaptopBattery, AcAdapter, Keyboard as KeyboardItem, Lcd as LcdItem, Laptop, Desktop } from "@shared/schema";
+import type { InStoreProduct } from "@shared/schema";
+import {
+  isDeprecatedSyncInStoreSku,
+  mapInStoreRowToPosProduct,
+  type InStoreProductType,
+} from "@shared/inStoreProductTypes";
 
 interface POSProduct {
   id: string;
@@ -93,6 +98,7 @@ interface POSProduct {
   serialNumber?: string | null;
   partNumber?: string | null;
   productSource?: 'instore' | 'battery' | 'adapter' | 'keyboard' | 'lcd' | 'laptop' | 'desktop';
+  productType?: InStoreProductType;
   sourceId?: string;
   printSpecs?: string[];
   /** Older sticker / DB barcode when it differs from serial */
@@ -107,9 +113,6 @@ const SERIAL_INVENTORY_SOURCES = new Set<POSProduct["productSource"]>([
   "laptop",
   "desktop",
 ]);
-
-const SYNC_ADAPTER_SKU_PREFIX = "SYNC-ADP:";
-const SYNC_BATTERY_SKU_PREFIX = "SYNC-BAT:";
 
 type ServerPosScanProduct = {
   productSource: POSProduct["productSource"];
@@ -129,6 +132,10 @@ type ServerPosScanProduct = {
 };
 
 function posProductFromServerScan(p: ServerPosScanProduct): POSProduct {
+  const legacyType =
+    p.productSource && p.productSource !== "instore"
+      ? (p.productSource as InStoreProductType)
+      : undefined;
   return {
     id: p.id,
     nameAr: p.nameAr,
@@ -143,12 +150,19 @@ function posProductFromServerScan(p: ServerPosScanProduct): POSProduct {
     partNumber: p.partNumber,
     image: null,
     category: p.category,
-    productSource: p.productSource,
+    productSource: "instore",
+    productType: legacyType,
     sourceId: p.sourceId,
   };
 }
 
+function posCatalogKind(product: POSProduct): string {
+  if (product.productType && product.productType !== "generic") return product.productType;
+  return product.productSource || "instore";
+}
+
 function isSerialInventoryProduct(product: POSProduct): boolean {
+  if (product.productType && product.productType !== "generic") return true;
   return !!product.productSource && SERIAL_INVENTORY_SOURCES.has(product.productSource);
 }
 
@@ -169,7 +183,7 @@ function productMatchesScanCode(product: POSProduct, code: string): boolean {
     serialNumber: product.serialNumber,
     partNumber: product.partNumber,
   };
-  if (product.productSource === "laptop" || product.productSource === "desktop") {
+  if (posCatalogKind(product) === "laptop" || posCatalogKind(product) === "desktop") {
     if (serializedUnitMatchesScan(item, code, product.legacyScanCodes ?? [])) {
       return true;
     }
@@ -273,8 +287,11 @@ export default function SalesPOS({
   });
 
   const locQuery = `?locationId=${salesLocationId}`;
+  /** In-store POS uses unified inventory only (battery portal retired). */
   const includeSource = (s: ProductSourceFilter) =>
-    !productSources || productSources.includes(s);
+    orderType === "in-store"
+      ? s === "instore"
+      : !productSources || productSources.includes(s);
   const invalidatePosStockQueries = () => {
     queryClient.invalidateQueries({
       predicate: (query) => {
@@ -339,239 +356,38 @@ export default function SalesPOS({
     enabled: orderType === 'in-store' && includeSource('desktop'),
   });
 
-  const isLoading = orderType === 'in-store'
-    ? (inStoreLoading || batteriesLoading || adaptersLoading || keyboardsLoading || lcdsLoading || laptopsLoading || desktopsLoading)
-    : mainLoading;
+  const isLoading = orderType === "in-store" ? inStoreLoading : mainLoading;
 
-  const skipSyncedBatteryMirrors =
-    includeSource('battery') || includeSource('adapter');
-
-  const instoreProducts: POSProduct[] = orderType === 'in-store'
+  const instoreProducts: POSProduct[] = orderType === "in-store"
     ? inStoreRaw
-        .filter(p => p.isActive !== 0)
-        .filter(
-          (p) =>
-            !skipSyncedBatteryMirrors ||
-            (!p.sku?.startsWith('SYNC-BAT:') && !p.sku?.startsWith('SYNC-ADP:')),
-        )
-        .map(p => ({
-          id: String(p.id),
-          nameAr: p.nameAr,
-          nameEn: p.nameEn ?? null,
-          price: String(p.price),
-          wholesalePrice: p.wholesalePrice ? String(p.wholesalePrice) : null,
-          stockQuantity: p.stockQuantity,
-          sku: p.sku ?? null,
-          image: null,
-          category: p.category ?? null,
-          barcode: p.barcode ?? null,
-          scanCode: p.barcode ?? null,
-          productSource: 'instore' as const,
-        }))
-    : [];
-
-  const batteryProducts: POSProduct[] = orderType === 'in-store'
-    ? batteriesRaw
-        .filter(b => (b.stockQuantity || 0) >= 0)
-        .map(b => {
-          const scanCode = getInventoryScanCode(b);
+        .filter((p) => p.isActive !== 0)
+        .filter((p) => !isDeprecatedSyncInStoreSku(p.sku))
+        .map((p) => {
+          const mapped = mapInStoreRowToPosProduct({
+            id: p.id,
+            nameAr: p.nameAr,
+            nameEn: p.nameEn,
+            sku: p.sku,
+            barcode: p.barcode,
+            price: String(p.price),
+            wholesalePrice: p.wholesalePrice,
+            stockQuantity: p.stockQuantity,
+            category: p.category,
+            productType: p.productType,
+            specs: p.specs as Record<string, unknown> | null,
+          });
           return {
-          id: `bat-${b.id}`,
-          nameAr: `${b.brand} ${b.serialNumber}`,
-          nameEn: `${b.brand} ${b.serialNumber}`,
-          price: String(b.sellingPrice || '0'),
-          wholesalePrice: b.wholesalePrice ? String(b.wholesalePrice) : null,
-          stockQuantity: b.stockQuantity,
-          sku: scanCode,
-          barcode: scanCode,
-          scanCode,
-          serialNumber: b.serialNumber,
-          partNumber: b.partNumber ?? null,
-          image: null,
-          category: language === 'ar' ? 'بطاريات' : 'Batteries',
-          productSource: 'battery' as const,
-          sourceId: b.id,
-        };
+            ...mapped,
+            image: null,
+            productSource: "instore" as const,
+            productType: mapped.productType,
+          };
         })
     : [];
 
-  const adapterProducts: POSProduct[] = orderType === 'in-store'
-    ? adaptersRaw
-        .filter(a => (a.stockQuantity || 0) >= 0)
-        .map(a => {
-          const scanCode = getInventoryScanCode(a);
-          return {
-          id: `ada-${a.id}`,
-          nameAr: `${a.brand} ${a.serialNumber}${a.wattage ? ` ${a.wattage}W` : ''}`,
-          nameEn: `${a.brand} ${a.serialNumber}${a.wattage ? ` ${a.wattage}W` : ''}`,
-          price: String(a.sellingPrice || '0'),
-          wholesalePrice: a.wholesalePrice ? String(a.wholesalePrice) : null,
-          stockQuantity: a.stockQuantity,
-          sku: scanCode,
-          barcode: scanCode,
-          scanCode,
-          serialNumber: a.serialNumber,
-          partNumber: a.partNumber ?? null,
-          image: null,
-          category: language === 'ar' ? 'شواحن' : 'Chargers',
-          productSource: 'adapter' as const,
-          sourceId: a.id,
-        };
-        })
-    : [];
-
-  const keyboardProducts: POSProduct[] = orderType === 'in-store'
-    ? keyboardsRaw
-        .filter(k => (k.stockQuantity || 0) >= 0)
-        .map(k => {
-          const scanCode = getInventoryScanCode(k);
-          return {
-          id: `kbd-${k.id}`,
-          nameAr: `${k.brand} ${k.serialNumber}`,
-          nameEn: `${k.brand} ${k.serialNumber}`,
-          price: String(k.sellingPrice || '0'),
-          wholesalePrice: k.wholesalePrice ? String(k.wholesalePrice) : null,
-          stockQuantity: k.stockQuantity,
-          sku: scanCode,
-          barcode: scanCode,
-          scanCode,
-          serialNumber: k.serialNumber,
-          partNumber: k.partNumber ?? null,
-          image: null,
-          category: language === 'ar' ? 'كيبورد' : 'Keyboards',
-          productSource: 'keyboard' as const,
-          sourceId: k.id,
-        };
-        })
-    : [];
-
-  const lcdProducts: POSProduct[] = orderType === 'in-store'
-    ? lcdsRaw
-        .filter(l => (l.stockQuantity || 0) >= 0)
-        .map(l => {
-          const scanCode = getInventoryScanCode(l);
-          return {
-          id: `lcd-${l.id}`,
-          nameAr: `${l.brand} ${l.serialNumber}`,
-          nameEn: `${l.brand} ${l.serialNumber}`,
-          price: String(l.sellingPrice || '0'),
-          wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
-          stockQuantity: l.stockQuantity,
-          sku: scanCode,
-          barcode: scanCode,
-          scanCode,
-          serialNumber: l.serialNumber,
-          partNumber: l.partNumber ?? null,
-          image: null,
-          category: language === 'ar' ? 'شاشات LCD' : 'LCDs',
-          productSource: 'lcd' as const,
-          sourceId: l.id,
-        };
-        })
-    : [];
-
-  const laptopDuplicateScans = countDuplicateInventoryScanCodes(
-    laptopsRaw.filter((l) => (l.stockQuantity || 0) >= 0 && l.isActive !== 0),
-  );
-
-  const laptopProducts: POSProduct[] = orderType === 'in-store'
-    ? laptopsRaw
-        .filter(l => (l.stockQuantity || 0) >= 0 && l.isActive !== 0)
-        .map(l => {
-          const serial = (l.serialNumber || "").trim();
-          const dbBarcode = (l.barcode || "").trim();
-          const apiScan = ((l as Laptop & { scanCode?: string }).scanCode || "").trim();
-          const posSku = serial || resolveUniquePosScanCode(l, laptopDuplicateScans);
-          const storedBarcode = dbBarcode || apiScan || serial;
-          const legacyScanCodes = Array.from(
-            new Set([dbBarcode, apiScan, serial, posSku].filter((c) => c && c.length > 0)),
-          );
-          const sizeLabel = l.sizeInch ? ` ${l.sizeInch}"` : "";
-          const ramLabel = l.ram && !(l.model || "").toLowerCase().includes((l.ram || "").toLowerCase())
-            ? ` ${l.ram}`
-            : "";
-          return {
-          id: `lap-${l.id}`,
-          nameAr: `${l.brand} ${l.model || ''}${ramLabel}${sizeLabel}`.trim(),
-          nameEn: `${l.brand} ${l.model || ''}${ramLabel}${sizeLabel}`.trim(),
-          price: String(l.sellingPrice || '0'),
-          wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
-          stockQuantity: l.stockQuantity,
-          sku: posSku,
-          barcode: storedBarcode,
-          scanCode: posSku,
-          serialNumber: l.serialNumber,
-          partNumber: l.partNumber ?? null,
-          image: null,
-          category: language === 'ar' ? 'لابتوبات' : 'Laptops',
-          productSource: 'laptop' as const,
-          sourceId: l.id,
-          legacyScanCodes,
-          printSpecs: [
-            posSku ? `Barcode: ${posSku}` : null,
-            l.serialNumber && l.serialNumber !== posSku ? `Serial: ${l.serialNumber}` : null,
-            storedBarcode !== posSku ? `Scan: ${storedBarcode}` : null,
-            l.cpu ? `CPU: ${l.cpu}` : null,
-            l.ram ? `RAM: ${l.ram}` : null,
-            l.storage ? `Storage: ${l.storage}` : null,
-            l.gpu ? `GPU: ${l.gpu}` : null,
-            l.sizeInch ? `Screen: ${l.sizeInch}"` : null,
-            l.partNumber ? `Part No: ${l.partNumber}` : null,
-          ].filter(Boolean) as string[],
-        };
-        })
-    : [];
-
-  const desktopDuplicateScans = countDuplicateInventoryScanCodes(
-    desktopsRaw.filter((d) => (d.stockQuantity || 0) >= 0 && d.isActive !== 0),
-  );
-
-  const desktopProducts: POSProduct[] = orderType === 'in-store'
-    ? desktopsRaw
-        .filter(d => (d.stockQuantity || 0) >= 0 && d.isActive !== 0)
-        .map(d => {
-          const serial = (d.serialNumber || "").trim();
-          const dbBarcode = (d.barcode || "").trim();
-          const apiScan = ((d as Desktop & { scanCode?: string }).scanCode || "").trim();
-          const posSku = serial || resolveUniquePosScanCode(d, desktopDuplicateScans);
-          const storedBarcode = dbBarcode || apiScan || serial;
-          const legacyScanCodes = Array.from(
-            new Set([dbBarcode, apiScan, serial, posSku].filter((c) => c && c.length > 0)),
-          );
-          return {
-          id: `des-${d.id}`,
-          nameAr: `${d.brand} ${d.model || ''}`.trim(),
-          nameEn: `${d.brand} ${d.model || ''}`.trim(),
-          price: String(d.sellingPrice || '0'),
-          wholesalePrice: d.wholesalePrice ? String(d.wholesalePrice) : null,
-          stockQuantity: d.stockQuantity,
-          sku: posSku,
-          barcode: storedBarcode,
-          scanCode: posSku,
-          serialNumber: d.serialNumber,
-          partNumber: d.partNumber ?? null,
-          image: null,
-          category: language === 'ar' ? 'ديسكتوب' : 'Desktops',
-          productSource: 'desktop' as const,
-          sourceId: d.id,
-          legacyScanCodes,
-          printSpecs: [
-            posSku ? `Barcode: ${posSku}` : null,
-            d.serialNumber && d.serialNumber !== posSku ? `Serial: ${d.serialNumber}` : null,
-            storedBarcode !== posSku ? `Scan: ${storedBarcode}` : null,
-            d.cpu ? `CPU: ${d.cpu}` : null,
-            d.ram ? `RAM: ${d.ram}` : null,
-            d.storage ? `Storage: ${d.storage}` : null,
-            d.gpu ? `GPU: ${d.gpu}` : null,
-            d.partNumber ? `Part No: ${d.partNumber}` : null,
-          ].filter(Boolean) as string[],
-        };
-        })
-    : [];
-
-  const products: POSProduct[] = orderType === 'in-store'
-    ? [...instoreProducts, ...batteryProducts, ...adapterProducts, ...keyboardProducts, ...lcdProducts, ...laptopProducts, ...desktopProducts]
-    : mainProducts.map(p => ({
+  const products: POSProduct[] = orderType === "in-store"
+    ? instoreProducts
+    : mainProducts.map((p) => ({
         id: p.id,
         nameAr: p.nameAr,
         nameEn: p.nameEn ?? null,
@@ -581,49 +397,10 @@ export default function SalesPOS({
         barcode: (p as { barcode?: string | null }).barcode ?? null,
         image: p.image ?? null,
         category: p.category ?? null,
-        productSource: 'instore' as const,
+        productSource: "instore" as const,
       }));
 
-  /** Hidden SYNC-* in-store rows still carry the sticker barcode used at the register. */
-  const syncMirrorScanProducts: POSProduct[] =
-    orderType === "in-store" && skipSyncedBatteryMirrors
-      ? inStoreRaw
-          .filter(
-            (p) =>
-              p.isActive !== 0 &&
-              (p.sku?.startsWith(SYNC_ADAPTER_SKU_PREFIX) ||
-                p.sku?.startsWith(SYNC_BATTERY_SKU_PREFIX)),
-          )
-          .map((p) => {
-            const isAdapter = p.sku?.startsWith(SYNC_ADAPTER_SKU_PREFIX);
-            const sourceId = isAdapter
-              ? p.sku!.slice(SYNC_ADAPTER_SKU_PREFIX.length)
-              : p.sku!.slice(SYNC_BATTERY_SKU_PREFIX.length);
-            const scanCode = (p.barcode || "").trim() || null;
-            return {
-              id: isAdapter ? `ada-${sourceId}` : `bat-${sourceId}`,
-              nameAr: p.nameAr,
-              nameEn: p.nameEn ?? null,
-              price: String(p.price),
-              wholesalePrice: p.wholesalePrice ? String(p.wholesalePrice) : null,
-              stockQuantity: p.stockQuantity,
-              sku: scanCode,
-              barcode: scanCode,
-              scanCode,
-              serialNumber: null,
-              partNumber: null,
-              image: null,
-              category: p.category ?? null,
-              productSource: isAdapter ? ("adapter" as const) : ("battery" as const),
-              sourceId,
-            };
-          })
-      : [];
-
-  const productsForScan: POSProduct[] = [
-    ...products,
-    ...syncMirrorScanProducts.filter((m) => !products.some((p) => p.id === m.id)),
-  ];
+  const productsForScan: POSProduct[] = products;
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
@@ -1080,13 +857,7 @@ export default function SalesPOS({
       nameEn: item.product.nameEn,
       price: getEffectivePrice(item),
       quantity: item.quantity,
-      productSource: item.product.productSource || 'instore',
-      batteryId: item.product.productSource === 'battery' ? item.product.sourceId : undefined,
-      adapterId: item.product.productSource === 'adapter' ? item.product.sourceId : undefined,
-      keyboardId: item.product.productSource === 'keyboard' ? item.product.sourceId : undefined,
-      lcdId: item.product.productSource === 'lcd' ? item.product.sourceId : undefined,
-      laptopId: item.product.productSource === 'laptop' ? item.product.sourceId : undefined,
-      desktopId: item.product.productSource === 'desktop' ? item.product.sourceId : undefined,
+      productSource: orderType === "in-store" ? "instore" : (item.product.productSource || "instore"),
     })),
     customerName: customerName || (language === 'ar' ? 'عميل في المتجر' : 'Walk-in Customer'),
     customerPhone: customerPhone.trim(),
@@ -1583,17 +1354,17 @@ export default function SalesPOS({
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            {product.productSource === 'battery' ? (
+                            {posCatalogKind(product) === 'battery' ? (
                               <Battery className={cn(placeholderIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'adapter' ? (
+                            ) : posCatalogKind(product) === 'adapter' ? (
                               <Plug className={cn(placeholderIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'keyboard' ? (
+                            ) : posCatalogKind(product) === 'keyboard' ? (
                               <Keyboard className={cn(placeholderIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'lcd' ? (
+                            ) : posCatalogKind(product) === 'lcd' ? (
                               <Monitor className={cn(placeholderIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'laptop' ? (
+                            ) : posCatalogKind(product) === 'laptop' ? (
                               <LaptopIcon className={cn(placeholderIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'desktop' ? (
+                            ) : posCatalogKind(product) === 'desktop' ? (
                               <Computer className={cn(placeholderIconClass, "text-primary/40")} />
                             ) : (
                               <Package className={cn(placeholderIconClass, "text-muted-foreground/30")} />
@@ -1612,17 +1383,17 @@ export default function SalesPOS({
                         >
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
-                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd' || product.productSource === 'laptop' || product.productSource === 'desktop') && (
+                        {(posCatalogKind(product) === 'battery' || posCatalogKind(product) === 'adapter' || posCatalogKind(product) === 'keyboard' || posCatalogKind(product) === 'lcd' || posCatalogKind(product) === 'laptop' || posCatalogKind(product) === 'desktop') && (
                           <Badge variant="outline" className="text-[10px]">
-                            {product.productSource === 'battery'
+                            {posCatalogKind(product) === 'battery'
                               ? (language === 'ar' ? 'بطارية' : 'Battery')
-                              : product.productSource === 'adapter'
+                              : posCatalogKind(product) === 'adapter'
                               ? (language === 'ar' ? 'شاحن' : 'Adapter')
-                              : product.productSource === 'keyboard'
+                              : posCatalogKind(product) === 'keyboard'
                               ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
-                              : product.productSource === 'lcd'
+                              : posCatalogKind(product) === 'lcd'
                               ? (language === 'ar' ? 'LCD' : 'LCD')
-                              : product.productSource === 'laptop'
+                              : posCatalogKind(product) === 'laptop'
                               ? (language === 'ar' ? 'لابتوب' : 'Laptop')
                               : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                           </Badge>
@@ -1693,17 +1464,17 @@ export default function SalesPOS({
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center">
-                            {product.productSource === 'battery' ? (
+                            {posCatalogKind(product) === 'battery' ? (
                               <Battery className={cn(listIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'adapter' ? (
+                            ) : posCatalogKind(product) === 'adapter' ? (
                               <Plug className={cn(listIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'keyboard' ? (
+                            ) : posCatalogKind(product) === 'keyboard' ? (
                               <Keyboard className={cn(listIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'lcd' ? (
+                            ) : posCatalogKind(product) === 'lcd' ? (
                               <Monitor className={cn(listIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'laptop' ? (
+                            ) : posCatalogKind(product) === 'laptop' ? (
                               <LaptopIcon className={cn(listIconClass, "text-primary/40")} />
-                            ) : product.productSource === 'desktop' ? (
+                            ) : posCatalogKind(product) === 'desktop' ? (
                               <Computer className={cn(listIconClass, "text-primary/40")} />
                             ) : (
                               <Package className={cn(listIconClass, "text-muted-foreground/30")} />
@@ -1717,17 +1488,17 @@ export default function SalesPOS({
                         <p className={cn("font-semibold truncate", isInStoreCatalog ? "text-xs" : "text-sm")}>
                           {language === 'ar' ? product.nameAr : (product.nameEn || product.nameAr)}
                         </p>
-                        {(product.productSource === 'battery' || product.productSource === 'adapter' || product.productSource === 'keyboard' || product.productSource === 'lcd' || product.productSource === 'laptop' || product.productSource === 'desktop') && (
+                        {(posCatalogKind(product) === 'battery' || posCatalogKind(product) === 'adapter' || posCatalogKind(product) === 'keyboard' || posCatalogKind(product) === 'lcd' || posCatalogKind(product) === 'laptop' || posCatalogKind(product) === 'desktop') && (
                           <Badge variant="outline" className="text-[10px] mb-1">
-                            {product.productSource === 'battery'
+                            {posCatalogKind(product) === 'battery'
                               ? (language === 'ar' ? 'بطارية' : 'Battery')
-                              : product.productSource === 'adapter'
+                              : posCatalogKind(product) === 'adapter'
                               ? (language === 'ar' ? 'شاحن' : 'Adapter')
-                              : product.productSource === 'keyboard'
+                              : posCatalogKind(product) === 'keyboard'
                               ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
-                              : product.productSource === 'lcd'
+                              : posCatalogKind(product) === 'lcd'
                               ? (language === 'ar' ? 'LCD' : 'LCD')
-                              : product.productSource === 'laptop'
+                              : posCatalogKind(product) === 'laptop'
                               ? (language === 'ar' ? 'لابتوب' : 'Laptop')
                               : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                           </Badge>
@@ -1878,17 +1649,17 @@ export default function SalesPOS({
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              {item.product.productSource === 'battery' ? (
+                              {posCatalogKind(item.product) === 'battery' ? (
                                 <Battery className="h-6 w-6 text-primary/40" />
-                              ) : item.product.productSource === 'adapter' ? (
+                              ) : posCatalogKind(item.product) === 'adapter' ? (
                                 <Plug className="h-6 w-6 text-primary/40" />
-                              ) : item.product.productSource === 'keyboard' ? (
+                              ) : posCatalogKind(item.product) === 'keyboard' ? (
                                 <Keyboard className="h-6 w-6 text-primary/40" />
-                              ) : item.product.productSource === 'lcd' ? (
+                              ) : posCatalogKind(item.product) === 'lcd' ? (
                                 <Monitor className="h-6 w-6 text-primary/40" />
-                              ) : item.product.productSource === 'laptop' ? (
+                              ) : posCatalogKind(item.product) === 'laptop' ? (
                                 <LaptopIcon className="h-6 w-6 text-primary/40" />
-                              ) : item.product.productSource === 'desktop' ? (
+                              ) : posCatalogKind(item.product) === 'desktop' ? (
                                 <Computer className="h-6 w-6 text-primary/40" />
                               ) : (
                                 <Package className="h-6 w-6 text-muted-foreground/30" />
@@ -1902,17 +1673,17 @@ export default function SalesPOS({
                           <p className={cn("font-medium line-clamp-1", isInStoreCatalog ? "text-xs" : "text-sm")}>
                             {language === 'ar' ? item.product.nameAr : (item.product.nameEn || item.product.nameAr)}
                           </p>
-                          {(item.product.productSource === 'battery' || item.product.productSource === 'adapter' || item.product.productSource === 'keyboard' || item.product.productSource === 'lcd' || item.product.productSource === 'laptop' || item.product.productSource === 'desktop') && (
+                          {(posCatalogKind(item.product) === 'battery' || posCatalogKind(item.product) === 'adapter' || posCatalogKind(item.product) === 'keyboard' || posCatalogKind(item.product) === 'lcd' || posCatalogKind(item.product) === 'laptop' || posCatalogKind(item.product) === 'desktop') && (
                             <Badge variant="outline" className="text-[10px] mb-0.5">
-                              {item.product.productSource === 'battery'
+                              {posCatalogKind(item.product) === 'battery'
                                 ? (language === 'ar' ? 'بطارية' : 'Battery')
-                                : item.product.productSource === 'adapter'
+                                : posCatalogKind(item.product) === 'adapter'
                                 ? (language === 'ar' ? 'شاحن' : 'Adapter')
-                                : item.product.productSource === 'keyboard'
+                                : posCatalogKind(item.product) === 'keyboard'
                                 ? (language === 'ar' ? 'كيبورد' : 'Keyboard')
-                                : item.product.productSource === 'lcd'
+                                : posCatalogKind(item.product) === 'lcd'
                                 ? (language === 'ar' ? 'LCD' : 'LCD')
-                                : item.product.productSource === 'laptop'
+                                : posCatalogKind(item.product) === 'laptop'
                                 ? (language === 'ar' ? 'لابتوب' : 'Laptop')
                                 : (language === 'ar' ? 'ديسكتوب' : 'Desktop')}
                             </Badge>
@@ -1921,7 +1692,7 @@ export default function SalesPOS({
                             <p className={cn("text-primary font-bold", isInStoreCatalog ? "text-xs" : "text-sm")}>
                               {formatPrice(parseFloat(getEffectivePrice(item)))} × {item.quantity}
                             </p>
-                            {item.product.wholesalePrice && (orderType === 'in-store' || item.product.productSource === 'battery' || item.product.productSource === 'adapter') && (
+                            {item.product.wholesalePrice && (orderType === 'in-store' || posCatalogKind(item.product) === 'battery' || posCatalogKind(item.product) === 'adapter') && (
                               <button
                                 onClick={() => toggleWholesale(item.product.id)}
                                 className={`text-xs px-1.5 py-0.5 rounded font-medium border transition-colors ${

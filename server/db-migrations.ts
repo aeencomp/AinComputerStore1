@@ -69,6 +69,12 @@ const STARTUP_MIGRATIONS: string[] = [
   `UPDATE orders SET payment_status = 'deferred'
      WHERE payment_method = 'deferred'
        AND COALESCE(payment_status, '') <> 'deferred'`,
+
+  `ALTER TABLE in_store_products ADD COLUMN IF NOT EXISTS product_type TEXT NOT NULL DEFAULT 'generic'`,
+  `ALTER TABLE in_store_products ADD COLUMN IF NOT EXISTS specs JSONB`,
+  `ALTER TABLE in_store_products ADD COLUMN IF NOT EXISTS legacy_source TEXT`,
+  `ALTER TABLE in_store_products ADD COLUMN IF NOT EXISTS legacy_id TEXT`,
+  `UPDATE in_store_products SET product_type = 'generic' WHERE product_type IS NULL OR product_type = ''`,
 ];
 
 export async function runDbMigrations(): Promise<void> {

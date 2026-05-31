@@ -35,12 +35,15 @@ export const PCBuilder = lazy(() => import("@/pages/PCBuilder"));
 export const MarketAnalysis = lazy(() => import("@/pages/MarketAnalysis"));
 export const CustomerDashboard = lazy(() => import("@/pages/CustomerDashboard"));
 
-export const BatteryLogin = lazy(() => import("@/pages/BatteryLogin"));
-export const BatteryDashboard = lazy(() => import("@/pages/BatteryDashboard"));
-export const BatteryManage = lazy(() => import("@/pages/BatteryManage"));
-export const BatteryPOS = lazy(() => import("@/pages/BatteryPOS"));
-export const BatterySalesReport = lazy(() => import("@/pages/BatterySalesReport"));
-export const BatteryReceiptPrint = lazy(() => import("@/pages/BatteryReceiptPrint"));
+export const BatteryRedirectInventory = lazy(() =>
+  import("@/pages/BatterySystemRedirect").then((m) => ({ default: m.BatteryRedirectInventory })),
+);
+export const BatteryRedirectPos = lazy(() =>
+  import("@/pages/BatterySystemRedirect").then((m) => ({ default: m.BatteryRedirectPos })),
+);
+export const BatteryRedirectSalesLogin = lazy(() =>
+  import("@/pages/BatterySystemRedirect").then((m) => ({ default: m.BatteryRedirectSalesLogin })),
+);
 
 export const ShopLogin = lazy(() => import("@/pages/shop/ShopLogin"));
 export const ShopDashboard = lazy(() => import("@/pages/shop/ShopDashboard"));

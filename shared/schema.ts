@@ -1273,6 +1273,10 @@ export const inStoreProducts = pgTable("in_store_products", {
   lowStockThreshold: integer("low_stock_threshold").notNull().default(3),
   isActive: integer("is_active").notNull().default(1),
   salesLocationId: integer("sales_location_id").notNull().default(1),
+  productType: text("product_type").notNull().default("generic"),
+  specs: jsonb("specs"),
+  legacySource: text("legacy_source"),
+  legacyId: text("legacy_id"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

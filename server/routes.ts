@@ -22,6 +22,16 @@ import { startPriceSync, syncPrices, getSyncStatus, startDesktopPriceSync, syncD
 import { normalizeCustomerEmail } from "./auth-email";
 import { runDbMigrations } from "./db-migrations";
 import { canonicalAdpSerial } from "@shared/inventoryScanCode";
+import { isInStoreProductType } from "@shared/inStoreProductTypes";
+import {
+  deductInStoreSaleStock,
+  migrateAllSalesLocationsToUnified,
+  migrateBatteryInventoryToUnified,
+  mirrorLegacyStockFromUnified,
+  normalizeUnifiedProductCodes,
+  setInStoreStockQuantity,
+  syncLegacyFromUnifiedProduct,
+} from "./instore-unified";
 import {
   resolveRequestLocationId,
   getSessionLocationId,
@@ -1712,36 +1722,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Update inventory for each item sold
       for (const item of items) {
         try {
-          if (item.productSource === 'battery' && item.batteryId) {
+          if (resolvedOrderType === "in-store") {
+            const rawId = String(item.productId || "").replace(/^inst-/, "");
+            const instoreId = parseInt(rawId, 10);
+            if (!Number.isNaN(instoreId)) {
+              await deductInStoreSaleStock(instoreId, item.quantity);
+              continue;
+            }
+          }
+          if (item.productSource === "battery" && item.batteryId) {
             await db.update(laptopBatteries)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
               .where(eq(laptopBatteries.id, item.batteryId));
             await syncLaptopBatteryById(item.batteryId);
-          } else if (item.productSource === 'adapter' && item.adapterId) {
+          } else if (item.productSource === "adapter" && item.adapterId) {
             await db.update(acAdapters)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
               .where(eq(acAdapters.id, item.adapterId));
             await syncAcAdapterById(item.adapterId);
-          } else if (item.productSource === 'keyboard' && item.keyboardId) {
+          } else if (item.productSource === "keyboard" && item.keyboardId) {
             await db.update(keyboards)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
               .where(eq(keyboards.id, item.keyboardId));
-          } else if (item.productSource === 'lcd' && item.lcdId) {
+          } else if (item.productSource === "lcd" && item.lcdId) {
             await db.update(lcds)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}` })
               .where(eq(lcds.id, item.lcdId));
-          } else if (item.productSource === 'laptop' && item.laptopId) {
+          } else if (item.productSource === "laptop" && item.laptopId) {
             await db.update(laptops)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}`, updatedAt: new Date() })
               .where(eq(laptops.id, item.laptopId));
-          } else if (item.productSource === 'desktop' && item.desktopId) {
+          } else if (item.productSource === "desktop" && item.desktopId) {
             await db.update(desktops)
               .set({ stockQuantity: sql`stock_quantity - ${item.quantity}`, updatedAt: new Date() })
               .where(eq(desktops.id, item.desktopId));
-          } else if (resolvedOrderType === 'in-store') {
-            await storage.adjustInStoreProductStock(parseInt(item.productId), -item.quantity);
+          } else if (resolvedOrderType === "in-store") {
+            await deductInStoreSaleStock(parseInt(item.productId, 10), item.quantity);
           } else {
-            await storage.adjustProductStock(item.productId, -item.quantity, salesUserId, 'walk-in sale', order.orderNumber);
+            await storage.adjustProductStock(item.productId, -item.quantity, salesUserId, "walk-in sale", order.orderNumber);
           }
         } catch (stockError) {
           console.error(`Failed to adjust stock for product ${item.productId}:`, stockError);
@@ -2426,10 +2444,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
       }
-      const product = await storage.createInStoreProduct({
+      const productType = isInStoreProductType((body as any).productType)
+        ? (body as any).productType
+        : "generic";
+      const specs = (body as any).specs && typeof (body as any).specs === "object"
+        ? (body as any).specs
+        : null;
+      const normalizedCodes = normalizeUnifiedProductCodes(
+        productType,
+        specs || {},
+        (body as any).sku,
+        (body as any).barcode,
+      );
+      let product = await storage.createInStoreProduct({
         ...(body as any),
+        productType,
+        specs: normalizedCodes.specs ?? specs,
+        sku: normalizedCodes.sku ?? (body as any).sku,
+        barcode: normalizedCodes.barcode ?? (body as any).barcode,
         salesLocationId: resolvedLocationId,
       });
+      if (productType !== "generic") {
+        await syncLegacyFromUnifiedProduct(product);
+        const refreshed = await storage.getInStoreProductById(product.id);
+        if (refreshed) product = refreshed;
+      }
       return res.json(canViewCost ? product : stripInStoreCostPrice(product));
     } catch (error) {
       console.error("Error creating in-store product:", error);
@@ -2463,8 +2502,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         });
       }
-      const product = await storage.updateInStoreProduct(parseInt(req.params.id), body as any);
+      const productType = isInStoreProductType((body as any).productType)
+        ? (body as any).productType
+        : (existing.productType as string) || "generic";
+      const specs =
+        (body as any).specs && typeof (body as any).specs === "object"
+          ? (body as any).specs
+          : existing.specs;
+      const normalizedCodes = normalizeUnifiedProductCodes(
+        productType,
+        (specs || {}) as Record<string, unknown>,
+        (body as any).sku ?? existing.sku,
+        (body as any).barcode ?? existing.barcode,
+      );
+      let product = await storage.updateInStoreProduct(parseInt(req.params.id), {
+        ...(body as any),
+        productType,
+        specs: normalizedCodes.specs ?? specs,
+        sku: normalizedCodes.sku ?? (body as any).sku,
+        barcode: normalizedCodes.barcode ?? (body as any).barcode,
+      } as any);
       if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
+      if (productType !== "generic") {
+        await syncLegacyFromUnifiedProduct(product);
+        const refreshed = await storage.getInStoreProductById(product.id);
+        if (refreshed) product = refreshed;
+      }
       return res.json(canViewCost ? product : stripInStoreCostPrice(product));
     } catch (error) {
       console.error("Error updating in-store product:", error);
@@ -2501,12 +2564,52 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!(await canManageInStoreLocation(req, existing.salesLocationId ?? LOCATION_MAIN_ID))) {
         return res.status(403).json({ error: "ليس لديك صلاحية تعديل مخزون هذا الموقع" });
       }
-      const product = await storage.adjustInStoreProductStock(parseInt(req.params.id), adjustment);
+      let product = await storage.adjustInStoreProductStock(parseInt(req.params.id), adjustment);
       if (!product) return res.status(404).json({ error: "المنتج غير موجود" });
+      if (product.productType && product.productType !== "generic") {
+        await syncLegacyFromUnifiedProduct(product);
+        const refreshed = await storage.getInStoreProductById(product.id);
+        if (refreshed) product = refreshed;
+      }
       return res.json(product);
     } catch (error) {
       console.error("Error adjusting in-store product stock:", error);
       return res.status(500).json({ error: "فشل تعديل المخزون" });
+    }
+  });
+
+  app.post("/api/instore/migrations/unify-battery-inventory", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const migrateAll = req.body?.allLocations === true;
+      if (migrateAll) {
+        const stats = await migrateAllSalesLocationsToUnified();
+        return res.json({
+          success: true,
+          message: "تم دمج مخزون جميع المواقع في المخزون الموحد",
+          stats,
+        });
+      }
+      const locationId = req.body?.locationId != null
+        ? parseInt(String(req.body.locationId), 10)
+        : resolveRequestLocationId(req);
+      if (Number.isNaN(locationId)) {
+        return res.status(400).json({ error: "موقع غير صالح" });
+      }
+      if (!(await canManageInStoreLocation(req, locationId))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية تعديل مخزون هذا الموقع" });
+      }
+      const stats = await migrateBatteryInventoryToUnified(locationId);
+      return res.json({
+        success: true,
+        message: "تم دمج مخزون البطاريات في المخزون الموحد",
+        stats,
+      });
+    } catch (error) {
+      console.error("Error migrating battery inventory to unified:", error);
+      return res.status(500).json({ error: "فشل دمج المخزون" });
     }
   });
 
@@ -3664,32 +3767,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let updated = 0;
       for (const u of updates) {
         const source = u?.source || "instore";
-        if (source === "instore") {
-          if (typeof u.id === "number") inStoreUpdates.push({ id: u.id, quantity: u.quantity });
-          continue;
-        }
-        if (source === "battery") {
-          const row = await storage.updateLaptopBattery(String(u.id), { stockQuantity: u.quantity });
-          if (row) updated++;
-          continue;
-        }
-        if (source === "adapter") {
-          const row = await storage.updateAcAdapter(String(u.id), { stockQuantity: u.quantity });
-          if (row) updated++;
-          continue;
-        }
-        if (source === "keyboard") {
-          const result = await db.update(keyboards).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(keyboards.id, String(u.id))).returning();
-          if (result.length > 0) updated++;
-          continue;
-        }
-        if (source === "lcd") {
-          const result = await db.update(lcds).set({ stockQuantity: u.quantity, updatedAt: new Date() }).where(eq(lcds.id, String(u.id))).returning();
-          if (result.length > 0) updated++;
-        }
+        const instoreId =
+          typeof u.id === "number" ? u.id : parseInt(String(u.id).replace(/^inst-/, ""), 10);
+        if (source !== "instore" || Number.isNaN(instoreId)) continue;
+        inStoreUpdates.push({ id: instoreId, quantity: u.quantity });
       }
       if (inStoreUpdates.length > 0) {
         updated += await storage.bulkSetInStoreStock(inStoreUpdates);
+        for (const { id } of inStoreUpdates) {
+          const product = await storage.getInStoreProductById(id);
+          if (product) await mirrorLegacyStockFromUnified(product);
+        }
       }
       return res.json({ updated });
     } catch (error) {

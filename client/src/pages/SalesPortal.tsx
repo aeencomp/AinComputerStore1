@@ -645,12 +645,7 @@ export default function SalesPortal() {
           <SalesPOS user={currentUser} orderType="in-store" salesLocationId={1} />
         )}
         {location === "/sales/pos-loc2" && (
-          <SalesPOS
-            user={currentUser}
-            orderType="in-store"
-            salesLocationId={2}
-            productSources={['laptop', 'desktop', 'instore', 'adapter']}
-          />
+          <SalesPOS user={currentUser} orderType="in-store" salesLocationId={2} />
         )}
         {location === "/sales/inventory-loc1" && (
           <SalesInStoreInventory user={currentUser} salesLocationId={1} />

@@ -26,6 +26,12 @@ import {
   type InventoryCodeSource,
 } from "@shared/inventoryScanCode";
 import {
+  instoreRowMatchesScan,
+  isDeprecatedSyncInStoreSku,
+  mapInStoreRowToPosProduct,
+  type InStoreProductRow,
+} from "@shared/inStoreProductTypes";
+import {
   SYNC_ADAPTER_SKU_PREFIX,
   SYNC_BATTERY_SKU_PREFIX,
 } from "./battery-instore-sync";
@@ -241,82 +247,36 @@ export async function searchInventoryAtLocation(
   const query = q.trim().toLowerCase();
   if (!query) return [];
 
-  const [instore, laps, desks, adapterRows] = await Promise.all([
-    db.select().from(inStoreProducts).where(eq(inStoreProducts.salesLocationId, locationId)),
-    db
-      .select()
-      .from(laptops)
-      .where(and(eq(laptops.salesLocationId, locationId), eq(laptops.isActive, 1))),
-    db
-      .select()
-      .from(desktops)
-      .where(and(eq(desktops.salesLocationId, locationId), eq(desktops.isActive, 1))),
-    db
-      .select()
-      .from(acAdapters)
-      .where(and(eq(acAdapters.salesLocationId, locationId), eq(acAdapters.isActive, 1))),
-  ]);
+  const instore = await db
+    .select()
+    .from(inStoreProducts)
+    .where(and(eq(inStoreProducts.salesLocationId, locationId), eq(inStoreProducts.isActive, 1)));
 
   const results: TransferInventoryHit[] = [];
 
   for (const p of instore) {
+    if (isDeprecatedSyncInStoreSku(p.sku)) continue;
     const qty = p.stockQuantity || 0;
     if (qty < 1) continue;
+    const row: InStoreProductRow = {
+      id: p.id,
+      nameAr: p.nameAr,
+      nameEn: p.nameEn,
+      sku: p.sku,
+      barcode: p.barcode,
+      price: String(p.price),
+      stockQuantity: qty,
+      productType: p.productType,
+      specs: p.specs as InStoreProductRow["specs"],
+    };
     const label = `${p.nameAr} ${p.sku || ""} ${p.barcode || ""}`.toLowerCase();
-    if (label.includes(query) || (p.barcode && p.barcode.toLowerCase() === query)) {
+    if (label.includes(query) || instoreRowMatchesScan(row, q)) {
       results.push({
         productSource: "instore",
         productId: String(p.id),
         label: p.nameAr,
         stockQuantity: qty,
         barcode: p.barcode,
-      });
-    }
-  }
-  for (const l of laps) {
-    const qty = l.stockQuantity || 0;
-    if (qty < 1) continue;
-    const label = `${l.brand} ${l.model || ""} ${l.serialNumber} ${l.barcode || ""}`.toLowerCase();
-    if (label.includes(query) || l.serialNumber.toLowerCase() === query) {
-      results.push({
-        productSource: "laptop",
-        productId: l.id,
-        label: `${l.brand} ${l.model || ""} — ${l.serialNumber}`,
-        stockQuantity: qty,
-        barcode: l.barcode,
-      });
-    }
-  }
-  for (const d of desks) {
-    const qty = d.stockQuantity || 0;
-    if (qty < 1) continue;
-    const label = `${d.brand} ${d.model || ""} ${d.serialNumber} ${d.barcode || ""}`.toLowerCase();
-    if (label.includes(query) || d.serialNumber.toLowerCase() === query) {
-      results.push({
-        productSource: "desktop",
-        productId: d.id,
-        label: `${d.brand} ${d.model || ""} — ${d.serialNumber}`,
-        stockQuantity: qty,
-        barcode: d.barcode,
-      });
-    }
-  }
-  for (const a of adapterRows) {
-    const qty = a.stockQuantity || 0;
-    if (qty < 1) continue;
-    const watt = a.wattage != null ? `${a.wattage}w` : "";
-    const label = `${a.brand} ${watt} ${a.serialNumber} ${a.barcode || ""} ${a.partNumber || ""}`.toLowerCase();
-    if (
-      label.includes(query) ||
-      a.serialNumber.toLowerCase() === query ||
-      (a.barcode && a.barcode.toLowerCase() === query)
-    ) {
-      results.push({
-        productSource: "adapter",
-        productId: a.id,
-        label: `${a.brand}${watt ? ` ${watt}` : ""} — ${a.serialNumber}`,
-        stockQuantity: qty,
-        barcode: a.barcode,
       });
     }
   }
@@ -455,21 +415,33 @@ async function finalizeAdapterAtLocation(
 }
 
 function mapInstoreToPosScan(p: typeof inStoreProducts.$inferSelect): PosScanResolvedProduct {
-  const scanCode = (p.barcode || p.sku || "").trim() || null;
+  const mapped = mapInStoreRowToPosProduct({
+    id: p.id,
+    nameAr: p.nameAr,
+    nameEn: p.nameEn,
+    sku: p.sku,
+    barcode: p.barcode,
+    price: String(p.price),
+    wholesalePrice: p.wholesalePrice,
+    stockQuantity: p.stockQuantity ?? 0,
+    category: p.category,
+    productType: p.productType,
+    specs: p.specs as InStoreProductRow["specs"],
+  });
   return {
     productSource: "instore",
-    id: String(p.id),
-    nameAr: p.nameAr,
-    nameEn: p.nameEn ?? null,
-    price: String(p.price),
-    wholesalePrice: p.wholesalePrice ? String(p.wholesalePrice) : null,
-    stockQuantity: p.stockQuantity ?? 0,
-    sku: p.sku ?? null,
-    barcode: p.barcode ?? null,
-    scanCode,
-    serialNumber: null,
-    partNumber: null,
-    category: p.category ?? null,
+    id: mapped.id,
+    nameAr: mapped.nameAr,
+    nameEn: mapped.nameEn,
+    price: mapped.price,
+    wholesalePrice: mapped.wholesalePrice,
+    stockQuantity: mapped.stockQuantity,
+    sku: mapped.sku,
+    barcode: mapped.barcode,
+    scanCode: mapped.scanCode,
+    serialNumber: mapped.serialNumber,
+    partNumber: mapped.partNumber,
+    category: mapped.category,
   };
 }
 
@@ -487,32 +459,19 @@ export async function resolvePosScanAtLocation(
     .where(and(eq(inStoreProducts.salesLocationId, locationId), eq(inStoreProducts.isActive, 1)));
 
   for (const p of instoreRows) {
-    const instoreCodes: InventoryCodeSource = {
+    if (isDeprecatedSyncInStoreSku(p.sku)) continue;
+    const row: InStoreProductRow = {
+      id: p.id,
+      nameAr: p.nameAr,
+      nameEn: p.nameEn,
+      sku: p.sku,
       barcode: p.barcode,
-      serialNumber: p.sku,
-      scanCode: p.barcode,
+      price: String(p.price),
+      stockQuantity: p.stockQuantity ?? 0,
+      productType: p.productType,
+      specs: p.specs as InStoreProductRow["specs"],
     };
-    if (!inventoryRowMatchesScan(instoreCodes, code)) continue;
-
-    if (p.sku?.startsWith(SYNC_ADAPTER_SKU_PREFIX)) {
-      const adapterId = p.sku.slice(SYNC_ADAPTER_SKU_PREFIX.length);
-      const [a] = await db
-        .select()
-        .from(acAdapters)
-        .where(eq(acAdapters.id, adapterId))
-        .limit(1);
-      if (a) return finalizeAdapterAtLocation(a, locationId);
-    }
-    if (p.sku?.startsWith(SYNC_BATTERY_SKU_PREFIX)) {
-      const batteryId = p.sku.slice(SYNC_BATTERY_SKU_PREFIX.length);
-      const [b] = await db
-        .select()
-        .from(laptopBatteries)
-        .where(eq(laptopBatteries.id, batteryId))
-        .limit(1);
-      if (b) return mapBatteryToPosScan(b);
-    }
-
+    if (!instoreRowMatchesScan(row, code)) continue;
     return mapInstoreToPosScan(p);
   }
 

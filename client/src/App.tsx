@@ -88,12 +88,12 @@ function Router() {
         <Route path="/my-orders" component={Lazy.CustomerDashboard} />
         <Route path="/payment/zaincash/callback" component={ZainCashCallback} />
         <Route path="/payment/qicard/callback" component={QiCardCallback} />
-        <Route path="/battery/login" component={Lazy.BatteryLogin} />
-        <Route path="/battery" component={Lazy.BatteryDashboard} />
-        <Route path="/battery/manage" component={Lazy.BatteryManage} />
-        <Route path="/battery/pos" component={Lazy.BatteryPOS} />
-        <Route path="/battery/pos/print" component={Lazy.BatteryReceiptPrint} />
-        <Route path="/battery/reports" component={Lazy.BatterySalesReport} />
+        <Route path="/battery/login" component={Lazy.BatteryRedirectSalesLogin} />
+        <Route path="/battery/manage" component={Lazy.BatteryRedirectInventory} />
+        <Route path="/battery/pos" component={Lazy.BatteryRedirectPos} />
+        <Route path="/battery/pos/print" component={Lazy.BatteryRedirectPos} />
+        <Route path="/battery" component={Lazy.BatteryRedirectInventory} />
+        <Route path="/battery/reports" component={Lazy.BatteryRedirectInventory} />
         <Route path="/portals" component={Portals} />
         <Route path="/shop/login" component={Lazy.ShopLogin} />
         <Route path="/shop/new-request" component={Lazy.ShopNewRepair} />

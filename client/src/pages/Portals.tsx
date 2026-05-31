@@ -62,18 +62,16 @@ export default function Portals() {
     },
     {
       id: "battery",
-      nameAr: "بوابة البطاريات",
-      nameEn: "Battery Portal",
-      descriptionAr: "إدارة البطاريات والشواحن",
-      descriptionEn: "Manage batteries and adapters",
+      nameAr: "مخزون المبيعات (سابقاً بطاريات)",
+      nameEn: "Sales inventory (was Battery)",
+      descriptionAr: "تم دمج البطاريات والشواحن في مخزون الموقع 1",
+      descriptionEn: "Batteries and adapters are now in Sales inventory",
       icon: Battery,
-      loginPath: "/battery/login",
+      loginPath: "/sales",
       color: "bg-amber-500",
       features: [
-        { nameAr: "إدارة البطاريات", nameEn: "Battery Management", icon: Battery },
-        { nameAr: "إدارة الشواحن", nameEn: "Adapter Management", icon: Laptop },
-        { nameAr: "نقطة البيع", nameEn: "Point of Sale", icon: Store },
-        { nameAr: "التقارير", nameEn: "Reports", icon: BarChart3 },
+        { nameAr: "مخزون الموقع 1", nameEn: "Location 1 inventory", icon: Warehouse },
+        { nameAr: "نقطة بيع المعرض", nameEn: "In-store POS", icon: Store },
       ]
     },
     {

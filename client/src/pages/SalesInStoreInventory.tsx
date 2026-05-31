@@ -51,6 +51,21 @@ import {
 } from "lucide-react";
 import QRCode from "qrcode";
 import type { InStoreProduct, LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import {
+  categoryForProductType,
+  defaultUnifiedNameAr,
+  isDeprecatedSyncInStoreSku,
+  isInStoreProductType,
+  productTypeLabel,
+  unifiedInStorePrimaryScanCode,
+  type InStoreProductRow,
+  type InStoreProductSpecs,
+  type InStoreProductType,
+} from "@shared/inStoreProductTypes";
+import {
+  InStoreTypedProductFields,
+  PRODUCT_TYPE_OPTIONS,
+} from "@/components/instore/InStoreTypedProductFields";
 
 interface SalesUser {
   id: string;
@@ -140,6 +155,9 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
   const [activeTab, setActiveTab] = useState<"inventory" | "stockcount">("inventory");
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [typeFilter, setTypeFilter] = useState<"all" | InStoreProductType>("all");
+  const [productType, setProductType] = useState<InStoreProductType>("generic");
+  const [productSpecs, setProductSpecs] = useState<InStoreProductSpecs>({});
   const [inventoryFilter, setInventoryFilter] = useState<"all" | "in-stock" | "low-stock">("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("list");
@@ -285,6 +303,28 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
     onError: (e: any) => toast({ title: e.message, variant: 'destructive' }),
   });
 
+  const migrateUnifiedMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/instore/migrations/unify-battery-inventory", {
+        allLocations: true,
+      });
+      return res.json();
+    },
+    onSuccess: (data: { stats?: { created: number; updated: number } }) => {
+      invalidateInventoryQueries();
+      const s = data.stats;
+      toast({
+        title: language === "ar" ? "تم دمج المخزون" : "Inventory unified",
+        description: s
+          ? language === "ar"
+            ? `جديد: ${s.created} — محدّث: ${s.updated}`
+            : `Created: ${s.created}, updated: ${s.updated}`
+          : undefined,
+      });
+    },
+    onError: (e: Error) => toast({ title: e.message, variant: "destructive" }),
+  });
+
   const stockMutation = useMutation({
     mutationFn: async ({ id, adjustment }: { id: number; adjustment: number }) => {
       const res = await apiRequest('PATCH', `/api/instore/products/${id}/stock`, { adjustment });
@@ -329,6 +369,8 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
   const openAdd = () => {
     setEditingProduct(null);
     setForm(emptyForm);
+    setProductType("generic");
+    setProductSpecs({});
     setImageFile(null);
     setImagePreview(null);
     setShowDialog(true);
@@ -336,6 +378,9 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
 
   const openEdit = (p: InStoreProduct) => {
     setEditingProduct(p);
+    const pt = isInStoreProductType(p.productType) ? p.productType : "generic";
+    setProductType(pt);
+    setProductSpecs((p.specs as InStoreProductSpecs) || {});
     setForm({
       nameAr: p.nameAr,
       nameEn: p.nameEn || "",
@@ -391,10 +436,20 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
   const primaryExactDuplicate = exactDuplicateMatches[0];
 
   const handleSubmit = async () => {
-    if (!form.nameAr.trim() || !form.price.trim()) {
+    const resolvedNameAr =
+      form.nameAr.trim() ||
+      (productType !== "generic" ? defaultUnifiedNameAr(productType, productSpecs) : "");
+    if (!resolvedNameAr || !form.price.trim()) {
       toast({
         title: language === 'ar' ? 'الاسم والسعر مطلوبان' : 'Name and price are required',
         variant: 'destructive',
+      });
+      return;
+    }
+    if (productType === "adapter" && !String(productSpecs.serialNumber || "").trim()) {
+      toast({
+        title: language === "ar" ? "رقم الشاحن (ADP) مطلوب" : "Adapter serial (ADP) is required",
+        variant: "destructive",
       });
       return;
     }
@@ -422,21 +477,24 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
         return;
       }
     }
+    const nameAr = resolvedNameAr;
     const payload: Record<string, unknown> = {
-      nameAr: form.nameAr.trim(),
-      nameEn: form.nameEn.trim() || null,
+      nameAr,
+      nameEn: form.nameEn.trim() || nameAr,
       sku: form.sku.trim() || null,
       barcode: form.barcode.trim() || null,
       price: form.price,
       wholesalePrice: form.wholesalePrice || null,
       bulkWholesalePrice: form.bulkWholesalePrice || null,
-      category: form.category.trim() || null,
+      category: form.category.trim() || categoryForProductType(productType),
       description: form.description.trim() || null,
       image: imageUrl,
       stockQuantity: parseInt(form.stockQuantity) || 0,
       lowStockThreshold: parseInt(form.lowStockThreshold) || 3,
       isActive: 1,
       salesLocationId,
+      productType,
+      specs: productType === "generic" ? null : productSpecs,
     };
     if (canViewCostPrice) {
       payload.costPrice = form.costPrice || null;
@@ -479,6 +537,10 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
 
   const filtered = products.filter(p => {
     if (!matchesInventoryFilter(p)) return false;
+    if (typeFilter !== "all") {
+      const pt = isInStoreProductType(p.productType) ? p.productType : "generic";
+      if (pt !== typeFilter) return false;
+    }
     if (selectedCategory !== "all" && (p.category || "").trim() !== selectedCategory) return false;
 
     const q = searchQuery.trim();
@@ -621,68 +683,48 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     };
   };
 
-  const countProducts: CountableProduct[] = [
-    ...products.map(p => ({
-      id: p.id,
-      source: "instore" as const,
-      nameAr: p.nameAr,
-      nameEn: p.nameEn,
-      serialNumber: null,
-      sku: p.sku,
-      barcode: p.barcode,
-      stockQuantity: p.stockQuantity,
-      salesLocationId: p.salesLocationId,
-    })),
-    ...batteries.map(toCountableBattery),
-    ...adapters.map(toCountableAdapter),
-    ...laptops.map(toCountableLaptop),
-    ...desktops.map(toCountableDesktop),
-    ...keyboards.map(k => {
-      const scanCode = getInventoryScanCode(k);
+  const countProducts: CountableProduct[] = products
+    .filter((p) => p.isActive !== 0)
+    .filter((p) => !isDeprecatedSyncInStoreSku(p.sku))
+    .map((p) => {
+      const row: InStoreProductRow = {
+        id: p.id,
+        nameAr: p.nameAr,
+        nameEn: p.nameEn,
+        sku: p.sku,
+        barcode: p.barcode,
+        price: String(p.price),
+        stockQuantity: p.stockQuantity,
+        productType: p.productType,
+        specs: p.specs as InStoreProductSpecs | null,
+      };
+      const scanCode = unifiedInStorePrimaryScanCode(row) || p.barcode || p.sku;
+      const specs = (p.specs || {}) as InStoreProductSpecs;
+      const serial =
+        typeof specs.serialNumber === "string" ? specs.serialNumber : null;
       return {
-        id: k.id,
-        source: "keyboard" as const,
-        nameAr: `${k.brand} ${k.serialNumber}`,
-        nameEn: `${k.brand} ${k.serialNumber}`,
-        serialNumber: k.serialNumber,
+        id: p.id,
+        source: "instore" as const,
+        nameAr: p.nameAr,
+        nameEn: p.nameEn,
+        serialNumber: serial,
         sku: scanCode,
         barcode: scanCode,
-        stockQuantity: k.stockQuantity || 0,
+        stockQuantity: p.stockQuantity,
+        salesLocationId: p.salesLocationId,
       };
-    }),
-    ...lcds.map(l => {
-      const scanCode = getInventoryScanCode(l);
-      return {
-        id: l.id,
-        source: "lcd" as const,
-        nameAr: `${l.brand} ${l.serialNumber}`,
-        nameEn: `${l.brand} ${l.serialNumber}`,
-        serialNumber: l.serialNumber,
-        sku: scanCode,
-        barcode: scanCode,
-        stockQuantity: l.stockQuantity || 0,
-      };
-    }),
-  ];
+    });
 
-  const globalLookupProducts: CountableProduct[] = [
-    ...countProducts,
-    ...laptopsAll
-      .filter((l) => !laptops.some((x) => x.id === l.id))
-      .map(toCountableLaptop),
-    ...desktopsAll
-      .filter((d) => !desktops.some((x) => x.id === d.id))
-      .map(toCountableDesktop),
-  ];
+  const globalLookupProducts: CountableProduct[] = countProducts;
 
   const countScopeStats = {
-    instore: countProducts.filter(p => p.source === "instore").length,
-    batteries: countProducts.filter(p => p.source === "battery").length,
-    adapters: countProducts.filter(p => p.source === "adapter").length,
-    laptops: countProducts.filter(p => p.source === "laptop").length,
-    desktops: countProducts.filter(p => p.source === "desktop").length,
-    keyboards: countProducts.filter(p => p.source === "keyboard").length,
-    lcds: countProducts.filter(p => p.source === "lcd").length,
+    instore: countProducts.length,
+    batteries: 0,
+    adapters: 0,
+    laptops: 0,
+    desktops: 0,
+    keyboards: 0,
+    lcds: 0,
   };
 
   const findProductByCode = useCallback((code: string): CountableProduct | null => {
@@ -862,10 +904,25 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
           </p>
         </div>
         {activeTab === "inventory" && !readOnly && (
-          <Button onClick={openAdd} data-testid="button-add-instore-product">
-            <Plus className="h-4 w-4 me-2" />
-            {language === 'ar' ? 'إضافة منتج' : 'Add Product'}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              disabled={migrateUnifiedMutation.isPending}
+              onClick={() => migrateUnifiedMutation.mutate()}
+              data-testid="button-unify-battery-inventory"
+            >
+              {migrateUnifiedMutation.isPending ? (
+                <Loader2 className="h-4 w-4 me-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 me-2" />
+              )}
+              {language === "ar" ? "دمج مخزون البطاريات (كل المواقع)" : "Migrate battery stock (all locations)"}
+            </Button>
+            <Button onClick={openAdd} data-testid="button-add-instore-product">
+              <Plus className="h-4 w-4 me-2" />
+              {language === "ar" ? "إضافة منتج" : "Add Product"}
+            </Button>
+          </div>
         )}
       </div>
 
@@ -983,6 +1040,31 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             </div>
           </div>
 
+          {/* Product type filters */}
+          <div className="overflow-x-auto">
+            <div className="flex items-center gap-2 min-w-max pb-1">
+              <Button
+                size="sm"
+                variant={typeFilter === "all" ? "default" : "outline"}
+                onClick={() => setTypeFilter("all")}
+                className="whitespace-nowrap"
+              >
+                {language === "ar" ? "كل الأنواع" : "All types"}
+              </Button>
+              {PRODUCT_TYPE_OPTIONS.filter((t) => t !== "generic").map((t) => (
+                <Button
+                  key={t}
+                  size="sm"
+                  variant={typeFilter === t ? "default" : "outline"}
+                  onClick={() => setTypeFilter(t)}
+                  className="whitespace-nowrap"
+                >
+                  {productTypeLabel(t, language === "ar" ? "ar" : "en")}
+                </Button>
+              ))}
+            </div>
+          </div>
+
           {/* Category quick filters (like POS chips) */}
           <div className="overflow-x-auto">
             <div className="flex items-center gap-2 min-w-max pb-1">
@@ -1055,6 +1137,14 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                         <div className="font-semibold truncate">{product.nameAr}</div>
                         {product.nameEn && <div className="text-xs text-muted-foreground truncate">{product.nameEn}</div>}
                         <div className="flex items-center gap-1 flex-wrap">
+                          {product.productType && product.productType !== "generic" && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {productTypeLabel(
+                                isInStoreProductType(product.productType) ? product.productType : "generic",
+                                language === "ar" ? "ar" : "en",
+                              )}
+                            </Badge>
+                          )}
                           {product.category && <Badge variant="outline" className="text-[10px]">{product.category}</Badge>}
                           {isOut ? (
                             <Badge variant="destructive" className="text-[10px]">{language === 'ar' ? 'نفذ' : 'Out'}</Badge>
@@ -1604,7 +1694,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       )}
 
       {/* Add / Edit Dialog */}
-      <Dialog open={showDialog} onOpenChange={open => { if (!open) { setShowDialog(false); setEditingProduct(null); setForm(emptyForm); setImageFile(null); setImagePreview(null); } }}>
+      <Dialog open={showDialog} onOpenChange={open => { if (!open) { setShowDialog(false); setEditingProduct(null); setForm(emptyForm); setProductType("generic"); setProductSpecs({}); setImageFile(null); setImagePreview(null); } }}>
         <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
@@ -1614,6 +1704,37 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3 pt-2">
+            <div>
+              <Label>{language === "ar" ? "نوع المنتج" : "Product type"}</Label>
+              <select
+                className="mt-1 flex h-9 w-full rounded-md border border-input bg-background px-3 text-sm"
+                value={productType}
+                disabled={!!editingProduct && editingProduct.legacyId != null}
+                onChange={(e) => {
+                  const next = e.target.value as InStoreProductType;
+                  setProductType(next);
+                  if (next !== "generic") {
+                    setForm((f) => ({
+                      ...f,
+                      category: categoryForProductType(next),
+                    }));
+                  }
+                }}
+              >
+                {PRODUCT_TYPE_OPTIONS.map((t) => (
+                  <option key={t} value={t}>
+                    {productTypeLabel(t, language === "ar" ? "ar" : "en")}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <InStoreTypedProductFields
+              productType={productType}
+              specs={productSpecs}
+              onSpecsChange={setProductSpecs}
+              language={language === "ar" ? "ar" : "en"}
+              readOnly={readOnly}
+            />
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <Label>{language === 'ar' ? 'الاسم (عربي) *' : 'Name (Arabic) *'}</Label>
