@@ -108,6 +108,46 @@ const SERIAL_INVENTORY_SOURCES = new Set<POSProduct["productSource"]>([
   "desktop",
 ]);
 
+const SYNC_ADAPTER_SKU_PREFIX = "SYNC-ADP:";
+const SYNC_BATTERY_SKU_PREFIX = "SYNC-BAT:";
+
+type ServerPosScanProduct = {
+  productSource: POSProduct["productSource"];
+  id: string;
+  sourceId?: string;
+  nameAr: string;
+  nameEn: string | null;
+  price: string;
+  wholesalePrice: string | null;
+  stockQuantity: number;
+  sku: string | null;
+  barcode: string | null;
+  scanCode: string | null;
+  serialNumber: string | null;
+  partNumber: string | null;
+  category: string | null;
+};
+
+function posProductFromServerScan(p: ServerPosScanProduct): POSProduct {
+  return {
+    id: p.id,
+    nameAr: p.nameAr,
+    nameEn: p.nameEn,
+    price: p.price,
+    wholesalePrice: p.wholesalePrice,
+    stockQuantity: p.stockQuantity,
+    sku: p.sku,
+    barcode: p.barcode,
+    scanCode: p.scanCode,
+    serialNumber: p.serialNumber,
+    partNumber: p.partNumber,
+    image: null,
+    category: p.category,
+    productSource: p.productSource,
+    sourceId: p.sourceId,
+  };
+}
+
 function isSerialInventoryProduct(product: POSProduct): boolean {
   return !!product.productSource && SERIAL_INVENTORY_SOURCES.has(product.productSource);
 }
@@ -536,6 +576,47 @@ export default function SalesPOS({
         productSource: 'instore' as const,
       }));
 
+  /** Hidden SYNC-* in-store rows still carry the sticker barcode used at the register. */
+  const syncMirrorScanProducts: POSProduct[] =
+    orderType === "in-store" && skipSyncedBatteryMirrors
+      ? inStoreRaw
+          .filter(
+            (p) =>
+              p.isActive !== 0 &&
+              (p.sku?.startsWith(SYNC_ADAPTER_SKU_PREFIX) ||
+                p.sku?.startsWith(SYNC_BATTERY_SKU_PREFIX)),
+          )
+          .map((p) => {
+            const isAdapter = p.sku?.startsWith(SYNC_ADAPTER_SKU_PREFIX);
+            const sourceId = isAdapter
+              ? p.sku!.slice(SYNC_ADAPTER_SKU_PREFIX.length)
+              : p.sku!.slice(SYNC_BATTERY_SKU_PREFIX.length);
+            const scanCode = (p.barcode || "").trim() || null;
+            return {
+              id: isAdapter ? `ada-${sourceId}` : `bat-${sourceId}`,
+              nameAr: p.nameAr,
+              nameEn: p.nameEn ?? null,
+              price: String(p.price),
+              wholesalePrice: p.wholesalePrice ? String(p.wholesalePrice) : null,
+              stockQuantity: p.stockQuantity,
+              sku: scanCode,
+              barcode: scanCode,
+              scanCode,
+              serialNumber: null,
+              partNumber: null,
+              image: null,
+              category: p.category ?? null,
+              productSource: isAdapter ? ("adapter" as const) : ("battery" as const),
+              sourceId,
+            };
+          })
+      : [];
+
+  const productsForScan: POSProduct[] = [
+    ...products,
+    ...syncMirrorScanProducts.filter((m) => !products.some((p) => p.id === m.id)),
+  ];
+
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['/api/categories'],
     enabled: orderType === 'walk-in',
@@ -767,10 +848,10 @@ export default function SalesPOS({
         setSearchQuery("");
       }
 
-      let scanMatches = products.filter((p) => productMatchesScanCode(p, code));
+      let scanMatches = productsForScan.filter((p) => productMatchesScanCode(p, code));
 
       if (scanMatches.length === 0 && scanIntent) {
-        const looseMatches = products.filter((p) => {
+        const looseMatches = productsForScan.filter((p) => {
           if (!p.productSource || !SERIAL_INVENTORY_SOURCES.has(p.productSource)) return false;
           return inventoryItemMatchesScan(
             {
@@ -826,6 +907,50 @@ export default function SalesPOS({
       if (!product) {
         e.preventDefault();
         setSearchQuery("");
+        if (scanIntent && orderType === "in-store") {
+          void (async () => {
+            try {
+              const res = await apiRequest(
+                "GET",
+                `/api/sales/pos/resolve-scan?locationId=${salesLocationId}&code=${encodeURIComponent(code)}`,
+              );
+              const data = (await res.json()) as { product?: ServerPosScanProduct };
+              const resolved = data.product
+                ? posProductFromServerScan(data.product)
+                : null;
+              if (resolved) {
+                const stockQty = resolved.stockQuantity || 0;
+                const existing = cart.find((item) => item.product.id === resolved.id);
+                const currentQty = existing ? existing.quantity : 0;
+                if (currentQty >= stockQty) {
+                  toast({
+                    title: language === "ar" ? "المخزون غير كافٍ" : "Insufficient Stock",
+                    description:
+                      language === "ar"
+                        ? `الكمية المتوفرة: ${stockQty}`
+                        : `Available: ${stockQty}`,
+                    variant: "destructive",
+                  });
+                  return;
+                }
+                playBarcodeScanBeep();
+                addToCart(resolved);
+                return;
+              }
+            } catch {
+              /* fall through to not-found toast */
+            }
+            toast({
+              title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
+              description:
+                language === "ar"
+                  ? `لا يوجد منتج لهذا الرمز: ${code}. امسح سيريال الوحدة (مثل LAP-0081 أو ADP-0003) أو اختره من القائمة.`
+                  : `No product for code: ${code}. Scan the unit serial (e.g. LAP-0081 or ADP-0003) or pick from the list.`,
+              variant: "destructive",
+            });
+          })();
+          return;
+        }
         toast({
           title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
           description:

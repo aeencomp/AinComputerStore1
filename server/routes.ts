@@ -41,6 +41,7 @@ import {
   repairTransferInventoryDuplicates,
   listActiveLaptopsForSalesLocation,
   listActiveDesktopsForSalesLocation,
+  resolvePosScanAtLocation,
 } from "./sales-locations";
 import {
   syncLaptopBatteryToInStore,
@@ -1398,6 +1399,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error searching loc2 inventory:", error);
       return res.status(500).json({ error: "فشل البحث" });
+    }
+  });
+
+  app.get("/api/sales/pos/resolve-scan", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) return res.status(401).json({ error: "غير مصرح" });
+
+      const locationId = resolveRequestLocationId(req);
+      const code = String(req.query.code || "").trim();
+      if (!code) return res.status(400).json({ error: "رمز المسح مطلوب" });
+
+      const product = await resolvePosScanAtLocation(locationId, code);
+      if (!product) {
+        return res.status(404).json({ error: "لم يُعثر على المنتج", code });
+      }
+      return res.json({ product });
+    } catch (error) {
+      console.error("Error resolving POS scan:", error);
+      return res.status(500).json({ error: "فشل البحث عن المنتج" });
     }
   });
 

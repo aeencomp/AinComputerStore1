@@ -11,7 +11,22 @@ import {
   laptops,
   desktops,
   acAdapters,
+  laptopBatteries,
+  keyboards,
+  lcds,
 } from "@shared/schema";
+import {
+  getInventoryScanCode,
+  inventoryItemMatchesScan,
+  normalizeScannedBarcode,
+  type InventoryCodeSource,
+} from "@shared/inventoryScanCode";
+import {
+  SYNC_ADAPTER_SKU_PREFIX,
+  SYNC_BATTERY_SKU_PREFIX,
+} from "./battery-instore-sync";
+
+export { getInventoryScanCode } from "@shared/inventoryScanCode";
 
 export const LOCATION_MAIN_ID = 1;
 export const LOCATION_SHOP2_ID = 2;
@@ -305,16 +320,261 @@ export async function searchInventoryAtLocation(
   return results.slice(0, 40);
 }
 
-/** Scan code that must stay the same when stock moves between locations. */
-export function getInventoryScanCode(row: { barcode?: string | null; serialNumber: string }): string {
-  const barcode = (row.barcode || "").trim();
-  if (barcode) return barcode;
-  return (row.serialNumber || "").trim();
-}
-
 /** @deprecated Use getInventoryScanCode */
 function getStableBarcode(row: { barcode?: string | null; serialNumber: string }): string {
   return getInventoryScanCode(row);
+}
+
+export type PosScanResolvedProduct = {
+  productSource: "instore" | "battery" | "adapter" | "keyboard" | "lcd" | "laptop" | "desktop";
+  id: string;
+  sourceId?: string;
+  nameAr: string;
+  nameEn: string | null;
+  price: string;
+  wholesalePrice: string | null;
+  stockQuantity: number;
+  sku: string | null;
+  barcode: string | null;
+  scanCode: string | null;
+  serialNumber: string | null;
+  partNumber: string | null;
+  category: string | null;
+};
+
+function inventoryRowMatchesScan(row: InventoryCodeSource, code: string): boolean {
+  return inventoryItemMatchesScan(row, code);
+}
+
+function mapAdapterToPosScan(a: typeof acAdapters.$inferSelect): PosScanResolvedProduct {
+  const scanCode = getInventoryScanCode(a);
+  const watt = a.wattage != null ? ` ${a.wattage}W` : "";
+  const name = `${a.brand} ${a.serialNumber}${watt}`;
+  return {
+    productSource: "adapter",
+    id: `ada-${a.id}`,
+    sourceId: a.id,
+    nameAr: name,
+    nameEn: name,
+    price: String(a.sellingPrice || "0"),
+    wholesalePrice: a.wholesalePrice ? String(a.wholesalePrice) : null,
+    stockQuantity: a.stockQuantity ?? 0,
+    sku: scanCode,
+    barcode: scanCode,
+    scanCode,
+    serialNumber: a.serialNumber,
+    partNumber: a.partNumber ?? null,
+    category: "شواحن",
+  };
+}
+
+function mapBatteryToPosScan(b: typeof laptopBatteries.$inferSelect): PosScanResolvedProduct {
+  const scanCode = getInventoryScanCode(b);
+  const name = `${b.brand} ${b.serialNumber}`;
+  return {
+    productSource: "battery",
+    id: `bat-${b.id}`,
+    sourceId: b.id,
+    nameAr: name,
+    nameEn: name,
+    price: String(b.sellingPrice || "0"),
+    wholesalePrice: b.wholesalePrice ? String(b.wholesalePrice) : null,
+    stockQuantity: b.stockQuantity ?? 0,
+    sku: scanCode,
+    barcode: scanCode,
+    scanCode,
+    serialNumber: b.serialNumber,
+    partNumber: b.partNumber ?? null,
+    category: "بطاريات",
+  };
+}
+
+function mapInstoreToPosScan(p: typeof inStoreProducts.$inferSelect): PosScanResolvedProduct {
+  const scanCode = (p.barcode || p.sku || "").trim() || null;
+  return {
+    productSource: "instore",
+    id: String(p.id),
+    nameAr: p.nameAr,
+    nameEn: p.nameEn ?? null,
+    price: String(p.price),
+    wholesalePrice: p.wholesalePrice ? String(p.wholesalePrice) : null,
+    stockQuantity: p.stockQuantity ?? 0,
+    sku: p.sku ?? null,
+    barcode: p.barcode ?? null,
+    scanCode,
+    serialNumber: null,
+    partNumber: null,
+    category: p.category ?? null,
+  };
+}
+
+/** Resolve a barcode/serial scan to a POS line item at a sales location (DB lookup). */
+export async function resolvePosScanAtLocation(
+  locationId: number,
+  scanned: string,
+): Promise<PosScanResolvedProduct | null> {
+  const code = normalizeScannedBarcode(scanned);
+  if (!code) return null;
+
+  const instoreRows = await db
+    .select()
+    .from(inStoreProducts)
+    .where(and(eq(inStoreProducts.salesLocationId, locationId), eq(inStoreProducts.isActive, 1)));
+
+  for (const p of instoreRows) {
+    const instoreCodes: InventoryCodeSource = {
+      barcode: p.barcode,
+      serialNumber: p.sku,
+      scanCode: p.barcode,
+    };
+    if (!inventoryRowMatchesScan(instoreCodes, code)) continue;
+
+    if (p.sku?.startsWith(SYNC_ADAPTER_SKU_PREFIX)) {
+      const adapterId = p.sku.slice(SYNC_ADAPTER_SKU_PREFIX.length);
+      const [a] = await db
+        .select()
+        .from(acAdapters)
+        .where(eq(acAdapters.id, adapterId))
+        .limit(1);
+      if (a) return mapAdapterToPosScan(a);
+    }
+    if (p.sku?.startsWith(SYNC_BATTERY_SKU_PREFIX)) {
+      const batteryId = p.sku.slice(SYNC_BATTERY_SKU_PREFIX.length);
+      const [b] = await db
+        .select()
+        .from(laptopBatteries)
+        .where(eq(laptopBatteries.id, batteryId))
+        .limit(1);
+      if (b) return mapBatteryToPosScan(b);
+    }
+
+    return mapInstoreToPosScan(p);
+  }
+
+  const locActive = and(eq(acAdapters.salesLocationId, locationId), eq(acAdapters.isActive, 1));
+
+  const adapterRows = await db.select().from(acAdapters).where(locActive);
+  for (const a of adapterRows) {
+    if (inventoryRowMatchesScan(a, code)) return mapAdapterToPosScan(a);
+  }
+
+  const batteryRows = await db
+    .select()
+    .from(laptopBatteries)
+    .where(and(eq(laptopBatteries.salesLocationId, locationId), eq(laptopBatteries.isActive, 1)));
+  for (const b of batteryRows) {
+    if (inventoryRowMatchesScan(b, code)) return mapBatteryToPosScan(b);
+  }
+
+  const laptopRows = await db
+    .select()
+    .from(laptops)
+    .where(and(eq(laptops.salesLocationId, locationId), eq(laptops.isActive, 1)));
+  for (const l of laptopRows) {
+    if (inventoryRowMatchesScan(l, code)) {
+      const scanCode = getInventoryScanCode(l);
+      const name = `${l.brand} ${l.model || ""} — ${l.serialNumber}`.trim();
+      return {
+        productSource: "laptop",
+        id: `lap-${l.id}`,
+        sourceId: l.id,
+        nameAr: name,
+        nameEn: name,
+        price: String(l.sellingPrice || "0"),
+        wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
+        stockQuantity: l.stockQuantity ?? 0,
+        sku: scanCode,
+        barcode: l.barcode ?? scanCode,
+        scanCode: l.serialNumber || scanCode,
+        serialNumber: l.serialNumber,
+        partNumber: l.partNumber ?? null,
+        category: "لابتوبات",
+      };
+    }
+  }
+
+  const desktopRows = await db
+    .select()
+    .from(desktops)
+    .where(and(eq(desktops.salesLocationId, locationId), eq(desktops.isActive, 1)));
+  for (const d of desktopRows) {
+    if (inventoryRowMatchesScan(d, code)) {
+      const scanCode = getInventoryScanCode(d);
+      const name = `${d.brand} ${d.model || ""} — ${d.serialNumber}`.trim();
+      return {
+        productSource: "desktop",
+        id: `des-${d.id}`,
+        sourceId: d.id,
+        nameAr: name,
+        nameEn: name,
+        price: String(d.sellingPrice || "0"),
+        wholesalePrice: d.wholesalePrice ? String(d.wholesalePrice) : null,
+        stockQuantity: d.stockQuantity ?? 0,
+        sku: scanCode,
+        barcode: d.barcode ?? scanCode,
+        scanCode: d.serialNumber || scanCode,
+        serialNumber: d.serialNumber,
+        partNumber: d.partNumber ?? null,
+        category: "Desktop",
+      };
+    }
+  }
+
+  const keyboardRows = await db
+    .select()
+    .from(keyboards)
+    .where(and(eq(keyboards.salesLocationId, locationId), eq(keyboards.isActive, 1)));
+  for (const k of keyboardRows) {
+    if (inventoryRowMatchesScan(k, code)) {
+      const scanCode = getInventoryScanCode(k);
+      const name = `${k.brand} ${k.serialNumber}`;
+      return {
+        productSource: "keyboard",
+        id: `kbd-${k.id}`,
+        sourceId: k.id,
+        nameAr: name,
+        nameEn: name,
+        price: String(k.sellingPrice || "0"),
+        wholesalePrice: k.wholesalePrice ? String(k.wholesalePrice) : null,
+        stockQuantity: k.stockQuantity ?? 0,
+        sku: scanCode,
+        barcode: scanCode,
+        scanCode,
+        serialNumber: k.serialNumber,
+        partNumber: k.partNumber ?? null,
+        category: "كيبورد",
+      };
+    }
+  }
+
+  const lcdRows = await db
+    .select()
+    .from(lcds)
+    .where(and(eq(lcds.salesLocationId, locationId), eq(lcds.isActive, 1)));
+  for (const l of lcdRows) {
+    if (inventoryRowMatchesScan(l, code)) {
+      const scanCode = getInventoryScanCode(l);
+      const name = `${l.brand} ${l.serialNumber}`;
+      return {
+        productSource: "lcd",
+        id: `lcd-${l.id}`,
+        sourceId: l.id,
+        nameAr: name,
+        nameEn: name,
+        price: String(l.sellingPrice || "0"),
+        wholesalePrice: l.wholesalePrice ? String(l.wholesalePrice) : null,
+        stockQuantity: l.stockQuantity ?? 0,
+        sku: scanCode,
+        barcode: scanCode,
+        scanCode,
+        serialNumber: l.serialNumber,
+        partNumber: l.partNumber ?? null,
+        category: "شاشات LCD",
+      };
+    }
+  }
+
+  return null;
 }
 
 /** Keep a stable scan barcode when internal serial changes unless the client sends a new barcode. */
