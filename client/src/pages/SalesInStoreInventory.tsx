@@ -14,6 +14,7 @@ import {
   countDuplicateInventoryScanCodes,
   getInventoryScanCode,
   inventoryItemMatchesScan,
+  matchesInventorySearch,
   resolveUniquePosScanCode,
 } from "@/lib/inventoryScanCode";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -200,8 +201,9 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
     enabled: activeTab === "stockcount",
   });
 
+  const adaptersUrl = `/api/battery/adapters?locationId=${salesLocationId}`;
   const { data: adapters = [] } = useQuery<AcAdapter[]>({
-    queryKey: ['/api/battery/adapters'],
+    queryKey: [adaptersUrl],
     enabled: activeTab === "stockcount",
   });
 
@@ -479,11 +481,16 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
     if (!matchesInventoryFilter(p)) return false;
     if (selectedCategory !== "all" && (p.category || "").trim() !== selectedCategory) return false;
 
-    const q = searchQuery.toLowerCase();
-    const matchesSearch = !q || p.nameAr.toLowerCase().includes(q) ||
-      (p.nameEn || '').toLowerCase().includes(q) ||
-      (p.sku || '').toLowerCase().includes(q) ||
-      (p.barcode || '').toLowerCase().includes(q);
+    const q = searchQuery.trim();
+    const matchesSearch =
+      !q ||
+      p.nameAr.toLowerCase().includes(q.toLowerCase()) ||
+      (p.nameEn || "").toLowerCase().includes(q.toLowerCase()) ||
+      matchesInventorySearch(
+        { barcode: p.barcode, serialNumber: p.sku, scanCode: p.barcode },
+        q,
+        [p.nameAr, p.nameEn || ""],
+      );
     if (!matchesSearch) return false;
     
     return true;

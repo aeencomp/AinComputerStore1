@@ -153,3 +153,38 @@ export function inventoryItemMatchesScan(
   if (barcode && inventoryCodesMatch(barcode, scanned)) return true;
   return false;
 }
+
+/** UI search box (Battery Manage, inventory lists) — looser than POS scan. */
+export function matchesInventorySearch(
+  item: InventoryCodeSource,
+  query: string,
+  extraText: string[] = [],
+): boolean {
+  const q = query.trim();
+  if (!q) return true;
+  if (inventoryItemMatchesScan(item, q)) return true;
+
+  const ql = q.toLowerCase();
+  const token = extractLeadingInventorySerial(q);
+  if (token) {
+    for (const field of [item.serialNumber, item.barcode, item.partNumber, item.scanCode]) {
+      const v = (field ?? "").trim();
+      if (!v) continue;
+      if (inventoryCodesMatch(v, token)) return true;
+      const lead = extractLeadingInventorySerial(v);
+      if (lead && lead.toUpperCase() === token.toUpperCase()) return true;
+    }
+  }
+
+  const blob = [item.serialNumber, item.barcode, item.partNumber, item.scanCode, ...extraText]
+    .filter((x) => (x ?? "").trim())
+    .join(" ")
+    .toLowerCase();
+
+  if (blob.includes(ql)) return true;
+
+  const words = ql.split(/\s+/).filter((w) => w.length >= 2);
+  if (words.length > 1 && words.every((w) => blob.includes(w))) return true;
+
+  return false;
+}

@@ -4,6 +4,7 @@ export {
   getInventoryScanCode,
   inventoryCodesMatch,
   inventoryItemMatchesScan,
+  matchesInventorySearch,
   normalizeInventoryCodeKey,
   parseInventorySerialToken,
 } from "@shared/inventoryScanCode";

@@ -51,7 +51,32 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import type { LaptopBattery, AcAdapter, Laptop as LaptopItem, Desktop as DesktopItem, Keyboard as KeyboardItem, Lcd as LcdItem } from "@shared/schema";
+import { matchesInventorySearch } from "@shared/inventoryScanCode";
 import { BrandSelect } from "@/components/BrandSelect";
+
+function adapterMatchesSearch(adapter: AcAdapter, query: string): boolean {
+  return matchesInventorySearch(
+    {
+      serialNumber: adapter.serialNumber,
+      barcode: adapter.barcode,
+      partNumber: adapter.partNumber,
+    },
+    query,
+    [adapter.brand, ...(adapter.compatibleLaptops || []), adapter.wattage?.toString() || ""],
+  );
+}
+
+function batteryMatchesSearch(battery: LaptopBattery, query: string): boolean {
+  return matchesInventorySearch(
+    {
+      serialNumber: battery.serialNumber,
+      barcode: battery.barcode,
+      partNumber: battery.partNumber,
+    },
+    query,
+    [battery.brand, ...(battery.compatibleLaptops || [])],
+  );
+}
 
 type SerialSource = { serialNumber?: string | null; barcode?: string | null };
 
@@ -838,6 +863,30 @@ export default function BatteryManage() {
     },
   });
 
+  const normalizeAdapterSerialsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/battery/migrations/normalize-adapter-serials", {});
+      return res.json();
+    },
+    onSuccess: (result: { fixed?: number }) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/battery/adapters"] });
+      toast({
+        title: language === "ar" ? "تم تصحيح أرقام الشواحن" : "Adapter serials normalized",
+        description:
+          language === "ar"
+            ? `تم تصحيح ${result?.fixed ?? 0} شاحن (مثل ADP-0003)`
+            : `Fixed ${result?.fixed ?? 0} adapter serial(s) to ADP-#### format`,
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: language === "ar" ? "خطأ" : "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    },
+  });
+
   const syncWithInstoreBarcodesMutation = useMutation({
     mutationFn: async () => {
       const res = await apiRequest('POST', '/api/battery/migrations/sync-barcodes-with-instore', {});
@@ -1534,14 +1583,8 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
     }
     
     if (adapterSearchQuery.trim()) {
-      const query = adapterSearchQuery.toLowerCase();
-      filteredAdapters = filteredAdapters.filter(a => 
-        a.serialNumber.toLowerCase().includes(query) ||
-        a.brand.toLowerCase().includes(query) ||
-        a.partNumber?.toLowerCase().includes(query) ||
-        a.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(query)) ||
-        a.wattage?.toString().includes(query)
-      );
+      const query = adapterSearchQuery.trim();
+      filteredAdapters = filteredAdapters.filter((a) => adapterMatchesSearch(a, query));
     }
     
     return filteredAdapters;
@@ -1619,6 +1662,19 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
               <Loader2 className="h-4 w-4 me-2 animate-spin" />
             ) : null}
             {language === 'ar' ? 'توليد باركود تسلسلي' : 'Regenerate Sequence'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => normalizeAdapterSerialsMutation.mutate()}
+            disabled={normalizeAdapterSerialsMutation.isPending}
+            className="border-white/50 text-white hover:bg-green-700"
+            data-testid="button-normalize-adapter-serials"
+          >
+            {normalizeAdapterSerialsMutation.isPending ? (
+              <Loader2 className="h-4 w-4 me-2 animate-spin" />
+            ) : null}
+            {language === "ar" ? "تصحيح سيريال ADP" : "Fix ADP Serials"}
           </Button>
           <Button
             variant="outline"
@@ -1769,19 +1825,12 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       }
                       
                       if (searchQuery.trim()) {
-                        const query = searchQuery.toLowerCase();
-                        filteredBatteries = filteredBatteries.filter(b => 
-                          b.serialNumber.toLowerCase().includes(query) ||
-                          b.brand.toLowerCase().includes(query) ||
-                          b.partNumber?.toLowerCase().includes(query) ||
-                          b.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(query))
+                        const query = searchQuery.trim();
+                        filteredBatteries = filteredBatteries.filter((b) =>
+                          batteryMatchesSearch(b, query),
                         );
-                        // Also search adapters
-                        filteredAdaptersInSearch = adapters.filter(a => 
-                          a.brand.toLowerCase().includes(query) ||
-                          a.serialNumber.toLowerCase().includes(query) ||
-                          a.wattage?.toString().includes(query) ||
-                          a.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(query))
+                        filteredAdaptersInSearch = adapters.filter((a) =>
+                          adapterMatchesSearch(a, query),
                         );
                       }
                       
@@ -2262,14 +2311,25 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                               data-testid={`adapter-item-${adapter.id}`}
                             >
                               <div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <p className="font-bold">{adapter.brand}</p>
                                   {adapter.wattage && (
                                     <Badge variant="outline" className="text-xs">
                                       {adapter.wattage}W
                                     </Badge>
                                   )}
+                                  <Badge variant="secondary" className="text-xs font-mono">
+                                    {language === "ar"
+                                      ? `موقع ${adapter.salesLocationId ?? 1}`
+                                      : `Loc ${adapter.salesLocationId ?? 1}`}
+                                  </Badge>
                                 </div>
+                                <p className="text-xs font-mono text-muted-foreground mt-1">
+                                  {adapter.serialNumber}
+                                  {adapter.barcode && adapter.barcode !== adapter.serialNumber
+                                    ? ` · ${adapter.barcode}`
+                                    : ""}
+                                </p>
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {adapter.compatibleLaptops.slice(0, 3).map((laptop, idx) => (
                                     <Badge key={idx} variant="secondary" className="text-xs">

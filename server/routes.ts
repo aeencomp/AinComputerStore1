@@ -6698,9 +6698,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       let results;
-      if (type === 'serial') {
-        const adapter = await storage.getAcAdapterBySerial(q);
-        results = adapter ? [adapter] : [];
+      if (type === "serial") {
+        const exact = await storage.getAcAdapterBySerial(q);
+        results = exact ? [exact] : await storage.searchAdaptersByLaptopModel(q);
       } else {
         results = await storage.searchAdaptersByLaptopModel(q);
       }

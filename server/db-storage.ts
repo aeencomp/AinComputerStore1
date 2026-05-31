@@ -1209,13 +1209,24 @@ export class DrizzleStorage implements IStorage {
   }
   
   async searchAdaptersByLaptopModel(laptopModel: string): Promise<AcAdapter[]> {
+    const { matchesInventorySearch } = await import("@shared/inventoryScanCode");
     const allAdapters = await db.select().from(acAdapters).where(eq(acAdapters.isActive, 1));
-    const searchLower = laptopModel.toLowerCase();
-    return allAdapters.filter(adapter => 
-      adapter.brand.toLowerCase().includes(searchLower) ||
-      adapter.serialNumber.toLowerCase().includes(searchLower) ||
-      adapter.wattage?.toString().includes(searchLower) ||
-      adapter.compatibleLaptops.some(laptop => laptop.toLowerCase().includes(searchLower))
+    const q = laptopModel.trim();
+    if (!q) return allAdapters;
+    return allAdapters.filter((adapter) =>
+      matchesInventorySearch(
+        {
+          serialNumber: adapter.serialNumber,
+          barcode: adapter.barcode,
+          partNumber: adapter.partNumber,
+        },
+        q,
+        [
+          adapter.brand,
+          ...(adapter.compatibleLaptops || []),
+          adapter.wattage?.toString() || "",
+        ],
+      ),
     );
   }
   
