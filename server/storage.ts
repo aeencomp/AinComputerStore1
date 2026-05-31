@@ -160,6 +160,7 @@ export interface IStorage {
   getAcAdapter(id: string): Promise<AcAdapter | undefined>;
   getAcAdapterBySerial(serialNumber: string): Promise<AcAdapter | undefined>;
   searchAdaptersByLaptopModel(laptopModel: string): Promise<AcAdapter[]>;
+  searchAcAdapters(query: string): Promise<AcAdapter[]>;
   getLowStockAdapters(): Promise<AcAdapter[]>;
   createAcAdapter(adapter: InsertAcAdapter): Promise<AcAdapter>;
   updateAcAdapter(id: string, updates: Partial<InsertAcAdapter>): Promise<AcAdapter | undefined>;

@@ -1209,10 +1209,39 @@ export class DrizzleStorage implements IStorage {
   }
   
   async searchAdaptersByLaptopModel(laptopModel: string): Promise<AcAdapter[]> {
-    const { matchesInventorySearch } = await import("@shared/inventoryScanCode");
-    const allAdapters = await db.select().from(acAdapters).where(eq(acAdapters.isActive, 1));
-    const q = laptopModel.trim();
-    if (!q) return allAdapters;
+    return this.searchAcAdapters(laptopModel);
+  }
+
+  async searchAcAdapters(query: string): Promise<AcAdapter[]> {
+    const q = query.trim();
+    if (!q) return this.getAcAdapters();
+
+    const { matchesInventorySearch, extractLeadingInventorySerial } = await import(
+      "@shared/inventoryScanCode",
+    );
+    const token = extractLeadingInventorySerial(q);
+    const likeQ = `%${q}%`;
+    const sqlConditions = [
+      ilike(acAdapters.serialNumber, likeQ),
+      ilike(acAdapters.barcode, likeQ),
+      ilike(acAdapters.brand, likeQ),
+      ilike(acAdapters.partNumber, likeQ),
+    ];
+    if (token && token.toUpperCase() !== q.toUpperCase()) {
+      const likeToken = `%${token}%`;
+      sqlConditions.push(ilike(acAdapters.serialNumber, likeToken));
+      sqlConditions.push(ilike(acAdapters.barcode, likeToken));
+    }
+
+    const fromSql = await db
+      .select()
+      .from(acAdapters)
+      .where(or(...sqlConditions))
+      .orderBy(desc(acAdapters.createdAt));
+
+    if (fromSql.length > 0) return fromSql;
+
+    const allAdapters = await db.select().from(acAdapters).orderBy(desc(acAdapters.createdAt));
     return allAdapters.filter((adapter) =>
       matchesInventorySearch(
         {

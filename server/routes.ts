@@ -6650,9 +6650,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
 
+      const search =
+        typeof req.query.search === "string" ? req.query.search.trim() : "";
+
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
         : (salesUserId ? resolveRequestLocationId(req) : null);
+
+      if (search) {
+        let rows = await storage.searchAcAdapters(search);
+        if (locationId && !Number.isNaN(locationId)) {
+          rows = rows.filter((a) => a.salesLocationId === locationId);
+        }
+        return res.json(rows);
+      }
+
       if (locationId && !Number.isNaN(locationId)) {
         const rows = await db
           .select()

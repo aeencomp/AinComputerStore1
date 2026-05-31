@@ -390,10 +390,40 @@ export default function BatteryManage() {
     enabled: !!currentUser,
   });
 
-  const { data: adapters = [], isLoading: adaptersLoading } = useQuery<AcAdapter[]>({
-    queryKey: ['/api/battery/adapters'],
-    enabled: !!currentUser,
+  const adapterSearchTerm = adapterSearchQuery.trim();
+  const batteriesTabInventorySearch =
+    activeTab === "batteries" && /^(ADP|BAT|LAP|DES)[\s._-]*\d+/i.test(searchQuery.trim())
+      ? searchQuery.trim()
+      : "";
+  const serverAdapterSearchTerm = adapterSearchTerm || batteriesTabInventorySearch;
+
+  const { data: adaptersAll = [], isLoading: adaptersLoading } = useQuery<AcAdapter[]>({
+    queryKey: ["/api/battery/adapters", "all"],
+    queryFn: async () => {
+      const res = await fetch("/api/battery/adapters", { credentials: "include" });
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!currentUser && !serverAdapterSearchTerm,
   });
+
+  const { data: adaptersSearchResults = [], isLoading: adaptersSearchLoading } = useQuery<
+    AcAdapter[]
+  >({
+    queryKey: ["/api/battery/adapters", "search", serverAdapterSearchTerm],
+    queryFn: async () => {
+      const res = await fetch(
+        `/api/battery/adapters?search=${encodeURIComponent(serverAdapterSearchTerm)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error(await res.text());
+      return res.json();
+    },
+    enabled: !!currentUser && serverAdapterSearchTerm.length >= 2,
+  });
+
+  const adapters = serverAdapterSearchTerm ? adaptersSearchResults : adaptersAll;
+  const adaptersListLoading = serverAdapterSearchTerm ? adaptersSearchLoading : adaptersLoading;
 
   const { data: keyboards = [], isLoading: keyboardsLoading } = useQuery<KeyboardItem[]>({
     queryKey: ['/api/battery/keyboards'],
@@ -1582,11 +1612,12 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
       );
     }
     
-    if (adapterSearchQuery.trim()) {
-      const query = adapterSearchQuery.trim();
-      filteredAdapters = filteredAdapters.filter((a) => adapterMatchesSearch(a, query));
+    if (adapterSearchTerm && !serverAdapterSearchTerm) {
+      filteredAdapters = filteredAdapters.filter((a) =>
+        adapterMatchesSearch(a, adapterSearchTerm),
+      );
     }
-    
+
     return filteredAdapters;
   };
 
@@ -1829,9 +1860,10 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                         filteredBatteries = filteredBatteries.filter((b) =>
                           batteryMatchesSearch(b, query),
                         );
-                        filteredAdaptersInSearch = adapters.filter((a) =>
-                          adapterMatchesSearch(a, query),
-                        );
+                        filteredAdaptersInSearch =
+                          serverAdapterSearchTerm && activeTab === "batteries"
+                            ? adaptersSearchResults
+                            : adaptersAll.filter((a) => adapterMatchesSearch(a, query));
                       }
                       
                       if (filteredBatteries.length === 0 && filteredAdaptersInSearch.length === 0) {
@@ -2283,7 +2315,7 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {adaptersLoading ? (
+                    {adaptersListLoading ? (
                       <div className="flex justify-center py-8">
                         <Loader2 className="h-8 w-8 animate-spin" />
                       </div>
@@ -2296,9 +2328,16 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                       
                       if (filteredAdapters.length === 0) {
                         return (
-                          <p className="text-center text-muted-foreground py-8">
-                            {language === 'ar' ? 'لا توجد نتائج' : 'No results found'}
-                          </p>
+                          <div className="text-center text-muted-foreground py-8 space-y-2">
+                            <p>{language === "ar" ? "لا توجد نتائج" : "No results found"}</p>
+                            {adapterSearchTerm && (
+                              <p className="text-xs">
+                                {language === "ar"
+                                  ? `بحث: ${adapterSearchTerm} — جرّب الباركود الكامل أو زر «تصحيح سيريال ADP» في الأعلى`
+                                  : `Searched: ${adapterSearchTerm} — try full barcode or «Fix ADP Serials» above`}
+                              </p>
+                            )}
+                          </div>
                         );
                       }
                       
