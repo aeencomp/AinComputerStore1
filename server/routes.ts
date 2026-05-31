@@ -9941,6 +9941,102 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/instore/withdrawals/report-by-employee", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+        return res.status(403).json({ error: "ليس لديك صلاحية عرض السحوبات" });
+      }
+
+      const todayBaghdad = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+      const parseDate = (raw: unknown, fallback: string) => {
+        const s = String(raw || "").trim();
+        return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : fallback;
+      };
+      const fromDate = parseDate(req.query.from, todayBaghdad);
+      const toDate = parseDate(req.query.to, todayBaghdad);
+      if (fromDate > toDate) {
+        return res.status(400).json({ error: "تاريخ البداية يجب أن يكون قبل تاريخ النهاية" });
+      }
+
+      const locationId = req.query.locationId != null
+        ? parseInt(String(req.query.locationId), 10)
+        : (salesUserId ? resolveRequestLocationId(req) : null);
+      const employeeFilter = String(req.query.employeeName || "").trim();
+
+      const dateFromClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${fromDate}::date`;
+      const dateToClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date <= ${toDate}::date`;
+      const locClause = locationId && !Number.isNaN(locationId)
+        ? eq(cashWithdrawals.salesLocationId, locationId)
+        : undefined;
+
+      const rows = await db
+        .select()
+        .from(cashWithdrawals)
+        .where(locClause ? and(dateFromClause, dateToClause, locClause) : and(dateFromClause, dateToClause))
+        .orderBy(desc(cashWithdrawals.createdAt));
+
+      type DayAgg = { totalAmount: number; entryCount: number };
+      const byEmployee = new Map<string, Map<string, DayAgg>>();
+      const employeeNames = new Set<string>();
+
+      for (const row of rows) {
+        const name = (row.employeeName || "").trim() || "—";
+        employeeNames.add(name);
+        if (
+          employeeFilter &&
+          name.localeCompare(employeeFilter, undefined, { sensitivity: "accent" }) !== 0
+        ) {
+          continue;
+        }
+        const day = new Date(row.createdAt).toLocaleDateString("en-CA", {
+          timeZone: "Asia/Baghdad",
+        });
+        const amount = parseFloat(String(row.amount)) || 0;
+        if (!byEmployee.has(name)) byEmployee.set(name, new Map());
+        const days = byEmployee.get(name)!;
+        const prev = days.get(day) || { totalAmount: 0, entryCount: 0 };
+        days.set(day, {
+          totalAmount: prev.totalAmount + amount,
+          entryCount: prev.entryCount + 1,
+        });
+      }
+
+      const employees = Array.from(byEmployee.entries())
+        .map(([employeeName, dayMap]) => {
+          const byDate = Array.from(dayMap.entries())
+            .map(([date, agg]) => ({
+              date,
+              totalAmount: agg.totalAmount,
+              entryCount: agg.entryCount,
+            }))
+            .sort((a, b) => b.date.localeCompare(a.date));
+          const totalAmount = byDate.reduce((s, d) => s + d.totalAmount, 0);
+          const entryCount = byDate.reduce((s, d) => s + d.entryCount, 0);
+          return { employeeName, totalAmount, entryCount, byDate };
+        })
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
+      const grandTotal = employees.reduce((s, e) => s + e.totalAmount, 0);
+      const grandCount = employees.reduce((s, e) => s + e.entryCount, 0);
+
+      return res.json({
+        from: fromDate,
+        to: toDate,
+        locationId: locationId && !Number.isNaN(locationId) ? locationId : null,
+        grandTotal,
+        grandCount,
+        employeeNames: Array.from(employeeNames).sort((a, b) => a.localeCompare(b, "ar")),
+        employees,
+      });
+    } catch (err) {
+      console.error("Withdrawals report-by-employee error:", err);
+      return res.status(500).json({ error: "خطأ في تقرير السحوبات" });
+    }
+  });
+
   app.post("/api/instore/withdrawals", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
