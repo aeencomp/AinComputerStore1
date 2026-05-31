@@ -9978,7 +9978,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(locClause ? and(dateFromClause, dateToClause, locClause) : and(dateFromClause, dateToClause))
         .orderBy(desc(cashWithdrawals.createdAt));
 
-      type DayAgg = { totalAmount: number; entryCount: number };
+      type WithdrawalLine = {
+        id: number;
+        amount: number;
+        reason: string | null;
+        createdAt: string;
+      };
+      type DayAgg = {
+        totalAmount: number;
+        entryCount: number;
+        entries: WithdrawalLine[];
+      };
       const byEmployee = new Map<string, Map<string, DayAgg>>();
       const employeeNames = new Set<string>();
 
@@ -9997,10 +10007,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const amount = parseFloat(String(row.amount)) || 0;
         if (!byEmployee.has(name)) byEmployee.set(name, new Map());
         const days = byEmployee.get(name)!;
-        const prev = days.get(day) || { totalAmount: 0, entryCount: 0 };
+        const prev = days.get(day) || { totalAmount: 0, entryCount: 0, entries: [] };
+        const createdAt =
+          row.createdAt instanceof Date
+            ? row.createdAt.toISOString()
+            : String(row.createdAt);
         days.set(day, {
           totalAmount: prev.totalAmount + amount,
           entryCount: prev.entryCount + 1,
+          entries: [
+            ...prev.entries,
+            {
+              id: row.id,
+              amount,
+              reason: row.reason ?? null,
+              createdAt,
+            },
+          ],
         });
       }
 
@@ -10011,6 +10034,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               date,
               totalAmount: agg.totalAmount,
               entryCount: agg.entryCount,
+              entries: agg.entries.sort(
+                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+              ),
             }))
             .sort((a, b) => b.date.localeCompare(a.date));
           const totalAmount = byDate.reduce((s, d) => s + d.totalAmount, 0);

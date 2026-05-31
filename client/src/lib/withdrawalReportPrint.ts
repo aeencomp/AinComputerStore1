@@ -1,5 +1,12 @@
 import { STORE_BRAND_RED, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
 
+export type WithdrawalReportLine = {
+  id: number;
+  amount: number;
+  reason: string | null;
+  createdAt: string;
+};
+
 export type WithdrawalReportPrintData = {
   from: string;
   to: string;
@@ -9,7 +16,12 @@ export type WithdrawalReportPrintData = {
     employeeName: string;
     totalAmount: number;
     entryCount: number;
-    byDate: Array<{ date: string; totalAmount: number; entryCount: number }>;
+    byDate: Array<{
+      date: string;
+      totalAmount: number;
+      entryCount: number;
+      entries: WithdrawalReportLine[];
+    }>;
   }>;
   /** When not "all", show filter line on print */
   employeeFilter?: string;
@@ -26,6 +38,18 @@ const escapeHtml = (s: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+function formatBaghdadTime(iso: string): string {
+  try {
+    return new Date(iso).toLocaleTimeString("ar-IQ", {
+      timeZone: "Asia/Baghdad",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "";
+  }
+}
+
 export function buildWithdrawalReportA4Html(data: WithdrawalReportPrintData): string {
   const printedAt = new Date().toLocaleString("ar-IQ", {
     timeZone: "Asia/Baghdad",
@@ -39,16 +63,31 @@ export function buildWithdrawalReportA4Html(data: WithdrawalReportPrintData): st
 
   const employeeSections = data.employees
     .map((emp) => {
-      const rows = emp.byDate
+      const detailRows = emp.byDate
+        .flatMap((dayRow) =>
+          dayRow.entries.map(
+            (line) => `
+        <tr>
+          <td>${escapeHtml(dayRow.date)}</td>
+          <td style="text-align:center;color:#666">${escapeHtml(formatBaghdadTime(line.createdAt))}</td>
+          <td style="text-align:end;font-weight:600">${fmtNum(line.amount)} IQD</td>
+          <td>${escapeHtml(line.reason?.trim() || "—")}</td>
+        </tr>`,
+          ),
+        )
+        .join("");
+
+      const summaryRows = emp.byDate
         .map(
           (row) => `
-        <tr>
+        <tr class="summary-row">
           <td>${escapeHtml(row.date)}</td>
           <td style="text-align:center">${row.entryCount}</td>
-          <td style="text-align:end;font-weight:600;color:${STORE_BRAND_RED}">${fmtNum(row.totalAmount)} IQD</td>
+          <td colspan="2" style="text-align:end;font-weight:600;color:${STORE_BRAND_RED}">${fmtNum(row.totalAmount)} IQD</td>
         </tr>`,
         )
         .join("");
+
       return `
       <section class="employee-block">
         <div class="employee-head">
@@ -56,16 +95,29 @@ export function buildWithdrawalReportA4Html(data: WithdrawalReportPrintData): st
           <span class="employee-total">${fmtNum(emp.totalAmount)} IQD</span>
         </div>
         <p class="employee-sub">${emp.entryCount} عملية · إجمالي الفترة للموظف</p>
-        <table>
+        <p class="section-label">ملخص يومي</p>
+        <table class="summary-table">
           <thead>
             <tr>
               <th>التاريخ</th>
               <th style="text-align:center">العمليات</th>
-              <th style="text-align:end">المجموع</th>
+              <th colspan="2" style="text-align:end">المجموع اليومي</th>
+            </tr>
+          </thead>
+          <tbody>${summaryRows}</tbody>
+        </table>
+        <p class="section-label">تفاصيل السحوبات (السبب)</p>
+        <table>
+          <thead>
+            <tr>
+              <th>التاريخ</th>
+              <th style="text-align:center">الوقت</th>
+              <th style="text-align:end">المبلغ</th>
+              <th>السبب / الملاحظة</th>
             </tr>
           </thead>
           <tbody>
-            ${rows || `<tr><td colspan="3" style="text-align:center;color:#888">—</td></tr>`}
+            ${detailRows || `<tr><td colspan="4" style="text-align:center;color:#888">—</td></tr>`}
           </tbody>
         </table>
       </section>`;
@@ -109,7 +161,7 @@ export function buildWithdrawalReportA4Html(data: WithdrawalReportPrintData): st
     }
     .summary-box strong { font-size: 18px; color: ${STORE_BRAND_RED}; }
     .employee-block {
-      margin-bottom: 16px;
+      margin-bottom: 18px;
       page-break-inside: avoid;
     }
     .employee-head {
@@ -123,10 +175,17 @@ export function buildWithdrawalReportA4Html(data: WithdrawalReportPrintData): st
     }
     .employee-head h3 { font-size: 14px; font-weight: 700; }
     .employee-total { font-size: 14px; font-weight: 700; color: ${STORE_BRAND_RED}; }
-    .employee-sub { font-size: 11px; color: #666; margin-bottom: 6px; }
-    table { width: 100%; border-collapse: collapse; font-size: 11px; }
-    th, td { border: 1px solid #e5e7eb; padding: 6px 8px; }
+    .employee-sub { font-size: 11px; color: #666; margin-bottom: 8px; }
+    .section-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #555;
+      margin: 8px 0 4px;
+    }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 6px; }
+    th, td { border: 1px solid #e5e7eb; padding: 5px 6px; vertical-align: top; }
     th { background: #f8fafc; font-weight: 600; }
+    tr.summary-row td { background: #fafafa; }
     .footer {
       margin-top: 20px;
       padding-top: 8px;

@@ -53,7 +53,17 @@ interface WithdrawalEmployeeReport {
     employeeName: string;
     totalAmount: number;
     entryCount: number;
-    byDate: Array<{ date: string; totalAmount: number; entryCount: number }>;
+    byDate: Array<{
+      date: string;
+      totalAmount: number;
+      entryCount: number;
+      entries: Array<{
+        id: number;
+        amount: number;
+        reason: string | null;
+        createdAt: string;
+      }>;
+    }>;
   }>;
 }
 
@@ -664,33 +674,49 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
                           </span>
                         </button>
                         {open && (
-                          <div className="mt-3 border-t pt-3 overflow-x-auto">
-                            <table className="w-full text-sm">
-                              <thead>
-                                <tr className="text-muted-foreground border-b">
-                                  <th className="text-start py-2 pe-4">
-                                    {language === "ar" ? "التاريخ" : "Date"}
-                                  </th>
-                                  <th className="text-end py-2 pe-4">
-                                    {language === "ar" ? "العمليات" : "Count"}
-                                  </th>
-                                  <th className="text-end py-2">
-                                    {language === "ar" ? "المجموع" : "Total"}
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {emp.byDate.map((row) => (
-                                  <tr key={row.date} className="border-b border-border/50">
-                                    <td className="py-2 pe-4">{row.date}</td>
-                                    <td className="text-end py-2 pe-4">{row.entryCount}</td>
-                                    <td className="text-end py-2 font-medium text-orange-600">
-                                      {fmt(row.totalAmount)} IQD
-                                    </td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
+                          <div className="mt-3 border-t pt-3 overflow-x-auto space-y-4">
+                            {emp.byDate.map((dayRow) => (
+                              <div key={dayRow.date}>
+                                <div className="flex justify-between text-xs text-muted-foreground mb-1 px-1">
+                                  <span>{dayRow.date}</span>
+                                  <span className="font-medium text-orange-600">
+                                    {fmt(dayRow.totalAmount)} IQD · {dayRow.entryCount}
+                                  </span>
+                                </div>
+                                <table className="w-full text-sm">
+                                  <thead>
+                                    <tr className="text-muted-foreground border-b">
+                                      <th className="text-start py-1.5 pe-2">
+                                        {language === "ar" ? "الوقت" : "Time"}
+                                      </th>
+                                      <th className="text-end py-1.5 pe-2">
+                                        {language === "ar" ? "المبلغ" : "Amount"}
+                                      </th>
+                                      <th className="text-start py-1.5">
+                                        {language === "ar" ? "السبب" : "Reason"}
+                                      </th>
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {dayRow.entries.map((line) => (
+                                      <tr key={line.id} className="border-b border-border/40">
+                                        <td className="py-1.5 pe-2 text-muted-foreground">
+                                          {format(new Date(line.createdAt), "hh:mm a", {
+                                            locale: language === "ar" ? arSA : undefined,
+                                          })}
+                                        </td>
+                                        <td className="text-end py-1.5 pe-2 font-medium">
+                                          {fmt(line.amount)} IQD
+                                        </td>
+                                        <td className="py-1.5 text-muted-foreground">
+                                          {line.reason?.trim() || "—"}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </CardContent>
