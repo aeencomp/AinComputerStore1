@@ -137,7 +137,7 @@ function isBarcodeScanIntent(code: string, hadScanBuffer: boolean): boolean {
   if (hadScanBuffer) return true;
   const c = code.trim();
   if (!c) return false;
-  if (/^(LAP|DES|BAT|ADP|MAC)[\s._-]*\d+/i.test(c)) return true;
+  if (/^(LAP|DES|BAT|ADP|MAC)[\s._-]*\d+(\s|$)/i.test(c)) return true;
   if (/^\d{8,}$/.test(c)) return true;
   return c.length >= 6 && /^[A-Za-z0-9._-]+$/.test(c) && !/\s/.test(c);
 }
@@ -771,7 +771,7 @@ export default function SalesPOS({
 
       if (scanMatches.length === 0 && scanIntent) {
         const looseMatches = products.filter((p) => {
-          if (p.productSource !== "laptop" && p.productSource !== "desktop") return false;
+          if (!p.productSource || !SERIAL_INVENTORY_SOURCES.has(p.productSource)) return false;
           return inventoryItemMatchesScan(
             {
               scanCode: p.scanCode ?? p.sku,
@@ -830,8 +830,8 @@ export default function SalesPOS({
           title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
           description:
             language === "ar"
-              ? `لا يوجد منتج لهذا الرمز: ${code}. امسح سيريال الجهاز (مثل LAP-0081) أو اختره من القائمة.`
-              : `No product for code: ${code}. Scan the unit serial (e.g. LAP-0081) or pick from the list.`,
+              ? `لا يوجد منتج لهذا الرمز: ${code}. امسح سيريال الوحدة (مثل LAP-0081 أو ADP-0003) أو اختره من القائمة.`
+              : `No product for code: ${code}. Scan the unit serial (e.g. LAP-0081 or ADP-0003) or pick from the list.`,
           variant: "destructive",
         });
         return;

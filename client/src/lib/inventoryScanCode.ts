@@ -53,7 +53,7 @@ export function normalizeInventoryCodeKey(code: string): string {
 /** LAP-0008 / lap-008 / lap008 → { prefix: "lap", num: 8 } */
 export function parseInventorySerialToken(code: string): { prefix: string; num: number } | null {
   const raw = normalizeScannedBarcode(code).trim();
-  const labeled = raw.match(/^(LAP|DES|ADP|BAT)[\s._-]*(\d+)$/i);
+  const labeled = raw.match(/^(LAP|DES|ADP|BAT)[\s._-]*(\d+)/i);
   if (labeled) {
     const num = parseInt(labeled[2], 10);
     if (!Number.isNaN(num)) {
@@ -62,7 +62,7 @@ export function parseInventorySerialToken(code: string): { prefix: string; num: 
   }
 
   const compact = normalizeInventoryCodeKey(code);
-  const compactMatch = compact.match(/^(lap|des|adp|bat)(\d+)$/);
+  const compactMatch = compact.match(/^(lap|des|adp|bat)(\d+)/);
   if (compactMatch) {
     const num = parseInt(compactMatch[2], 10);
     if (!Number.isNaN(num)) {
@@ -73,26 +73,52 @@ export function parseInventorySerialToken(code: string): { prefix: string; num: 
   return null;
 }
 
+/**
+ * Sticker / scanner text often appends brand after the serial (e.g. "ADP-0003 DELL").
+ * Returns a canonical LAP/ADP-style token when present.
+ */
+export function extractLeadingInventorySerial(code: string): string | null {
+  const raw = normalizeScannedBarcode(code).trim();
+  const m = raw.match(/^((?:LAP|DES|ADP|BAT)[\s._-]*\d+)/i);
+  if (!m) return null;
+  const token = parseInventorySerialToken(m[1]);
+  if (!token) return m[1].trim();
+  return `${token.prefix.toUpperCase()}-${String(token.num).padStart(4, "0")}`;
+}
+
+function inventoryCodeMatchVariants(code: string): string[] {
+  const trimmed = code.trim();
+  const out = new Set<string>([trimmed]);
+  const leading = extractLeadingInventorySerial(trimmed);
+  if (leading) out.add(leading);
+  return [...out];
+}
+
 export function inventoryCodesMatch(
   stored: string | null | undefined,
   scanned: string,
 ): boolean {
   if (!stored?.trim() || !scanned.trim()) return false;
-  if (codesMatch(stored, scanned)) return true;
 
-  const a = normalizeInventoryCodeKey(stored);
-  const b = normalizeInventoryCodeKey(scanned);
-  if (a && b && a === b) return true;
+  for (const s of inventoryCodeMatchVariants(stored)) {
+    for (const b of inventoryCodeMatchVariants(scanned)) {
+      if (codesMatch(s, b)) return true;
 
-  const storedToken = parseInventorySerialToken(stored);
-  const scannedToken = parseInventorySerialToken(scanned);
-  if (
-    storedToken &&
-    scannedToken &&
-    storedToken.prefix === scannedToken.prefix &&
-    storedToken.num === scannedToken.num
-  ) {
-    return true;
+      const a = normalizeInventoryCodeKey(s);
+      const c = normalizeInventoryCodeKey(b);
+      if (a && c && a === c) return true;
+
+      const storedToken = parseInventorySerialToken(s);
+      const scannedToken = parseInventorySerialToken(b);
+      if (
+        storedToken &&
+        scannedToken &&
+        storedToken.prefix === scannedToken.prefix &&
+        storedToken.num === scannedToken.num
+      ) {
+        return true;
+      }
+    }
   }
 
   return false;
