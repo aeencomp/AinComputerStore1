@@ -29,9 +29,11 @@ import {
   BarChart3,
   ChevronDown,
   ChevronRight,
+  Printer,
 } from "lucide-react";
 import { format } from "date-fns";
 import { arSA } from "date-fns/locale";
+import { openWithdrawalReportA4Print } from "@/lib/withdrawalReportPrint";
 
 interface CashWithdrawal {
   id: number;
@@ -268,10 +270,30 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
 
   const totalWithdrawn = withdrawals.reduce((s, w) => s + parseFloat(w.amount), 0);
 
-  const fmt = (n: number) => Math.round(n).toString();
+  const fmt = (n: number) =>
+    new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 }).format(Math.round(n));
 
   const reportEmployees = employeeReport?.employees ?? [];
   const reportEmployeeNames = employeeReport?.employeeNames ?? [];
+
+  const handlePrintReport = () => {
+    if (!employeeReport || reportEmployees.length === 0) {
+      toast({
+        title: language === "ar" ? "لا توجد بيانات للطباعة" : "Nothing to print",
+        variant: "destructive",
+      });
+      return;
+    }
+    openWithdrawalReportA4Print({
+      from: employeeReport.from,
+      to: employeeReport.to,
+      grandTotal: employeeReport.grandTotal,
+      grandCount: employeeReport.grandCount,
+      employees: reportEmployees,
+      employeeFilter: reportEmployee,
+      issuedBy: user.name,
+    });
+  };
 
   return (
     <div className="p-4 md:p-6 space-y-6" dir={isRTL ? "rtl" : "ltr"}>
@@ -563,14 +585,25 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
                       <SelectItem value="all">
                         {language === "ar" ? "كل الموظفين" : "All employees"}
                       </SelectItem>
-                      {reportEmployees.map((e) => (
-                        <SelectItem key={e.employeeName} value={e.employeeName}>
-                          {e.employeeName}
+                      {reportEmployeeNames.map((name) => (
+                        <SelectItem key={name} value={name}>
+                          {name}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="gap-2"
+                  disabled={reportLoading || !employeeReport || reportEmployees.length === 0}
+                  onClick={handlePrintReport}
+                  data-testid="button-print-withdrawal-report"
+                >
+                  <Printer className="h-4 w-4" />
+                  {language === "ar" ? "طباعة A4" : "Print A4"}
+                </Button>
               </div>
             </CardContent>
           </Card>
