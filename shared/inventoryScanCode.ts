@@ -74,6 +74,13 @@ export function extractLeadingInventorySerial(code: string): string | null {
   return `${token.prefix.toUpperCase()}-${String(token.num).padStart(4, "0")}`;
 }
 
+/** Optional brand text after serial token (e.g. "ADP-0003 DELL"). */
+export function parseBrandSuffixFromScan(code: string): string | null {
+  const raw = normalizeScannedBarcode(code).trim();
+  const m = raw.match(/^(?:LAP|DES|ADP|BAT)[\s._-]*\d+\s+(.+)$/i);
+  return m ? m[1].trim() : null;
+}
+
 function inventoryCodeMatchVariants(code: string): string[] {
   const trimmed = code.trim();
   const out = new Set<string>([trimmed]);

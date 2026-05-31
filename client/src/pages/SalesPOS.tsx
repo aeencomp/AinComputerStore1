@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, fetchWithTimeout } from "@/lib/queryClient";
 import { playBarcodeScanBeep } from "@/lib/scanBeep";
 import {
   appendScanKeystroke,
@@ -154,6 +154,13 @@ function isSerialInventoryProduct(product: POSProduct): boolean {
 
 function productMatchesScanCode(product: POSProduct, code: string): boolean {
   if (!isSerialInventoryProduct(product)) {
+    const scanItem = {
+      scanCode: product.scanCode ?? product.barcode ?? product.sku,
+      barcode: product.barcode,
+      serialNumber: product.serialNumber,
+      partNumber: product.partNumber,
+    };
+    if (inventoryItemMatchesScan(scanItem, code)) return true;
     return codesMatch(product.sku, code) || codesMatch(product.barcode, code);
   }
   const item = {
@@ -358,6 +365,7 @@ export default function SalesPOS({
           image: null,
           category: p.category ?? null,
           barcode: p.barcode ?? null,
+          scanCode: p.barcode ?? null,
           productSource: 'instore' as const,
         }))
     : [];
@@ -909,11 +917,11 @@ export default function SalesPOS({
         setSearchQuery("");
         if (scanIntent && orderType === "in-store") {
           void (async () => {
-            try {
-              const res = await apiRequest(
-                "GET",
-                `/api/sales/pos/resolve-scan?locationId=${salesLocationId}&code=${encodeURIComponent(code)}`,
-              );
+            const res = await fetchWithTimeout(
+              `/api/sales/pos/resolve-scan?locationId=${salesLocationId}&code=${encodeURIComponent(code)}`,
+              { credentials: "include" },
+            );
+            if (res.ok) {
               const data = (await res.json()) as { product?: ServerPosScanProduct };
               const resolved = data.product
                 ? posProductFromServerScan(data.product)
@@ -937,15 +945,13 @@ export default function SalesPOS({
                 addToCart(resolved);
                 return;
               }
-            } catch {
-              /* fall through to not-found toast */
             }
             toast({
               title: language === "ar" ? "لم يُعثر على المنتج" : "Product not found",
               description:
                 language === "ar"
-                  ? `لا يوجد منتج لهذا الرمز: ${code}. امسح سيريال الوحدة (مثل LAP-0081 أو ADP-0003) أو اختره من القائمة.`
-                  : `No product for code: ${code}. Scan the unit serial (e.g. LAP-0081 or ADP-0003) or pick from the list.`,
+                  ? `لا يوجد منتج لهذا الرمز: ${code}. تأكد أن الشاحن مسجّل في الموقع ${salesLocationId} وأن الباركود في النظام يطابق الملصق.`
+                  : `No product for code: ${code}. Ensure the item is registered at location ${salesLocationId} and the system barcode matches the label.`,
               variant: "destructive",
             });
           })();

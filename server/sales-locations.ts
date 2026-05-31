@@ -16,9 +16,12 @@ import {
   lcds,
 } from "@shared/schema";
 import {
+  extractLeadingInventorySerial,
   getInventoryScanCode,
+  inventoryCodesMatch,
   inventoryItemMatchesScan,
   normalizeScannedBarcode,
+  parseBrandSuffixFromScan,
   type InventoryCodeSource,
 } from "@shared/inventoryScanCode";
 import {
@@ -389,6 +392,66 @@ function mapBatteryToPosScan(b: typeof laptopBatteries.$inferSelect): PosScanRes
   };
 }
 
+async function findAcAdapterByScanCode(
+  code: string,
+): Promise<typeof acAdapters.$inferSelect | undefined> {
+  const rows = await db.select().from(acAdapters);
+  for (const a of rows) {
+    if ((a.isActive ?? 1) !== 1) continue;
+    if (inventoryItemMatchesScan(a, code)) return a;
+  }
+
+  const token = extractLeadingInventorySerial(code);
+  if (!token) return undefined;
+
+  const brandSuffix = parseBrandSuffixFromScan(code);
+  for (const a of rows) {
+    if ((a.isActive ?? 1) !== 1) continue;
+    if (!inventoryCodesMatch(a.serialNumber, token)) continue;
+    if (brandSuffix && !inventoryCodesMatch(a.brand, brandSuffix)) continue;
+    return a;
+  }
+
+  for (const a of rows) {
+    if ((a.isActive ?? 1) !== 1) continue;
+    const barcode = (a.barcode || "").trim();
+    if (barcode && inventoryCodesMatch(barcode, code)) return a;
+  }
+
+  return undefined;
+}
+
+async function finalizeAdapterAtLocation(
+  adapter: typeof acAdapters.$inferSelect,
+  locationId: number,
+): Promise<PosScanResolvedProduct> {
+  const mapped = mapAdapterToPosScan(adapter);
+  const syncSku = `${SYNC_ADAPTER_SKU_PREFIX}${adapter.id}`;
+  const [mirror] = await db
+    .select()
+    .from(inStoreProducts)
+    .where(
+      and(eq(inStoreProducts.sku, syncSku), eq(inStoreProducts.salesLocationId, locationId)),
+    )
+    .limit(1);
+
+  if (mirror) {
+    mapped.stockQuantity = mirror.stockQuantity ?? 0;
+    const mirrorBarcode = (mirror.barcode || "").trim();
+    if (mirrorBarcode) {
+      mapped.barcode = mirrorBarcode;
+      mapped.scanCode = mirrorBarcode;
+      mapped.sku = mirrorBarcode;
+    }
+  } else if (adapter.salesLocationId === locationId) {
+    mapped.stockQuantity = adapter.stockQuantity ?? 0;
+  } else {
+    mapped.stockQuantity = 0;
+  }
+
+  return mapped;
+}
+
 function mapInstoreToPosScan(p: typeof inStoreProducts.$inferSelect): PosScanResolvedProduct {
   const scanCode = (p.barcode || p.sku || "").trim() || null;
   return {
@@ -436,7 +499,7 @@ export async function resolvePosScanAtLocation(
         .from(acAdapters)
         .where(eq(acAdapters.id, adapterId))
         .limit(1);
-      if (a) return mapAdapterToPosScan(a);
+      if (a) return finalizeAdapterAtLocation(a, locationId);
     }
     if (p.sku?.startsWith(SYNC_BATTERY_SKU_PREFIX)) {
       const batteryId = p.sku.slice(SYNC_BATTERY_SKU_PREFIX.length);
@@ -451,11 +514,16 @@ export async function resolvePosScanAtLocation(
     return mapInstoreToPosScan(p);
   }
 
+  const adapterGlobal = await findAcAdapterByScanCode(code);
+  if (adapterGlobal) {
+    return finalizeAdapterAtLocation(adapterGlobal, locationId);
+  }
+
   const locActive = and(eq(acAdapters.salesLocationId, locationId), eq(acAdapters.isActive, 1));
 
   const adapterRows = await db.select().from(acAdapters).where(locActive);
   for (const a of adapterRows) {
-    if (inventoryRowMatchesScan(a, code)) return mapAdapterToPosScan(a);
+    if (inventoryRowMatchesScan(a, code)) return finalizeAdapterAtLocation(a, locationId);
   }
 
   const batteryRows = await db
