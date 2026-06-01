@@ -382,3 +382,33 @@ export async function sendTicketUpdatedMessage(
 
   return sendWhatsAppMessage(customerPhone, message);
 }
+
+/** Daily revenue summary to owner/manager (Location 1, 2, repair). */
+export async function sendDailyRevenueWhatsApp(
+  to: string,
+  messageBody: string,
+  templateParams?: { date: string; loc1: string; loc2: string; repair: string; total: string },
+): Promise<WhatsAppMessageResult> {
+  const templateName = (process.env.WHATSAPP_DAILY_REVENUE_TEMPLATE || "").trim();
+
+  if (templateName && templateParams) {
+    const templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
+      to,
+      templateName,
+      "ar",
+      [
+        templateParams.date,
+        templateParams.loc1,
+        templateParams.loc2,
+        templateParams.repair,
+        templateParams.total,
+      ],
+    );
+    if (templateResult.success) return templateResult;
+    console.warn(
+      `Daily revenue WhatsApp template failed (code=${templateResult.errorCode ?? "n/a"}): ${templateResult.error}. Trying text message.`,
+    );
+  }
+
+  return sendWhatsAppMessage(to, messageBody);
+}

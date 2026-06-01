@@ -75,6 +75,8 @@ const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE in_store_products ADD COLUMN IF NOT EXISTS legacy_source TEXT`,
   `ALTER TABLE in_store_products ADD COLUMN IF NOT EXISTS legacy_id TEXT`,
   `UPDATE in_store_products SET product_type = 'generic' WHERE product_type IS NULL OR product_type = ''`,
+
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS daily_revenue_whatsapp_number TEXT DEFAULT ''`,
 ];
 
 export async function runDbMigrations(): Promise<void> {

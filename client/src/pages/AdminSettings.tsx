@@ -29,6 +29,8 @@ export default function AdminSettings() {
   const [whatsappTestPhone, setWhatsappTestPhone] = useState('');
   const [whatsappTestResult, setWhatsappTestResult] = useState<{ ok: boolean; message: string } | null>(null);
   const [whatsappTesting, setWhatsappTesting] = useState(false);
+  const [dailyRevenueSending, setDailyRevenueSending] = useState(false);
+  const [dailyRevenueSendResult, setDailyRevenueSendResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const storeSettingsFormSchema = useMemo(() => z.object({
     storeNameAr: z.string().min(1, t("admin.settings.validation.storeNameArRequired")),
@@ -49,6 +51,7 @@ export default function AdminSettings() {
     whatsappPhoneNumberId: z.string().optional(),
     whatsappAccessToken: z.string().optional(),
     whatsappWabaId: z.string().optional(),
+    dailyRevenueWhatsappNumber: z.string().optional(),
     logoUrl: z.string().optional(),
     faviconUrl: z.string().optional(),
     primaryColor: z.string().optional(),
@@ -113,6 +116,7 @@ export default function AdminSettings() {
       whatsappPhoneNumberId: settings.whatsappPhoneNumberId || "",
       whatsappAccessToken: settings.whatsappAccessToken || "",
       whatsappWabaId: settings.whatsappWabaId || "",
+      dailyRevenueWhatsappNumber: settings.dailyRevenueWhatsappNumber || "",
       logoUrl: settings.logoUrl || "",
       faviconUrl: settings.faviconUrl || "",
       primaryColor: settings.primaryColor || "#3B82F6",
@@ -598,6 +602,76 @@ export default function AdminSettings() {
                         {language === 'ar'
                           ? 'احفظ الإعدادات أولاً ثم اختبر الاتصال. إذا ظهر خطأ "Invalid parameter" فهذا يعني أن رمز الوصول لا يتطابق مع Phone Number ID.'
                           : 'Save settings first, then test. If you see "Invalid parameter" it means the access token does not match the Phone Number ID.'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="border rounded-md p-4 space-y-3 bg-muted/30">
+                    <p className="text-sm font-medium">
+                      {language === 'ar' ? 'تقرير الإيرادات اليومي (واتساب)' : 'Daily revenue WhatsApp report'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {language === 'ar'
+                        ? 'يُرسل إيرادات الموقع 1 والموقع 2 والصيانة لرقم المالك. اختياري: قالب Meta WHATSAPP_DAILY_REVENUE_TEMPLATE (5 متغيرات: تاريخ، موقع1، موقع2، صيانة، إجمالي).'
+                        : 'Sends Location 1, Location 2, and repair revenue. Optional env WHATSAPP_DAILY_REVENUE_TEMPLATE (5 body params).'}
+                    </p>
+                    <div className="space-y-2">
+                      <Label htmlFor="dailyRevenueWhatsappNumber">
+                        {language === 'ar' ? 'رقم واتساب المالك / الإدارة' : 'Owner/manager WhatsApp number'}
+                      </Label>
+                      <Input
+                        id="dailyRevenueWhatsappNumber"
+                        {...form.register("dailyRevenueWhatsappNumber")}
+                        placeholder="07XXXXXXXXX"
+                        data-testid="input-daily-revenue-whatsapp"
+                        dir="ltr"
+                      />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      disabled={dailyRevenueSending}
+                      data-testid="button-send-daily-revenue-whatsapp"
+                      onClick={async () => {
+                        setDailyRevenueSending(true);
+                        setDailyRevenueSendResult(null);
+                        try {
+                          const res = await apiRequest('POST', '/api/admin/daily-revenue/whatsapp', {
+                            phone: form.getValues('dailyRevenueWhatsappNumber')?.trim() || undefined,
+                          });
+                          const data = await res.json();
+                          if (data.success) {
+                            setDailyRevenueSendResult({
+                              ok: true,
+                              message: language === 'ar'
+                                ? 'تم إرسال تقرير إيرادات اليوم بنجاح.'
+                                : "Today's revenue report sent successfully.",
+                            });
+                          } else {
+                            setDailyRevenueSendResult({
+                              ok: false,
+                              message: data.error || 'Send failed',
+                            });
+                          }
+                        } catch (e: any) {
+                          setDailyRevenueSendResult({ ok: false, message: e.message });
+                        } finally {
+                          setDailyRevenueSending(false);
+                        }
+                      }}
+                    >
+                      {dailyRevenueSending ? (
+                        <Loader2 className="h-4 w-4 animate-spin me-2" />
+                      ) : null}
+                      {language === 'ar' ? 'إرسال تقرير اليوم الآن' : "Send today's report now"}
+                    </Button>
+                    {dailyRevenueSendResult && (
+                      <p
+                        className={`text-sm font-medium ${dailyRevenueSendResult.ok ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}
+                        data-testid="text-daily-revenue-send-result"
+                      >
+                        {dailyRevenueSendResult.ok ? '✓ ' : '✗ '}
+                        {dailyRevenueSendResult.message}
                       </p>
                     )}
                   </div>

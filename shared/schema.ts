@@ -308,6 +308,8 @@ export const storeSettings = pgTable("store_settings", {
   whatsappPhoneNumberId: text("whatsapp_phone_number_id").default(""),
   whatsappAccessToken: text("whatsapp_access_token").default(""),
   whatsappWabaId: text("whatsapp_waba_id").default(""),
+  /** Owner/manager number for automated daily revenue WhatsApp summaries */
+  dailyRevenueWhatsappNumber: text("daily_revenue_whatsapp_number").default(""),
 
   // Theme & Branding
   logoUrl: text("logo_url").default(""),

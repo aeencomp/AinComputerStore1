@@ -6,7 +6,13 @@ import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
-import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage, sendWhatsAppTemplate } from "./whatsapp";
+import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage, sendWhatsAppTemplate, sendDailyRevenueWhatsApp } from "./whatsapp";
+import {
+  baghdadDateString,
+  buildDailyRevenueWhatsAppMessage,
+  computeCombinedDailyRevenue,
+  formatIqdAmount,
+} from "./daily-revenue-report";
 import bcrypt from "bcrypt";
 import { generateOTP, storeOTP, verifyOTP } from "./otp";
 import { sendOTPEmail } from "./resend-client";
@@ -9772,6 +9778,140 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
+    }
+  });
+
+  async function canSendDailyRevenueWhatsApp(req: Request): Promise<boolean> {
+    if ((req.session as any).adminId) return true;
+    const salesUserId = (req.session as any).salesUserId as string | undefined;
+    if (!salesUserId) return false;
+    const salesUser = await storage.getSalesUser(salesUserId);
+    return isSalesAdminRole(salesUser?.role);
+  }
+
+  async function sendDailyRevenueWhatsAppForDate(
+    baghdadDateStr: string,
+    phoneOverride?: string,
+  ) {
+    const settings = await storage.getStoreSettings();
+    const to =
+      (phoneOverride && phoneOverride.trim()) ||
+      (settings?.dailyRevenueWhatsappNumber && settings.dailyRevenueWhatsappNumber.trim()) ||
+      "";
+    if (!to) {
+      return {
+        ok: false as const,
+        status: 400,
+        body: {
+          error:
+            "لم يُضبط رقم واتساب التقرير اليومي. أضفه من إعدادات الأدمن → WhatsApp → رقم تقرير الإيرادات.",
+        },
+      };
+    }
+
+    const revenue = await computeCombinedDailyRevenue(baghdadDateStr);
+    const messageBody = buildDailyRevenueWhatsAppMessage(
+      revenue,
+      settings?.storeNameAr || undefined,
+    );
+    const result = await sendDailyRevenueWhatsApp(to, messageBody, {
+      date: revenue.date,
+      loc1: formatIqdAmount(revenue.location1InStore),
+      loc2: formatIqdAmount(revenue.location2InStore),
+      repair: formatIqdAmount(revenue.repair),
+      total: formatIqdAmount(revenue.total),
+    });
+
+    if (!result.success) {
+      return {
+        ok: false as const,
+        status: 400,
+        body: {
+          error: result.error || "فشل إرسال واتساب",
+          errorCode: result.errorCode,
+          revenue,
+          messagePreview: messageBody,
+        },
+      };
+    }
+
+    return {
+      ok: true as const,
+      status: 200,
+      body: {
+        success: true,
+        messageId: result.messageId,
+        to,
+        revenue,
+        messagePreview: messageBody,
+      },
+    };
+  }
+
+  app.get("/api/admin/daily-revenue/preview", async (req: any, res: any) => {
+    if (!(await canSendDailyRevenueWhatsApp(req))) {
+      return res.status(401).json({ error: "غير مصرح" });
+    }
+    try {
+      const dateParam = req.query.date as string | undefined;
+      const baghdadDateStr =
+        dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+          ? dateParam
+          : baghdadDateString();
+      const revenue = await computeCombinedDailyRevenue(baghdadDateStr);
+      const settings = await storage.getStoreSettings();
+      const messagePreview = buildDailyRevenueWhatsAppMessage(
+        revenue,
+        settings?.storeNameAr || undefined,
+      );
+      return res.json({
+        revenue,
+        messagePreview,
+        configuredPhone: settings?.dailyRevenueWhatsappNumber?.trim() || null,
+      });
+    } catch (err) {
+      console.error("Daily revenue preview error:", err);
+      return res.status(500).json({ error: "خطأ في حساب الإيرادات" });
+    }
+  });
+
+  app.post("/api/admin/daily-revenue/whatsapp", async (req: any, res: any) => {
+    if (!(await canSendDailyRevenueWhatsApp(req))) {
+      return res.status(401).json({ error: "غير مصرح" });
+    }
+    try {
+      const dateParam = req.body?.date as string | undefined;
+      const phone = req.body?.phone as string | undefined;
+      const baghdadDateStr =
+        dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+          ? dateParam
+          : baghdadDateString();
+      const outcome = await sendDailyRevenueWhatsAppForDate(baghdadDateStr, phone);
+      return res.status(outcome.status).json(outcome.body);
+    } catch (err) {
+      console.error("Daily revenue WhatsApp send error:", err);
+      return res.status(500).json({ error: "خطأ في إرسال التقرير" });
+    }
+  });
+
+  /** Scheduled send from VPS cron — requires DAILY_REVENUE_CRON_SECRET header. */
+  app.post("/api/cron/daily-revenue/whatsapp", async (req: any, res: any) => {
+    const secret = process.env.DAILY_REVENUE_CRON_SECRET?.trim();
+    const provided = String(req.headers["x-cron-secret"] || req.body?.secret || "").trim();
+    if (!secret || provided !== secret) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const dateParam = req.body?.date as string | undefined;
+      const baghdadDateStr =
+        dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)
+          ? dateParam
+          : baghdadDateString();
+      const outcome = await sendDailyRevenueWhatsAppForDate(baghdadDateStr);
+      return res.status(outcome.status).json(outcome.body);
+    } catch (err) {
+      console.error("Cron daily revenue WhatsApp error:", err);
+      return res.status(500).json({ error: "خطأ في إرسال التقرير" });
     }
   });
 

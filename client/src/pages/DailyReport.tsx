@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -21,6 +23,7 @@ import {
   CheckCircle2,
   Radio,
   HandCoins,
+  MessageCircle,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -120,7 +123,7 @@ interface DailyReportApiResponse {
 }
 
 interface DailyReportProps {
-  user: { id: string };
+  user: { id: string; role?: string };
   salesLocationId?: number;
 }
 
@@ -585,6 +588,8 @@ function buildPrintHTML(data: ShiftReportData): string {
 
 export default function DailyReport({ user, salesLocationId = 1 }: DailyReportProps) {
   const { language } = useLanguage();
+  const { toast } = useToast();
+  const canSendDailyRevenueWhatsApp = user.role === "sales_admin";
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [manualLabelName, setManualLabelName] = useState("");
   const [manualLabelDate, setManualLabelDate] = useState("");
@@ -592,6 +597,33 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
   const [dailyLabelQrDataUrl, setDailyLabelQrDataUrl] = useState<string>("");
   const labelPrintRef = useRef<HTMLDivElement>(null);
   const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+
+  const sendDailyRevenueWhatsAppMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/daily-revenue/whatsapp", {
+        date: baghdadToday,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Send failed");
+      return data;
+    },
+    onSuccess: () => {
+      toast({
+        title: language === "ar" ? "تم إرسال واتساب" : "WhatsApp sent",
+        description:
+          language === "ar"
+            ? "تم إرسال تقرير إيرادات اليوم (الموقع 1، 2، الصيانة)."
+            : "Today's revenue report was sent (Location 1, 2, repair).",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        variant: "destructive",
+        title: language === "ar" ? "فشل الإرسال" : "Send failed",
+        description: err.message,
+      });
+    },
+  });
 
   // List of all shifts
   const { data: shifts = [], isLoading: shiftsLoading, refetch: refetchShifts } = useQuery<SalesShift[]>({
@@ -838,6 +870,22 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
             <Printer className="h-4 w-4" />
             {language === "ar" ? "طباعة ملصق (50×30)" : "Print label (50×30)"}
           </Button>
+          {canSendDailyRevenueWhatsApp && (
+            <Button
+              variant="outline"
+              onClick={() => sendDailyRevenueWhatsAppMutation.mutate()}
+              disabled={sendDailyRevenueWhatsAppMutation.isPending}
+              className="gap-2 border-green-600 text-green-700 hover:bg-green-50 dark:hover:bg-green-950"
+              data-testid="button-send-daily-revenue-whatsapp"
+            >
+              {sendDailyRevenueWhatsAppMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <MessageCircle className="h-4 w-4" />
+              )}
+              {language === "ar" ? "إرسال إيرادات واتساب" : "Send revenue WhatsApp"}
+            </Button>
+          )}
         </div>
       </div>
 
