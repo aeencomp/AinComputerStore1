@@ -31,6 +31,8 @@ export default function AdminSettings() {
   const [whatsappTesting, setWhatsappTesting] = useState(false);
   const [dailyRevenueSending, setDailyRevenueSending] = useState(false);
   const [dailyRevenueSendResult, setDailyRevenueSendResult] = useState<{ ok: boolean; message: string } | null>(null);
+  const [whatsappDiagnosing, setWhatsappDiagnosing] = useState(false);
+  const [whatsappDiagnostics, setWhatsappDiagnostics] = useState<Record<string, unknown> | null>(null);
 
   const storeSettingsFormSchema = useMemo(() => z.object({
     storeNameAr: z.string().min(1, t("admin.settings.validation.storeNameArRequired")),
@@ -577,7 +579,21 @@ export default function AdminSettings() {
                             const res = await apiRequest('POST', '/api/admin/whatsapp/test', { to: whatsappTestPhone.trim() });
                             const data = await res.json();
                             if (data.ok) {
-                              setWhatsappTestResult({ ok: true, message: language === 'ar' ? 'تم إرسال رسالة الاختبار بنجاح!' : 'Test message sent successfully!' });
+                              const statusNote = data.messageStatus
+                                ? (language === 'ar'
+                                  ? ` (حالة Meta: ${data.messageStatus}${data.deliveryMethod === 'free_text' ? ' — قد لا تصل' : ''})`
+                                  : ` (Meta: ${data.messageStatus}${data.deliveryMethod === 'free_text' ? ' — may not deliver' : ''})`)
+                                : '';
+                              const failEvents = Array.isArray(data.recentDeliveryEvents)
+                                ? data.recentDeliveryEvents.filter((e: { status?: string }) => e.status === 'failed')
+                                : [];
+                              const failNote = failEvents.length > 0
+                                ? (language === 'ar' ? ' — يوجد فشل تسليم في السجل الأخير.' : ' — recent delivery failures in log.')
+                                : '';
+                              setWhatsappTestResult({
+                                ok: true,
+                                message: (language === 'ar' ? 'قبلها Meta — تحقق من واتساب العميل.' : 'Accepted by Meta — check customer WhatsApp.') + statusNote + failNote,
+                              });
                             } else {
                               const errMsg = data.data?.error?.message || data.error || 'Unknown error';
                               setWhatsappTestResult({ ok: false, message: errMsg });
@@ -600,9 +616,36 @@ export default function AdminSettings() {
                     {!whatsappTestResult && (
                       <p className="text-xs text-muted-foreground">
                         {language === 'ar'
-                          ? 'احفظ الإعدادات أولاً ثم اختبر الاتصال. إذا ظهر خطأ "Invalid parameter" فهذا يعني أن رمز الوصول لا يتطابق مع Phone Number ID.'
-                          : 'Save settings first, then test. If you see "Invalid parameter" it means the access token does not match the Phone Number ID.'}
+                          ? 'احفظ الإعدادات أولاً ثم اختبر. «قبلها Meta» ≠ وصلت للهاتف — استخدم تشخيص واتساب أدناه.'
+                          : 'Save first, then test. "Accepted by Meta" ≠ delivered — use Diagnose below.'}
                       </p>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={whatsappDiagnosing}
+                      data-testid="button-whatsapp-diagnostics"
+                      onClick={async () => {
+                        setWhatsappDiagnosing(true);
+                        try {
+                          const res = await apiRequest('GET', '/api/admin/whatsapp/diagnostics');
+                          const data = await res.json();
+                          setWhatsappDiagnostics(data);
+                        } catch (e: any) {
+                          setWhatsappDiagnostics({ error: e.message });
+                        } finally {
+                          setWhatsappDiagnosing(false);
+                        }
+                      }}
+                    >
+                      {whatsappDiagnosing ? <Loader2 className="h-4 w-4 animate-spin me-2" /> : null}
+                      {language === 'ar' ? 'تشخيص واتساب' : 'Diagnose WhatsApp'}
+                    </Button>
+                    {whatsappDiagnostics && (
+                      <pre className="text-xs bg-background border rounded p-2 overflow-auto max-h-48 dir-ltr text-left" data-testid="text-whatsapp-diagnostics">
+                        {JSON.stringify(whatsappDiagnostics, null, 2)}
+                      </pre>
                     )}
                   </div>
 

@@ -212,7 +212,7 @@ export default function TicketDetail() {
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
       });
-      if (response?._whatsappStatus === 'sent') {
+      if (response?._whatsappStatus?.startsWith('accepted:') || response?._whatsappStatus === 'sent' || response?._whatsappStatus === 'queued') {
         toast({
           title: isRTL ? 'تم إرسال رسالة واتساب' : 'WhatsApp Message Sent',
           description: isRTL

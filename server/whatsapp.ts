@@ -6,14 +6,50 @@ const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
 interface WhatsAppMessageResult {
   success: boolean;
   messageId?: string;
+  /** Meta initial status: usually "accepted" (not yet on the phone). */
+  messageStatus?: string;
+  waId?: string;
   error?: string;
   errorCode?: number | string;
   errorData?: any;
   /** How the message was sent (for diagnostics). */
-  deliveryMethod?: 'daily_template' | 'repair_status_template' | 'free_text';
+  deliveryMethod?: 'daily_template' | 'repair_status_template' | 'template' | 'free_text';
   /** Shown when delivery may fail (e.g. free-text outside 24h window). */
   deliveryWarning?: string;
   formattedTo?: string;
+  templateName?: string;
+  templateLanguage?: string;
+}
+
+export type WhatsAppDeliveryEvent = {
+  at: string;
+  messageId?: string;
+  status: string;
+  recipientId?: string;
+  errors?: unknown;
+};
+
+/** Last delivery receipts from Meta webhook (failed/delivered/read). */
+export const whatsappDeliveryEvents: WhatsAppDeliveryEvent[] = [];
+
+export function recordWhatsAppDeliveryEvent(event: Omit<WhatsAppDeliveryEvent, 'at'>) {
+  whatsappDeliveryEvents.unshift({ ...event, at: new Date().toISOString() });
+  if (whatsappDeliveryEvents.length > 150) {
+    whatsappDeliveryEvents.length = 150;
+  }
+  if (event.status === 'failed') {
+    console.error('WhatsApp delivery FAILED:', JSON.stringify(event));
+  }
+}
+
+function parseMetaSendResponse(data: any): Pick<WhatsAppMessageResult, 'messageId' | 'messageStatus' | 'waId'> {
+  const msg = data?.messages?.[0];
+  const contact = data?.contacts?.[0];
+  return {
+    messageId: msg?.id,
+    messageStatus: msg?.message_status,
+    waId: contact?.wa_id,
+  };
 }
 
 /** Exported for API diagnostics (E.164 without +). */
@@ -75,26 +111,172 @@ function getTemplateCandidates(
   return Array.from(new Set(all));
 }
 
-async function getCredentials(): Promise<{ phoneNumberId: string; accessToken: string; wabaId: string }> {
+export async function getCredentials(): Promise<{
+  phoneNumberId: string;
+  accessToken: string;
+  wabaId: string;
+  source: 'database' | 'environment' | 'mixed' | 'none';
+}> {
   try {
     const dbSettings = await storage.getStoreSettings();
-    const phoneNumberId = (dbSettings?.whatsappPhoneNumberId && dbSettings.whatsappPhoneNumberId.trim())
-      ? dbSettings.whatsappPhoneNumberId.trim()
-      : (process.env.WHATSAPP_PHONE_NUMBER_ID || '');
-    const accessToken = (dbSettings?.whatsappAccessToken && dbSettings.whatsappAccessToken.trim())
-      ? dbSettings.whatsappAccessToken.trim()
-      : (process.env.WHATSAPP_ACCESS_TOKEN || '');
-    const wabaId = (dbSettings?.whatsappWabaId && dbSettings.whatsappWabaId.trim())
-      ? dbSettings.whatsappWabaId.trim()
-      : (process.env.WHATSAPP_WABA_ID || '');
-    return { phoneNumberId, accessToken, wabaId };
+    const dbPhone = dbSettings?.whatsappPhoneNumberId?.trim() || '';
+    const dbToken = dbSettings?.whatsappAccessToken?.trim() || '';
+    const dbWaba = dbSettings?.whatsappWabaId?.trim() || '';
+    const envPhone = (process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+    const envToken = (process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
+    const envWaba = (process.env.WHATSAPP_WABA_ID || '').trim();
+
+    const phoneNumberId = dbPhone || envPhone;
+    const accessToken = dbToken || envToken;
+    const wabaId = dbWaba || envWaba;
+
+    const usesDb = !!(dbPhone || dbToken || dbWaba);
+    const usesEnv = !!(envPhone || envToken || envWaba);
+    let source: 'database' | 'environment' | 'mixed' | 'none' = 'none';
+    if (usesDb && usesEnv) source = 'mixed';
+    else if (usesDb) source = 'database';
+    else if (usesEnv) source = 'environment';
+
+    return { phoneNumberId, accessToken, wabaId, source };
   } catch {
+    const envPhone = (process.env.WHATSAPP_PHONE_NUMBER_ID || '').trim();
+    const envToken = (process.env.WHATSAPP_ACCESS_TOKEN || '').trim();
+    const envWaba = (process.env.WHATSAPP_WABA_ID || '').trim();
     return {
-      phoneNumberId: process.env.WHATSAPP_PHONE_NUMBER_ID || '',
-      accessToken: process.env.WHATSAPP_ACCESS_TOKEN || '',
-      wabaId: process.env.WHATSAPP_WABA_ID || '',
+      phoneNumberId: envPhone,
+      accessToken: envToken,
+      wabaId: envWaba,
+      source: envPhone || envToken || envWaba ? 'environment' : 'none',
     };
   }
+}
+
+let wabaTemplatesCache: { at: number; items: Array<{ name: string; status: string; language: string; components?: any[] }> } | null = null;
+
+async function fetchWabaMessageTemplates() {
+  const now = Date.now();
+  if (wabaTemplatesCache && now - wabaTemplatesCache.at < 5 * 60 * 1000) {
+    return wabaTemplatesCache.items;
+  }
+  const { wabaId, accessToken } = await getCredentials();
+  if (!wabaId || !accessToken) return [];
+  try {
+    const response = await axios.get(`${WHATSAPP_API_URL}/${wabaId}/message_templates`, {
+      params: {
+        fields: 'name,status,language,components',
+        limit: 250,
+        access_token: accessToken,
+      },
+    });
+    const items = (response.data?.data || []) as Array<{ name: string; status: string; language: string; components?: any[] }>;
+    wabaTemplatesCache = { at: now, items };
+    return items;
+  } catch (error: any) {
+    const err = error.response?.data?.error;
+    console.error('Failed to fetch WABA templates:', JSON.stringify(err || error.message));
+    return [];
+  }
+}
+
+async function approvedLanguagesForTemplate(templateName: string): Promise<string[]> {
+  const items = await fetchWabaMessageTemplates();
+  return items
+    .filter((t) => t.name === templateName && String(t.status).toUpperCase() === 'APPROVED')
+    .map((t) => t.language)
+    .filter(Boolean);
+}
+
+function countBodyPlaceholders(components?: any[]): number {
+  const body = components?.find((c) => String(c.type).toUpperCase() === 'BODY');
+  const text = String(body?.text || '');
+  const matches = text.match(/\{\{\d+\}\}/g);
+  return matches?.length ?? 0;
+}
+
+export function isValidIraqWhatsAppE164(formatted: string): boolean {
+  return /^9647\d{9}$/.test(formatted);
+}
+
+export function validateWhatsAppPhone(phone: string): { ok: boolean; formatted: string; error?: string } {
+  const formatted = formatPhoneNumber(phone);
+  if (!formatted) {
+    return { ok: false, formatted: '', error: 'رقم الهاتف فارغ' };
+  }
+  if (!isValidIraqWhatsAppE164(formatted)) {
+    return {
+      ok: false,
+      formatted,
+      error: `رقم غير صالح للواتساب العراقي (${formatted}). استخدم 07XXXXXXXXX.`,
+    };
+  }
+  return { ok: true, formatted };
+}
+
+export async function getWhatsAppDiagnostics() {
+  const creds = await getCredentials();
+  const configured = !!(creds.phoneNumberId && creds.accessToken);
+
+  const result: Record<string, unknown> = {
+    configured,
+    credentialSource: creds.source,
+    phoneNumberId: creds.phoneNumberId ? `…${creds.phoneNumberId.slice(-6)}` : null,
+    wabaId: creds.wabaId ? `…${creds.wabaId.slice(-6)}` : null,
+    hasAccessToken: !!creds.accessToken,
+    apiVersion: WHATSAPP_API_URL.replace('https://graph.facebook.com/', ''),
+    webhookHint:
+      'In Meta Developer → WhatsApp → Configuration, subscribe webhook to messages field and set callback URL to https://YOUR_DOMAIN/api/whatsapp/webhook',
+    recentDeliveryEvents: whatsappDeliveryEvents.slice(0, 25),
+  };
+
+  if (!configured) {
+    result.error = 'WhatsApp credentials missing. Set Phone Number ID + Access Token in Admin Settings or .env on VPS.';
+    return result;
+  }
+
+  try {
+    const me = await axios.get(`${WHATSAPP_API_URL}/me`, {
+      params: { access_token: creds.accessToken },
+    });
+    result.tokenValid = true;
+    result.metaApp = me.data;
+  } catch (error: any) {
+    result.tokenValid = false;
+    result.tokenError = error.response?.data?.error || error.message;
+  }
+
+  try {
+    const phone = await axios.get(`${WHATSAPP_API_URL}/${creds.phoneNumberId}`, {
+      params: {
+        fields: 'display_phone_number,verified_name,quality_rating,account_mode',
+        access_token: creds.accessToken,
+      },
+    });
+    result.phoneNumber = phone.data;
+  } catch (error: any) {
+    result.phoneNumberError = error.response?.data?.error || error.message;
+  }
+
+  const templates = await fetchWabaMessageTemplates();
+  const repairNames = getTemplateCandidates('WHATSAPP_REPAIR_STATUS_TEMPLATES', 'repair_status_update');
+  const createdNames = getTemplateCandidates('WHATSAPP_REPAIR_CREATED_TEMPLATES', 'repair_ticket_created');
+
+  result.approvedTemplateCount = templates.filter((t) => String(t.status).toUpperCase() === 'APPROVED').length;
+  result.repairStatusTemplates = repairNames.map((name) => ({
+    name,
+    approved: templates.filter((t) => t.name === name && String(t.status).toUpperCase() === 'APPROVED'),
+  }));
+  result.repairCreatedTemplates = createdNames.map((name) => ({
+    name,
+    approved: templates.filter((t) => t.name === name && String(t.status).toUpperCase() === 'APPROVED'),
+  }));
+
+  const hasApprovedStatus = (result.repairStatusTemplates as any[]).some((t) => t.approved?.length > 0);
+  if (!hasApprovedStatus) {
+    result.critical =
+      'No APPROVED repair_status_update template found on this WABA. Repair WhatsApp cannot deliver until Meta approves the template.';
+  }
+
+  return result;
 }
 
 // Send a free-form text message (only works within 24h after customer messages first)
@@ -128,7 +310,7 @@ export async function sendWhatsAppMessage(
     });
 
     console.log('WhatsApp text message sent:', response.data);
-    return { success: true, messageId: response.data.messages?.[0]?.id };
+    return { success: true, ...parseMetaSendResponse(response.data), deliveryMethod: 'free_text' };
   } catch (error: any) {
     const errData = error.response?.data?.error;
     const errorMessage = errData?.message || error.message;
@@ -206,7 +388,13 @@ export async function sendWhatsAppTemplate(
       });
 
       console.log(`WhatsApp template "${templateName}" sent to ${formattedPhone}:`, response.data);
-      return { success: true, messageId: response.data.messages?.[0]?.id };
+      return {
+        success: true,
+        ...parseMetaSendResponse(response.data),
+        deliveryMethod: 'template',
+        templateName,
+        formattedTo: formattedPhone,
+      };
     } catch (error: any) {
       const errorDetail = error.response?.data?.error;
       const errorMessage = errorDetail?.message || error.message;
@@ -238,19 +426,40 @@ async function sendWhatsAppTemplateWithLanguageFallbacks(
   preferredLanguage: string,
   params: string[],
 ): Promise<WhatsAppMessageResult> {
+  const approvedLangs = await approvedLanguagesForTemplate(templateName);
   const tryLanguages = Array.from(
     new Set(
-      [preferredLanguage, 'ar', 'ar_IQ', 'en_US']
+      [preferredLanguage, ...approvedLangs, 'ar', 'ar_IQ', 'en', 'en_US']
         .map((v) => (v || '').trim())
         .filter(Boolean),
     ),
   );
 
+  const templates = await fetchWabaMessageTemplates();
+  const templateDefs = templates.filter((t) => t.name === templateName);
+  const paramVariants: string[][] = [params];
+  if (templateDefs.length > 0) {
+    const counts = new Set(templateDefs.map((t) => countBodyPlaceholders(t.components)));
+    for (const count of counts) {
+      if (count < params.length) paramVariants.push(params.slice(0, count));
+      if (count === 0) paramVariants.push([]);
+    }
+  }
+
   let lastError: WhatsAppMessageResult = { success: false, error: 'Template send failed' };
   for (const lang of tryLanguages) {
-    const result = await sendWhatsAppTemplate(to, templateName, lang, params);
-    if (result.success) return result;
-    lastError = result;
+    for (const variant of paramVariants) {
+      const result = await sendWhatsAppTemplate(to, templateName, lang, variant);
+      if (result.success) {
+        return { ...result, templateLanguage: lang };
+      }
+      lastError = result;
+      const errText = `${result.error || ''}`.toLowerCase();
+      const isParamMismatch =
+        result.errorCode === 132000 ||
+        (errText.includes('parameter') && errText.includes('match'));
+      if (!isParamMismatch) break;
+    }
   }
 
   return lastError;
@@ -263,6 +472,11 @@ export async function sendTicketCreatedMessage(
   deviceType: string,
   deviceBrand: string
 ): Promise<WhatsAppMessageResult> {
+  const phoneCheck = validateWhatsAppPhone(customerPhone);
+  if (!phoneCheck.ok) {
+    return { success: false, error: phoneCheck.error, formattedTo: phoneCheck.formatted };
+  }
+
   const templateCandidates = getTemplateCandidates(
     'WHATSAPP_REPAIR_CREATED_TEMPLATES',
     'repair_ticket_created',
@@ -314,6 +528,11 @@ export async function sendTicketUpdatedMessage(
   finalCost?: string | null,
   options?: TicketUpdatedMessageOptions,
 ): Promise<WhatsAppMessageResult> {
+  const phoneCheck = validateWhatsAppPhone(customerPhone);
+  if (!phoneCheck.ok) {
+    return { success: false, error: phoneCheck.error, formattedTo: phoneCheck.formatted };
+  }
+
   const templateCandidates = getTemplateCandidates(
     'WHATSAPP_REPAIR_STATUS_TEMPLATES',
     'repair_status_update',
@@ -409,10 +628,6 @@ export async function sendTicketUpdatedMessage(
 
   const textResult = await sendWhatsAppMessage(customerPhone, message);
   return { ...textResult, deliveryMethod: 'free_text' };
-}
-
-function isValidIraqWhatsAppE164(formatted: string): boolean {
-  return /^9647\d{9}$/.test(formatted);
 }
 
 /**

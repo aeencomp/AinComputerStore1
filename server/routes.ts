@@ -6,7 +6,18 @@ import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
-import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage, sendWhatsAppTemplate, sendDailyRevenueWhatsApp, formatPhoneNumber } from "./whatsapp";
+import {
+  sendTicketCreatedMessage,
+  sendTicketUpdatedMessage,
+  sendWhatsAppMessage,
+  sendWhatsAppTemplate,
+  sendDailyRevenueWhatsApp,
+  formatPhoneNumber,
+  getWhatsAppDiagnostics,
+  getCredentials,
+  recordWhatsAppDeliveryEvent,
+  whatsappDeliveryEvents,
+} from "./whatsapp";
 import {
   baghdadDateString,
   buildDailyRevenueWhatsAppMessage,
@@ -4296,7 +4307,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.json({
         ...ticket,
-        _whatsappStatus: whatsappResult.success ? 'queued' : `failed: ${whatsappResult.error || 'unknown'}`
+        _whatsappStatus: whatsappResult.success
+          ? `accepted:${whatsappResult.messageStatus || 'unknown'}${whatsappResult.deliveryMethod === 'free_text' ? ':free_text_may_not_deliver' : ''}`
+          : `failed: ${whatsappResult.error || 'unknown'}`,
+        _whatsappMeta: whatsappResult.success
+          ? {
+              messageId: whatsappResult.messageId,
+              messageStatus: whatsappResult.messageStatus,
+              formattedTo: whatsappResult.formattedTo,
+              deliveryMethod: whatsappResult.deliveryMethod,
+              templateName: whatsappResult.templateName,
+            }
+          : { errorCode: whatsappResult.errorCode },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4653,7 +4675,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       return res.json({
         ...ticket,
-        _whatsappStatus: whatsappResult.success ? 'queued' : `failed: ${whatsappResult.error || 'unknown'}`
+        _whatsappStatus: whatsappResult.success
+          ? `accepted:${whatsappResult.messageStatus || 'unknown'}${whatsappResult.deliveryMethod === 'free_text' ? ':free_text_may_not_deliver' : ''}`
+          : `failed: ${whatsappResult.error || 'unknown'}`,
+        _whatsappMeta: whatsappResult.success
+          ? {
+              messageId: whatsappResult.messageId,
+              messageStatus: whatsappResult.messageStatus,
+              formattedTo: whatsappResult.formattedTo,
+              deliveryMethod: whatsappResult.deliveryMethod,
+              templateName: whatsappResult.templateName,
+            }
+          : { errorCode: whatsappResult.errorCode },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -4686,12 +4719,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           id: ticket.id,
           ticketNumber: ticket.ticketNumber,
           _whatsappStatus: whatsappResult.success
-            ? "sent"
+            ? `accepted:${whatsappResult.messageStatus || "unknown"}`
             : `failed: ${whatsappResult.error || "unknown"}`,
         });
         await new Promise((r) => setTimeout(r, 350));
       }
-      const sent = results.filter((r) => r._whatsappStatus === "sent").length;
+      const sent = results.filter((r) => r._whatsappStatus.startsWith("accepted:")).length;
       return res.json({
         total: targets.length,
         sent,
@@ -9736,19 +9769,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/admin/whatsapp/templates', async (req: any, res: any) => {
     if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
-    const dbSettings = await storage.getStoreSettings();
-    const wabaId = (dbSettings?.whatsappWabaId && dbSettings.whatsappWabaId.trim()) ? dbSettings.whatsappWabaId.trim() : process.env.WHATSAPP_WABA_ID;
-    const token = (dbSettings?.whatsappAccessToken && dbSettings.whatsappAccessToken.trim()) ? dbSettings.whatsappAccessToken.trim() : process.env.WHATSAPP_ACCESS_TOKEN;
-    if (!wabaId || !token) return res.status(500).json({ error: 'WhatsApp not configured' });
+    const { wabaId, accessToken } = await getCredentials();
+    if (!wabaId || !accessToken) return res.status(500).json({ error: 'WhatsApp not configured' });
     try {
       const response = await fetch(
-        `https://graph.facebook.com/v18.0/${wabaId}/message_templates?fields=name,status,language,components&access_token=${token}`
+        `https://graph.facebook.com/v21.0/${wabaId}/message_templates?fields=name,status,language,components&access_token=${encodeURIComponent(accessToken)}`
       );
       const data = await response.json() as any;
       return res.json(data);
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
+  });
+
+  app.get('/api/admin/whatsapp/diagnostics', async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
+    try {
+      const diagnostics = await getWhatsAppDiagnostics();
+      return res.json(diagnostics);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get('/api/admin/whatsapp/delivery-events', async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
+    return res.json({ events: whatsappDeliveryEvents.slice(0, 50) });
   });
 
   app.post('/api/admin/whatsapp/test', async (req: any, res: any) => {
@@ -9768,13 +9814,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
         null
       );
 
+      const acceptedNotDeliveredHint =
+        result.success && result.messageStatus === 'accepted'
+          ? 'Meta accepted the message. Delivery is async — check «تشخيص واتساب» for failed receipts. If nothing arrives: verify token, template APPROVED, and webhook subscribed to messages.'
+          : undefined;
+
       return res.json({
         ok: result.success,
         source: 'repair_status_update_pipeline',
         messageId: result.messageId,
+        messageStatus: result.messageStatus,
+        waId: result.waId,
+        formattedTo: result.formattedTo,
+        deliveryMethod: result.deliveryMethod,
+        templateName: result.templateName,
+        templateLanguage: result.templateLanguage,
         error: result.error,
         errorCode: result.errorCode,
         errorData: result.errorData,
+        hint: acceptedNotDeliveredHint,
+        recentDeliveryEvents: whatsappDeliveryEvents.slice(0, 10),
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
@@ -10007,6 +10066,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const ts = st?.timestamp;
             const recipientId = st?.recipient_id;
             const errors = st?.errors;
+            recordWhatsAppDeliveryEvent({
+              messageId: msgId,
+              status: String(status || 'unknown'),
+              recipientId,
+              errors,
+            });
             console.log("WhatsApp status update:", {
               id: msgId,
               status,
