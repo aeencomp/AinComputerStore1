@@ -6,7 +6,7 @@ import {
   salesShifts,
   adminUsers,
 } from "@shared/schema";
-import { and, or, gte, lte, inArray, eq, isNotNull, isNull, desc } from "drizzle-orm";
+import { and, or, inArray, eq, isNotNull, isNull, desc, sql } from "drizzle-orm";
 import { LOCATION_MAIN_ID, LOCATION_SHOP2_ID } from "./sales-locations";
 import {
   isOrderDeferred,
@@ -57,117 +57,168 @@ export function baghdadDateString(date?: Date): string {
   return (date ?? new Date()).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
-function dayBounds(baghdadDateStr: string) {
-  const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
-  const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
-  return { startOfDay, endOfDay };
+/** DB `timestamp` columns store Baghdad wall clock — compare in SQL, not JS Date. */
+function sqlBaghdadDayStart(dateStr: string) {
+  return sql`((${dateStr}::date)::timestamp)`;
 }
 
-/** Same logic as GET /api/daily-report — shift-aware Baghdad calendar day. */
+function sqlBaghdadDayEnd(dateStr: string) {
+  return sql`((((${dateStr}::date) + interval '1 day')::timestamp) - interval '1 millisecond')`;
+}
+
+export type DailyReportSummaryOptions = {
+  /**
+   * Owner WhatsApp report: all sales on the calendar day per location.
+   * Shift report UI: shift-aware attribution (default).
+   */
+  calendarDayOnly?: boolean;
+};
+
+/** Same logic as GET /api/daily-report — shift-aware Baghdad calendar day (SQL timestamps). */
 export async function computeDailyReportSummary(
   baghdadDateStr: string,
   salesLocationId: number,
+  options?: DailyReportSummaryOptions,
 ): Promise<DailyReportSummary> {
-  const { startOfDay, endOfDay } = dayBounds(baghdadDateStr);
-  const now = new Date();
-
-  const shiftsOnDate = await db
-    .select()
-    .from(salesShifts)
-    .where(
-      and(
-        eq(salesShifts.salesLocationId, salesLocationId),
-        gte(salesShifts.startTime, startOfDay),
-        lte(salesShifts.startTime, endOfDay),
-      ),
-    )
-    .orderBy(desc(salesShifts.startTime));
-
-  const effectiveEnd =
-    shiftsOnDate.length > 0
-      ? new Date(
-          Math.max(endOfDay.getTime(), ...shiftsOnDate.map((s) => (s.endTime || now).getTime())),
-        )
-      : endOfDay;
+  const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
+  const dayEndSql = sqlBaghdadDayEnd(baghdadDateStr);
 
   const allInStoreOrders: (typeof orders.$inferSelect)[] = [];
-  const seenOrderIds = new Set<string>();
 
-  if (shiftsOnDate.length > 0) {
-    for (const shift of shiftsOnDate) {
-      const shiftEnd = shift.endTime || now;
-      const shiftOrders = await db
+  if (options?.calendarDayOnly) {
+    allInStoreOrders.push(
+      ...(await db
         .select()
         .from(orders)
         .where(
           and(
             inArray(orders.orderType, ["walk-in", "in-store"]),
             eq(orders.salesLocationId, salesLocationId),
-            eq(orders.salespersonId, shift.salesUserId),
-            gte(orders.createdAt, shift.startTime),
-            lte(orders.createdAt, shiftEnd),
+            sql`${orders.createdAt} >= ${dayStartSql}`,
+            sql`${orders.createdAt} <= ${dayEndSql}`,
+          ),
+        )),
+    );
+  } else {
+    const shiftsOnDate = await db
+      .select()
+      .from(salesShifts)
+      .where(
+        and(
+          eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.startTime} >= ${dayStartSql}`,
+          sql`${salesShifts.startTime} <= ${dayEndSql}`,
+        ),
+      )
+      .orderBy(desc(salesShifts.startTime));
+
+    const effectiveEndSql =
+      shiftsOnDate.length > 0
+        ? sql`(
+            select greatest(
+              ${dayEndSql},
+              coalesce(max(coalesce(end_time, timezone('Asia/Baghdad', now()))), ${dayEndSql})
+            )
+            from sales_shifts
+            where sales_location_id = ${salesLocationId}
+              and start_time >= ${dayStartSql}
+              and start_time <= ${dayEndSql}
+          )`
+        : dayEndSql;
+
+    const seenOrderIds = new Set<string>();
+
+    if (shiftsOnDate.length > 0) {
+      for (const shift of shiftsOnDate) {
+        const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shift.id} limit 1)`;
+        const shiftEndSql = sql`(select coalesce(end_time, timezone('Asia/Baghdad', now())) from sales_shifts where id = ${shift.id} limit 1)`;
+        const shiftOrders = await db
+          .select()
+          .from(orders)
+          .where(
+            and(
+              inArray(orders.orderType, ["walk-in", "in-store"]),
+              eq(orders.salesLocationId, salesLocationId),
+              eq(orders.salespersonId, shift.salesUserId),
+              sql`${orders.createdAt} >= ${shiftStartSql}`,
+              sql`${orders.createdAt} <= ${shiftEndSql}`,
+            ),
+          );
+        for (const o of shiftOrders) {
+          if (!seenOrderIds.has(o.id)) {
+            seenOrderIds.add(o.id);
+            allInStoreOrders.push(o);
+          }
+        }
+      }
+
+      const adminOrders = await db
+        .select()
+        .from(orders)
+        .where(
+          and(
+            inArray(orders.orderType, ["walk-in", "in-store"]),
+            eq(orders.salesLocationId, salesLocationId),
+            isNull(orders.salespersonId),
+            sql`${orders.createdAt} >= ${dayStartSql}`,
+            sql`${orders.createdAt} <= ${effectiveEndSql}`,
           ),
         );
-      for (const o of shiftOrders) {
+      for (const o of adminOrders) {
         if (!seenOrderIds.has(o.id)) {
           seenOrderIds.add(o.id);
           allInStoreOrders.push(o);
         }
       }
-    }
 
-    const adminOrders = await db
-      .select()
-      .from(orders)
-      .where(
-        and(
-          inArray(orders.orderType, ["walk-in", "in-store"]),
-          eq(orders.salesLocationId, salesLocationId),
-          isNull(orders.salespersonId),
-          gte(orders.createdAt, startOfDay),
-          lte(orders.createdAt, effectiveEnd),
-        ),
-      );
-    for (const o of adminOrders) {
-      if (!seenOrderIds.has(o.id)) {
-        seenOrderIds.add(o.id);
-        allInStoreOrders.push(o);
+      const adminTaggedRows = await db
+        .select({ o: orders })
+        .from(orders)
+        .innerJoin(adminUsers, eq(orders.salespersonId, adminUsers.id))
+        .where(
+          and(
+            inArray(orders.orderType, ["walk-in", "in-store"]),
+            eq(orders.salesLocationId, salesLocationId),
+            sql`${orders.createdAt} >= ${dayStartSql}`,
+            sql`${orders.createdAt} <= ${effectiveEndSql}`,
+          ),
+        );
+      for (const row of adminTaggedRows) {
+        const o = row.o;
+        if (!seenOrderIds.has(o.id)) {
+          seenOrderIds.add(o.id);
+          allInStoreOrders.push(o);
+        }
       }
+    } else {
+      const calOrders = await db
+        .select()
+        .from(orders)
+        .where(
+          and(
+            inArray(orders.orderType, ["walk-in", "in-store"]),
+            eq(orders.salesLocationId, salesLocationId),
+            sql`${orders.createdAt} >= ${dayStartSql}`,
+            sql`${orders.createdAt} <= ${dayEndSql}`,
+          ),
+        );
+      allInStoreOrders.push(...calOrders);
     }
-
-    const adminTaggedRows = await db
-      .select({ o: orders })
-      .from(orders)
-      .innerJoin(adminUsers, eq(orders.salespersonId, adminUsers.id))
-      .where(
-        and(
-          inArray(orders.orderType, ["walk-in", "in-store"]),
-          eq(orders.salesLocationId, salesLocationId),
-          gte(orders.createdAt, startOfDay),
-          lte(orders.createdAt, effectiveEnd),
-        ),
-      );
-    for (const row of adminTaggedRows) {
-      const o = row.o;
-      if (!seenOrderIds.has(o.id)) {
-        seenOrderIds.add(o.id);
-        allInStoreOrders.push(o);
-      }
-    }
-  } else {
-    const calOrders = await db
-      .select()
-      .from(orders)
-      .where(
-        and(
-          inArray(orders.orderType, ["walk-in", "in-store"]),
-          eq(orders.salesLocationId, salesLocationId),
-          gte(orders.createdAt, startOfDay),
-          lte(orders.createdAt, endOfDay),
-        ),
-      );
-    allInStoreOrders.push(...calOrders);
   }
+
+  const repairEndSql = options?.calendarDayOnly ? dayEndSql : sql`(
+    select greatest(
+      ${dayEndSql},
+      coalesce(
+        (select max(coalesce(end_time, timezone('Asia/Baghdad', now())))
+         from sales_shifts
+         where sales_location_id = ${salesLocationId}
+           and start_time >= ${dayStartSql}
+           and start_time <= ${dayEndSql}),
+        ${dayEndSql}
+      )
+    )
+  )`;
 
   const paidRepairTickets =
     salesLocationId === LOCATION_MAIN_ID
@@ -178,18 +229,20 @@ export async function computeDailyReportSummary(
             or(
               and(
                 eq(repairTickets.paymentStatus, "paid"),
-                gte(repairTickets.updatedAt, startOfDay),
-                lte(repairTickets.updatedAt, effectiveEnd),
+                sql`${repairTickets.updatedAt} >= ${dayStartSql}`,
+                sql`${repairTickets.updatedAt} <= ${repairEndSql}`,
               ),
               and(
                 eq(repairTickets.status, "delivered"),
                 isNotNull(repairTickets.deliveredAt),
-                gte(repairTickets.deliveredAt, startOfDay),
-                lte(repairTickets.deliveredAt, effectiveEnd),
+                sql`${repairTickets.deliveredAt} >= ${dayStartSql}`,
+                sql`${repairTickets.deliveredAt} <= ${repairEndSql}`,
               ),
             ),
           )
       : [];
+
+  const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndSql;
 
   const dailyWithdrawals = await db
     .select()
@@ -197,8 +250,8 @@ export async function computeDailyReportSummary(
     .where(
       and(
         eq(cashWithdrawals.salesLocationId, salesLocationId),
-        gte(cashWithdrawals.createdAt, startOfDay),
-        lte(cashWithdrawals.createdAt, effectiveEnd),
+        sql`${cashWithdrawals.createdAt} >= ${dayStartSql}`,
+        sql`${cashWithdrawals.createdAt} <= ${withdrawalEndSql}`,
       ),
     );
 
@@ -260,9 +313,10 @@ export async function computeDailyReportSummary(
 export async function computeCombinedDailyRevenue(
   baghdadDateStr: string,
 ): Promise<CombinedDailyRevenue> {
+  const calendarOpts = { calendarDayOnly: true as const };
   const [loc1, loc2] = await Promise.all([
-    computeDailyReportSummary(baghdadDateStr, LOCATION_MAIN_ID),
-    computeDailyReportSummary(baghdadDateStr, LOCATION_SHOP2_ID),
+    computeDailyReportSummary(baghdadDateStr, LOCATION_MAIN_ID, calendarOpts),
+    computeDailyReportSummary(baghdadDateStr, LOCATION_SHOP2_ID, calendarOpts),
   ]);
 
   const location1InStore = loc1.inStoreTotal;
