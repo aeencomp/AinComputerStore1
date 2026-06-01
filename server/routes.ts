@@ -9829,6 +9829,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         body: {
           error: result.error || "فشل إرسال واتساب",
           errorCode: result.errorCode,
+          errorData: result.errorData,
+          formattedTo: result.formattedTo || formatPhoneNumber(to),
+          hintAr:
+            "جرّب زر «اختبار واتساب» أعلاه لنفس الرقم. إن فشل الاختبار أيضاً: راجع Phone Number ID ورمز الوصول في Meta. إن نجح الاختبار فأعد إرسال التقرير بعد التحديث.",
           revenue,
           messagePreview: messageBody,
         },

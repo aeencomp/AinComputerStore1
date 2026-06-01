@@ -657,9 +657,13 @@ export default function AdminSettings() {
                                   : `Sent to ${data.formattedTo || data.to || 'configured number'}.`) + methodNote,
                             });
                           } else {
+                            const extra = data.formattedTo
+                              ? ` (${data.formattedTo})`
+                              : '';
+                            const code = data.errorCode ? ` [${data.errorCode}]` : '';
                             setDailyRevenueSendResult({
                               ok: false,
-                              message: data.error || 'Send failed',
+                              message: (data.error || 'Send failed') + extra + code + (data.hintAr ? ` — ${data.hintAr}` : ''),
                             });
                           }
                         } catch (e: any) {

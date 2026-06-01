@@ -299,6 +299,11 @@ export async function sendTicketCreatedMessage(
   return sendWhatsAppMessage(customerPhone, message);
 }
 
+export type TicketUpdatedMessageOptions = {
+  /** When true, do not fall back to free-text (won't deliver outside 24h window). */
+  skipFreeTextFallback?: boolean;
+};
+
 export async function sendTicketUpdatedMessage(
   customerPhone: string,
   customerName: string,
@@ -306,7 +311,8 @@ export async function sendTicketUpdatedMessage(
   status: string,
   technicianNotes?: string | null,
   costEstimate?: string | null,
-  finalCost?: string | null
+  finalCost?: string | null,
+  options?: TicketUpdatedMessageOptions,
 ): Promise<WhatsAppMessageResult> {
   const templateCandidates = getTemplateCandidates(
     'WHATSAPP_REPAIR_STATUS_TEMPLATES',
@@ -356,7 +362,9 @@ export async function sendTicketUpdatedMessage(
         'ar',
         params
       );
-      if (templateResult.success) return templateResult;
+      if (templateResult.success) {
+        return { ...templateResult, deliveryMethod: 'template' };
+      }
       const errText = `${templateResult.error || ''}`.toLowerCase();
       if (!errText.includes('parameter') || !errText.includes('match')) break;
     }
@@ -374,7 +382,20 @@ export async function sendTicketUpdatedMessage(
       'ar',
       [primaryParams[0], primaryParams[1], primaryParams[2], '-']
     );
-    if (retryResult.success) return retryResult;
+    if (retryResult.success) {
+      return { ...retryResult, deliveryMethod: 'template' };
+    }
+  }
+
+  if (options?.skipFreeTextFallback) {
+    return {
+      ...retryResult,
+      success: false,
+      error:
+        retryResult.error ||
+        'فشل إرسال قالب واتساب. جرّب «اختبار واتساب» لنفس الرقم في الإعدادات (إشعار الصيانة).',
+      deliveryMethod: undefined,
+    };
   }
 
   // Last resort fallback (may fail outside 24h window). Keep it, but make the failure visible via logs/result.
@@ -386,63 +407,16 @@ export async function sendTicketUpdatedMessage(
     (extras.length ? '\n' + sanitizeTemplateParam(extras.join('\n'), 700) : '') +
     `\n\nالعين لتجارة الحاسبات - 07850006977`;
 
-  return sendWhatsAppMessage(customerPhone, message);
+  const textResult = await sendWhatsAppMessage(customerPhone, message);
+  return { ...textResult, deliveryMethod: 'free_text' };
 }
 
-async function tryRepairStatusTemplateForDailyRevenue(
-  to: string,
-  templateParams: { date: string; loc1: string; loc2: string; repair: string; total: string },
-): Promise<WhatsAppMessageResult> {
-  const repairTemplates = getTemplateCandidates(
-    'WHATSAPP_REPAIR_STATUS_TEMPLATES',
-    'repair_status_update',
-  );
-
-  const details = sanitizeTemplateParam(
-    `م1: ${templateParams.loc1} | م2: ${templateParams.loc2} | صيانة: ${templateParams.repair} | الإجمالي: ${templateParams.total}`,
-    900,
-  );
-
-  const paramVariants: string[][] = [
-    ['تقرير إيرادات', templateParams.date, templateParams.loc1, details],
-    ['تقرير إيرادات', templateParams.date, details],
-    [templateParams.date, templateParams.loc1, details],
-    [templateParams.date, details],
-    [details],
-  ];
-
-  let lastError: WhatsAppMessageResult = { success: false, error: 'Repair template fallback failed' };
-
-  for (const templateName of repairTemplates) {
-    for (const params of paramVariants) {
-      const sanitized = params.map((p) => sanitizeTemplateParam(p));
-      const result = await sendWhatsAppTemplateWithLanguageFallbacks(
-        to,
-        templateName,
-        'ar',
-        sanitized,
-      );
-      if (result.success) {
-        return {
-          ...result,
-          deliveryMethod: 'repair_status_template',
-        };
-      }
-      lastError = result;
-      const errText = `${result.error || ''}`.toLowerCase();
-      const isParamMismatch =
-        result.errorCode === 132000 ||
-        (errText.includes('parameter') && errText.includes('match'));
-      if (!isParamMismatch) break;
-    }
-  }
-
-  return lastError;
+function isValidIraqWhatsAppE164(formatted: string): boolean {
+  return /^9647\d{9}$/.test(formatted);
 }
 
 /**
- * Daily revenue summary to owner/manager (Location 1, 2, repair).
- * Uses approved templates (business-initiated). Free-text is last resort and often does not deliver.
+ * Daily revenue summary — uses the same repair_status_update pipeline as customer repair alerts.
  */
 export async function sendDailyRevenueWhatsApp(
   to: string,
@@ -451,9 +425,21 @@ export async function sendDailyRevenueWhatsApp(
 ): Promise<WhatsAppMessageResult> {
   const formattedTo = formatPhoneNumber(to);
 
+  if (!isValidIraqWhatsAppE164(formattedTo)) {
+    return {
+      success: false,
+      formattedTo,
+      error: `رقم واتساب غير صالح (${formattedTo}). استخدم صيغة عراقية مثل 07801234567.`,
+    };
+  }
+
+  if (!templateParams) {
+    return { success: false, formattedTo, error: 'بيانات التقرير ناقصة' };
+  }
+
   const dedicatedTemplate = (process.env.WHATSAPP_DAILY_REVENUE_TEMPLATE || '').trim();
 
-  if (dedicatedTemplate && templateParams) {
+  if (dedicatedTemplate) {
     const templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
       to,
       dedicatedTemplate,
@@ -474,27 +460,45 @@ export async function sendDailyRevenueWhatsApp(
       };
     }
     console.warn(
-      `Daily revenue template "${dedicatedTemplate}" failed (code=${templateResult.errorCode ?? 'n/a'}): ${templateResult.error}. Trying repair_status_update.`,
+      `Daily revenue template "${dedicatedTemplate}" failed (code=${templateResult.errorCode ?? 'n/a'}): ${templateResult.error}. Using repair_status_update.`,
     );
   }
 
-  if (templateParams) {
-    const repairFallback = await tryRepairStatusTemplateForDailyRevenue(to, templateParams);
-    if (repairFallback.success) {
-      return { ...repairFallback, formattedTo };
-    }
-    console.warn(
-      `Daily revenue repair template fallback failed (code=${repairFallback.errorCode ?? 'n/a'}): ${repairFallback.error}. Trying free-text.`,
-    );
+  const revenueNotes = sanitizeTemplateParam(
+    `م1: ${templateParams.loc1} | م2: ${templateParams.loc2} | صيانة: ${templateParams.repair} | مجموع: ${templateParams.total}`,
+    900,
+  );
+
+  const repairPipeline = await sendTicketUpdatedMessage(
+    to,
+    'تقرير إيرادات',
+    templateParams.date,
+    'إيرادات اليوم',
+    revenueNotes,
+    null,
+    null,
+    { skipFreeTextFallback: true },
+  );
+
+  if (repairPipeline.success) {
+    return {
+      ...repairPipeline,
+      deliveryMethod: 'repair_status_template',
+      formattedTo,
+    };
   }
 
-  const textResult = await sendWhatsAppMessage(to, messageBody);
+  console.error(
+    `Daily revenue WhatsApp failed for ${formattedTo} (code=${repairPipeline.errorCode ?? 'n/a'}): ${repairPipeline.error}`,
+  );
+
   return {
-    ...textResult,
+    ...repairPipeline,
+    success: false,
     formattedTo,
-    deliveryMethod: textResult.success ? 'free_text' : undefined,
-    deliveryWarning: textResult.success
-      ? 'تم قبول الرسالة من Meta كرسالة نصية. غالباً لا تصل إلا إذا راسلتم رقم المتجر على واتساب خلال 24 ساعة. يُفضّل استخدام قالب معتمد (repair_status_update يُجرَّب تلقائياً).'
-      : undefined,
+    error:
+      repairPipeline.error ||
+      'فشل إرسال واتساب. من الإعدادات جرّب «اختبار واتساب» لنفس الرقم — إن نجح الاختبار ولم يصل التقرير، راجع سجلات pm2.',
+    messagePreview: messageBody,
   };
 }
