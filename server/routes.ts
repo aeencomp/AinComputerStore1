@@ -6,7 +6,7 @@ import { db } from "./db";
 import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
-import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage, sendWhatsAppTemplate, sendDailyRevenueWhatsApp } from "./whatsapp";
+import { sendTicketCreatedMessage, sendTicketUpdatedMessage, sendWhatsAppMessage, sendWhatsAppTemplate, sendDailyRevenueWhatsApp, formatPhoneNumber } from "./whatsapp";
 import {
   baghdadDateString,
   buildDailyRevenueWhatsAppMessage,
@@ -9842,6 +9842,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         success: true,
         messageId: result.messageId,
         to,
+        formattedTo: result.formattedTo || formatPhoneNumber(to),
+        deliveryMethod: result.deliveryMethod,
+        deliveryWarning: result.deliveryWarning,
         revenue,
         messagePreview: messageBody,
       },

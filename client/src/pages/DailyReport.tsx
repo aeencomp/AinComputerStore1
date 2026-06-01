@@ -607,13 +607,16 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
       if (!res.ok) throw new Error(data.error || "Send failed");
       return data;
     },
-    onSuccess: () => {
+    onSuccess: (data: { deliveryMethod?: string; deliveryWarning?: string; formattedTo?: string }) => {
+      const viaTemplate = data.deliveryMethod === "repair_status_template" || data.deliveryMethod === "daily_template";
       toast({
         title: language === "ar" ? "تم إرسال واتساب" : "WhatsApp sent",
         description:
-          language === "ar"
-            ? "تم إرسال تقرير إيرادات اليوم (الموقع 1، 2، الصيانة)."
-            : "Today's revenue report was sent (Location 1, 2, repair).",
+          data.deliveryWarning && !viaTemplate
+            ? data.deliveryWarning
+            : language === "ar"
+              ? `تقرير اليوم (موقع 1، 2، صيانة) → ${data.formattedTo || "الرقم المضبوط"}${viaTemplate ? " (قالب معتمد)" : ""}`
+              : `Today's report sent to ${data.formattedTo || "configured number"}${viaTemplate ? " (approved template)" : ""}`,
       });
     },
     onError: (err: Error) => {

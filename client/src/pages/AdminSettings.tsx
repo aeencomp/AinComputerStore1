@@ -612,8 +612,8 @@ export default function AdminSettings() {
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {language === 'ar'
-                        ? 'يُرسل إيرادات الموقع 1 والموقع 2 والصيانة لرقم المالك. اختياري: قالب Meta WHATSAPP_DAILY_REVENUE_TEMPLATE (5 متغيرات: تاريخ، موقع1، موقع2، صيانة، إجمالي).'
-                        : 'Sends Location 1, Location 2, and repair revenue. Optional env WHATSAPP_DAILY_REVENUE_TEMPLATE (5 body params).'}
+                        ? 'يُرسل إيرادات الموقع 1 والموقع 2 والصيانة. يستخدم قالب repair_status_update المعتمد تلقائياً (نفس إشعارات الصيانة) حتى تصل الرسالة. الرقم بصيغة 07XXXXXXXXX.'
+                        : 'Sends Location 1, 2, and repair totals. Uses your approved repair_status_update template automatically so delivery works. Use 07XXXXXXXXX format.'}
                     </p>
                     <div className="space-y-2">
                       <Label htmlFor="dailyRevenueWhatsappNumber">
@@ -641,11 +641,20 @@ export default function AdminSettings() {
                           });
                           const data = await res.json();
                           if (data.success) {
+                            const methodNote =
+                              data.deliveryMethod === 'free_text' && data.deliveryWarning
+                                ? data.deliveryWarning
+                                : data.deliveryMethod === 'repair_status_template'
+                                  ? (language === 'ar'
+                                    ? ' أُرسل عبر قالب إشعارات الصيانة.'
+                                    : ' Sent via repair notification template.')
+                                  : '';
                             setDailyRevenueSendResult({
                               ok: true,
-                              message: language === 'ar'
-                                ? 'تم إرسال تقرير إيرادات اليوم بنجاح.'
-                                : "Today's revenue report sent successfully.",
+                              message:
+                                (language === 'ar'
+                                  ? `تم الإرسال إلى ${data.formattedTo || data.to || 'الرقم المضبوط'}.`
+                                  : `Sent to ${data.formattedTo || data.to || 'configured number'}.`) + methodNote,
                             });
                           } else {
                             setDailyRevenueSendResult({

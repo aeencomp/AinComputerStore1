@@ -9,9 +9,15 @@ interface WhatsAppMessageResult {
   error?: string;
   errorCode?: number | string;
   errorData?: any;
+  /** How the message was sent (for diagnostics). */
+  deliveryMethod?: 'daily_template' | 'repair_status_template' | 'free_text';
+  /** Shown when delivery may fail (e.g. free-text outside 24h window). */
+  deliveryWarning?: string;
+  formattedTo?: string;
 }
 
-function formatPhoneNumber(phone: string): string {
+/** Exported for API diagnostics (E.164 without +). */
+export function formatPhoneNumber(phone: string): string {
   // Normalize Arabic-Indic digits then keep digits only.
   // This supports inputs like "٠٧٨..." which JS \d does not treat as [0-9].
   const toLatinDigits = (s: string) =>
@@ -383,19 +389,75 @@ export async function sendTicketUpdatedMessage(
   return sendWhatsAppMessage(customerPhone, message);
 }
 
-/** Daily revenue summary to owner/manager (Location 1, 2, repair). */
+async function tryRepairStatusTemplateForDailyRevenue(
+  to: string,
+  templateParams: { date: string; loc1: string; loc2: string; repair: string; total: string },
+): Promise<WhatsAppMessageResult> {
+  const repairTemplates = getTemplateCandidates(
+    'WHATSAPP_REPAIR_STATUS_TEMPLATES',
+    'repair_status_update',
+  );
+
+  const details = sanitizeTemplateParam(
+    `م1: ${templateParams.loc1} | م2: ${templateParams.loc2} | صيانة: ${templateParams.repair} | الإجمالي: ${templateParams.total}`,
+    900,
+  );
+
+  const paramVariants: string[][] = [
+    ['تقرير إيرادات', templateParams.date, templateParams.loc1, details],
+    ['تقرير إيرادات', templateParams.date, details],
+    [templateParams.date, templateParams.loc1, details],
+    [templateParams.date, details],
+    [details],
+  ];
+
+  let lastError: WhatsAppMessageResult = { success: false, error: 'Repair template fallback failed' };
+
+  for (const templateName of repairTemplates) {
+    for (const params of paramVariants) {
+      const sanitized = params.map((p) => sanitizeTemplateParam(p));
+      const result = await sendWhatsAppTemplateWithLanguageFallbacks(
+        to,
+        templateName,
+        'ar',
+        sanitized,
+      );
+      if (result.success) {
+        return {
+          ...result,
+          deliveryMethod: 'repair_status_template',
+        };
+      }
+      lastError = result;
+      const errText = `${result.error || ''}`.toLowerCase();
+      const isParamMismatch =
+        result.errorCode === 132000 ||
+        (errText.includes('parameter') && errText.includes('match'));
+      if (!isParamMismatch) break;
+    }
+  }
+
+  return lastError;
+}
+
+/**
+ * Daily revenue summary to owner/manager (Location 1, 2, repair).
+ * Uses approved templates (business-initiated). Free-text is last resort and often does not deliver.
+ */
 export async function sendDailyRevenueWhatsApp(
   to: string,
   messageBody: string,
   templateParams?: { date: string; loc1: string; loc2: string; repair: string; total: string },
 ): Promise<WhatsAppMessageResult> {
-  const templateName = (process.env.WHATSAPP_DAILY_REVENUE_TEMPLATE || "").trim();
+  const formattedTo = formatPhoneNumber(to);
 
-  if (templateName && templateParams) {
+  const dedicatedTemplate = (process.env.WHATSAPP_DAILY_REVENUE_TEMPLATE || '').trim();
+
+  if (dedicatedTemplate && templateParams) {
     const templateResult = await sendWhatsAppTemplateWithLanguageFallbacks(
       to,
-      templateName,
-      "ar",
+      dedicatedTemplate,
+      'ar',
       [
         templateParams.date,
         templateParams.loc1,
@@ -404,11 +466,35 @@ export async function sendDailyRevenueWhatsApp(
         templateParams.total,
       ],
     );
-    if (templateResult.success) return templateResult;
+    if (templateResult.success) {
+      return {
+        ...templateResult,
+        deliveryMethod: 'daily_template',
+        formattedTo,
+      };
+    }
     console.warn(
-      `Daily revenue WhatsApp template failed (code=${templateResult.errorCode ?? "n/a"}): ${templateResult.error}. Trying text message.`,
+      `Daily revenue template "${dedicatedTemplate}" failed (code=${templateResult.errorCode ?? 'n/a'}): ${templateResult.error}. Trying repair_status_update.`,
     );
   }
 
-  return sendWhatsAppMessage(to, messageBody);
+  if (templateParams) {
+    const repairFallback = await tryRepairStatusTemplateForDailyRevenue(to, templateParams);
+    if (repairFallback.success) {
+      return { ...repairFallback, formattedTo };
+    }
+    console.warn(
+      `Daily revenue repair template fallback failed (code=${repairFallback.errorCode ?? 'n/a'}): ${repairFallback.error}. Trying free-text.`,
+    );
+  }
+
+  const textResult = await sendWhatsAppMessage(to, messageBody);
+  return {
+    ...textResult,
+    formattedTo,
+    deliveryMethod: textResult.success ? 'free_text' : undefined,
+    deliveryWarning: textResult.success
+      ? 'تم قبول الرسالة من Meta كرسالة نصية. غالباً لا تصل إلا إذا راسلتم رقم المتجر على واتساب خلال 24 ساعة. يُفضّل استخدام قالب معتمد (repair_status_update يُجرَّب تلقائياً).'
+      : undefined,
+  };
 }
