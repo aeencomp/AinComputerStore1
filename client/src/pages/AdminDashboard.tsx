@@ -358,6 +358,7 @@ export default function AdminDashboard() {
   });
   const [passwordForm, setPasswordForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' });
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [selectedNotificationOrderId, setSelectedNotificationOrderId] = useState<string | null>(null);
 
   // Real-time order notifications
   const { notifications, unreadCount, markAsRead, markAllAsRead, isConnected } = useAdminNotifications();
@@ -582,6 +583,10 @@ export default function AdminDashboard() {
     }
   };
 
+  const selectedNotificationOrder = selectedNotificationOrderId
+    ? orders.find((o) => o.id === selectedNotificationOrderId) || null
+    : null;
+
   const handleCreateAdmin = () => {
     if (!newAdminForm.username || !newAdminForm.password || !newAdminForm.name) {
       toast({
@@ -713,6 +718,7 @@ export default function AdminDashboard() {
                           onClick={() => {
                             markAsRead(notification.timestamp);
                             queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+                            setSelectedNotificationOrderId(notification.data.orderId);
                             setNotificationsOpen(false);
                           }}
                           data-testid={`notification-${notification.data.orderNumber}`}
@@ -1212,6 +1218,88 @@ export default function AdminDashboard() {
           </TabsContent>
         </Tabs>
       </main>
+
+      <Dialog
+        open={!!selectedNotificationOrderId}
+        onOpenChange={(open) => !open && setSelectedNotificationOrderId(null)}
+      >
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'ar' ? 'تفاصيل الطلب' : 'Order Details'}
+              {selectedNotificationOrder?.orderNumber ? ` #${selectedNotificationOrder.orderNumber}` : ''}
+            </DialogTitle>
+          </DialogHeader>
+          {!selectedNotificationOrder ? (
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar'
+                ? 'تعذر تحميل تفاصيل الطلب. افتح تبويب الطلبات للمراجعة.'
+                : 'Could not load order details. Open Orders tab to review it.'}
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <div className="grid md:grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'العميل:' : 'Customer:'}</span> {selectedNotificationOrder.customerName || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الهاتف:' : 'Phone:'}</span> {selectedNotificationOrder.customerPhone || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'البريد:' : 'Email:'}</span> {selectedNotificationOrder.customerEmail || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'المدينة:' : 'City:'}</span> {selectedNotificationOrder.customerCity || '-'}</div>
+                <div className="md:col-span-2"><span className="text-muted-foreground">{language === 'ar' ? 'العنوان:' : 'Address:'}</span> {selectedNotificationOrder.customerAddress || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الرمز البريدي:' : 'Postal:'}</span> {selectedNotificationOrder.customerPostal || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الحالة:' : 'Status:'}</span> {selectedNotificationOrder.status || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'وقت الطلب:' : 'Created:'}</span> {new Date(selectedNotificationOrder.createdAt).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')}</div>
+              </div>
+
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="text-sm font-semibold">{language === 'ar' ? 'المنتجات المطلوبة' : 'Ordered Items'}</p>
+                {selectedNotificationOrder.items.length === 0 ? (
+                  <p className="text-xs text-muted-foreground">{language === 'ar' ? 'لا توجد عناصر' : 'No items'}</p>
+                ) : (
+                  selectedNotificationOrder.items.map((itemStr: string, idx: number) => {
+                    try {
+                      const item = JSON.parse(itemStr);
+                      const product = productMap.get(item.productId);
+                      const displayName = language === 'ar'
+                        ? (item.nameAr || product?.nameAr || item.productId)
+                        : (item.nameEn || product?.nameEn || item.productId);
+                      return (
+                        <div key={`${selectedNotificationOrder.id}-item-${idx}`} className="flex justify-between items-start text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0">
+                          <div className="min-w-0">
+                            <p className="font-medium truncate">{displayName}</p>
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {getFulfillmentLines(item).map((line: string, lineIndex: number) => (
+                                <Badge key={lineIndex} variant="outline" className="text-[10px]">
+                                  {line}
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                          <div className="text-end shrink-0 ms-2">
+                            <p>{language === 'ar' ? 'الكمية' : 'Qty'}: {item.quantity ?? 1}</p>
+                            <p className="font-semibold">{new Intl.NumberFormat('ar-IQ').format(Number(item.price || 0))} {t('common.currency')}</p>
+                          </div>
+                        </div>
+                      );
+                    } catch {
+                      return (
+                        <p key={`${selectedNotificationOrder.id}-raw-${idx}`} className="text-xs text-muted-foreground truncate">
+                          {itemStr}
+                        </p>
+                      );
+                    }
+                  })
+                )}
+              </div>
+
+              <div className="rounded-md border p-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'المجموع الفرعي:' : 'Subtotal:'}</span> {new Intl.NumberFormat('ar-IQ').format(Number((selectedNotificationOrder as any).subtotal || 0))} {t('common.currency')}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الشحن:' : 'Shipping:'}</span> {new Intl.NumberFormat('ar-IQ').format(Number((selectedNotificationOrder as any).shipping || 0))} {t('common.currency')}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الإجمالي:' : 'Total:'}</span> {new Intl.NumberFormat('ar-IQ').format(Number(selectedNotificationOrder.total || 0))} {t('common.currency')}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'عدد العناصر:' : 'Items:'}</span> {selectedNotificationOrder.items.length}</div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Order Dialog */}
       <AlertDialog open={!!deleteOrderId} onOpenChange={(open) => !open && setDeleteOrderId(null)}>

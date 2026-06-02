@@ -44,7 +44,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { ShoppingBag, CheckCheck, Trash2 } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import SalesDashboard from "./SalesDashboard";
 import SalesPOS from "./SalesPOS";
 import SalesInventory from "./SalesInventory";
@@ -83,6 +90,7 @@ export default function SalesPortal() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [selectedNotificationOrder, setSelectedNotificationOrder] = useState<any | null>(null);
   const [seenOrderIds, setSeenOrderIds] = useState<Set<string>>(() => {
     try { return new Set<string>(JSON.parse(localStorage.getItem('sales_seen_orders') || '[]')); }
     catch { return new Set<string>(); }
@@ -124,11 +132,58 @@ export default function SalesPortal() {
 
   const unreadOrderCount = recentOrders.filter((o: any) => !seenOrderIds.has(o.id)).length;
 
+  const markOrderSeen = (orderId: string) => {
+    const next = new Set<string>(seenOrderIds);
+    next.add(orderId);
+    setSeenOrderIds(next);
+    localStorage.setItem('sales_seen_orders', JSON.stringify(Array.from(next)));
+  };
+
   const markAllOrdersSeen = () => {
     const allIds = recentOrders.map((o: any) => o.id);
     const next = new Set<string>(Array.from(seenOrderIds).concat(allIds));
     setSeenOrderIds(next);
     localStorage.setItem('sales_seen_orders', JSON.stringify(Array.from(next)));
+  };
+
+  const renderOrderItemRows = (order: any) => {
+    if (!Array.isArray(order?.items) || order.items.length === 0) {
+      return (
+        <p className="text-xs text-muted-foreground">
+          {language === 'ar' ? 'لا توجد عناصر' : 'No items'}
+        </p>
+      );
+    }
+
+    return order.items.map((itemStr: string, idx: number) => {
+      try {
+        const item = JSON.parse(itemStr);
+        return (
+          <div key={`${order.id}-item-${idx}`} className="flex items-center justify-between text-xs border-b border-border/50 pb-2 last:border-0 last:pb-0">
+            <div className="min-w-0">
+              <p className="font-medium truncate">
+                {item.nameAr || item.nameEn || item.productId || (language === 'ar' ? 'منتج' : 'Product')}
+              </p>
+              {item.serialNumber && (
+                <p className="text-muted-foreground font-mono truncate">{item.serialNumber}</p>
+              )}
+            </div>
+            <div className="text-end shrink-0 ms-2">
+              <p>{language === 'ar' ? 'الكمية' : 'Qty'}: {item.quantity ?? 1}</p>
+              <p className="font-semibold">
+                {new Intl.NumberFormat('ar-IQ').format(Number(item.price || 0))} IQD
+              </p>
+            </div>
+          </div>
+        );
+      } catch {
+        return (
+          <p key={`${order.id}-raw-${idx}`} className="text-xs text-muted-foreground truncate">
+            {itemStr}
+          </p>
+        );
+      }
+    });
   };
 
   const logoutMutation = useMutation({
@@ -467,10 +522,15 @@ export default function SalesPortal() {
                         return (
                           <div
                             key={order.id}
-                            className={`flex gap-3 p-3 border-b last:border-0 ${isNew ? 'bg-primary/5' : ''}`}
+                            className={`flex gap-3 p-3 border-b last:border-0 cursor-pointer hover:bg-accent/50 transition-colors ${isNew ? 'bg-primary/5' : ''}`}
+                            onClick={() => {
+                              markOrderSeen(order.id);
+                              setSelectedNotificationOrder(order);
+                            }}
+                            data-testid={`sales-notification-order-${order.orderNumber}`}
                           >
                             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
-                              <ShoppingBag className="h-4 w-4 text-primary" />
+                              <ShoppingCart className="h-4 w-4 text-primary" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-medium">
@@ -488,7 +548,10 @@ export default function SalesPortal() {
                                 </Badge>
                               </div>
                             </div>
-                            {isNew && <span className="h-2 w-2 rounded-full bg-primary shrink-0 mt-1.5" />}
+                            <div className="flex items-start gap-2 shrink-0 mt-0.5">
+                              {isNew && <span className="h-2 w-2 rounded-full bg-primary mt-1.5" />}
+                              <ExternalLink className="h-3.5 w-3.5 text-muted-foreground" />
+                            </div>
                           </div>
                         );
                       })
@@ -676,6 +739,51 @@ export default function SalesPortal() {
         )}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}
       </main>
+
+      <Dialog open={!!selectedNotificationOrder} onOpenChange={(open) => !open && setSelectedNotificationOrder(null)}>
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+          <DialogHeader>
+            <DialogTitle>
+              {language === 'ar' ? 'تفاصيل الطلب الإلكتروني' : 'Online Order Details'} #{selectedNotificationOrder?.orderNumber}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedNotificationOrder && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الاسم:' : 'Name:'}</span> {selectedNotificationOrder.customerName || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الهاتف:' : 'Phone:'}</span> {selectedNotificationOrder.customerPhone || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'البريد:' : 'Email:'}</span> {selectedNotificationOrder.customerEmail || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'المدينة:' : 'City:'}</span> {selectedNotificationOrder.customerCity || '-'}</div>
+                <div className="md:col-span-2"><span className="text-muted-foreground">{language === 'ar' ? 'العنوان:' : 'Address:'}</span> {selectedNotificationOrder.customerAddress || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الرمز البريدي:' : 'Postal:'}</span> {selectedNotificationOrder.customerPostal || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'طريقة الدفع:' : 'Payment:'}</span> {selectedNotificationOrder.paymentMethod || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'حالة الدفع:' : 'Payment Status:'}</span> {selectedNotificationOrder.paymentStatus || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'حالة الطلب:' : 'Order Status:'}</span> {selectedNotificationOrder.status || '-'}</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'وقت الطلب:' : 'Created:'}</span> {new Date(selectedNotificationOrder.createdAt).toLocaleString(language === 'ar' ? 'ar-IQ' : 'en-US')}</div>
+              </div>
+
+              <div className="rounded-md border p-3 space-y-2">
+                <p className="text-sm font-semibold">{language === 'ar' ? 'تفاصيل المنتجات' : 'Order Items'}</p>
+                {renderOrderItemRows(selectedNotificationOrder)}
+              </div>
+
+              <div className="rounded-md border p-3 grid grid-cols-2 md:grid-cols-4 gap-2 text-sm">
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'المجموع الفرعي:' : 'Subtotal:'}</span> {new Intl.NumberFormat('ar-IQ').format(Number(selectedNotificationOrder.subtotal || 0))} IQD</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الشحن:' : 'Shipping:'}</span> {new Intl.NumberFormat('ar-IQ').format(Number(selectedNotificationOrder.shipping || 0))} IQD</div>
+                <div><span className="text-muted-foreground">{language === 'ar' ? 'الخصم:' : 'Discount:'}</span> {new Intl.NumberFormat('ar-IQ').format(Number(selectedNotificationOrder.discount || 0))} IQD</div>
+                <div className="font-semibold"><span className="text-muted-foreground">{language === 'ar' ? 'الإجمالي:' : 'Total:'}</span> {new Intl.NumberFormat('ar-IQ').format(Number(selectedNotificationOrder.total || 0))} IQD</div>
+              </div>
+
+              {selectedNotificationOrder.notes && (
+                <div className="rounded-md border p-3 text-sm">
+                  <p className="font-semibold mb-1">{language === 'ar' ? 'ملاحظات' : 'Notes'}</p>
+                  <p className="text-muted-foreground whitespace-pre-wrap">{selectedNotificationOrder.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <IntercomWidget portal="sales" />
     </div>
   );
