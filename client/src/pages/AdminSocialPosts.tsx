@@ -240,7 +240,12 @@ export default function AdminSocialPosts() {
       refetchConfig();
     },
     onError: (err: Error) => {
-      toast({ title: ar ? "لم يتم النشر" : "Auto post skipped/failed", description: err.message, variant: "destructive" });
+      const msg = err.message || "";
+      const reason =
+        msg.includes("Auto-post disabled")
+          ? (ar ? "فعّل «نشر تلقائي يومي» أو استخدم تبويب إنشاء منشور → نشر على فيسبوك" : "Enable daily auto-post or use Create Post tab")
+          : msg;
+      toast({ title: ar ? "لم يتم النشر" : "Post failed", description: reason, variant: "destructive" });
     },
   });
 
@@ -507,8 +512,8 @@ export default function AdminSocialPosts() {
                     <Label>{ar ? "نشر تلقائي يومي" : "Daily auto-post"}</Label>
                     <p className="text-xs text-muted-foreground mt-1">
                       {ar
-                        ? "يتطلب cron على السيرفر — راجع التعليمات أدناه"
-                        : "Requires server cron — see instructions below"}
+                        ? "للجدولة اليومية فقط — زر «نشر تلقائي الآن» يعمل بدون تفعيل هذا الخيار"
+                        : "For daily schedule only — «Run auto-post now» works without this toggle"}
                     </p>
                   </div>
                   <Switch

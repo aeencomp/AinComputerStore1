@@ -10202,6 +10202,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!settings) return res.status(404).json({ error: "Settings not found" });
       const outcome = await runAutoFacebookPost(settings, (patch) => storage.updateStoreSettings(patch as any), {
         force: !!req.body?.force,
+        manualTest: true,
       });
       if (outcome.skipped) {
         return res.status(400).json({ skipped: true, reason: outcome.reason });

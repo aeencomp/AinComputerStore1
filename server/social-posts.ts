@@ -387,9 +387,9 @@ export async function getFacebookPostHistory(limit = 30) {
 export async function runAutoFacebookPost(
   settings: StoreSettings,
   updateSettings: (patch: Partial<StoreSettings>) => Promise<StoreSettings>,
-  options?: { force?: boolean },
+  options?: { force?: boolean; manualTest?: boolean },
 ): Promise<{ skipped?: boolean; reason?: string; post?: GeneratedSocialPost; result?: FacebookPublishResult }> {
-  if (!settings.facebookAutoPostEnabled) {
+  if (!options?.manualTest && !settings.facebookAutoPostEnabled) {
     return { skipped: true, reason: "Auto-post disabled" };
   }
 
@@ -434,12 +434,12 @@ export async function runAutoFacebookPost(
     imageUrl: post.imageUrl,
     linkUrl: post.linkUrl,
     facebookPostId: result.facebookPostId,
-    source: "cron",
+    source: options?.manualTest ? "manual" : "cron",
     success: result.success,
     error: result.error,
   });
 
-  if (result.success) {
+  if (result.success && !options?.manualTest) {
     await updateSettings({
       facebookAutoPostLastAt: new Date(),
     } as Partial<StoreSettings>);
