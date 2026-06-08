@@ -10124,14 +10124,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!pageId || !token) {
         return res.status(400).json({ error: "Page ID and Access Token required" });
       }
-      const result = await testFacebookPublish(pageId, token, true);
+      const result = await testFacebookPublish(pageId, token);
       if (!result.success) {
         return res.status(400).json({ error: result.error, errorData: result.errorData });
       }
       return res.json({
         success: true,
         facebookPostId: result.facebookPostId,
-        note: "Draft post created on Facebook (unpublished). Save token if this succeeded.",
+        note: "Test post published on your Page. Delete it on Facebook if you want. Save token if this succeeded.",
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });

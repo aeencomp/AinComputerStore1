@@ -265,8 +265,11 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
 }
 
 function facebookErrorHint(code?: number, message?: string): string | undefined {
+  if (message?.includes("posted to a page as the page itself")) {
+    return "Use Page token: Explorer → User or Page → select العين لتجارة الحاسبات → Generate Access Token → paste that token here.";
+  }
   if (code === 200 || message?.includes("permission to post") || message?.includes("pages_manage_posts")) {
-    return "Regenerate token: Graph API Explorer → check pages_manage_posts AND pages_read_engagement → GET /me/accounts → paste that Page access_token (not the user token). You must be Page Admin.";
+    return "Regenerate token: Graph API Explorer → check pages_manage_posts AND pages_read_engagement → select Page (not User Token) → paste token here. You must be Page Admin.";
   }
   if (code === 190) {
     return "Token expired or invalid — generate a new Page token in Graph API Explorer.";
@@ -291,16 +294,15 @@ async function postToFacebookEndpoint(
   return { ok: res.ok, data };
 }
 
-/** Minimal publish test — unpublished draft when testOnly so Page feed stays clean. */
+/** Minimal publish test — real post (Facebook rejects unpublished drafts without strict Page token). */
 export async function testFacebookPublish(
   pageId: string,
   accessToken: string,
-  testOnly = true,
 ): Promise<FacebookPublishResult> {
   const body: Record<string, string> = {
-    message: "اختبار نشر من نظام العين — يمكن حذف هذه المسودة",
+    message: "اختبار نشر من نظام العين — يمكن حذف هذا المنشور",
     access_token: accessToken,
-    published: testOnly ? "false" : "true",
+    published: "true",
   };
   const result = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/feed`, body);
   if (result.ok) {

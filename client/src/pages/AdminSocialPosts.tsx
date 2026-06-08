@@ -241,8 +241,8 @@ export default function AdminSocialPosts() {
       toast({
         title: ar ? "نجح اختبار النشر!" : "Publish test OK!",
         description: ar
-          ? "تم إنشاء مسودة على فيسبوك. احفظ التوكن ثم انشر المنشورات."
-          : "Draft created on Facebook. Save token then publish posts.",
+          ? "ظهر منشور اختبار على صفحتك. احفظ التوكن ثم انشر المنشورات."
+          : "Test post on your Page. Save token then publish posts.",
       });
     },
     onError: (err: Error) => {
@@ -600,7 +600,7 @@ export default function AdminSocialPosts() {
                     ) : (
                       <Send className="h-4 w-4" />
                     )}
-                    {ar ? "اختبار النشر (مسودة)" : "Test publish (draft)"}
+                    {ar ? "اختبار النشر" : "Test publish"}
                   </Button>
                   <Button
                     variant="secondary"
@@ -679,8 +679,8 @@ export default function AdminSocialPosts() {
                     </li>
                     <li>
                       {ar
-                        ? "انسخ التوكن من Explorer والصقه في الحقل أعلاه → اضغط «اختبار النشر (مسودة)»"
-                        : "Paste Explorer token above → click «Test publish (draft)»"}
+                        ? "انسخ التوكن من Explorer والصقه في الحقل أعلاه → اضغط «اختبار النشر»"
+                        : "Paste Explorer token above → click «Test publish»"}
                     </li>
                     <li dir="ltr" className="font-mono text-[10px]">
                       Explorer POST /159035964278475/feed message=test (not GET)
