@@ -113,17 +113,38 @@ function pushPhoneLines(lines: string[], phone: string | undefined) {
   lines.push(formatPhoneForPost(phone));
 }
 
-/** Fix mixed Arabic + numbers/URLs/Latin for correct RTL on Facebook and admin preview. */
+const BIDI_CONTROLS = /[\u200E\u200F\u2066\u2067\u2068\u2069\u061C]/g;
+
+/** Strip invisible bidi chars — they break Facebook link detection. */
+export function cleanMessageForFacebook(message: string): string {
+  return message.replace(BIDI_CONTROLS, "");
+}
+
+function normalizeContactLines(line: string): string | null {
+  const wa = line.match(/واتساب:\s*(.+)/);
+  if (wa) {
+    return `📲 واتساب:\n${formatPhoneForPost(wa[1].replace(BIDI_CONTROLS, ""))}`;
+  }
+  const ph = line.match(/هاتف:\s*(.+)/);
+  if (ph) {
+    return `📞 هاتف:\n${formatPhoneForPost(ph[1].replace(BIDI_CONTROLS, ""))}`;
+  }
+  return null;
+}
+
+/** RTL-friendly Arabic text — URLs and phones stay plain so links work on Facebook. */
 export function formatArabicRtlMessage(message: string): string {
   const lines = message.split("\n").map((line) => {
     if (!line.trim()) return line;
 
-    const trimmed = line.trim();
-    if (/^https?:\/\//i.test(trimmed)) return isolateLtr(trimmed);
-    if (isPhoneOnlyLine(trimmed)) return isolateLtr(formatPhoneForPost(trimmed));
+    const trimmed = line.trim().replace(BIDI_CONTROLS, "");
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (isPhoneOnlyLine(trimmed)) return formatPhoneForPost(trimmed);
+
+    const contactFix = normalizeContactLines(line);
+    if (contactFix) return contactFix;
 
     let out = line;
-    out = out.replace(/https?:\/\/\S+/gi, (url) => isolateLtr(url));
     out = out.replace(/\b(\d{1,3}(?:,\d{3})+)\b/g, (num) => isolateLtr(num));
     out = out.replace(/كود خصم:\s*([A-Za-z0-9_-]+)/g, (_, code) => `كود خصم: ${isolateLtr(code)}`);
     out = out.replace(/#([A-Za-z][A-Za-z0-9_]*)/g, (tag) => isolateLtr(tag));
@@ -522,7 +543,7 @@ export async function publishToFacebook(
 
   try {
     const baseBody: Record<string, string> = {
-      message: formatArabicRtlMessage(post.message),
+      message: cleanMessageForFacebook(formatArabicRtlMessage(post.message)),
       access_token: accessToken,
       published: "true",
     };
