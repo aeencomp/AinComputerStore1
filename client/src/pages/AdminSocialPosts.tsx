@@ -599,13 +599,29 @@ export default function AdminSocialPosts() {
                       </>
                     ) : diagnostics.configured ? (
                       <>
-                        <p className="text-green-700 flex items-center gap-2">
-                          <CheckCircle className="h-4 w-4 shrink-0" />
+                        <p
+                          className={`flex items-center gap-2 ${
+                            diagnostics.canPublish === false ? "text-amber-700" : "text-green-700"
+                          }`}
+                        >
+                          {diagnostics.canPublish === false ? (
+                            <XCircle className="h-4 w-4 shrink-0" />
+                          ) : (
+                            <CheckCircle className="h-4 w-4 shrink-0" />
+                          )}
                           {ar ? "متصل:" : "Connected:"}{" "}
                           {String(diagnostics.pageName || diagnostics.pageId)}
                         </p>
                         {"note" in diagnostics && diagnostics.note && (
                           <p className="text-xs text-muted-foreground">{String(diagnostics.note)}</p>
+                        )}
+                        {"warning" in diagnostics && diagnostics.warning && (
+                          <p className="text-xs text-amber-800 font-medium">{String(diagnostics.warning)}</p>
+                        )}
+                        {Array.isArray(diagnostics.pageTasks) && diagnostics.pageTasks.length > 0 && (
+                          <p className="text-xs text-muted-foreground" dir="ltr">
+                            tasks: {(diagnostics.pageTasks as string[]).join(", ")}
+                          </p>
                         )}
                       </>
                     ) : (
@@ -614,13 +630,25 @@ export default function AdminSocialPosts() {
                   </div>
                 )}
 
-                <div className="rounded-md bg-blue-50 border border-blue-100 p-3 text-xs space-y-1 text-blue-900">
+                <div className="rounded-md bg-blue-50 border border-blue-100 p-3 text-xs space-y-2 text-blue-900">
                   <p className="font-medium">{ar ? "كيف تحصل على التوكن الصحيح:" : "How to get the correct token:"}</p>
-                  <p dir="ltr" className="font-mono">Graph API Explorer → GET /me/accounts</p>
-                  <p>
+                  <ol className="list-decimal list-inside space-y-1">
+                    <li>
+                      {ar
+                        ? "Graph API Explorer → Generate Token → فعّل: pages_manage_posts و pages_read_engagement و pages_show_list"
+                        : "Graph API Explorer → Generate Token → enable: pages_manage_posts, pages_read_engagement, pages_show_list"}
+                    </li>
+                    <li dir="ltr" className="font-mono">GET /me/accounts?fields=id,name,access_token,tasks</li>
+                    <li>
+                      {ar
+                        ? "انسخ access_token لصفحتك — الصقه في الحقل أعلاه (لا تتركه فارغاً) ثم احفظ"
+                        : "Copy access_token for your Page — paste above (do not leave blank) then Save"}
+                    </li>
+                  </ol>
+                  <p className="text-amber-800 font-medium">
                     {ar
-                      ? "انسخ access_token و id من صفحتك. لا تستخدم توكن المستخدم العادي. الصلاحية المطلوبة للنشر: pages_manage_posts"
-                      : "Copy access_token and id for your Page. Do not use a plain user token. Required permission: pages_manage_posts"}
+                      ? "⚠️ إذا كان التوكن محفوظاً قديماً: الصق توكناً جديداً كاملاً بعد إضافة الصلاحيات"
+                      : "⚠️ If token was saved before: paste a full new token after adding permissions"}
                   </p>
                 </div>
 

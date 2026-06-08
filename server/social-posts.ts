@@ -209,9 +209,10 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
     };
   }
 
+  const requiredPermissions = ["pages_manage_posts", "pages_read_engagement"];
+
   try {
-    // Only id+name — fan_count/link need pages_read_engagement (App Review). Posting needs pages_manage_posts only.
-    const url = `${GRAPH_API}/${pageId}?fields=id,name&access_token=${encodeURIComponent(accessToken)}`;
+    const url = `${GRAPH_API}/${pageId}?fields=id,name,tasks&access_token=${encodeURIComponent(accessToken)}`;
     const res = await fetch(url);
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) {
@@ -228,8 +229,14 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
         error: fbError?.message || "Facebook API error",
         errorData: data.error,
         hint,
+        requiredPermissions,
       };
     }
+
+    const tasks = Array.isArray(data.tasks) ? (data.tasks as string[]) : [];
+    const canCreate = tasks.includes("CREATE_CONTENT") || tasks.includes("MANAGE");
+    const publishReady = canCreate;
+
     return {
       configured: true,
       pageId,
@@ -237,8 +244,15 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
       siteUrl,
       pageName: data.name,
       pageIdVerified: data.id,
-      canPublish: true,
-      note: "Connection OK. Publishing requires pages_manage_posts on this Page token.",
+      pageTasks: tasks,
+      canPublish: publishReady,
+      requiredPermissions,
+      note: publishReady
+        ? "Token can publish to this Page."
+        : "Page name loads but token cannot post. Regenerate Page token with pages_manage_posts + pages_read_engagement.",
+      warning: publishReady
+        ? undefined
+        : "This token is missing post permission. Paste a new access_token from GET /me/accounts after selecting both permissions in Graph API Explorer.",
     };
   } catch (err) {
     return {
@@ -252,8 +266,8 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
 }
 
 function facebookErrorHint(code?: number, message?: string): string | undefined {
-  if (code === 200 || message?.includes("permission to post")) {
-    return "Use the Page access_token from GET /me/accounts with pages_manage_posts. You must be Page Admin.";
+  if (code === 200 || message?.includes("permission to post") || message?.includes("pages_manage_posts")) {
+    return "Regenerate token: Graph API Explorer → check pages_manage_posts AND pages_read_engagement → GET /me/accounts → paste that Page access_token (not the user token). You must be Page Admin.";
   }
   if (code === 190) {
     return "Token expired or invalid — generate a new Page token in Graph API Explorer.";
