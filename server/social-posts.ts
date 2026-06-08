@@ -278,13 +278,41 @@ async function postToFacebookEndpoint(
   endpoint: string,
   body: Record<string, string>,
 ): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  const form = new URLSearchParams();
+  for (const [key, value] of Object.entries(body)) {
+    if (value != null && value !== "") form.set(key, value);
+  }
   const res = await fetch(endpoint, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: form.toString(),
   });
   const data = (await res.json()) as Record<string, unknown>;
   return { ok: res.ok, data };
+}
+
+/** Minimal publish test — unpublished draft when testOnly so Page feed stays clean. */
+export async function testFacebookPublish(
+  pageId: string,
+  accessToken: string,
+  testOnly = true,
+): Promise<FacebookPublishResult> {
+  const body: Record<string, string> = {
+    message: "اختبار نشر من نظام العين — يمكن حذف هذه المسودة",
+    access_token: accessToken,
+    published: testOnly ? "false" : "true",
+  };
+  const result = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/feed`, body);
+  if (result.ok) {
+    return { success: true, facebookPostId: String(result.data.id || "") || undefined };
+  }
+  const err = result.data.error as { message?: string; code?: number } | undefined;
+  const hint = facebookErrorHint(err?.code, err?.message);
+  return {
+    success: false,
+    error: hint ? `${err?.message || "Failed"} — ${hint}` : err?.message,
+    errorData: result.data.error,
+  };
 }
 
 export async function publishToFacebook(

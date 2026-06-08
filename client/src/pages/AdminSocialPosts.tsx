@@ -229,6 +229,27 @@ export default function AdminSocialPosts() {
     },
   });
 
+  const testPublishMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/social/test-publish", {
+        facebookPageId: configForm.facebookPageId,
+        facebookPageAccessToken: configForm.facebookPageAccessToken.trim() || undefined,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({
+        title: ar ? "نجح اختبار النشر!" : "Publish test OK!",
+        description: ar
+          ? "تم إنشاء مسودة على فيسبوك. احفظ التوكن ثم انشر المنشورات."
+          : "Draft created on Facebook. Save token then publish posts.",
+      });
+    },
+    onError: (err: Error) => {
+      toast({ title: ar ? "فشل اختبار النشر" : "Publish test failed", description: err.message, variant: "destructive" });
+    },
+  });
+
   const autoPostMutation = useMutation({
     mutationFn: async (force?: boolean) => {
       const res = await apiRequest("POST", "/api/admin/social/auto-post-now", { force: !!force });
@@ -569,6 +590,19 @@ export default function AdminSocialPosts() {
                     {ar ? "اختبار الاتصال" : "Test Connection"}
                   </Button>
                   <Button
+                    variant="outline"
+                    className="gap-2 border-blue-300 text-blue-800"
+                    onClick={() => testPublishMutation.mutate()}
+                    disabled={testPublishMutation.isPending || !configForm.facebookPageId}
+                  >
+                    {testPublishMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Send className="h-4 w-4" />
+                    )}
+                    {ar ? "اختبار النشر (مسودة)" : "Test publish (draft)"}
+                  </Button>
+                  <Button
                     variant="secondary"
                     className="gap-2"
                     onClick={() => autoPostMutation.mutate(true)}
@@ -635,14 +669,21 @@ export default function AdminSocialPosts() {
                   <ol className="list-decimal list-inside space-y-1">
                     <li>
                       {ar
-                        ? "Graph API Explorer → Generate Token → فعّل: pages_manage_posts و pages_read_engagement و pages_show_list"
-                        : "Graph API Explorer → Generate Token → enable: pages_manage_posts, pages_read_engagement, pages_show_list"}
+                        ? "Explorer → Permissions: pages_manage_posts + pages_read_engagement + pages_show_list"
+                        : "Explorer → Permissions: pages_manage_posts + pages_read_engagement + pages_show_list"}
                     </li>
-                    <li dir="ltr" className="font-mono">GET /me/accounts?fields=id,name,access_token</li>
                     <li>
                       {ar
-                        ? "انسخ access_token لصفحتك — الصقه في الحقل أعلاه (لا تتركه فارغاً) ثم احفظ"
-                        : "Copy access_token for your Page — paste above (do not leave blank) then Save"}
+                        ? "User or Page → اختر «العين لتجارة الحاسبات» (ليس User Token) → Generate Access Token"
+                        : "User or Page → select your Page (not User Token) → Generate Access Token"}
+                    </li>
+                    <li>
+                      {ar
+                        ? "انسخ التوكن من Explorer والصقه في الحقل أعلاه → اضغط «اختبار النشر (مسودة)»"
+                        : "Paste Explorer token above → click «Test publish (draft)»"}
+                    </li>
+                    <li dir="ltr" className="font-mono text-[10px]">
+                      Explorer POST /159035964278475/feed message=test (not GET)
                     </li>
                   </ol>
                   <p className="text-amber-800 font-medium">

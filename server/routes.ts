@@ -36,6 +36,7 @@ import {
   maskToken,
   publishToFacebook,
   runAutoFacebookPost,
+  testFacebookPublish,
   type SocialPostType,
 } from "./social-posts";
 import bcrypt from "bcrypt";
@@ -10104,6 +10105,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getStoreSettings();
       const diagnostics = await getFacebookDiagnostics(settings);
       return res.json(diagnostics);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** Test publish with token from form (draft post) — verifies posting permission before save. */
+  app.post("/api/admin/social/test-publish", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const settings = await storage.getStoreSettings();
+      if (!settings) return res.status(404).json({ error: "Settings not found" });
+      const pageId = String(req.body?.facebookPageId || settings.facebookPageId || "").trim();
+      let token = String(req.body?.facebookPageAccessToken || "").trim();
+      if (!token || token.includes("••••")) {
+        token = getFacebookCredentials(settings).accessToken;
+      }
+      if (!pageId || !token) {
+        return res.status(400).json({ error: "Page ID and Access Token required" });
+      }
+      const result = await testFacebookPublish(pageId, token, true);
+      if (!result.success) {
+        return res.status(400).json({ error: result.error, errorData: result.errorData });
+      }
+      return res.json({
+        success: true,
+        facebookPostId: result.facebookPostId,
+        note: "Draft post created on Facebook (unpublished). Save token if this succeeded.",
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
