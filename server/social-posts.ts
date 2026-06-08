@@ -251,9 +251,33 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
   }
 }
 
+function facebookErrorHint(code?: number, message?: string): string | undefined {
+  if (code === 200 || message?.includes("permission to post")) {
+    return "Use the Page access_token from GET /me/accounts with pages_manage_posts. You must be Page Admin.";
+  }
+  if (code === 190) {
+    return "Token expired or invalid — generate a new Page token in Graph API Explorer.";
+  }
+  return undefined;
+}
+
+async function postToFacebookEndpoint(
+  endpoint: string,
+  body: Record<string, string>,
+): Promise<{ ok: boolean; data: Record<string, unknown> }> {
+  const res = await fetch(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = (await res.json()) as Record<string, unknown>;
+  return { ok: res.ok, data };
+}
+
 export async function publishToFacebook(
   settings: StoreSettings,
   post: GeneratedSocialPost,
+  options?: { skipImage?: boolean },
 ): Promise<FacebookPublishResult> {
   const { pageId, accessToken } = getFacebookCredentials(settings);
   if (!pageId || !accessToken) {
@@ -261,37 +285,55 @@ export async function publishToFacebook(
   }
 
   try {
-    let endpoint = `${GRAPH_API}/${pageId}/feed`;
-    const body: Record<string, string> = {
+    const baseBody: Record<string, string> = {
       message: post.message,
       access_token: accessToken,
     };
 
-    if (post.imageUrl) {
-      endpoint = `${GRAPH_API}/${pageId}/photos`;
-      body.url = post.imageUrl;
-      if (post.linkUrl) body.link = post.linkUrl;
-    } else if (post.linkUrl) {
-      body.link = post.linkUrl;
+    const tryPhoto = !!post.imageUrl && !options?.skipImage;
+    if (tryPhoto) {
+      const photoBody = { ...baseBody, url: post.imageUrl! };
+      if (post.linkUrl) photoBody.link = post.linkUrl;
+
+      const photoResult = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/photos`, photoBody);
+      if (photoResult.ok) {
+        const postId = String(photoResult.data.id || photoResult.data.post_id || "");
+        return { success: true, facebookPostId: postId || undefined };
+      }
+
+      const photoErr = photoResult.data.error as { message?: string; code?: number } | undefined;
+      const permDenied =
+        photoErr?.code === 200 || photoErr?.message?.toLowerCase().includes("permission");
+
+      if (!permDenied) {
+        return {
+          success: false,
+          error: photoErr?.message || "Facebook photo publish failed",
+          errorData: photoResult.data.error,
+        };
+      }
+
+      // Fall back to text+link post when photo permission missing
     }
 
-    const res = await fetch(endpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-    const data = (await res.json()) as Record<string, unknown>;
+    const feedBody = { ...baseBody };
+    if (post.linkUrl) feedBody.link = post.linkUrl;
 
-    if (!res.ok) {
-      return {
-        success: false,
-        error: (data.error as { message?: string })?.message || "Facebook publish failed",
-        errorData: data.error,
-      };
+    const feedResult = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/feed`, feedBody);
+    if (feedResult.ok) {
+      const postId = String(feedResult.data.id || feedResult.data.post_id || "");
+      return { success: true, facebookPostId: postId || undefined };
     }
 
-    const postId = String(data.id || data.post_id || "");
-    return { success: true, facebookPostId: postId || undefined };
+    const feedErr = feedResult.data.error as { message?: string; code?: number } | undefined;
+    const hint = facebookErrorHint(feedErr?.code, feedErr?.message);
+    const errorMsg = hint ? `${feedErr?.message || "Facebook publish failed"} — ${hint}` : feedErr?.message;
+
+    return {
+      success: false,
+      error: errorMsg || "Facebook publish failed",
+      errorData: feedResult.data.error,
+    };
   } catch (err) {
     return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
   }
