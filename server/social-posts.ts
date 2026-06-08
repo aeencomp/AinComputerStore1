@@ -210,17 +210,24 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
   }
 
   try {
-    const url = `${GRAPH_API}/${pageId}?fields=id,name,link,fan_count&access_token=${encodeURIComponent(accessToken)}`;
+    // Only id+name — fan_count/link need pages_read_engagement (App Review). Posting needs pages_manage_posts only.
+    const url = `${GRAPH_API}/${pageId}?fields=id,name&access_token=${encodeURIComponent(accessToken)}`;
     const res = await fetch(url);
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) {
+      const fbError = data.error as { message?: string; code?: number } | undefined;
+      const hint =
+        fbError?.code === 100
+          ? "Use the Page Access Token from GET /me/accounts (not a User token). Page ID must match that token."
+          : undefined;
       return {
         configured: true,
         pageId,
         hasToken: true,
         siteUrl,
-        error: (data.error as { message?: string })?.message || "Facebook API error",
+        error: fbError?.message || "Facebook API error",
         errorData: data.error,
+        hint,
       };
     }
     return {
@@ -229,8 +236,9 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
       hasToken: true,
       siteUrl,
       pageName: data.name,
-      pageLink: data.link,
-      fanCount: data.fan_count,
+      pageIdVerified: data.id,
+      canPublish: true,
+      note: "Connection OK. Publishing requires pages_manage_posts on this Page token.",
     };
   } catch (err) {
     return {

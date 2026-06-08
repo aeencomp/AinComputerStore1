@@ -586,24 +586,43 @@ export default function AdminSocialPosts() {
                 )}
 
                 {diagnostics && (
-                  <div className="rounded-md border p-3 text-sm space-y-1">
+                  <div className="rounded-md border p-3 text-sm space-y-2">
                     {"error" in diagnostics && diagnostics.error ? (
-                      <p className="text-red-700 flex items-center gap-2">
-                        <XCircle className="h-4 w-4 shrink-0" />
-                        {String(diagnostics.error)}
-                      </p>
+                      <>
+                        <p className="text-red-700 flex items-center gap-2">
+                          <XCircle className="h-4 w-4 shrink-0" />
+                          {String(diagnostics.error)}
+                        </p>
+                        {"hint" in diagnostics && diagnostics.hint && (
+                          <p className="text-xs text-muted-foreground">{String(diagnostics.hint)}</p>
+                        )}
+                      </>
                     ) : diagnostics.configured ? (
-                      <p className="text-green-700 flex items-center gap-2">
-                        <CheckCircle className="h-4 w-4 shrink-0" />
-                        {ar ? "متصل:" : "Connected:"}{" "}
-                        {String(diagnostics.pageName || diagnostics.pageId)}
-                        {diagnostics.fanCount != null && ` · ${diagnostics.fanCount} ${ar ? "متابع" : "fans"}`}
-                      </p>
+                      <>
+                        <p className="text-green-700 flex items-center gap-2">
+                          <CheckCircle className="h-4 w-4 shrink-0" />
+                          {ar ? "متصل:" : "Connected:"}{" "}
+                          {String(diagnostics.pageName || diagnostics.pageId)}
+                        </p>
+                        {"note" in diagnostics && diagnostics.note && (
+                          <p className="text-xs text-muted-foreground">{String(diagnostics.note)}</p>
+                        )}
+                      </>
                     ) : (
                       <p className="text-amber-700">{ar ? "غير مُعدّ بعد" : "Not configured yet"}</p>
                     )}
                   </div>
                 )}
+
+                <div className="rounded-md bg-blue-50 border border-blue-100 p-3 text-xs space-y-1 text-blue-900">
+                  <p className="font-medium">{ar ? "كيف تحصل على التوكن الصحيح:" : "How to get the correct token:"}</p>
+                  <p dir="ltr" className="font-mono">Graph API Explorer → GET /me/accounts</p>
+                  <p>
+                    {ar
+                      ? "انسخ access_token و id من صفحتك. لا تستخدم توكن المستخدم العادي. الصلاحية المطلوبة للنشر: pages_manage_posts"
+                      : "Copy access_token and id for your Page. Do not use a plain user token. Required permission: pages_manage_posts"}
+                  </p>
+                </div>
 
                 <div className="rounded-md bg-muted/50 p-3 text-xs space-y-2 font-mono" dir="ltr">
                   <p className="font-sans font-medium text-foreground">
