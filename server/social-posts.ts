@@ -188,8 +188,43 @@ export async function pickProductForAutoPost(
     if (sales.length > 0) pool = sales;
   }
 
+  if (mode === "random" || mode === "mixed") {
+    const idx = Math.floor(Math.random() * pool.length);
+    return { product: pool[idx], nextCursor: cursor };
+  }
+
   const idx = cursor % pool.length;
   return { product: pool[idx], nextCursor: (idx + 1) % pool.length };
+}
+
+export async function countFacebookAutoPostsToday(): Promise<number> {
+  const today = baghdadDateString();
+  const rows = await db
+    .select({ createdAt: facebookPostLog.createdAt })
+    .from(facebookPostLog)
+    .where(and(eq(facebookPostLog.source, "cron"), eq(facebookPostLog.success, 1)));
+
+  return rows.filter(
+    (r) => r.createdAt.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }) === today,
+  ).length;
+}
+
+async function pickMixedAutoPost(
+  settings: StoreSettings,
+  siteUrl: string,
+): Promise<GeneratedSocialPost> {
+  const roll = Math.random();
+  if (roll < 0.15) {
+    return generateAnnouncementPost(settings, siteUrl);
+  }
+  if (roll < 0.35) {
+    return generateRepairPost(settings, siteUrl);
+  }
+  const { product } = await pickProductForAutoPost("random", 0);
+  if (!product) {
+    return generateRepairPost(settings, siteUrl);
+  }
+  return generateProductPost(product, settings, siteUrl);
 }
 
 export async function exchangeUserTokenForPageToken(
@@ -534,12 +569,13 @@ export async function runAutoFacebookPost(
     return { skipped: true, reason: "Facebook not configured" };
   }
 
-  const today = baghdadDateString();
-  if (!options?.force && settings.facebookAutoPostLastAt) {
-    const lastDay = settings.facebookAutoPostLastAt.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
-    if (lastDay === today) {
-      return { skipped: true, reason: "Already posted today" };
-    }
+  const dailyLimit = Math.min(5, Math.max(1, settings.facebookAutoPostsPerDay ?? 1));
+  const postsToday = await countFacebookAutoPostsToday();
+  if (!options?.force && postsToday >= dailyLimit) {
+    return {
+      skipped: true,
+      reason: `Daily limit reached (${postsToday}/${dailyLimit})`,
+    };
   }
 
   const siteUrl = getPublicSiteUrl(settings);
@@ -550,16 +586,21 @@ export async function runAutoFacebookPost(
     post = generateRepairPost(settings, siteUrl);
   } else if (mode === "announcement") {
     post = generateAnnouncementPost(settings, siteUrl);
+  } else if (mode === "mixed") {
+    post = await pickMixedAutoPost(settings, siteUrl);
   } else {
+    const pickMode = mode === "sale" ? "sale" : mode === "random" ? "random" : "rotate";
     const cursor = settings.facebookAutoPostCursor ?? 0;
-    const { product, nextCursor } = await pickProductForAutoPost(mode === "sale" ? "sale" : "rotate", cursor);
+    const { product, nextCursor } = await pickProductForAutoPost(pickMode, cursor);
     if (!product) {
       return { skipped: true, reason: "No in-stock products" };
     }
     post = generateProductPost(product, settings, siteUrl);
-    await updateSettings({
-      facebookAutoPostCursor: nextCursor,
-    } as Partial<StoreSettings>);
+    if (pickMode === "rotate" || pickMode === "sale") {
+      await updateSettings({
+        facebookAutoPostCursor: nextCursor,
+      } as Partial<StoreSettings>);
+    }
   }
 
   const result = await publishToFacebook(settings, post);

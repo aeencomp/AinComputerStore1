@@ -86,6 +86,7 @@ const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_mode TEXT DEFAULT 'rotate'`,
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_last_at TIMESTAMP`,
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_cursor INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_posts_per_day INTEGER NOT NULL DEFAULT 1`,
 
   `CREATE TABLE IF NOT EXISTS facebook_post_log (
      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),

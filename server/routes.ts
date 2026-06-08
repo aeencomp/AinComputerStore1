@@ -10054,6 +10054,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         facebookAutoPostEnabled: settings.facebookAutoPostEnabled ?? 0,
         facebookAutoPostTime: settings.facebookAutoPostTime || "18:00",
         facebookAutoPostMode: settings.facebookAutoPostMode || "rotate",
+        facebookAutoPostsPerDay: settings.facebookAutoPostsPerDay ?? 1,
         facebookAutoPostLastAt: settings.facebookAutoPostLastAt,
         facebookUrl: settings.facebookUrl || "",
       });
@@ -10073,6 +10074,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (body.facebookAutoPostEnabled !== undefined) patch.facebookAutoPostEnabled = body.facebookAutoPostEnabled ? 1 : 0;
       if (body.facebookAutoPostTime !== undefined) patch.facebookAutoPostTime = String(body.facebookAutoPostTime).trim();
       if (body.facebookAutoPostMode !== undefined) patch.facebookAutoPostMode = String(body.facebookAutoPostMode).trim();
+      if (body.facebookAutoPostsPerDay !== undefined) {
+        const n = parseInt(String(body.facebookAutoPostsPerDay), 10);
+        patch.facebookAutoPostsPerDay = Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : 1;
+      }
 
       const newToken = body.facebookPageAccessToken;
       if (newToken !== undefined && newToken !== null) {
@@ -10093,6 +10098,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         facebookAutoPostEnabled: settings.facebookAutoPostEnabled ?? 0,
         facebookAutoPostTime: settings.facebookAutoPostTime || "18:00",
         facebookAutoPostMode: settings.facebookAutoPostMode || "rotate",
+        facebookAutoPostsPerDay: settings.facebookAutoPostsPerDay ?? 1,
         facebookAutoPostLastAt: settings.facebookAutoPostLastAt,
       });
     } catch (err: any) {

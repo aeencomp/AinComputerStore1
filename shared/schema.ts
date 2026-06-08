@@ -321,6 +321,7 @@ export const storeSettings = pgTable("store_settings", {
   facebookAutoPostTime: text("facebook_auto_post_time").default("18:00"),
   /** product | sale | repair | announcement | rotate */
   facebookAutoPostMode: text("facebook_auto_post_mode").default("rotate"),
+  facebookAutoPostsPerDay: integer("facebook_auto_posts_per_day").notNull().default(1),
   facebookAutoPostLastAt: timestamp("facebook_auto_post_last_at"),
   facebookAutoPostCursor: integer("facebook_auto_post_cursor").notNull().default(0),
 

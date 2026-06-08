@@ -55,6 +55,7 @@ type SocialConfig = {
   facebookAutoPostEnabled: number;
   facebookAutoPostTime: string;
   facebookAutoPostMode: string;
+  facebookAutoPostsPerDay?: number;
   facebookAutoPostLastAt?: string | null;
   facebookUrl?: string;
 };
@@ -78,11 +79,25 @@ const POST_TYPES: { value: SocialPostType; labelAr: string; labelEn: string }[] 
 ];
 
 const AUTO_MODES = [
-  { value: "rotate", labelAr: "تناوب المنتجات", labelEn: "Rotate products" },
+  { value: "random", labelAr: "منتج عشوائي يومياً", labelEn: "Random product daily" },
+  { value: "mixed", labelAr: "محتوى عشوائي (منتج + صيانة + إعلان)", labelEn: "Random mix (product + repair + ad)" },
+  { value: "rotate", labelAr: "تناوب المنتجات بالترتيب", labelEn: "Rotate products in order" },
   { value: "sale", labelAr: "منتجات مخفّضة", labelEn: "Sale items" },
-  { value: "repair", labelAr: "صيانة", labelEn: "Repair promo" },
-  { value: "announcement", labelAr: "إعلان المتجر", labelEn: "Store announcement" },
+  { value: "repair", labelAr: "صيانة فقط", labelEn: "Repair promo only" },
+  { value: "announcement", labelAr: "إعلان المتجر فقط", labelEn: "Store announcement only" },
 ];
+
+const POSTS_PER_DAY_OPTIONS = [1, 2, 3, 4, 5];
+
+function cronExamplesForPostsPerDay(n: number): string {
+  if (n >= 3) {
+    return "0 5,12,17 * * *  # ~8am, 3pm, 8pm Baghdad (add more lines if 4–5/day)";
+  }
+  if (n === 2) {
+    return "0 8,15 * * *  # ~11am and 6pm Baghdad";
+  }
+  return "0 15 * * *  # ~6pm Baghdad (once daily)";
+}
 
 export default function AdminSocialPosts() {
   const { language } = useLanguage();
@@ -106,7 +121,8 @@ export default function AdminSocialPosts() {
     facebookUserToken: "",
     facebookAutoPostEnabled: false,
     facebookAutoPostTime: "18:00",
-    facebookAutoPostMode: "rotate",
+    facebookAutoPostMode: "random",
+    facebookAutoPostsPerDay: 1,
   });
 
   const { data: currentAdmin } = useQuery<AdminUser>({
@@ -142,7 +158,8 @@ export default function AdminSocialPosts() {
       facebookPageAccessToken: "",
       facebookAutoPostEnabled: config.facebookAutoPostEnabled === 1,
       facebookAutoPostTime: config.facebookAutoPostTime || "18:00",
-      facebookAutoPostMode: config.facebookAutoPostMode || "rotate",
+      facebookAutoPostMode: config.facebookAutoPostMode || "random",
+      facebookAutoPostsPerDay: config.facebookAutoPostsPerDay ?? 1,
     });
   }, [config]);
 
@@ -219,6 +236,7 @@ export default function AdminSocialPosts() {
         facebookAutoPostEnabled: configForm.facebookAutoPostEnabled,
         facebookAutoPostTime: configForm.facebookAutoPostTime,
         facebookAutoPostMode: configForm.facebookAutoPostMode,
+        facebookAutoPostsPerDay: configForm.facebookAutoPostsPerDay,
       };
       if (configForm.facebookPageAccessToken.trim()) {
         payload.facebookPageAccessToken = configForm.facebookPageAccessToken.trim();
@@ -630,13 +648,29 @@ export default function AdminSocialPosts() {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
-                    <Label>{ar ? "وقت النشر (بغداد)" : "Post time (Baghdad)"}</Label>
-                    <Input
-                      value={configForm.facebookAutoPostTime}
-                      onChange={(e) => setConfigForm((f) => ({ ...f, facebookAutoPostTime: e.target.value }))}
-                      dir="ltr"
-                      placeholder="18:00"
-                    />
+                    <Label>{ar ? "عدد المنشورات يومياً" : "Posts per day"}</Label>
+                    <Select
+                      value={String(configForm.facebookAutoPostsPerDay)}
+                      onValueChange={(v) =>
+                        setConfigForm((f) => ({ ...f, facebookAutoPostsPerDay: parseInt(v, 10) || 1 }))
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {POSTS_PER_DAY_OPTIONS.map((n) => (
+                          <SelectItem key={n} value={String(n)}>
+                            {ar ? `${n} منشور / يوم` : `${n} post${n > 1 ? "s" : ""} / day`}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {ar
+                        ? "الحد الأقصى 5 — فيسبوك يفضّل 1–3 منشورات يومياً"
+                        : "Max 5 — Facebook works best with 1–3 posts/day"}
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label>{ar ? "نوع المنشور التلقائي" : "Auto post type"}</Label>
@@ -656,6 +690,21 @@ export default function AdminSocialPosts() {
                       </SelectContent>
                     </Select>
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{ar ? "وقت النشر المرجعي (بغداد)" : "Reference post time (Baghdad)"}</Label>
+                  <Input
+                    value={configForm.facebookAutoPostTime}
+                    onChange={(e) => setConfigForm((f) => ({ ...f, facebookAutoPostTime: e.target.value }))}
+                    dir="ltr"
+                    placeholder="18:00"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {ar
+                      ? "للتذكير فقط — الجدولة الفعلية عبر cron على السيرفر (انظر الأسفل)"
+                      : "Reminder only — real schedule is VPS cron (see below)"}
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -783,12 +832,17 @@ export default function AdminSocialPosts() {
                     {ar ? "أمر cron على السيرفر (يومياً الساعة 6 مساءً):" : "VPS cron (daily 6 PM Baghdad):"}
                   </p>
                   <code className="block whitespace-pre-wrap break-all">
-                    {`0 15 * * * curl -sS -X POST -H "x-cron-secret: YOUR_SECRET" https://aeen-iq.com/api/cron/facebook/auto-post`}
+                    {`${cronExamplesForPostsPerDay(configForm.facebookAutoPostsPerDay)} curl -sS -X POST -H "x-cron-secret: YOUR_SECRET" https://aeen-iq.com/api/cron/facebook/auto-post`}
                   </code>
                   <p className="font-sans text-muted-foreground">
                     {ar
-                      ? "استخدم FACEBOOK_CRON_SECRET أو DAILY_REVENUE_CRON_SECRET من ملف .env"
-                      : "Use FACEBOOK_CRON_SECRET or DAILY_REVENUE_CRON_SECRET from .env"}
+                      ? `كل تشغيل لـ cron = منشور واحد (حد ${configForm.facebookAutoPostsPerDay}/يوم). لعدة منشورات: عدة أوقات في crontab.`
+                      : `Each cron run = 1 post (max ${configForm.facebookAutoPostsPerDay}/day). For more: multiple crontab times.`}
+                  </p>
+                  <p className="font-sans text-muted-foreground">
+                    {ar
+                      ? "استخدم FACEBOOK_CRON_SECRET من ملف .env على السيرفر"
+                      : "Use FACEBOOK_CRON_SECRET from server .env"}
                   </p>
                 </div>
               </CardContent>
