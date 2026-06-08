@@ -10245,7 +10245,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!result.success) {
         return res.status(400).json({ error: result.error, errorData: result.errorData });
       }
-      return res.json({ success: true, facebookPostId: result.facebookPostId });
+      return res.json({
+        success: true,
+        facebookPostId: result.facebookPostId,
+        permalinkUrl: result.permalinkUrl,
+        isPublished: result.isPublished,
+        warning: result.warning,
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
@@ -10279,7 +10285,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           post: outcome.post,
         });
       }
-      return res.json({ success: true, post: outcome.post, facebookPostId: outcome.result.facebookPostId });
+      return res.json({
+        success: true,
+        post: outcome.post,
+        facebookPostId: outcome.result.facebookPostId,
+        permalinkUrl: outcome.result.permalinkUrl,
+        isPublished: outcome.result.isPublished,
+        warning: outcome.result.warning,
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

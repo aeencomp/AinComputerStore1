@@ -195,8 +195,14 @@ export default function AdminSocialPosts() {
       });
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: ar ? "تم النشر على فيسبوك!" : "Published to Facebook!" });
+    onSuccess: (data: { permalinkUrl?: string; warning?: string }) => {
+      toast({
+        title: ar ? "تم النشر على صفحة فيسبوك!" : "Published to Facebook Page!",
+        description: data.warning
+          || (data.permalinkUrl
+            ? (ar ? "المنشور على الصفحة — ليس على حسابك الشخصي" : "Post is on your Page — not your personal profile")
+            : undefined),
+      });
       refetchHistory();
       refetchDiagnostics();
     },
@@ -284,8 +290,11 @@ export default function AdminSocialPosts() {
       const res = await apiRequest("POST", "/api/admin/social/auto-post-now", { force: !!force });
       return res.json();
     },
-    onSuccess: () => {
-      toast({ title: ar ? "تم النشر التلقائي" : "Auto post published" });
+    onSuccess: (data: { permalinkUrl?: string; warning?: string }) => {
+      toast({
+        title: ar ? "تم النشر على الصفحة" : "Posted to Page",
+        description: data.warning || data.permalinkUrl,
+      });
       refetchHistory();
       refetchConfig();
     },
@@ -325,6 +334,22 @@ export default function AdminSocialPosts() {
               ? "أنشئ منشورات عربية تلقائياً وانشرها على صفحة متجرك في فيسبوك"
               : "Auto-generate Arabic posts and publish to your store Facebook Page"}
           </p>
+          <div className="mt-3 rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 space-y-1">
+            <p className="font-semibold">
+              {ar ? "مهم: الصفحة ≠ الحساب الشخصي" : "Important: Page ≠ personal profile"}
+            </p>
+            <p>
+              {ar
+                ? "المنشورات تظهر على صفحة «العين لتجارة الحاسبات» فقط. الزوار يجب أن يفتحوا رابط الصفحة وليس حسابك الشخصي."
+                : "Posts appear on your business Page only. Visitors must open the Page URL, not your personal profile."}
+            </p>
+            {(config?.facebookUrl || configForm.facebookPageId) && (
+              <p className="font-mono text-xs break-all" dir="ltr">
+                {config?.facebookUrl?.trim()
+                  || `https://www.facebook.com/${configForm.facebookPageId || "159035964278475"}`}
+              </p>
+            )}
+          </div>
         </div>
 
         <Tabs defaultValue="create" dir={dir}>
@@ -812,7 +837,16 @@ export default function AdminSocialPosts() {
                         </div>
                         <p className="text-sm whitespace-pre-line line-clamp-4">{entry.message}</p>
                         {entry.facebookPostId && (
-                          <p className="text-xs text-muted-foreground font-mono">ID: {entry.facebookPostId}</p>
+                          <a
+                            href={`https://www.facebook.com/${entry.facebookPostId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs text-blue-600 hover:underline font-mono inline-flex items-center gap-1"
+                            dir="ltr"
+                          >
+                            <ExternalLink className="h-3 w-3" />
+                            {entry.facebookPostId}
+                          </a>
                         )}
                         {entry.error && <p className="text-xs text-red-600">{entry.error}</p>}
                       </div>

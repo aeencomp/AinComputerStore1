@@ -24,8 +24,11 @@ export type GeneratedSocialPost = {
 export type FacebookPublishResult = {
   success: boolean;
   facebookPostId?: string;
+  permalinkUrl?: string;
+  isPublished?: boolean;
   error?: string;
   errorData?: unknown;
+  warning?: string;
 };
 
 function formatIqd(price: string | number): string {
@@ -327,6 +330,24 @@ function facebookErrorHint(code?: number, message?: string): string | undefined 
   return undefined;
 }
 
+async function fetchFacebookPostMeta(
+  postId: string,
+  accessToken: string,
+): Promise<{ isPublished?: boolean; permalinkUrl?: string }> {
+  try {
+    const url = `${GRAPH_API}/${postId}?fields=is_published,permalink_url&access_token=${encodeURIComponent(accessToken)}`;
+    const res = await fetch(url);
+    const data = (await res.json()) as { is_published?: boolean; permalink_url?: string };
+    if (!res.ok) return {};
+    return {
+      isPublished: data.is_published,
+      permalinkUrl: data.permalink_url,
+    };
+  } catch {
+    return {};
+  }
+}
+
 async function postToFacebookEndpoint(
   endpoint: string,
   body: Record<string, string>,
@@ -356,7 +377,18 @@ export async function testFacebookPublish(
   };
   const result = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/feed`, body);
   if (result.ok) {
-    return { success: true, facebookPostId: String(result.data.id || "") || undefined };
+    const facebookPostId = String(result.data.id || "") || undefined;
+    const meta = facebookPostId ? await fetchFacebookPostMeta(facebookPostId, accessToken) : {};
+    return {
+      success: true,
+      facebookPostId,
+      permalinkUrl: meta.permalinkUrl,
+      isPublished: meta.isPublished ?? true,
+      warning:
+        meta.isPublished === false
+          ? "Post saved but not public yet — check Page → Posts → Published in Meta Business Suite."
+          : undefined,
+    };
   }
   const err = result.data.error as { message?: string; code?: number } | undefined;
   const hint = facebookErrorHint(err?.code, err?.message);
@@ -381,17 +413,43 @@ export async function publishToFacebook(
     const baseBody: Record<string, string> = {
       message: post.message,
       access_token: accessToken,
+      published: "true",
     };
 
-    const tryPhoto = !!post.imageUrl && !options?.skipImage;
-    if (tryPhoto) {
-      const photoBody = { ...baseBody, url: post.imageUrl! };
+    const buildPublishResult = async (rawPostId: string): Promise<FacebookPublishResult> => {
+      const facebookPostId = rawPostId || undefined;
+      const meta = facebookPostId ? await fetchFacebookPostMeta(facebookPostId, accessToken) : {};
+      const permalinkUrl = meta.permalinkUrl || (facebookPostId ? `https://www.facebook.com/${facebookPostId}` : undefined);
+      const isPublished = meta.isPublished ?? true;
+      return {
+        success: true,
+        facebookPostId,
+        permalinkUrl,
+        isPublished,
+        warning: isPublished === false
+          ? "Post is not public — visitors cannot see it. Open Meta Business Suite → Page → Posts and publish it."
+          : undefined,
+      };
+    };
+
+    const tryImage = !!post.imageUrl && !options?.skipImage;
+    if (tryImage) {
+      const feedWithPicture: Record<string, string> = { ...baseBody, picture: post.imageUrl! };
+      if (post.linkUrl) feedWithPicture.link = post.linkUrl;
+
+      const pictureResult = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/feed`, feedWithPicture);
+      if (pictureResult.ok) {
+        const postId = String(pictureResult.data.id || pictureResult.data.post_id || "");
+        return buildPublishResult(postId);
+      }
+
+      const photoBody: Record<string, string> = { ...baseBody, url: post.imageUrl! };
       if (post.linkUrl) photoBody.link = post.linkUrl;
 
       const photoResult = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/photos`, photoBody);
       if (photoResult.ok) {
-        const postId = String(photoResult.data.id || photoResult.data.post_id || "");
-        return { success: true, facebookPostId: postId || undefined };
+        const postId = String(photoResult.data.post_id || photoResult.data.id || "");
+        return buildPublishResult(postId);
       }
 
       const photoErr = photoResult.data.error as { message?: string; code?: number } | undefined;
@@ -405,8 +463,6 @@ export async function publishToFacebook(
           errorData: photoResult.data.error,
         };
       }
-
-      // Fall back to text+link post when photo permission missing
     }
 
     const feedBody = { ...baseBody };
@@ -415,7 +471,7 @@ export async function publishToFacebook(
     const feedResult = await postToFacebookEndpoint(`${GRAPH_API}/${pageId}/feed`, feedBody);
     if (feedResult.ok) {
       const postId = String(feedResult.data.id || feedResult.data.post_id || "");
-      return { success: true, facebookPostId: postId || undefined };
+      return buildPublishResult(postId);
     }
 
     const feedErr = feedResult.data.error as { message?: string; code?: number } | undefined;
