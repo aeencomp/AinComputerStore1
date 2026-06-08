@@ -20,6 +20,7 @@ import ProductDetail from "@/pages/ProductDetail";
 import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
 import RepairRequest from "@/pages/RepairRequest";
+import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TrackRepair from "@/pages/TrackRepair";
 import TrackOrder from "@/pages/TrackOrder";
 import ZainCashCallback from "@/pages/ZainCashCallback";
@@ -81,6 +82,7 @@ function Router() {
         <Route path="/technician/tickets/:id" component={Lazy.TicketDetail} />
         <Route path="/technician/new-request" component={Lazy.NewRepairRequest} />
         <Route path="/technician/customer/:customerId" component={Lazy.CustomerProfile} />
+        <Route path="/privacy" component={PrivacyPolicy} />
         <Route path="/repair-request" component={RepairRequest} />
         <Route path="/track-repair" component={TrackRepair} />
         <Route path="/track-order" component={TrackOrder} />
