@@ -18,6 +18,7 @@ export const AdminDiscountCodes = lazy(() => import("@/pages/AdminDiscountCodes"
 export const AdminAnalytics = lazy(() => import("@/pages/AdminAnalytics"));
 export const PlatformAdmin = lazy(() => import("@/pages/admin/PlatformAdmin"));
 export const AdminWhatsApp = lazy(() => import("@/pages/AdminWhatsApp"));
+export const AdminSocialPosts = lazy(() => import("@/pages/AdminSocialPosts"));
 export const RecycleBin = lazy(() => import("@/pages/RecycleBin"));
 export const AdminUsers = lazy(() => import("@/pages/AdminUsers"));
 

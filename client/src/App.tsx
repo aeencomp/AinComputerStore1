@@ -67,6 +67,7 @@ function Router() {
         <Route path="/admin/discount-codes" component={Lazy.AdminDiscountCodes} />
         <Route path="/admin/analytics" component={Lazy.AdminAnalytics} />
         <Route path="/admin/whatsapp" component={Lazy.AdminWhatsApp} />
+        <Route path="/admin/social" component={Lazy.AdminSocialPosts} />
         <Route path="/admin/platform" component={Lazy.PlatformAdmin} />
         <Route path="/admin/recycle-bin" component={Lazy.RecycleBin} />
         <Route path="/admin/users" component={Lazy.AdminUsers} />

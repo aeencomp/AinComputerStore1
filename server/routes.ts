@@ -24,6 +24,20 @@ import {
   computeCombinedDailyRevenue,
   formatIqdAmount,
 } from "./daily-revenue-report";
+import {
+  generateAnnouncementPost,
+  generateProductPost,
+  generateRepairPost,
+  getFacebookCredentials,
+  getFacebookDiagnostics,
+  getFacebookPostHistory,
+  getPublicSiteUrl,
+  logFacebookPost,
+  maskToken,
+  publishToFacebook,
+  runAutoFacebookPost,
+  type SocialPostType,
+} from "./social-posts";
 import bcrypt from "bcrypt";
 import { generateOTP, storeOTP, verifyOTP } from "./otp";
 import { sendOTPEmail } from "./resend-client";
@@ -10017,6 +10031,217 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       return res.json({ success: true, messageId: result.messageId });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  // ============ FACEBOOK / SOCIAL POSTS ============
+
+  app.get("/api/admin/social/config", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const settings = await storage.getStoreSettings();
+      if (!settings) return res.status(404).json({ error: "Settings not found" });
+      const { accessToken } = getFacebookCredentials(settings);
+      return res.json({
+        publicSiteUrl: getPublicSiteUrl(settings),
+        facebookPageId: settings.facebookPageId || "",
+        facebookPageAccessTokenMasked: maskToken(accessToken),
+        hasFacebookToken: !!accessToken,
+        facebookAutoPostEnabled: settings.facebookAutoPostEnabled ?? 0,
+        facebookAutoPostTime: settings.facebookAutoPostTime || "18:00",
+        facebookAutoPostMode: settings.facebookAutoPostMode || "rotate",
+        facebookAutoPostLastAt: settings.facebookAutoPostLastAt,
+        facebookUrl: settings.facebookUrl || "",
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.put("/api/admin/social/config", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const body = req.body || {};
+      const patch: Record<string, unknown> = {};
+
+      if (body.publicSiteUrl !== undefined) patch.publicSiteUrl = String(body.publicSiteUrl).trim();
+      if (body.facebookPageId !== undefined) patch.facebookPageId = String(body.facebookPageId).trim();
+      if (body.facebookAutoPostEnabled !== undefined) patch.facebookAutoPostEnabled = body.facebookAutoPostEnabled ? 1 : 0;
+      if (body.facebookAutoPostTime !== undefined) patch.facebookAutoPostTime = String(body.facebookAutoPostTime).trim();
+      if (body.facebookAutoPostMode !== undefined) patch.facebookAutoPostMode = String(body.facebookAutoPostMode).trim();
+
+      const newToken = body.facebookPageAccessToken;
+      if (newToken !== undefined && newToken !== null) {
+        const tokenStr = String(newToken).trim();
+        const isMasked = tokenStr.includes("••••");
+        if (tokenStr && !isMasked) {
+          patch.facebookPageAccessToken = tokenStr;
+        }
+      }
+
+      const settings = await storage.updateStoreSettings(patch as any);
+      const { accessToken } = getFacebookCredentials(settings);
+      return res.json({
+        publicSiteUrl: getPublicSiteUrl(settings),
+        facebookPageId: settings.facebookPageId || "",
+        facebookPageAccessTokenMasked: maskToken(accessToken),
+        hasFacebookToken: !!accessToken,
+        facebookAutoPostEnabled: settings.facebookAutoPostEnabled ?? 0,
+        facebookAutoPostTime: settings.facebookAutoPostTime || "18:00",
+        facebookAutoPostMode: settings.facebookAutoPostMode || "rotate",
+        facebookAutoPostLastAt: settings.facebookAutoPostLastAt,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/admin/social/diagnostics", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const settings = await storage.getStoreSettings();
+      const diagnostics = await getFacebookDiagnostics(settings);
+      return res.json(diagnostics);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/admin/social/generate", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const postType = String(req.body?.postType || "product") as SocialPostType;
+      const productId = req.body?.productId as string | undefined;
+      const discountCode = req.body?.discountCode as string | undefined;
+      const customIntro = req.body?.customIntro as string | undefined;
+
+      const settings = await storage.getStoreSettings();
+      if (!settings) return res.status(404).json({ error: "Settings not found" });
+      const siteUrl = getPublicSiteUrl(settings);
+
+      if (postType === "repair") {
+        return res.json(generateRepairPost(settings, siteUrl));
+      }
+      if (postType === "announcement") {
+        return res.json(generateAnnouncementPost(settings, siteUrl));
+      }
+
+      if (!productId) {
+        return res.status(400).json({ error: "productId required for product/sale posts" });
+      }
+      const product = await storage.getProduct(productId);
+      if (!product) return res.status(404).json({ error: "Product not found" });
+
+      const post = generateProductPost(product, settings, siteUrl, { discountCode, customIntro });
+      if (postType === "sale") {
+        post.postType = "sale";
+      }
+      return res.json(post);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/admin/social/publish", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const { message, imageUrl, linkUrl, postType, productId } = req.body || {};
+      if (!message || !String(message).trim()) {
+        return res.status(400).json({ error: "message required" });
+      }
+
+      const settings = await storage.getStoreSettings();
+      if (!settings) return res.status(404).json({ error: "Settings not found" });
+
+      const post = {
+        postType: (postType || "product") as SocialPostType,
+        productId: productId || undefined,
+        message: String(message),
+        imageUrl: imageUrl ? String(imageUrl) : null,
+        linkUrl: linkUrl ? String(linkUrl) : null,
+      };
+
+      const result = await publishToFacebook(settings, post);
+      await logFacebookPost({
+        postType: post.postType,
+        productId: post.productId,
+        message: post.message,
+        imageUrl: post.imageUrl,
+        linkUrl: post.linkUrl,
+        facebookPostId: result.facebookPostId,
+        source: "manual",
+        success: result.success,
+        error: result.error,
+      });
+
+      if (!result.success) {
+        return res.status(400).json({ error: result.error, errorData: result.errorData });
+      }
+      return res.json({ success: true, facebookPostId: result.facebookPostId });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.get("/api/admin/social/history", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const history = await getFacebookPostHistory(40);
+      return res.json(history);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  app.post("/api/admin/social/auto-post-now", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const settings = await storage.getStoreSettings();
+      if (!settings) return res.status(404).json({ error: "Settings not found" });
+      const outcome = await runAutoFacebookPost(settings, (patch) => storage.updateStoreSettings(patch as any), {
+        force: !!req.body?.force,
+      });
+      if (outcome.skipped) {
+        return res.status(400).json({ skipped: true, reason: outcome.reason });
+      }
+      if (!outcome.result?.success) {
+        return res.status(400).json({
+          error: outcome.result?.error,
+          post: outcome.post,
+        });
+      }
+      return res.json({ success: true, post: outcome.post, facebookPostId: outcome.result.facebookPostId });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** VPS cron — POST daily auto Facebook post. Uses DAILY_REVENUE_CRON_SECRET or FACEBOOK_CRON_SECRET. */
+  app.post("/api/cron/facebook/auto-post", async (req: any, res: any) => {
+    const secret =
+      process.env.FACEBOOK_CRON_SECRET?.trim() ||
+      process.env.DAILY_REVENUE_CRON_SECRET?.trim();
+    const provided = String(req.headers["x-cron-secret"] || req.body?.secret || "").trim();
+    if (!secret || provided !== secret) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      const settings = await storage.getStoreSettings();
+      if (!settings) return res.status(404).json({ error: "Settings not found" });
+      const outcome = await runAutoFacebookPost(settings, (patch) => storage.updateStoreSettings(patch as any), {
+        force: !!req.body?.force,
+      });
+      if (outcome.skipped) {
+        return res.json({ skipped: true, reason: outcome.reason });
+      }
+      return res.json({
+        success: outcome.result?.success ?? false,
+        facebookPostId: outcome.result?.facebookPostId,
+        error: outcome.result?.error,
+        postType: outcome.post?.postType,
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }

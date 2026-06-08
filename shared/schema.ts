@@ -311,6 +311,19 @@ export const storeSettings = pgTable("store_settings", {
   /** Owner/manager number for automated daily revenue WhatsApp summaries */
   dailyRevenueWhatsappNumber: text("daily_revenue_whatsapp_number").default(""),
 
+  /** Public storefront URL for product links in social posts */
+  publicSiteUrl: text("public_site_url").default("https://aeen-iq.com"),
+  /** Facebook Page API — auto-posting */
+  facebookPageId: text("facebook_page_id").default(""),
+  facebookPageAccessToken: text("facebook_page_access_token").default(""),
+  facebookAutoPostEnabled: integer("facebook_auto_post_enabled").notNull().default(0),
+  /** Baghdad local time HH:MM — used as guidance for external cron */
+  facebookAutoPostTime: text("facebook_auto_post_time").default("18:00"),
+  /** product | sale | repair | announcement | rotate */
+  facebookAutoPostMode: text("facebook_auto_post_mode").default("rotate"),
+  facebookAutoPostLastAt: timestamp("facebook_auto_post_last_at"),
+  facebookAutoPostCursor: integer("facebook_auto_post_cursor").notNull().default(0),
+
   // Theme & Branding
   logoUrl: text("logo_url").default(""),
   faviconUrl: text("favicon_url").default(""),
@@ -374,6 +387,22 @@ export const insertStoreSettingsSchema = createInsertSchema(storeSettings).omit(
 
 export type InsertStoreSettings = z.infer<typeof insertStoreSettingsSchema>;
 export type StoreSettings = typeof storeSettings.$inferSelect;
+
+export const facebookPostLog = pgTable("facebook_post_log", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  postType: text("post_type").notNull(),
+  productId: varchar("product_id"),
+  message: text("message").notNull(),
+  imageUrl: text("image_url"),
+  linkUrl: text("link_url"),
+  facebookPostId: text("facebook_post_id"),
+  source: text("source").notNull().default("manual"),
+  success: integer("success").notNull().default(1),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export type FacebookPostLog = typeof facebookPostLog.$inferSelect;
 
 // Footer Links Types
 export interface FooterLink {

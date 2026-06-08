@@ -77,6 +77,29 @@ const STARTUP_MIGRATIONS: string[] = [
   `UPDATE in_store_products SET product_type = 'generic' WHERE product_type IS NULL OR product_type = ''`,
 
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS daily_revenue_whatsapp_number TEXT DEFAULT ''`,
+
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS public_site_url TEXT DEFAULT 'https://aeen-iq.com'`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_page_id TEXT DEFAULT ''`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_page_access_token TEXT DEFAULT ''`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_enabled INTEGER NOT NULL DEFAULT 0`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_time TEXT DEFAULT '18:00'`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_mode TEXT DEFAULT 'rotate'`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_last_at TIMESTAMP`,
+  `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_cursor INTEGER NOT NULL DEFAULT 0`,
+
+  `CREATE TABLE IF NOT EXISTS facebook_post_log (
+     id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
+     post_type TEXT NOT NULL,
+     product_id VARCHAR,
+     message TEXT NOT NULL,
+     image_url TEXT,
+     link_url TEXT,
+     facebook_post_id TEXT,
+     source TEXT NOT NULL DEFAULT 'manual',
+     success INTEGER NOT NULL DEFAULT 1,
+     error TEXT,
+     created_at TIMESTAMP NOT NULL DEFAULT NOW()
+   )`,
 ];
 
 export async function runDbMigrations(): Promise<void> {
