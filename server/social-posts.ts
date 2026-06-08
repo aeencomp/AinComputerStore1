@@ -189,6 +189,56 @@ export async function pickProductForAutoPost(
   return { product: pool[idx], nextCursor: (idx + 1) % pool.length };
 }
 
+export async function exchangeUserTokenForPageToken(
+  userAccessToken: string,
+  pageId: string,
+): Promise<{
+  success: boolean;
+  pageToken?: string;
+  pageName?: string;
+  error?: string;
+  availablePages?: { id: string; name: string }[];
+}> {
+  const token = userAccessToken.trim();
+  const targetId = pageId.trim();
+  if (!token || !targetId) {
+    return { success: false, error: "User token and Page ID required" };
+  }
+
+  try {
+    const url = `${GRAPH_API}/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(token)}`;
+    const res = await fetch(url);
+    const data = (await res.json()) as {
+      data?: { id: string; name: string; access_token: string }[];
+      error?: { message?: string };
+    };
+    if (!res.ok) {
+      return { success: false, error: data.error?.message || "Failed to read /me/accounts" };
+    }
+
+    const accounts = data.data || [];
+    const availablePages = accounts.map((a) => ({ id: a.id, name: a.name }));
+    const match = accounts.find((a) => a.id === targetId);
+    if (!match?.access_token) {
+      const names = availablePages.map((p) => `${p.name} (${p.id})`).join(", ");
+      return {
+        success: false,
+        error: `Page ID ${targetId} not found in your accounts. Available: ${names || "none"}`,
+        availablePages,
+      };
+    }
+
+    return {
+      success: true,
+      pageToken: match.access_token,
+      pageName: match.name,
+      availablePages,
+    };
+  } catch (err) {
+    return { success: false, error: err instanceof Error ? err.message : "Unknown error" };
+  }
+}
+
 export function getFacebookCredentials(settings: StoreSettings | null | undefined) {
   const pageId = settings?.facebookPageId?.trim() || process.env.FACEBOOK_PAGE_ID?.trim() || "";
   const accessToken =

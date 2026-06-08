@@ -103,6 +103,7 @@ export default function AdminSocialPosts() {
     publicSiteUrl: "https://aeen-iq.com",
     facebookPageId: "",
     facebookPageAccessToken: "",
+    facebookUserToken: "",
     facebookAutoPostEnabled: false,
     facebookAutoPostTime: "18:00",
     facebookAutoPostMode: "rotate",
@@ -226,6 +227,34 @@ export default function AdminSocialPosts() {
     },
     onError: (err: Error) => {
       toast({ title: ar ? "فشل الحفظ" : "Save failed", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const exchangeTokenMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/admin/social/exchange-token", {
+        userAccessToken: configForm.facebookUserToken,
+        facebookPageId: configForm.facebookPageId,
+      });
+      return res.json();
+    },
+    onSuccess: (data: { pageName?: string; message?: string }) => {
+      setConfigForm((f) => ({ ...f, facebookPageAccessToken: "", facebookUserToken: "" }));
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/social/config"] });
+      refetchDiagnostics();
+      toast({
+        title: ar ? "تم حفظ توكن الصفحة!" : "Page token saved!",
+        description: data.pageName
+          ? `${ar ? "الصفحة:" : "Page:"} ${data.pageName}`
+          : data.message,
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: ar ? "فشل استخراج التوكن" : "Token exchange failed",
+        description: err.message,
+        variant: "destructive",
+      });
     },
   });
 
@@ -526,6 +555,37 @@ export default function AdminSocialPosts() {
                   )}
                 </div>
 
+                <div className="rounded-md border border-amber-200 bg-amber-50 p-3 space-y-3">
+                  <p className="text-sm font-semibold text-amber-900">
+                    {ar ? "الطريقة الموصى بها (تحل خطأ #200)" : "Recommended fix for error #200"}
+                  </p>
+                  <div className="space-y-2">
+                    <Label>{ar ? "User Token من Explorer" : "User Token from Explorer"}</Label>
+                    <Input
+                      type="password"
+                      value={configForm.facebookUserToken}
+                      onChange={(e) => setConfigForm((f) => ({ ...f, facebookUserToken: e.target.value }))}
+                      dir="ltr"
+                      placeholder="EAA... (User Token — not Page dropdown token)"
+                    />
+                    <p className="text-xs text-amber-800">
+                      {ar
+                        ? "Explorer → User Token (مع الصلاحيات) → انسخ التوكن من الأعلى → الصق هنا"
+                        : "Explorer → User Token (with permissions) → copy top token → paste here"}
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-amber-400"
+                    disabled={exchangeTokenMutation.isPending || !configForm.facebookUserToken || !configForm.facebookPageId}
+                    onClick={() => exchangeTokenMutation.mutate()}
+                  >
+                    {exchangeTokenMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
+                    {ar ? "استخراج وحفظ Page Token" : "Extract & save Page Token"}
+                  </Button>
+                </div>
+
                 <SeparatorBlock />
 
                 <div className="flex items-center justify-between gap-4">
@@ -674,13 +734,13 @@ export default function AdminSocialPosts() {
                     </li>
                     <li>
                       {ar
-                        ? "User or Page → اختر «العين لتجارة الحاسبات» (ليس User Token) → Generate Access Token"
-                        : "User or Page → select your Page (not User Token) → Generate Access Token"}
+                        ? "انسخ User Token → الصق في «استخراج Page Token» أعلاه (أفضل من لصق Page token يدوياً)"
+                        : "Paste User Token → use «Extract & save Page Token» above (best method)"}
                     </li>
                     <li>
                       {ar
-                        ? "انسخ التوكن من Explorer والصقه في الحقل أعلاه → اضغط «اختبار النشر»"
-                        : "Paste Explorer token above → click «Test publish»"}
+                        ? "ثم اضغط «اختبار النشر»"
+                        : "Then click «Test publish»"}
                     </li>
                     <li dir="ltr" className="font-mono text-[10px]">
                       Explorer POST /159035964278475/feed message=test (not GET)

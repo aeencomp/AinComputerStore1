@@ -37,6 +37,7 @@ import {
   publishToFacebook,
   runAutoFacebookPost,
   testFacebookPublish,
+  exchangeUserTokenForPageToken,
   type SocialPostType,
 } from "./social-posts";
 import bcrypt from "bcrypt";
@@ -10105,6 +10106,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const settings = await storage.getStoreSettings();
       const diagnostics = await getFacebookDiagnostics(settings);
       return res.json(diagnostics);
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
+  });
+
+  /** Exchange Graph API Explorer User Token → Page access_token from /me/accounts */
+  app.post("/api/admin/social/exchange-token", async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const userToken = String(req.body?.userAccessToken || "").trim();
+      const pageId = String(req.body?.facebookPageId || "").trim();
+      const settings = await storage.getStoreSettings();
+      const targetPageId = pageId || settings?.facebookPageId || "";
+      if (!userToken) return res.status(400).json({ error: "User access token required" });
+      if (!targetPageId) return res.status(400).json({ error: "Facebook Page ID required" });
+
+      const outcome = await exchangeUserTokenForPageToken(userToken, targetPageId);
+      if (!outcome.success || !outcome.pageToken) {
+        return res.status(400).json({
+          error: outcome.error || "Exchange failed",
+          availablePages: outcome.availablePages,
+        });
+      }
+
+      await storage.updateStoreSettings({
+        facebookPageId: targetPageId,
+        facebookPageAccessToken: outcome.pageToken,
+      } as any);
+
+      return res.json({
+        success: true,
+        pageId: targetPageId,
+        pageName: outcome.pageName,
+        facebookPageAccessTokenMasked: maskToken(outcome.pageToken),
+        message: "Page token saved from /me/accounts. Try Test publish.",
+      });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
     }
