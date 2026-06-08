@@ -78,7 +78,7 @@ export default function PrivacyPolicy() {
             <section className="space-y-2">
               <h2 className="text-xl font-semibold">تواصل معنا</h2>
               <p>
-                العين لتجارة الحاسبات — بغداد، العراق
+                العين لتجارة الحاسبات — كربلاء، العراق
                 <br />
                 الموقع:{" "}
                 <a href="https://aeen-iq.com" className="text-primary underline" dir="ltr">

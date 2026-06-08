@@ -88,6 +88,9 @@ const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_post_cursor INTEGER NOT NULL DEFAULT 0`,
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS facebook_auto_posts_per_day INTEGER NOT NULL DEFAULT 1`,
 
+  `UPDATE store_settings SET address_ar = 'كربلاء، العراق', address_en = 'Karbala, Iraq'
+     WHERE address_ar IS NULL OR address_ar = '' OR address_ar = 'بغداد، العراق'`,
+
   `CREATE TABLE IF NOT EXISTS facebook_post_log (
      id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid(),
      post_type TEXT NOT NULL,

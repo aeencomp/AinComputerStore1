@@ -70,14 +70,60 @@ function isolateLtr(segment: string): string {
   return `${LRI}${segment}${PDI}`;
 }
 
+const DEFAULT_ADDRESS_AR = "كربلاء، العراق";
+
+function getStoreAddressAr(settings: StoreSettings): string {
+  return settings.addressAr?.trim() || DEFAULT_ADDRESS_AR;
+}
+
+function getCityHashtag(settings: StoreSettings): string {
+  const city = getStoreAddressAr(settings).split(/[،,]/)[0]?.trim() || "كربلاء";
+  return city.replace(/\s+/g, "_");
+}
+
+/** Normalize Iraqi mobile for display: 07850006977 */
+function formatPhoneForPost(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("964") && digits.length >= 12) {
+    return `0${digits.slice(3, 13)}`;
+  }
+  if (digits.startsWith("07") && digits.length >= 11) {
+    return digits.slice(0, 11);
+  }
+  if (digits.startsWith("7") && digits.length === 10) {
+    return `0${digits}`;
+  }
+  return raw.trim();
+}
+
+function isPhoneOnlyLine(line: string): boolean {
+  const digits = line.trim().replace(/\D/g, "");
+  return /^(?:964)?7\d{9}$/.test(digits) || /^07\d{9}$/.test(digits);
+}
+
+function pushWhatsAppLines(lines: string[], whatsapp: string | undefined) {
+  if (!whatsapp?.trim()) return;
+  lines.push("📲 واتساب:");
+  lines.push(formatPhoneForPost(whatsapp));
+}
+
+function pushPhoneLines(lines: string[], phone: string | undefined) {
+  if (!phone?.trim()) return;
+  lines.push("📞 هاتف:");
+  lines.push(formatPhoneForPost(phone));
+}
+
 /** Fix mixed Arabic + numbers/URLs/Latin for correct RTL on Facebook and admin preview. */
 export function formatArabicRtlMessage(message: string): string {
   const lines = message.split("\n").map((line) => {
     if (!line.trim()) return line;
 
+    const trimmed = line.trim();
+    if (/^https?:\/\//i.test(trimmed)) return isolateLtr(trimmed);
+    if (isPhoneOnlyLine(trimmed)) return isolateLtr(formatPhoneForPost(trimmed));
+
     let out = line;
     out = out.replace(/https?:\/\/\S+/gi, (url) => isolateLtr(url));
-    out = out.replace(/(\+?\d[\d\s\-]{7,}\d)/g, (phone) => isolateLtr(phone.trim()));
     out = out.replace(/\b(\d{1,3}(?:,\d{3})+)\b/g, (num) => isolateLtr(num));
     out = out.replace(/كود خصم:\s*([A-Za-z0-9_-]+)/g, (_, code) => `كود خصم: ${isolateLtr(code)}`);
     out = out.replace(/#([A-Za-z][A-Za-z0-9_]*)/g, (tag) => isolateLtr(tag));
@@ -104,6 +150,7 @@ export function generateProductPost(
   const image = resolvePublicAssetUrl(product.image, siteUrl);
   const specsLine = pickSpecsLine(product);
   const whatsapp = settings.whatsappNumber?.trim();
+  const cityTag = getCityHashtag(settings);
   const intro = extras?.customIntro?.trim() || (product.badge ? `🔥 ${product.badge}` : "🔥 عرض من متجرنا");
 
   const lines = [
@@ -116,8 +163,8 @@ export function generateProductPost(
   if (product.inStock === 0) lines.push("⏳ الكمية محدودة");
   if (extras?.discountCode) lines.push(`🎁 كود خصم: ${extras.discountCode}`);
   lines.push("", "🛒 اطلب الآن:", link);
-  if (whatsapp) lines.push(`📲 واتساب: ${whatsapp}`);
-  lines.push("", `#${storeName.replace(/\s+/g, "_")} #كمبيوتر #لابتوب #بغداد`);
+  pushWhatsAppLines(lines, whatsapp);
+  lines.push("", `#${storeName.replace(/\s+/g, "_")} #كمبيوتر #لابتوب #${cityTag}`);
 
   return {
     postType: extras?.discountCode || (oldPrice && parseFloat(String(product.oldPrice)) > parseFloat(String(product.price))) ? "sale" : "product",
@@ -132,7 +179,8 @@ export function generateRepairPost(settings: StoreSettings, siteUrl: string): Ge
   const storeName = settings.storeNameAr || "العين لتجارة الحاسبات";
   const whatsapp = settings.whatsappNumber?.trim();
   const phone = settings.phone?.trim();
-  const address = settings.addressAr?.trim() || "بغداد، العراق";
+  const address = getStoreAddressAr(settings);
+  const cityTag = getCityHashtag(settings);
   const hours = settings.hoursAr?.trim();
   const repairLink = `${siteUrl}/repair-request`;
 
@@ -148,9 +196,9 @@ export function generateRepairPost(settings: StoreSettings, siteUrl: string): Ge
   ];
   if (hours) lines.push(`🕐 ${hours}`);
   lines.push("", "📋 اطلب صيانة أونلاين:", repairLink);
-  if (whatsapp) lines.push(`📲 واتساب: ${whatsapp}`);
-  else if (phone) lines.push(`📞 ${phone}`);
-  lines.push("", "#صيانة_لابتوب #صيانة_كمبيوتر #بغداد");
+  if (whatsapp) pushWhatsAppLines(lines, whatsapp);
+  else pushPhoneLines(lines, phone);
+  lines.push("", `#صيانة_لابتوب #صيانة_كمبيوتر #${cityTag}`);
 
   return {
     postType: "repair",
@@ -172,7 +220,7 @@ export function generateAnnouncementPost(settings: StoreSettings, siteUrl: strin
     "",
     `🌐 ${siteUrl}`,
   ];
-  if (whatsapp) lines.push(`📲 واتساب: ${whatsapp}`);
+  pushWhatsAppLines(lines, whatsapp);
 
   return {
     postType: "announcement",
