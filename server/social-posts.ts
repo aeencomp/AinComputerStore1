@@ -62,6 +62,34 @@ function pickSpecsLine(product: Product, max = 3): string | null {
   return specs.slice(0, max).join(" · ");
 }
 
+const LRI = "\u2066";
+const PDI = "\u2069";
+const RLM = "\u200F";
+
+function isolateLtr(segment: string): string {
+  return `${LRI}${segment}${PDI}`;
+}
+
+/** Fix mixed Arabic + numbers/URLs/Latin for correct RTL on Facebook and admin preview. */
+export function formatArabicRtlMessage(message: string): string {
+  const lines = message.split("\n").map((line) => {
+    if (!line.trim()) return line;
+
+    let out = line;
+    out = out.replace(/https?:\/\/\S+/gi, (url) => isolateLtr(url));
+    out = out.replace(/(\+?\d[\d\s\-]{7,}\d)/g, (phone) => isolateLtr(phone.trim()));
+    out = out.replace(/\b(\d{1,3}(?:,\d{3})+)\b/g, (num) => isolateLtr(num));
+    out = out.replace(/كود خصم:\s*([A-Za-z0-9_-]+)/g, (_, code) => `كود خصم: ${isolateLtr(code)}`);
+    out = out.replace(/#([A-Za-z][A-Za-z0-9_]*)/g, (tag) => isolateLtr(tag));
+    out = out.replace(/\(كان\s+(\d{1,3}(?:,\d{3})*)\)/g, (_, num) => `(كان ${isolateLtr(num)})`);
+
+    return out;
+  });
+
+  const body = lines.join("\n").trim();
+  return body.startsWith(RLM) ? body : `${RLM}${body}`;
+}
+
 export function generateProductPost(
   product: Product,
   settings: StoreSettings,
@@ -94,7 +122,7 @@ export function generateProductPost(
   return {
     postType: extras?.discountCode || (oldPrice && parseFloat(String(product.oldPrice)) > parseFloat(String(product.price))) ? "sale" : "product",
     productId: product.id,
-    message: lines.join("\n"),
+    message: formatArabicRtlMessage(lines.join("\n")),
     imageUrl: image,
     linkUrl: link,
   };
@@ -126,7 +154,7 @@ export function generateRepairPost(settings: StoreSettings, siteUrl: string): Ge
 
   return {
     postType: "repair",
-    message: lines.join("\n"),
+    message: formatArabicRtlMessage(lines.join("\n")),
     imageUrl: settings.logoUrl ? resolvePublicAssetUrl(settings.logoUrl, siteUrl) : null,
     linkUrl: repairLink,
   };
@@ -148,7 +176,7 @@ export function generateAnnouncementPost(settings: StoreSettings, siteUrl: strin
 
   return {
     postType: "announcement",
-    message: lines.join("\n"),
+    message: formatArabicRtlMessage(lines.join("\n")),
     imageUrl: settings.heroImageUrl
       ? resolvePublicAssetUrl(settings.heroImageUrl, siteUrl)
       : settings.logoUrl
@@ -406,7 +434,7 @@ export async function testFacebookPublish(
   accessToken: string,
 ): Promise<FacebookPublishResult> {
   const body: Record<string, string> = {
-    message: "اختبار نشر من نظام العين — يمكن حذف هذا المنشور",
+    message: formatArabicRtlMessage("اختبار نشر من نظام العين — يمكن حذف هذا المنشور"),
     access_token: accessToken,
     published: "true",
   };
@@ -446,7 +474,7 @@ export async function publishToFacebook(
 
   try {
     const baseBody: Record<string, string> = {
-      message: post.message,
+      message: formatArabicRtlMessage(post.message),
       access_token: accessToken,
       published: "true",
     };

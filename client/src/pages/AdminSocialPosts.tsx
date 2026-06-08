@@ -467,8 +467,8 @@ export default function AdminSocialPosts() {
                   </Button>
 
                   {selectedProduct && (postType === "product" || postType === "sale") && (
-                    <div className="rounded-md border p-3 text-sm space-y-1">
-                      <p className="font-medium">{selectedProduct.nameAr}</p>
+                    <div className="rounded-md border p-3 text-sm space-y-1" dir="rtl">
+                      <p className="font-medium text-right">{selectedProduct.nameAr}</p>
                       <p className="text-muted-foreground">
                         {formatPrice(selectedProduct.price, language)} {ar ? "د.ع" : "IQD"}
                         {selectedProduct.oldPrice && (
@@ -498,15 +498,18 @@ export default function AdminSocialPosts() {
                     value={message}
                     onChange={(e) => setMessage(e.target.value)}
                     rows={12}
+                    dir="rtl"
                     placeholder={ar ? "اضغط إنشاء المنشور..." : "Click Generate Post..."}
-                    className="font-sans text-sm"
+                    className="font-sans text-sm text-right leading-relaxed"
+                    style={{ unicodeBidi: "plaintext" }}
                   />
                   {linkUrl && (
                     <a
                       href={linkUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-primary flex items-center gap-1"
+                      dir="ltr"
+                      className="text-xs text-primary flex items-center gap-1 justify-end"
                     >
                       <ExternalLink className="h-3 w-3" />
                       {linkUrl}
@@ -889,7 +892,13 @@ export default function AdminSocialPosts() {
                             {new Date(entry.createdAt).toLocaleString(ar ? "ar-IQ" : "en-IQ")}
                           </span>
                         </div>
-                        <p className="text-sm whitespace-pre-line line-clamp-4">{entry.message}</p>
+                        <p
+                          dir="rtl"
+                          className="text-sm text-right whitespace-pre-line line-clamp-4 leading-relaxed"
+                          style={{ unicodeBidi: "plaintext" }}
+                        >
+                          {entry.message}
+                        </p>
                         {entry.facebookPostId && (
                           <a
                             href={`https://www.facebook.com/${entry.facebookPostId}`}
