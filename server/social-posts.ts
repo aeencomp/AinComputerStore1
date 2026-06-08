@@ -212,14 +212,15 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
   const requiredPermissions = ["pages_manage_posts", "pages_read_engagement"];
 
   try {
-    const url = `${GRAPH_API}/${pageId}?fields=id,name,tasks&access_token=${encodeURIComponent(accessToken)}`;
+    // id+name only — "tasks" is not available on all Page token types (#100).
+    const url = `${GRAPH_API}/${pageId}?fields=id,name&access_token=${encodeURIComponent(accessToken)}`;
     const res = await fetch(url);
     const data = (await res.json()) as Record<string, unknown>;
     if (!res.ok) {
       const fbError = data.error as { message?: string; code?: number } | undefined;
       const hint =
         fbError?.code === 100
-          ? "Use the Page Access Token from GET /me/accounts (not a User token). Page ID must match that token."
+          ? "Use the Page access_token from GET /me/accounts (not a User token). Page ID must match that token."
           : undefined;
       return {
         configured: true,
@@ -233,9 +234,8 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
       };
     }
 
-    const tasks = Array.isArray(data.tasks) ? (data.tasks as string[]) : [];
-    const canCreate = tasks.includes("CREATE_CONTENT") || tasks.includes("MANAGE");
-    const publishReady = canCreate;
+    const verifiedId = String(data.id || "");
+    const idMatches = !verifiedId || verifiedId === pageId;
 
     return {
       configured: true,
@@ -243,16 +243,15 @@ export async function getFacebookDiagnostics(settings: StoreSettings | null | un
       hasToken: true,
       siteUrl,
       pageName: data.name,
-      pageIdVerified: data.id,
-      pageTasks: tasks,
-      canPublish: publishReady,
+      pageIdVerified: verifiedId || pageId,
+      canPublish: idMatches,
       requiredPermissions,
-      note: publishReady
-        ? "Token can publish to this Page."
-        : "Page name loads but token cannot post. Regenerate Page token with pages_manage_posts + pages_read_engagement.",
-      warning: publishReady
+      note: idMatches
+        ? "Connection OK. Use «نشر على فيسبوك» or «نشر تلقائي الآن» to verify posting."
+        : "Token works but Page ID may be wrong — use id from GET /me/accounts.",
+      warning: idMatches
         ? undefined
-        : "This token is missing post permission. Paste a new access_token from GET /me/accounts after selecting both permissions in Graph API Explorer.",
+        : `Saved Page ID (${pageId}) does not match token page (${verifiedId}).`,
     };
   } catch (err) {
     return {

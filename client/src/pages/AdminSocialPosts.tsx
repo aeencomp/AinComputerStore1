@@ -618,11 +618,6 @@ export default function AdminSocialPosts() {
                         {"warning" in diagnostics && diagnostics.warning && (
                           <p className="text-xs text-amber-800 font-medium">{String(diagnostics.warning)}</p>
                         )}
-                        {Array.isArray(diagnostics.pageTasks) && diagnostics.pageTasks.length > 0 && (
-                          <p className="text-xs text-muted-foreground" dir="ltr">
-                            tasks: {(diagnostics.pageTasks as string[]).join(", ")}
-                          </p>
-                        )}
                       </>
                     ) : (
                       <p className="text-amber-700">{ar ? "غير مُعدّ بعد" : "Not configured yet"}</p>
@@ -638,7 +633,7 @@ export default function AdminSocialPosts() {
                         ? "Graph API Explorer → Generate Token → فعّل: pages_manage_posts و pages_read_engagement و pages_show_list"
                         : "Graph API Explorer → Generate Token → enable: pages_manage_posts, pages_read_engagement, pages_show_list"}
                     </li>
-                    <li dir="ltr" className="font-mono">GET /me/accounts?fields=id,name,access_token,tasks</li>
+                    <li dir="ltr" className="font-mono">GET /me/accounts?fields=id,name,access_token</li>
                     <li>
                       {ar
                         ? "انسخ access_token لصفحتك — الصقه في الحقل أعلاه (لا تتركه فارغاً) ثم احفظ"
