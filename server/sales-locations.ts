@@ -304,6 +304,7 @@ export type PosScanResolvedProduct = {
   serialNumber: string | null;
   partNumber: string | null;
   category: string | null;
+  printSpecs?: string[];
 };
 
 function inventoryRowMatchesScan(row: InventoryCodeSource, code: string): boolean {
@@ -316,6 +317,14 @@ function mapAdapterToPosScan(a: typeof acAdapters.$inferSelect): PosScanResolved
     canonicalAdpSerial(a.serialNumber, a.barcode) || (a.serialNumber || "").trim();
   const watt = a.wattage != null ? ` ${a.wattage}W` : "";
   const name = `${a.brand} ${canonicalSerial}${watt}`;
+  const printSpecs = [
+    a.brand ? `الماركة: ${a.brand}` : "",
+    a.wattage != null ? `القدرة: ${a.wattage}W` : "",
+    canonicalSerial ? `الرقم التسلسلي: ${canonicalSerial}` : "",
+    a.partNumber ? `رقم القطعة: ${a.partNumber}` : "",
+    a.connectorType ? `نوع الموصل: ${a.connectorType}` : "",
+  ].filter(Boolean);
+
   return {
     productSource: "adapter",
     id: `ada-${a.id}`,
@@ -331,12 +340,22 @@ function mapAdapterToPosScan(a: typeof acAdapters.$inferSelect): PosScanResolved
     serialNumber: canonicalSerial,
     partNumber: a.partNumber ?? null,
     category: "شواحن",
+    printSpecs,
   };
 }
 
 function mapBatteryToPosScan(b: typeof laptopBatteries.$inferSelect): PosScanResolvedProduct {
   const scanCode = getInventoryScanCode(b);
   const name = `${b.brand} ${b.serialNumber}`;
+  const printSpecs = [
+    b.brand ? `الماركة: ${b.brand}` : "",
+    b.serialNumber ? `الرقم التسلسلي: ${b.serialNumber}` : "",
+    b.partNumber ? `رقم القطعة: ${b.partNumber}` : "",
+    Array.isArray(b.compatibleLaptops) && b.compatibleLaptops.length > 0
+      ? `متوافق مع: ${b.compatibleLaptops.slice(0, 4).join("، ")}`
+      : "",
+  ].filter(Boolean);
+
   return {
     productSource: "battery",
     id: `bat-${b.id}`,
@@ -352,6 +371,7 @@ function mapBatteryToPosScan(b: typeof laptopBatteries.$inferSelect): PosScanRes
     serialNumber: b.serialNumber,
     partNumber: b.partNumber ?? null,
     category: "بطاريات",
+    printSpecs,
   };
 }
 
@@ -442,6 +462,7 @@ function mapInstoreToPosScan(p: typeof inStoreProducts.$inferSelect): PosScanRes
     serialNumber: mapped.serialNumber,
     partNumber: mapped.partNumber,
     category: mapped.category,
+    printSpecs: mapped.printSpecs,
   };
 }
 

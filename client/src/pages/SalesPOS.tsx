@@ -129,6 +129,7 @@ type ServerPosScanProduct = {
   serialNumber: string | null;
   partNumber: string | null;
   category: string | null;
+  printSpecs?: string[];
 };
 
 function posProductFromServerScan(p: ServerPosScanProduct): POSProduct {
@@ -153,6 +154,7 @@ function posProductFromServerScan(p: ServerPosScanProduct): POSProduct {
     productSource: "instore",
     productType: legacyType,
     sourceId: p.sourceId,
+    printSpecs: p.printSpecs || [],
   };
 }
 
@@ -381,6 +383,7 @@ export default function SalesPOS({
             image: null,
             productSource: "instore" as const,
             productType: mapped.productType,
+            printSpecs: mapped.printSpecs,
           };
         })
     : [];
@@ -398,6 +401,7 @@ export default function SalesPOS({
         image: p.image ?? null,
         category: p.category ?? null,
         productSource: "instore" as const,
+        printSpecs: Array.isArray(p.specs) ? p.specs.filter(Boolean) : [],
       }));
 
   const productsForScan: POSProduct[] = products;
@@ -855,8 +859,10 @@ export default function SalesPOS({
       productId: item.product.id,
       nameAr: item.product.nameAr,
       nameEn: item.product.nameEn,
+      sku: item.product.sku,
       price: getEffectivePrice(item),
       quantity: item.quantity,
+      specs: item.product.printSpecs || [],
       productSource: orderType === "in-store" ? "instore" : (item.product.productSource || "instore"),
     })),
     customerName: customerName || (language === 'ar' ? 'عميل في المتجر' : 'Walk-in Customer'),

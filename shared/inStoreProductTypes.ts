@@ -191,7 +191,86 @@ export type UnifiedPosProduct = {
   category: string | null;
   productSource: "instore";
   productType: InStoreProductType;
+  /** Arabic lines for thermal / A4 receipts */
+  printSpecs: string[];
 };
+
+/** Build receipt spec lines from unified in-store JSON specs. */
+export function buildInStorePrintSpecs(
+  type: InStoreProductType,
+  specs: InStoreProductSpecs | null | undefined,
+): string[] {
+  const s = specs || {};
+  const lines: string[] = [];
+  const push = (label: string, key: string) => {
+    const v = specString(s, key);
+    if (v) lines.push(`${label}: ${v}`);
+  };
+  const pushNum = (label: string, key: string, suffix = "") => {
+    const n = specNumber(s, key);
+    if (n != null) lines.push(`${label}: ${n}${suffix}`);
+  };
+
+  switch (type) {
+    case "laptop":
+      push("الماركة", "brand");
+      push("الموديل", "model");
+      push("المعالج", "cpu");
+      push("الرام", "ram");
+      push("التخزين", "storage");
+      if (specString(s, "sizeInch") || specString(s, "resolution")) {
+        lines.push(
+          `الشاشة: ${[specString(s, "sizeInch"), specString(s, "resolution")].filter(Boolean).join(" ")}`,
+        );
+      }
+      if (specString(s, "gpu")) push("كرت الشاشة", "gpu");
+      push("الرقم التسلسلي", "serialNumber");
+      break;
+    case "desktop":
+      push("الماركة", "brand");
+      push("الموديل", "model");
+      push("المعالج", "cpu");
+      push("الرام", "ram");
+      push("التخزين", "storage");
+      if (specString(s, "gpu")) push("كرت الشاشة", "gpu");
+      push("الرقم التسلسلي", "serialNumber");
+      break;
+    case "battery":
+      push("الماركة", "brand");
+      push("الرقم التسلسلي", "serialNumber");
+      push("رقم القطعة", "partNumber");
+      if (Array.isArray(s.compatibleLaptops) && (s.compatibleLaptops as string[]).length > 0) {
+        lines.push(`متوافق مع: ${(s.compatibleLaptops as string[]).slice(0, 4).join("، ")}`);
+      }
+      break;
+    case "adapter":
+      push("الماركة", "brand");
+      pushNum("القدرة", "wattage", "W");
+      push("الرقم التسلسلي", "serialNumber");
+      push("رقم القطعة", "partNumber");
+      push("نوع الموصل", "connectorType");
+      push("حجم الرأس", "tipSize");
+      break;
+    case "keyboard":
+      push("الماركة", "brand");
+      push("التخطيط", "layout");
+      push("النوع", "keyboardType");
+      push("الرقم التسلسلي", "serialNumber");
+      break;
+    case "lcd":
+      push("الماركة", "brand");
+      push("المقاس", "sizeInch");
+      push("الدقة", "resolution");
+      push("الرقم التسلسلي", "serialNumber");
+      break;
+    default:
+      push("الرقم التسلسلي", "serialNumber");
+      push("الباركود", "barcode");
+      break;
+  }
+
+  return lines;
+}
 
 export function mapInStoreRowToPosProduct(row: InStoreProductRow): UnifiedPosProduct {
   const type = isInStoreProductType(row.productType) ? row.productType : "generic";
@@ -212,6 +291,7 @@ export function mapInStoreRowToPosProduct(row: InStoreProductRow): UnifiedPosPro
     category: row.category ?? categoryForProductType(type),
     productSource: "instore",
     productType: type,
+    printSpecs: buildInStorePrintSpecs(type, specs),
   };
 }
 

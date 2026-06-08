@@ -81,6 +81,11 @@ const escapeHtml = (s: string) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
+function normalizeItemSpecs(item: A4InvoiceItem): string[] {
+  if (!Array.isArray(item.specs)) return [];
+  return item.specs.map((s) => String(s).trim()).filter(Boolean);
+}
+
 /** Convert IQD amount to Arabic words (common POS amounts). */
 export function iqdToArabicWords(amount: number): string {
   const n = Math.abs(Math.round(amount));
@@ -240,18 +245,16 @@ export function buildA4InvoiceHtml(
       const lineTotal = unitPrice * qty;
       const name = escapeHtml(item.nameAr || item.nameEn || item.name || "-");
       const sku = escapeHtml(item.sku || "-");
-      const noteText =
-        item.notes ||
-        (Array.isArray(item.specs) && item.specs.length > 0
-          ? item.specs.join(" • ")
-          : idx === 0 && order.notes
-            ? order.notes
-            : "");
-      const notes = escapeHtml(noteText);
+      const specLines = normalizeItemSpecs(item);
+      const specsHtml = specLines.length
+        ? `<div class="item-specs">${specLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")}</div>`
+        : "";
+      const nameCell = `<div class="name-main">${name}</div>${specsHtml}`;
+      const notes = escapeHtml(item.notes || "");
       return `<tr>
         <td>${idx + 1}</td>
         <td class="sku">${sku}</td>
-        <td class="name">${name}</td>
+        <td class="name">${nameCell}</td>
         <td>${qty}</td>
         <td>قطعة</td>
         <td>${fmtIqd(unitPrice)}</td>
@@ -398,9 +401,14 @@ export function buildA4InvoiceHtml(
     border: 1px solid #ccc; padding: 7px 6px; text-align: center; vertical-align: middle;
   }
   table.items tbody tr:nth-child(even) { background: #fafafa; }
-  table.items td.name { text-align: right; font-weight: 700; min-width: 140px; }
-  table.items td.sku { font-family: monospace; font-weight: 700; direction: ltr; }
-  table.items td.notes { font-size: 10px; color: #444; text-align: right; max-width: 100px; }
+  table.items td.name { text-align: right; font-weight: 700; min-width: 180px; vertical-align: top; }
+  table.items td.name .name-main { font-weight: 800; font-size: 12px; line-height: 1.35; }
+  table.items td.name .item-specs {
+    margin-top: 5px; font-size: 9.5px; font-weight: 600; color: #333;
+    line-height: 1.5; border-top: 1px dashed #ddd; padding-top: 4px;
+  }
+  table.items td.sku { font-family: monospace; font-weight: 700; direction: ltr; vertical-align: top; }
+  table.items td.notes { font-size: 10px; color: #444; text-align: right; max-width: 100px; vertical-align: top; }
   .summary {
     display: grid; grid-template-columns: 1.1fr 0.9fr 1fr; gap: 12px;
     align-items: start; margin-bottom: 16px;
