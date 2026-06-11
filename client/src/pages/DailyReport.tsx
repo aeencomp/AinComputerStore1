@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -594,7 +594,6 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
   const [manualLabelName, setManualLabelName] = useState("");
   const [manualLabelDate, setManualLabelDate] = useState("");
   const [manualLabelAmount, setManualLabelAmount] = useState("");
-  const [dailyLabelQrDataUrl, setDailyLabelQrDataUrl] = useState<string>("");
   const labelPrintRef = useRef<HTMLDivElement>(null);
   const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
@@ -711,44 +710,6 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     return Number.isNaN(n) ? 0 : n;
   }, [manualLabelAmount]);
 
-  const dailyLabelQrValue = useMemo(() => {
-    if (!data?.shift) return "";
-    const d = data.shift.startTime
-      ? new Date(data.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).replace(/-/g, "")
-      : baghdadToday.replace(/-/g, "");
-    const sid = String(data.shift.id ?? "")
-      .replace(/[^a-zA-Z0-9]/g, "")
-      .toUpperCase()
-      .slice(0, 6) || "DAY";
-    return `DL${d}${sid}`;
-  }, [baghdadToday, data?.shift]);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        if (!dailyLabelQrValue) {
-          setDailyLabelQrDataUrl("");
-          return;
-        }
-        const { toDataURL } = await import("qrcode");
-        const dataUrl = await toDataURL(dailyLabelQrValue, {
-          width: 120,
-          margin: 0,
-          color: { dark: "#000000", light: "#ffffff" },
-          errorCorrectionLevel: "M",
-        });
-        if (!cancelled) setDailyLabelQrDataUrl(dataUrl);
-      } catch (e) {
-        console.error("Daily label QR generation error:", e);
-        if (!cancelled) setDailyLabelQrDataUrl("");
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [dailyLabelQrValue]);
-
   const handlePrint = () => {
     if (!data) return;
     const html = buildPrintHTML(data);
@@ -792,15 +753,13 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
       justify-content: center;
       gap: 0.5mm;
     }
-    .qr { width: 100%; display: flex; justify-content: center; margin-top: 0.6mm; }
-    .qr img { width: 22mm; height: 22mm; image-rendering: pixelated; }
     .row {
       display: flex;
       justify-content: space-between;
       align-items: baseline;
       gap: 2mm;
-      font-size: 8pt;
-      line-height: 1.1;
+      font-size: 12pt;
+      line-height: 1.2;
     }
     .row .k { color: #444; flex-shrink: 0; }
     .row .v { font-weight: 700; text-align: end; word-break: break-word; }
@@ -808,7 +767,6 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
 </head>
 <body>
   ${labelHtml}
-  ${dailyLabelQrDataUrl ? `<div class="qr"><img alt="QR" src="${dailyLabelQrDataUrl}"/></div>` : ""}
   <script>window.onload = () => window.print();</script>
 </body>
 </html>`);
@@ -1120,8 +1078,8 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                           justifyContent: "space-between",
                           alignItems: "baseline",
                           gap: "2mm",
-                          fontSize: "8pt",
-                          lineHeight: 1.1,
+                          fontSize: "12pt",
+                          lineHeight: 1.2,
                         }}
                       >
                         <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "الاسم" : "Name"}</span>
@@ -1134,8 +1092,8 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                           justifyContent: "space-between",
                           alignItems: "baseline",
                           gap: "2mm",
-                          fontSize: "8pt",
-                          lineHeight: 1.1,
+                          fontSize: "12pt",
+                          lineHeight: 1.2,
                         }}
                       >
                         <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "التاريخ" : "Date"}</span>
@@ -1148,8 +1106,8 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                           justifyContent: "space-between",
                           alignItems: "baseline",
                           gap: "2mm",
-                          fontSize: "8pt",
-                          lineHeight: 1.1,
+                          fontSize: "12pt",
+                          lineHeight: 1.2,
                         }}
                       >
                         <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "المبلغ" : "Amount"}</span>
@@ -1157,16 +1115,6 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                           {manualLabelAmount.trim() !== "" ? fmtNum(labelAmountValue) : "—"}
                         </span>
                       </div>
-                      {dailyLabelQrDataUrl ? (
-                        <div style={{ width: "100%", display: "flex", justifyContent: "center", marginTop: "0.6mm" }}>
-                          <img
-                            src={dailyLabelQrDataUrl}
-                            alt="QR"
-                            style={{ width: "22mm", height: "22mm", imageRendering: "pixelated" }}
-                            data-testid="img-daily-label-qr"
-                          />
-                        </div>
-                      ) : null}
                     </div>
                   </div>
                 </CardContent>
