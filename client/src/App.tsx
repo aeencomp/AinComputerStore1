@@ -21,6 +21,8 @@ import Checkout from "@/pages/Checkout";
 import OrderConfirmation from "@/pages/OrderConfirmation";
 import RepairRequest from "@/pages/RepairRequest";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
+import PromoLanding from "@/pages/PromoLanding";
+import { MetaPixel } from "@/components/MetaPixel";
 import TrackRepair from "@/pages/TrackRepair";
 import TrackOrder from "@/pages/TrackOrder";
 import ZainCashCallback from "@/pages/ZainCashCallback";
@@ -83,6 +85,7 @@ function Router() {
         <Route path="/technician/new-request" component={Lazy.NewRepairRequest} />
         <Route path="/technician/customer/:customerId" component={Lazy.CustomerProfile} />
         <Route path="/privacy" component={PrivacyPolicy} />
+        <Route path="/promo" component={PromoLanding} />
         <Route path="/repair-request" component={RepairRequest} />
         <Route path="/track-repair" component={TrackRepair} />
         <Route path="/track-order" component={TrackOrder} />
@@ -118,6 +121,7 @@ function App() {
             <TooltipProvider>
               <Toaster />
               <VisitorTracker />
+              <MetaPixel />
               <BlockedChecker>
                 <Router />
                 <PWAInstallPrompt />

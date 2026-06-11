@@ -58,6 +58,8 @@ type SocialConfig = {
   facebookAutoPostsPerDay?: number;
   facebookAutoPostLastAt?: string | null;
   facebookUrl?: string;
+  metaPixelId?: string;
+  promoLandingUrl?: string;
 };
 
 type PostLogEntry = {
@@ -123,6 +125,7 @@ export default function AdminSocialPosts() {
     facebookAutoPostTime: "18:00",
     facebookAutoPostMode: "random",
     facebookAutoPostsPerDay: 1,
+    metaPixelId: "",
   });
 
   const { data: currentAdmin } = useQuery<AdminUser>({
@@ -160,6 +163,7 @@ export default function AdminSocialPosts() {
       facebookAutoPostTime: config.facebookAutoPostTime || "18:00",
       facebookAutoPostMode: config.facebookAutoPostMode || "random",
       facebookAutoPostsPerDay: config.facebookAutoPostsPerDay ?? 1,
+      metaPixelId: config.metaPixelId || "",
     });
   }, [config]);
 
@@ -237,6 +241,7 @@ export default function AdminSocialPosts() {
         facebookAutoPostTime: configForm.facebookAutoPostTime,
         facebookAutoPostMode: configForm.facebookAutoPostMode,
         facebookAutoPostsPerDay: configForm.facebookAutoPostsPerDay,
+        metaPixelId: configForm.metaPixelId,
       };
       if (configForm.facebookPageAccessToken.trim()) {
         payload.facebookPageAccessToken = configForm.facebookPageAccessToken.trim();
@@ -630,6 +635,44 @@ export default function AdminSocialPosts() {
                     {exchangeTokenMutation.isPending && <Loader2 className="h-4 w-4 animate-spin me-2" />}
                     {ar ? "استخراج وحفظ Page Token" : "Extract & save Page Token"}
                   </Button>
+                </div>
+
+                <SeparatorBlock />
+
+                <div className="rounded-md border border-blue-200 bg-blue-50 p-4 space-y-3">
+                  <p className="text-sm font-semibold text-blue-900">
+                    {ar ? "إعلانات Meta (Pixel + صفحة هبوط)" : "Meta Ads (Pixel + landing page)"}
+                  </p>
+                  <div className="space-y-2">
+                    <Label>Meta Pixel ID</Label>
+                    <Input
+                      value={configForm.metaPixelId}
+                      onChange={(e) =>
+                        setConfigForm((f) => ({ ...f, metaPixelId: e.target.value.replace(/\D/g, "") }))
+                      }
+                      dir="ltr"
+                      placeholder="123456789012345"
+                    />
+                    <p className="text-xs text-blue-800">
+                      {ar
+                        ? "من Events Manager → مصادر البيانات → Pixel → معرّف Pixel"
+                        : "From Events Manager → Data sources → Pixel → Pixel ID"}
+                    </p>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>{ar ? "رابط صفحة الإعلان" : "Ad landing page URL"}</Label>
+                    <p className="font-mono text-xs break-all text-blue-900" dir="ltr">
+                      {config?.promoLandingUrl || `${configForm.publicSiteUrl}/promo`}
+                    </p>
+                    <p className="text-xs text-blue-800" dir="ltr">
+                      {`${config?.promoLandingUrl || `${configForm.publicSiteUrl}/promo`}?utm_source=facebook&utm_medium=paid&utm_campaign=store`}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {ar
+                        ? "استخدم هذا الرابط كوجهة في إعلان فيسبوك/إنستغرام"
+                        : "Use this URL as the destination in Facebook/Instagram ads"}
+                    </p>
+                  </div>
                 </div>
 
                 <SeparatorBlock />

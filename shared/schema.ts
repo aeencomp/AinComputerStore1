@@ -324,6 +324,8 @@ export const storeSettings = pgTable("store_settings", {
   facebookAutoPostsPerDay: integer("facebook_auto_posts_per_day").notNull().default(1),
   facebookAutoPostLastAt: timestamp("facebook_auto_post_last_at"),
   facebookAutoPostCursor: integer("facebook_auto_post_cursor").notNull().default(0),
+  /** Meta (Facebook) Pixel ID for ad conversion tracking — e.g. 123456789012345 */
+  metaPixelId: text("meta_pixel_id").default(""),
 
   // Theme & Branding
   logoUrl: text("logo_url").default(""),

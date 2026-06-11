@@ -10057,6 +10057,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         facebookAutoPostsPerDay: settings.facebookAutoPostsPerDay ?? 1,
         facebookAutoPostLastAt: settings.facebookAutoPostLastAt,
         facebookUrl: settings.facebookUrl || "",
+        metaPixelId: settings.metaPixelId || "",
+        promoLandingUrl: `${getPublicSiteUrl(settings)}/promo`,
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
@@ -10077,6 +10079,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (body.facebookAutoPostsPerDay !== undefined) {
         const n = parseInt(String(body.facebookAutoPostsPerDay), 10);
         patch.facebookAutoPostsPerDay = Number.isFinite(n) ? Math.min(5, Math.max(1, n)) : 1;
+      }
+      if (body.metaPixelId !== undefined) {
+        patch.metaPixelId = String(body.metaPixelId).trim().replace(/\D/g, "");
       }
 
       const newToken = body.facebookPageAccessToken;
@@ -10100,6 +10105,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         facebookAutoPostMode: settings.facebookAutoPostMode || "rotate",
         facebookAutoPostsPerDay: settings.facebookAutoPostsPerDay ?? 1,
         facebookAutoPostLastAt: settings.facebookAutoPostLastAt,
+        metaPixelId: settings.metaPixelId || "",
+        promoLandingUrl: `${getPublicSiteUrl(settings)}/promo`,
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
