@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -705,11 +705,6 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
   const data: ShiftReportData | null | undefined = selectedShiftId ? shiftReport : (activeSnapshot ?? dailyAsShift ?? null);
   const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
   const isFetching = selectedShiftId ? reportFetching : false;
-  const labelAmountValue = useMemo(() => {
-    const n = Number(manualLabelAmount.replace(/,/g, ""));
-    return Number.isNaN(n) ? 0 : n;
-  }, [manualLabelAmount]);
-
   const handlePrint = () => {
     if (!data) return;
     const html = buildPrintHTML(data);
@@ -1036,7 +1031,6 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                     </div>
                     <div className="flex gap-2">
                       <Input
-                        inputMode="decimal"
                         value={manualLabelAmount}
                         onChange={(e) => setManualLabelAmount(e.target.value)}
                         placeholder={language === "ar" ? "المبلغ (يدوي)" : "Amount (manual)"}
@@ -1112,7 +1106,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                       >
                         <span className="k" style={{ color: "#444", flexShrink: 0 }}>{language === "ar" ? "المبلغ" : "Amount"}</span>
                         <span className="v" style={{ fontWeight: 700, textAlign: "end" }}>
-                          {manualLabelAmount.trim() !== "" ? fmtNum(labelAmountValue) : "—"}
+                          {manualLabelAmount.trim() || "—"}
                         </span>
                       </div>
                     </div>
