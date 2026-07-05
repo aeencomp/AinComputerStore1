@@ -43,6 +43,7 @@ interface SalesUser {
   username: string;
   name: string;
   role: string;
+  activeSalesLocationId?: number | null;
   permissions: {
     canPos: number;
     canInventory: number;
@@ -60,6 +61,8 @@ interface SalesDashboardProps {
 export default function SalesDashboard({ user }: SalesDashboardProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
+  const salesLocationId = user.activeSalesLocationId ?? 1;
+  const shiftLocQuery = `?locationId=${salesLocationId}`;
   
   const [showShiftDialog, setShowShiftDialog] = useState(false);
   const [shiftAction, setShiftAction] = useState<'start' | 'end'>('start');
@@ -75,18 +78,18 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
 
   // Fetch current shift
   const { data: currentShift } = useQuery<SalesShift | null>({
-    queryKey: ['/api/sales/shifts/current'],
+    queryKey: [`/api/sales/shifts/current${shiftLocQuery}`],
   });
 
   // Fetch live snapshot for close dialog preview
   const { data: activeSnapshot } = useQuery<{ summary: { grandTotal: number; grandTotalCash: number; grandTotalZain: number; grandTotalQi: number; grandTotalCard: number; inStoreCount: number; repairCount: number } } | null>({
-    queryKey: ['/api/sales/shifts/active-snapshot'],
+    queryKey: [`/api/sales/shifts/active-snapshot${shiftLocQuery}`],
     enabled: !!currentShift,
     staleTime: 30000,
   });
 
   const startShiftMutation = useMutation({
-    mutationFn: async (data: { openingCash: string; notes: string }) => {
+    mutationFn: async (data: { openingCash: string; notes: string; salesLocationId: number }) => {
       const res = await apiRequest('POST', '/api/sales/shifts/start', data);
       return res.json();
     },
@@ -97,7 +100,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       setShowShiftDialog(false);
       setOpeningCash("");
       setShiftNotes("");
-      queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts/current'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/sales/shifts/current${shiftLocQuery}`] });
     },
     onError: () => {
       toast({
@@ -109,7 +112,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
 
   const endShiftMutation = useMutation({
     mutationFn: async (data: { closingCash: string; notes: string }) => {
-      const res = await apiRequest('POST', '/api/sales/shifts/end', data);
+      const res = await apiRequest('POST', `/api/sales/shifts/end${shiftLocQuery}`, data);
       return res.json();
     },
     onSuccess: (data) => {
@@ -123,7 +126,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       setShowShiftDialog(false);
       setClosingCash("");
       setShiftNotes("");
-      queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts/current'] });
+      queryClient.invalidateQueries({ queryKey: [`/api/sales/shifts/current${shiftLocQuery}`] });
     },
     onError: () => {
       toast({
@@ -138,6 +141,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       startShiftMutation.mutate({
         openingCash: openingCash || '0',
         notes: shiftNotes,
+        salesLocationId,
       });
     } else {
       endShiftMutation.mutate({

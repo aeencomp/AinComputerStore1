@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, repairTicketStatusHistory, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products, salesLocations, salesUserLocations, stockTransfers, inStoreProducts } from "@shared/schema";
 import { db } from "./db";
-import { eq, desc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
+import { eq, desc, asc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
 import { sendOrderConfirmationEmail } from "./utils/email";
 import {
@@ -141,6 +141,22 @@ function baghdadCalendarDateString(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
+/** Case-insensitive active shift (legacy rows may use mixed case). */
+const salesShiftIsActive = sql`lower(trim(${salesShifts.status})) = 'active'`;
+const salesShiftIsClosed = sql`lower(trim(${salesShifts.status})) = 'closed'`;
+
+async function autoCloseShiftRecord(shiftId: string, reason: string): Promise<void> {
+  const endTime = sql`timezone('Asia/Baghdad', now())`;
+  await db
+    .update(salesShifts)
+    .set({
+      status: "closed",
+      endTime,
+      notes: sql`COALESCE(${salesShifts.notes}, '') || ${"\n[auto] " + reason}`,
+    })
+    .where(eq(salesShifts.id, shiftId));
+}
+
 /**
  * Block edit/delete when the timestamp falls only in a closed shift window.
  * Withdrawals are listed by Baghdad calendar day, so early-morning rows can
@@ -170,7 +186,7 @@ async function isCashWithdrawalEditBlocked(recordTime: Date): Promise<boolean> {
     const [anyActive] = await db
       .select({ id: salesShifts.id })
       .from(salesShifts)
-      .where(eq(salesShifts.status, "active"))
+      .where(salesShiftIsActive)
       .limit(1);
     if (anyActive) {
       return false;
@@ -460,30 +476,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   adminNotifications.initialize(httpServer);
   intercomService.initialize(httpServer);
 
-  async function closeDuplicateActiveShiftsForUser(salesUserId: string) {
+  async function closeDuplicateActiveShiftsForUser(
+    salesUserId: string,
+    salesLocationId?: number,
+  ) {
+    const conditions = [
+      eq(salesShifts.salesUserId, salesUserId),
+      salesShiftIsActive,
+    ];
+    if (salesLocationId != null) {
+      conditions.push(eq(salesShifts.salesLocationId, salesLocationId));
+    }
+
     const actives = await db
       .select()
       .from(salesShifts)
-      .where(and(eq(salesShifts.salesUserId, salesUserId), eq(salesShifts.status, "active")))
+      .where(and(...conditions))
       .orderBy(desc(salesShifts.startTime));
 
     if (actives.length <= 1) return actives[0] ?? null;
 
+    // Keep the most recent shift (matches POS/dashboard); close older duplicate rows.
     const keep = actives[0];
     const toClose = actives.slice(1);
-    const endTime = new Date();
+    const endTime = sql`timezone('Asia/Baghdad', now())`;
 
     await db
       .update(salesShifts)
       .set({
         status: "closed",
         endTime,
-        notes: sql`COALESCE(${salesShifts.notes}, '') || '\n[auto] closed duplicate active shift on ' || ${endTime.toISOString()}`,
+        notes: sql`COALESCE(${salesShifts.notes}, '') || '\n[auto] closed older duplicate active shift'`,
       })
       .where(inArray(salesShifts.id, toClose.map((s) => s.id)));
 
     console.warn(
-      `[shift-fix] Closed ${toClose.length} duplicate active shifts for user ${salesUserId}. Kept ${keep.id}.`,
+      `[shift-fix] Closed ${toClose.length} older duplicate active shift(s) for user ${salesUserId}${salesLocationId != null ? ` at location ${salesLocationId}` : ""}. Kept ${keep.id}.`,
     );
     return keep;
   }
@@ -492,18 +520,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const actives = await db
       .select()
       .from(salesShifts)
-      .where(sql`lower(${salesShifts.status}) = 'active'`)
+      .where(salesShiftIsActive)
       .orderBy(desc(salesShifts.startTime));
 
     if (actives.length <= 1) return;
 
-    const keepByUser = new Map<string, typeof salesShifts.$inferSelect>();
+    const keepByUserLocation = new Map<string, typeof salesShifts.$inferSelect>();
     const toCloseIds: string[] = [];
 
     for (const s of actives) {
-      const key = s.salesUserId;
-      if (!keepByUser.has(key)) {
-        keepByUser.set(key, s);
+      const key = `${s.salesUserId}:${s.salesLocationId}`;
+      if (!keepByUserLocation.has(key)) {
+        keepByUserLocation.set(key, s);
       } else {
         toCloseIds.push(s.id);
       }
@@ -511,30 +539,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
     if (toCloseIds.length === 0) return;
 
-    const endTime = new Date();
+    const endTime = sql`timezone('Asia/Baghdad', now())`;
     await db
       .update(salesShifts)
       .set({
         status: "closed",
         endTime,
-        notes: sql`COALESCE(${salesShifts.notes}, '') || '\n[auto] closed duplicate active shift on ' || ${endTime.toISOString()}`,
+        notes: sql`COALESCE(${salesShifts.notes}, '') || '\n[auto] closed older duplicate active shift'`,
       })
       .where(inArray(salesShifts.id, toCloseIds));
 
-    console.warn(`[shift-fix] Closed ${toCloseIds.length} duplicate active shifts (global).`);
+    console.warn(`[shift-fix] Closed ${toCloseIds.length} older duplicate active shift(s) (global).`);
   }
 
   async function ensureSalesShiftConstraints() {
-    // Enforce at DB level: at most one active shift per sales user.
+    // Enforce at DB level: at most one active shift per sales user per location.
     // Use lower(status) in predicate to tolerate legacy values like 'Active'.
     try {
+      await db.execute(sql`DROP INDEX IF EXISTS sales_shifts_one_active_per_user`);
+      await db.execute(sql`DROP INDEX IF EXISTS sales_shifts_one_active_per_user_location`);
       await db.execute(sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS sales_shifts_one_active_per_user
-        ON sales_shifts (sales_user_id)
-        WHERE (lower(status) = 'active')
+        CREATE UNIQUE INDEX IF NOT EXISTS sales_shifts_one_active_per_user_location
+        ON sales_shifts (sales_user_id, sales_location_id)
+        WHERE (lower(trim(status)) = 'active')
       `);
     } catch (e) {
-      console.error("[shift-fix] failed to create unique index sales_shifts_one_active_per_user:", e);
+      console.error("[shift-fix] failed to create unique index sales_shifts_one_active_per_user_location:", e);
     }
   }
 
@@ -560,7 +590,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaultAdmin();
   await storage.initializeDefaultSalesAdmin();
 
-  // One-time hygiene: ensure there is at most one active shift per sales user.
+  // One-time hygiene: ensure there is at most one active shift per sales user per location.
   // This prevents duplicate actives from breaking reports/closing logic.
   try {
     await closeDuplicateActiveShiftsAllUsers();
@@ -1954,15 +1984,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const locationId = resolveRequestLocationId(req);
 
+      if (salesUserId) {
+        await closeDuplicateActiveShiftsForUser(salesUserId, locationId);
+      }
+
       let activeShift;
       if (!isSupervisor && salesUserId) {
-        // Self-heal: if the DB has multiple active shifts for this user, auto-close the older ones.
-        activeShift = await closeDuplicateActiveShiftsForUser(salesUserId);
-        if (activeShift) return res.json(activeShift);
         [activeShift] = await db.select().from(salesShifts)
           .where(and(
             eq(salesShifts.salesUserId, salesUserId),
-            eq(salesShifts.status, 'active'),
+            salesShiftIsActive,
             eq(salesShifts.salesLocationId, locationId),
           ))
           .orderBy(desc(salesShifts.startTime))
@@ -1970,7 +2001,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       } else {
         [activeShift] = await db.select().from(salesShifts)
           .where(and(
-            eq(salesShifts.status, 'active'),
+            salesShiftIsActive,
             eq(salesShifts.salesLocationId, locationId),
           ))
           .orderBy(desc(salesShifts.startTime))
@@ -1996,13 +2027,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "المستخدم غير موجود" });
       }
       
-      // Self-heal duplicates then check if an active shift remains.
-      const existingShift = await closeDuplicateActiveShiftsForUser(salesUserId);
-      
-      if (existingShift) {
-        return res.status(400).json({ error: "لديك وردية نشطة بالفعل", shift: existingShift });
-      }
-      
       const { openingCash, notes, salesLocationId: bodyLocId } = req.body;
       const salesLocationId = bodyLocId != null
         ? parseInt(String(bodyLocId), 10)
@@ -2013,15 +2037,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية لهذا الموقع" });
       }
 
-      const [existingAtLoc] = await db.select().from(salesShifts)
-        .where(and(
-          eq(salesShifts.salesUserId, salesUserId),
-          eq(salesShifts.status, 'active'),
-          eq(salesShifts.salesLocationId, salesLocationId),
-        ))
-        .limit(1);
-      if (existingAtLoc) {
-        return res.status(400).json({ error: "لديك وردية نشطة في هذا الموقع", shift: existingAtLoc });
+      // Self-heal duplicates at this location, auto-close stale previous-day shifts, then block if still active.
+      let existingShift = await closeDuplicateActiveShiftsForUser(salesUserId, salesLocationId);
+
+      if (existingShift) {
+        const shiftDay = baghdadCalendarDateString(new Date(existingShift.startTime));
+        const today = baghdadCalendarDateString(new Date());
+        if (shiftDay < today) {
+          await autoCloseShiftRecord(
+            existingShift.id,
+            `closed stale shift from ${shiftDay} before starting ${today}`,
+          );
+          existingShift = null;
+        }
+      }
+
+      if (existingShift) {
+        return res.status(400).json({ error: "لديك وردية نشطة في هذا الموقع", shift: existingShift });
       }
       
       const [newShift] = await db.insert(salesShifts).values({
@@ -2052,6 +2084,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const canViewAll =
         isSupervisor ||
         (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
+      const locationId = resolveRequestLocationId(req);
       
       // Get active shift
       // Regular users can only end their own shift.
@@ -2059,21 +2092,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // even when it's owned by a different cashier account.
       let activeShift;
       if (!canViewAll) {
-        // Self-heal: if the DB has multiple active shifts for this user, auto-close the older ones.
-        activeShift = await closeDuplicateActiveShiftsForUser(salesUserId);
-        if (!activeShift) {
-          return res.status(400).json({ error: "لا توجد وردية نشطة" });
-        }
+        await closeDuplicateActiveShiftsForUser(salesUserId, locationId);
         [activeShift] = await db.select().from(salesShifts)
           .where(and(
             eq(salesShifts.salesUserId, salesUserId),
-            eq(salesShifts.status, 'active')
+            salesShiftIsActive,
+            eq(salesShifts.salesLocationId, locationId),
           ))
           .orderBy(desc(salesShifts.startTime))
           .limit(1);
       } else {
         [activeShift] = await db.select().from(salesShifts)
-          .where(eq(salesShifts.status, 'active'))
+          .where(and(
+            salesShiftIsActive,
+            eq(salesShifts.salesLocationId, locationId),
+          ))
           .orderBy(desc(salesShifts.startTime))
           .limit(1);
       }
@@ -2294,9 +2327,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         isSupervisor ||
         (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
-      // Keep list clean even if bad historical data exists.
-      await closeDuplicateActiveShiftsAllUsers();
-
       const locationId = resolveRequestLocationId(req);
       const conditions: any[] = [];
       conditions.push(eq(salesShifts.salesLocationId, locationId));
@@ -2311,12 +2341,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shifts = await db.select().from(salesShifts)
         .where(and(...conditions))
         .orderBy(desc(salesShifts.startTime));
-      // Defensive: even if legacy data still has duplicates, only return newest active per user.
+      // Defensive: even if legacy data still has duplicates, only return newest active per user at this location.
       const newestActiveByUser = new Set<string>();
       const filtered = shifts.filter((s) => {
         if (String(s.status).toLowerCase() !== "active") return true;
-        if (newestActiveByUser.has(s.salesUserId)) return false;
-        newestActiveByUser.add(s.salesUserId);
+        const key = `${s.salesUserId}:${s.salesLocationId}`;
+        if (newestActiveByUser.has(key)) return false;
+        newestActiveByUser.add(key);
         return true;
       });
       return res.json(filtered);
@@ -2345,17 +2376,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let activeShift;
       const locationId = resolveRequestLocationId(req);
       if (!canViewAll && salesUserId) {
+        await closeDuplicateActiveShiftsForUser(salesUserId, locationId);
         [activeShift] = await db.select().from(salesShifts)
           .where(and(
             eq(salesShifts.salesUserId, salesUserId),
-            eq(salesShifts.status, 'active'),
+            salesShiftIsActive,
             eq(salesShifts.salesLocationId, locationId),
           ))
           .orderBy(desc(salesShifts.startTime)).limit(1);
       } else {
         [activeShift] = await db.select().from(salesShifts)
           .where(and(
-            eq(salesShifts.status, 'active'),
+            salesShiftIsActive,
             eq(salesShifts.salesLocationId, locationId),
           ))
           .orderBy(desc(salesShifts.startTime)).limit(1);
