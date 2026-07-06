@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -24,6 +24,7 @@ import {
   Radio,
   HandCoins,
   MessageCircle,
+  Trash2,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -46,7 +47,7 @@ interface InStoreOrder {
 }
 
 interface RepairSale {
-  id: number;
+  id: string;
   ticketNumber: string;
   customerName: string;
   customerPhone?: string;
@@ -123,7 +124,7 @@ interface DailyReportApiResponse {
 }
 
 interface DailyReportProps {
-  user: { id: string; role?: string };
+  user: { id: string; role?: string; permissions?: { canEditReceipt?: number } };
   salesLocationId?: number;
 }
 
@@ -589,6 +590,8 @@ function buildPrintHTML(data: ShiftReportData): string {
 export default function DailyReport({ user, salesLocationId = 1 }: DailyReportProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const canEditRepairSales = user.role === "sales_admin" || user.permissions?.canEditReceipt === 1;
   const canSendDailyRevenueWhatsApp = user.role === "sales_admin";
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [manualLabelName, setManualLabelName] = useState("");
@@ -673,6 +676,43 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     enabled: !!selectedShiftId,
     staleTime: 0,
   });
+
+  const excludeRepairFromReportMutation = useMutation({
+    mutationFn: async (ticketId: string) => {
+      const res = await apiRequest("PATCH", `/api/sales/repair-tickets/${ticketId}/exclude-from-report`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      toast({
+        title: language === "ar" ? "تم إخفاء مبيعة الصيانة من التقرير" : "Repair sale hidden from report",
+        description: language === "ar"
+          ? "التذكرة ما زالت موجودة في بوابة الفني"
+          : "The ticket remains in the technician portal",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        variant: "destructive",
+        title: language === "ar" ? "فشل الإخفاء" : "Hide failed",
+        description: err.message,
+      });
+    },
+  });
+
+  const confirmExcludeRepair = (ticket: RepairSale) => {
+    const msg = language === "ar"
+      ? `إخفاء تذكرة ${ticket.ticketNumber} من تقرير المبيعات؟ (تبقى في بوابة الفني)`
+      : `Hide ticket ${ticket.ticketNumber} from sales report? (It stays in the technician portal)`;
+    if (window.confirm(msg)) {
+      excludeRepairFromReportMutation.mutate(ticket.id);
+    }
+  };
 
   const dailyAsShift: ShiftReportData | null = dailyReportApi ? {
     shift: {
@@ -1415,6 +1455,9 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             <th className="text-end py-2 px-4 font-medium text-muted-foreground">
                               {language === "ar" ? "المبلغ" : "Amount"}
                             </th>
+                            {canEditRepairSales && (
+                              <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16" />
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -1454,6 +1497,25 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                                   <td className={`py-2 px-4 text-end font-semibold ${ticket.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
                                     {fmtNum(amount)}
                                   </td>
+                                  {canEditRepairSales && (
+                                    <td className="py-2 px-4 text-center">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => confirmExcludeRepair(ticket)}
+                                        disabled={excludeRepairFromReportMutation.isPending}
+                                        title={language === "ar" ? "إخفاء من التقرير" : "Hide from report"}
+                                        className="text-destructive hover:text-destructive"
+                                        data-testid={`button-hide-repair-${ticket.id}`}
+                                      >
+                                        {excludeRepairFromReportMutation.isPending ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </td>
+                                  )}
                                 </tr>
                                 {hasDetails && (
                                   <tr key={`${ticket.id}-detail`} className="border-b last:border-0 bg-muted/20">
@@ -1482,7 +1544,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                         </tbody>
                         <tfoot>
                           <tr className="bg-muted/30 border-t-2 font-semibold">
-                            <td colSpan={5} className="py-2 px-4">
+                            <td colSpan={canEditRepairSales ? 6 : 5} className="py-2 px-4">
                               {language === "ar" ? "المجموع" : "Total"}
                               {(data.summary.repairTotalDeferred ?? 0) > 0 && (
                                 <span className="text-xs text-orange-500 font-normal ms-2">
@@ -1493,6 +1555,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             <td className="py-2 px-4 text-end text-blue-600 dark:text-blue-400">
                               {fmtNum(data.summary.repairTotal)}
                             </td>
+                            {canEditRepairSales && <td />}
                           </tr>
                         </tfoot>
                       </table>

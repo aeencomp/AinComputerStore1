@@ -91,6 +91,8 @@ const STARTUP_MIGRATIONS: string[] = [
   `UPDATE store_settings SET address_ar = 'كربلاء، العراق', address_en = 'Karbala, Iraq'
      WHERE address_ar IS NULL OR address_ar = '' OR address_ar = 'بغداد، العراق'`,
 
+  `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS excluded_from_sales_report INTEGER NOT NULL DEFAULT 0`,
+
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS meta_pixel_id TEXT DEFAULT ''`,
 
   `CREATE TABLE IF NOT EXISTS facebook_post_log (

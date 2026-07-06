@@ -474,6 +474,8 @@ export const repairTickets = pgTable("repair_tickets", {
   pendingReminderLastAt: timestamp("pending_reminder_last_at"),
   /** Last time we reminded about completed-not-picked (for 30-day cadence). */
   completedPickupReminderLastAt: timestamp("completed_pickup_reminder_last_at"),
+  /** 1 = hidden from sales/shift reports only; technician dashboard unchanged. */
+  excludedFromSalesReport: integer("excluded_from_sales_report").notNull().default(0),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

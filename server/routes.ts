@@ -25,6 +25,13 @@ import {
   formatIqdAmount,
 } from "./daily-revenue-report";
 import {
+  computeShiftReportForShift,
+  reconcileClosedShiftRecord,
+  reconcileRecentClosedShifts,
+  fetchShiftReportEndTime,
+  repairTicketIncludedInSalesReport,
+} from "./shift-report";
+import {
   generateAnnouncementPost,
   generateProductPost,
   generateRepairPost,
@@ -552,6 +559,49 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.warn(`[shift-fix] Closed ${toCloseIds.length} older duplicate active shift(s) (global).`);
   }
 
+  /** Block POS sales when no active shift is open at this location. */
+  async function assertActiveShiftForPos(
+    req: Request,
+    salesUserId: string,
+    salesLocationId: number,
+  ): Promise<void> {
+    const salesUserRole = (req.session as any).salesUserRole as string | undefined;
+    const adminId = (req.session as any).adminId;
+    const isSupervisor = !!adminId || salesUserRole === "sales_admin";
+
+    if (salesUserId) {
+      await closeDuplicateActiveShiftsForUser(salesUserId, salesLocationId);
+    }
+
+    let activeShift;
+    if (!isSupervisor && salesUserId) {
+      [activeShift] = await db
+        .select()
+        .from(salesShifts)
+        .where(and(
+          eq(salesShifts.salesUserId, salesUserId),
+          salesShiftIsActive,
+          eq(salesShifts.salesLocationId, salesLocationId),
+        ))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+    } else {
+      [activeShift] = await db
+        .select()
+        .from(salesShifts)
+        .where(and(
+          salesShiftIsActive,
+          eq(salesShifts.salesLocationId, salesLocationId),
+        ))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+    }
+
+    if (!activeShift) {
+      throw new Error("الوردية مغلقة. يرجى بدء الوردية قبل إجراء أي مبيعة.");
+    }
+  }
+
   async function ensureSalesShiftConstraints() {
     // Enforce at DB level: at most one active shift per sales user per location.
     // Use lower(status) in predicate to tolerate legacy values like 'Active'.
@@ -595,6 +645,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   try {
     await closeDuplicateActiveShiftsAllUsers();
     await ensureSalesShiftConstraints();
+    const reconciled = await reconcileRecentClosedShifts(3);
+    if (reconciled > 0) {
+      console.log(`[shift-report] restored totals on ${reconciled} closed shift(s)`);
+    }
   } catch (e) {
     console.error("[shift-fix] failed global duplicate cleanup:", e);
   }
@@ -1720,6 +1774,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "ليس لديك صلاحية البيع من هذا الموقع" });
       }
 
+      try {
+        await assertActiveShiftForPos(req, salesUserId, salesLocationId);
+      } catch (shiftErr: any) {
+        return res.status(403).json({ error: shiftErr.message || "الوردية مغلقة" });
+      }
+
       const allowedOrderTypes = ['walk-in', 'in-store'];
       const resolvedOrderType = allowedOrderTypes.includes(requestedOrderType) ? requestedOrderType : 'walk-in';
 
@@ -2190,127 +2250,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ─── Shift List & Shift Report ───────────────────────────────────────────────
 
-  // Helper: compute shift report using DB-local timestamps.
-  //
-  // IMPORTANT: This project stores many timestamps as `timestamp` (no timezone).
-  // If we pull them into JS Dates, Node/pg will interpret them as UTC which shifts
-  // Baghdad-local values by +3h and breaks comparisons (end < start).
-  //
-  // So we compute the shift window entirely in SQL:
-  //   start := sales_shifts.start_time
-  //   end   := COALESCE(sales_shifts.end_time, timezone('Asia/Baghdad', now()))
-  async function computeShiftReportForShift(shiftId: string) {
-    const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, shiftId)).limit(1);
-    const salesLocationId = shift?.salesLocationId ?? LOCATION_MAIN_ID;
-    const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
-    const shiftEndSql = sql`(select coalesce(end_time, timezone('Asia/Baghdad', now())) from sales_shifts where id = ${shiftId} limit 1)`;
-
-    const inStoreOrders = await db
-      .select()
-      .from(orders)
-      .where(and(
-        inArray(orders.orderType, ['walk-in', 'in-store']),
-        eq(orders.salesLocationId, salesLocationId),
-        sql`${orders.createdAt} >= ${shiftStartSql}`,
-        sql`${orders.createdAt} <= ${shiftEndSql}`,
-      ));
-
-    const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID
-      ? await db
-        .select()
-        .from(repairTickets)
-        .where(
-          or(
-            and(
-              eq(repairTickets.paymentStatus, 'paid'),
-              sql`${repairTickets.updatedAt} >= ${shiftStartSql}`,
-              sql`${repairTickets.updatedAt} <= ${shiftEndSql}`,
-            ),
-            and(
-              eq(repairTickets.status, 'delivered'),
-              isNotNull(repairTickets.deliveredAt),
-              sql`${repairTickets.deliveredAt} >= ${shiftStartSql}`,
-              sql`${repairTickets.deliveredAt} <= ${shiftEndSql}`,
-            ),
-          ),
-        )
-      : [];
-
-    // Note: cashWithdrawals table has no salesUserId column so withdrawals are scoped
-    // by time range only. If multiple employees work concurrently and all record withdrawals,
-    // those withdrawals appear in every overlapping shift report. Adding per-employee
-    // withdrawal attribution would require a schema migration.
-    const dailyWithdrawals = await db
-      .select()
-      .from(cashWithdrawals)
-      .where(and(
-        eq(cashWithdrawals.salesLocationId, salesLocationId),
-        sql`${cashWithdrawals.createdAt} >= ${shiftStartSql}`,
-        sql`${cashWithdrawals.createdAt} <= ${shiftEndSql}`,
-      ))
-      .orderBy(desc(cashWithdrawals.createdAt));
-
-    // Staff advances in the same time window (no salesUserId column, scoped by time only)
-    const dailyAdvances = await db
-      .select()
-      .from(staffAdvances)
-      .where(and(
-        eq(staffAdvances.salesLocationId, salesLocationId),
-        sql`${staffAdvances.createdAt} >= ${shiftStartSql}`,
-        sql`${staffAdvances.createdAt} <= ${shiftEndSql}`,
-      ))
-      .orderBy(desc(staffAdvances.createdAt));
-
-    const inStoreTotalCash = inStoreOrders.reduce((s, o) => s + orderCashAmount(o), 0);
-    const inStoreTotalCard = inStoreOrders.reduce((s, o) => s + orderCardAmount(o), 0);
-    const inStoreTotalZain = inStoreOrders.filter(o => isInStoreZainCash(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotalQi = inStoreOrders.filter(o => isInStoreQiCard(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotalDeferred = inStoreOrders.filter(o => isOrderDeferred(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const inStoreTotal = inStoreOrders.filter(o => !isOrderDeferred(o)).reduce((s, o) => s + parseFloat(o.total || '0'), 0);
-    const totalWithdrawals = dailyWithdrawals.reduce((s, w) => s + parseFloat(w.amount), 0);
-    const totalAdvances = dailyAdvances.reduce((s, a) => s + parseFloat(a.amount), 0);
-    const repairTotalDeferred = paidRepairTickets.filter(t => t.paymentStatus === 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
-    const repairTotal = paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').reduce((s, t) => s + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
-    const repairTotalCash = paidRepairTickets.reduce((s, t) => s + repairCashAmount(t), 0);
-    const repairTotalCard = paidRepairTickets.reduce((s, t) => s + repairCardAmount(t), 0);
-
-    const baseGrandTotal = inStoreTotal + repairTotal;
-    const grandTotal = baseGrandTotal + totalAdvances;
-
-    return {
-      inStoreSales: inStoreOrders,
-      repairSales: paidRepairTickets,
-      withdrawals: dailyWithdrawals,
-      advances: dailyAdvances,
-      summary: {
-        inStoreCount: inStoreOrders.length,
-        inStoreTotal,
-        inStoreTotalCash,
-        inStoreTotalCard,
-        inStoreTotalZain,
-        inStoreTotalQi,
-        inStoreTotalDeferred,
-        repairCount: paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').length,
-        repairTotal,
-        repairTotalDeferred,
-        repairTotalCash,
-        repairTotalCard,
-        repairTotalZain: 0,
-        repairTotalQi: 0,
-        totalWithdrawals,
-        withdrawalCount: dailyWithdrawals.length,
-        advancesTotal: totalAdvances,
-        advancesCount: dailyAdvances.length,
-        grandTotal,
-        grandTotalCash: inStoreTotalCash + repairTotalCash,
-        grandTotalCard: inStoreTotalCard + repairTotalCard,
-        grandTotalZain: inStoreTotalZain,
-        grandTotalQi: inStoreTotalQi,
-        netTotal: grandTotal - totalWithdrawals,
-      }
-    };
-  }
-
   // GET /api/sales/shifts — list shifts for the report screen
   // - Regular sales user: own CLOSED shifts only (active handled by /active-snapshot)
   // - sales_admin role or main adminId: return CLOSED + ACTIVE shifts so they can select
@@ -2400,11 +2339,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // included in this endpoint. For a full view, supervisors can navigate to each
       // individual shift via GET /api/sales/shifts/:id/report.
       // Orders are always scoped to the shift owner so totals are per-employee accurate.
-      const reportData = await computeShiftReportForShift(activeShift.id);
+      const { shift: _reportShift, ...reportData } = await computeShiftReportForShift(activeShift.id);
       return res.json({ shift: activeShift, ...reportData });
     } catch (error) {
       console.error("Error fetching active snapshot:", error);
       return res.status(500).json({ error: "فشل جلب بيانات الوردية النشطة" });
+    }
+  });
+
+  // Hide a technician repair payment from sales reports only (ticket stays in technician portal).
+  app.patch("/api/sales/repair-tickets/:id/exclude-from-report", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = salesUserId ? await storage.getSalesUser(salesUserId) : null;
+      const isSupervisor = !!adminId || currentUser?.role === "sales_admin";
+      const canEdit = isSupervisor || currentUser?.canEditReceipt === 1;
+      if (!canEdit) {
+        return res.status(403).json({ error: "ليس لديك صلاحية حذف مبيعات الصيانة" });
+      }
+
+      const ticketId = String(req.params.id || "").trim();
+      if (!ticketId) {
+        return res.status(400).json({ error: "معرف غير صالح" });
+      }
+
+      const [ticket] = await db
+        .select()
+        .from(repairTickets)
+        .where(eq(repairTickets.id, ticketId))
+        .limit(1);
+      if (!ticket) {
+        return res.status(404).json({ error: "التذكرة غير موجودة" });
+      }
+
+      await db
+        .update(repairTickets)
+        .set({ excludedFromSalesReport: 1 })
+        .where(eq(repairTickets.id, ticketId));
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error excluding repair ticket from report:", error);
+      return res.status(500).json({ error: "فشل إخفاء مبيعة الصيانة من التقرير" });
     }
   });
 
@@ -2432,9 +2413,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: "غير مصرح" });
       }
 
+      if (String(shift.status).toLowerCase() === "closed") {
+        await reconcileClosedShiftRecord(shift.id);
+      }
+
       const reportData = await computeShiftReportForShift(shift.id);
       res.set('Cache-Control', 'no-store');
-      return res.json({ shift, ...reportData });
+      return res.json({ ...reportData, shift });
     } catch (error) {
       console.error("Error fetching shift report:", error);
       return res.status(500).json({ error: "فشل جلب تقرير الوردية" });
@@ -10972,10 +10957,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ))
         .orderBy(desc(salesShifts.startTime));
 
-      // Compute the effective end: extend past midnight if any shift ran past midnight
+      // Compute extended shift ends (restores sales after premature auto-close)
       const now = new Date();
+      const extendedShiftEnds = new Map<string, Date>();
+      for (const shift of shiftsOnDate) {
+        if (String(shift.status).toLowerCase() === "closed") {
+          await reconcileClosedShiftRecord(shift.id);
+          extendedShiftEnds.set(
+            shift.id,
+            await fetchShiftReportEndTime(shift.id, {
+              status: shift.status,
+              salesUserId: shift.salesUserId,
+              salesLocationId: shift.salesLocationId,
+              startTime: shift.startTime,
+            }),
+          );
+        } else {
+          extendedShiftEnds.set(shift.id, shift.endTime || now);
+        }
+      }
+
       const effectiveEnd = shiftsOnDate.length > 0
-        ? new Date(Math.max(endOfDay.getTime(), ...shiftsOnDate.map(s => (s.endTime || now).getTime())))
+        ? new Date(Math.max(
+          endOfDay.getTime(),
+          ...[...extendedShiftEnds.values()].map(d => d.getTime()),
+        ))
         : endOfDay;
 
       // ── In-store orders (shift-scoped) ────────────────────────────────────────
@@ -10986,7 +10992,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       if (shiftsOnDate.length > 0) {
         for (const shift of shiftsOnDate) {
-          const shiftEnd = shift.endTime || now;
+          const shiftEnd = extendedShiftEnds.get(shift.id) || shift.endTime || now;
+
           const shiftOrders = await db.select().from(orders).where(and(
             inArray(orders.orderType, ['walk-in', 'in-store']),
             eq(orders.salesLocationId, salesLocationId),
@@ -11050,19 +11057,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Use the extended end so repairs settled after midnight during an open shift
       // are also captured for this date.
       const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
-        or(
-          and(
-            eq(repairTickets.paymentStatus, 'paid'),
-            gte(repairTickets.updatedAt, startOfDay),
-            lte(repairTickets.updatedAt, effectiveEnd)
+        and(
+          repairTicketIncludedInSalesReport,
+          or(
+            and(
+              eq(repairTickets.paymentStatus, 'paid'),
+              gte(repairTickets.updatedAt, startOfDay),
+              lte(repairTickets.updatedAt, effectiveEnd)
+            ),
+            and(
+              eq(repairTickets.status, 'delivered'),
+              isNotNull(repairTickets.deliveredAt),
+              gte(repairTickets.deliveredAt, startOfDay),
+              lte(repairTickets.deliveredAt, effectiveEnd)
+            )
           ),
-          and(
-            eq(repairTickets.status, 'delivered'),
-            isNotNull(repairTickets.deliveredAt),
-            gte(repairTickets.deliveredAt, startOfDay),
-            lte(repairTickets.deliveredAt, effectiveEnd)
-          )
-        )
+        ),
       ) : [];
 
       const inStoreTotalCash = inStoreOrders

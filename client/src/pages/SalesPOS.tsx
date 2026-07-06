@@ -74,6 +74,7 @@ import {
   Edit3,
   Save,
   Split,
+  AlertTriangle,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { InStoreProduct } from "@shared/schema";
@@ -357,6 +358,19 @@ export default function SalesPOS({
     queryKey: [`/api/battery/desktops${locQuery}`],
     enabled: orderType === 'in-store' && includeSource('desktop'),
   });
+
+  const { data: currentShift, isFetched: shiftFetched } = useQuery<{ id: string } | null>({
+    queryKey: ['/api/sales/shifts/current', salesLocationId],
+    queryFn: async () => {
+      const r = await fetch(`/api/sales/shifts/current?locationId=${salesLocationId}`, { credentials: 'include' });
+      if (!r.ok) throw new Error('Failed to load shift');
+      return r.json();
+    },
+    staleTime: 30000,
+    refetchInterval: 60000,
+  });
+
+  const shiftClosed = shiftFetched && !currentShift;
 
   const isLoading = orderType === "in-store" ? inStoreLoading : mainLoading;
 
@@ -884,6 +898,16 @@ export default function SalesPOS({
   });
 
   const handleCheckout = () => {
+    if (shiftClosed) {
+      toast({
+        title: language === 'ar' ? 'الوردية مغلقة' : 'Shift is closed',
+        description: language === 'ar'
+          ? 'يرجى بدء الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
+          : 'Please start a shift from the sales dashboard before making sales',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (cart.length === 0) {
       toast({
         title: language === 'ar' ? 'السلة فارغة' : 'Cart is empty',
@@ -895,6 +919,16 @@ export default function SalesPOS({
   };
 
   const confirmCheckout = () => {
+    if (shiftClosed) {
+      toast({
+        title: language === 'ar' ? 'الوردية مغلقة' : 'Shift is closed',
+        description: language === 'ar'
+          ? 'يرجى بدء الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
+          : 'Please start a shift from the sales dashboard before making sales',
+        variant: 'destructive',
+      });
+      return;
+    }
     if (paymentMethod === "split") {
       const cash = parseFloat(splitCashAmount) || 0;
       const card = parseFloat(splitCardAmount) || 0;
@@ -1180,7 +1214,18 @@ export default function SalesPOS({
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-180px)]">
+    <div className="flex flex-col gap-4 h-[calc(100vh-180px)]">
+      {shiftClosed && (
+        <div className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-amber-900 dark:text-amber-100">
+          <AlertTriangle className="h-5 w-5 shrink-0" />
+          <p className="text-sm font-medium">
+            {language === 'ar'
+              ? 'الوردية مغلقة — لا يمكن إجراء مبيعات. ابدأ الوردية من لوحة المبيعات أولاً.'
+              : 'Shift is closed — sales are blocked. Start a shift from the sales dashboard first.'}
+          </p>
+        </div>
+      )}
+    <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0">
       {/* Left Column - Products Catalog */}
       <div className="flex-1 flex flex-col min-w-0">
         <Card className="flex-1 flex flex-col overflow-hidden">
@@ -1992,7 +2037,7 @@ export default function SalesPOS({
                     className="w-full h-12 text-lg font-bold gap-2" 
                     size="lg"
                     onClick={handleCheckout}
-                    disabled={createOrderMutation.isPending || cart.length === 0}
+                    disabled={createOrderMutation.isPending || cart.length === 0 || shiftClosed}
                     data-testid="button-checkout"
                   >
                     {createOrderMutation.isPending ? (
@@ -2572,7 +2617,7 @@ export default function SalesPOS({
                 type="button"
                 className="flex-1 gap-2"
                 onClick={confirmCheckout}
-                disabled={createOrderMutation.isPending}
+                disabled={createOrderMutation.isPending || shiftClosed}
                 data-testid="button-confirm-checkout"
               >
                 {createOrderMutation.isPending ? (
@@ -2647,6 +2692,7 @@ export default function SalesPOS({
           </div>
         </DialogContent>
       </Dialog>
+    </div>
     </div>
   );
 }

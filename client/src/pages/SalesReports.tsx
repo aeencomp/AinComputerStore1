@@ -66,11 +66,13 @@ interface RepairTicket {
   status: string;
   updatedAt: string;
   deliveredAt?: string;
+  excludedFromSalesReport?: number;
 }
 
 interface SalesUser {
   id: string;
   name?: string;
+  role?: string;
   permissions: {
     canViewReports: number;
     canEditReceipt?: number;
@@ -171,6 +173,45 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     queryClient.invalidateQueries({ queryKey: ['/api/orders', salesLocationId] });
     queryClient.invalidateQueries({ queryKey: ['/api/daily-report'] });
     queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+  };
+
+  const canEditRepairSales = user.role === 'sales_admin' || user.permissions.canEditReceipt === 1;
+
+  const excludeRepairFromReportMutation = useMutation({
+    mutationFn: async (ticketId: string) => {
+      const res = await apiRequest('PATCH', `/api/sales/repair-tickets/${ticketId}/exclude-from-report`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateOrderQueries();
+      toast({
+        title: language === 'ar' ? 'تم إخفاء مبيعة الصيانة من التقرير' : 'Repair sale hidden from report',
+        description: language === 'ar'
+          ? 'التذكرة ما زالت موجودة في بوابة الفني'
+          : 'The ticket remains in the technician portal',
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: language === 'ar' ? 'فشل الإخفاء' : 'Hide failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+    },
+  });
+
+  const confirmExcludeRepair = (ticket: RepairTicket) => {
+    const msg = language === 'ar'
+      ? `إخفاء تذكرة ${ticket.ticketNumber} من تقرير المبيعات؟ (تبقى في بوابة الفني)`
+      : `Hide ticket ${ticket.ticketNumber} from sales report? (It stays in the technician portal)`;
+    if (window.confirm(msg)) {
+      excludeRepairFromReportMutation.mutate(ticket.id);
+    }
   };
 
   const deleteOrderMutation = useMutation({
@@ -323,6 +364,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const onlineOrders = filteredOrders.filter(o => o.orderType === 'online').length;
 
   const filteredRepairTickets = salesLocationId === 1 ? allRepairTickets.filter(t => {
+    if ((t as RepairTicket).excludedFromSalesReport === 1) return false;
     if (t.paymentStatus !== 'paid' && t.paymentStatus !== 'deferred' && t.status !== 'delivered') return false;
     const ticketDate = new Date(t.deliveredAt || t.updatedAt);
     const rangeStart = getDateRangeStart();
@@ -1137,6 +1179,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                     <th className="text-end py-2 px-4 font-medium text-muted-foreground">
                       {language === 'ar' ? 'المبلغ' : 'Amount'}
                     </th>
+                    {canEditRepairSales && (
+                      <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16" />
+                    )}
                   </tr>
                 </thead>
                 <tbody>
@@ -1181,13 +1226,32 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                         <td className={`py-2 px-4 text-end font-semibold ${isDeferred ? 'text-orange-600' : ''}`}>
                           {formatPrice(amount)} IQD
                         </td>
+                        {canEditRepairSales && (
+                          <td className="py-2 px-4 text-center">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => confirmExcludeRepair(ticket)}
+                              disabled={excludeRepairFromReportMutation.isPending}
+                              title={language === 'ar' ? 'إخفاء من التقرير' : 'Hide from report'}
+                              className="text-destructive hover:text-destructive"
+                              data-testid={`button-hide-repair-${ticket.id}`}
+                            >
+                              {excludeRepairFromReportMutation.isPending ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-4 h-4" />
+                              )}
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/30 border-t-2 font-semibold">
-                    <td colSpan={6} className="py-2 px-4">
+                    <td colSpan={canEditRepairSales ? 7 : 6} className="py-2 px-4">
                       {language === 'ar' ? 'المجموع' : 'Total'}
                       {repairTotalDeferred > 0 && (
                         <span className="text-xs text-orange-500 font-normal ms-2">
