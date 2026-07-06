@@ -663,7 +663,7 @@ export const salesShifts = pgTable("sales_shifts", {
   totalSales: decimal("total_sales", { precision: 10, scale: 2 }).default("0"),
   totalTransactions: integer("total_transactions").default(0),
   notes: text("notes"),
-  status: text("status").notNull().default("active"), // "active", "closed"
+  status: text("status").notNull().default("active"), // "active", "paused", "closed"
   salesLocationId: integer("sales_location_id").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

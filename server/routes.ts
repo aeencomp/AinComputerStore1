@@ -148,8 +148,10 @@ function baghdadCalendarDateString(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
-/** Case-insensitive active shift (legacy rows may use mixed case). */
+/** Case-insensitive shift status (legacy rows may use mixed case). */
 const salesShiftIsActive = sql`lower(trim(${salesShifts.status})) = 'active'`;
+const salesShiftIsPaused = sql`lower(trim(${salesShifts.status})) = 'paused'`;
+const salesShiftIsOpen = sql`lower(trim(${salesShifts.status})) in ('active', 'paused')`;
 const salesShiftIsClosed = sql`lower(trim(${salesShifts.status})) = 'closed'`;
 
 async function autoCloseShiftRecord(shiftId: string, reason: string): Promise<void> {
@@ -573,49 +575,108 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await closeDuplicateActiveShiftsForUser(salesUserId, salesLocationId);
     }
 
-    let activeShift;
+    let openShift;
     if (!isSupervisor && salesUserId) {
-      [activeShift] = await db
+      [openShift] = await db
         .select()
         .from(salesShifts)
         .where(and(
           eq(salesShifts.salesUserId, salesUserId),
-          salesShiftIsActive,
+          salesShiftIsOpen,
           eq(salesShifts.salesLocationId, salesLocationId),
         ))
         .orderBy(desc(salesShifts.startTime))
         .limit(1);
     } else {
-      [activeShift] = await db
+      [openShift] = await db
         .select()
         .from(salesShifts)
         .where(and(
-          salesShiftIsActive,
+          salesShiftIsOpen,
           eq(salesShifts.salesLocationId, salesLocationId),
         ))
         .orderBy(desc(salesShifts.startTime))
         .limit(1);
     }
 
-    if (!activeShift) {
+    if (!openShift) {
       throw new Error("الوردية مغلقة. يرجى بدء الوردية قبل إجراء أي مبيعة.");
+    }
+    if (String(openShift.status).toLowerCase() === "paused") {
+      throw new Error("الوردية متوقفة. استأنف الوردية قبل إجراء أي مبيعة.");
     }
   }
 
   async function ensureSalesShiftConstraints() {
-    // Enforce at DB level: at most one active shift per sales user per location.
-    // Use lower(status) in predicate to tolerate legacy values like 'Active'.
+    // Enforce at DB level: at most one open shift (active or paused) per user per location.
     try {
       await db.execute(sql`DROP INDEX IF EXISTS sales_shifts_one_active_per_user`);
       await db.execute(sql`DROP INDEX IF EXISTS sales_shifts_one_active_per_user_location`);
+      await db.execute(sql`DROP INDEX IF EXISTS sales_shifts_one_open_per_user_location`);
       await db.execute(sql`
-        CREATE UNIQUE INDEX IF NOT EXISTS sales_shifts_one_active_per_user_location
+        CREATE UNIQUE INDEX IF NOT EXISTS sales_shifts_one_open_per_user_location
         ON sales_shifts (sales_user_id, sales_location_id)
-        WHERE (lower(trim(status)) = 'active')
+        WHERE (lower(trim(status)) IN ('active', 'paused'))
       `);
     } catch (e) {
-      console.error("[shift-fix] failed to create unique index sales_shifts_one_active_per_user_location:", e);
+      console.error("[shift-fix] failed to create unique index sales_shifts_one_open_per_user_location:", e);
     }
+  }
+
+  async function sessionCanManageLocationShift(req: Request): Promise<{
+    salesUserId?: string;
+    canViewAll: boolean;
+    locationId: number;
+  }> {
+    const salesUserId = (req.session as any).salesUserId as string | undefined;
+    const salesUserRole = (req.session as any).salesUserRole as string | undefined;
+    const adminId = (req.session as any).adminId;
+    const isSupervisor = !!adminId || salesUserRole === "sales_admin";
+    const canViewAll =
+      isSupervisor ||
+      (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports === 1);
+    return {
+      salesUserId,
+      canViewAll,
+      locationId: resolveRequestLocationId(req),
+    };
+  }
+
+  async function findOpenShiftForRequest(
+    req: Request,
+    mode: "open" | "active" | "paused",
+  ) {
+    const { salesUserId, canViewAll, locationId } = await sessionCanManageLocationShift(req);
+    const statusFilter =
+      mode === "active" ? salesShiftIsActive
+        : mode === "paused" ? salesShiftIsPaused
+          : salesShiftIsOpen;
+
+    if (!canViewAll && salesUserId) {
+      await closeDuplicateActiveShiftsForUser(salesUserId, locationId);
+      const [shift] = await db
+        .select()
+        .from(salesShifts)
+        .where(and(
+          eq(salesShifts.salesUserId, salesUserId),
+          statusFilter,
+          eq(salesShifts.salesLocationId, locationId),
+        ))
+        .orderBy(desc(salesShifts.startTime))
+        .limit(1);
+      return shift;
+    }
+
+    const [shift] = await db
+      .select()
+      .from(salesShifts)
+      .where(and(
+        statusFilter,
+        eq(salesShifts.salesLocationId, locationId),
+      ))
+      .orderBy(desc(salesShifts.startTime))
+      .limit(1);
+    return shift;
   }
 
   httpServer.on('upgrade', (req, socket, head) => {
@@ -2034,41 +2095,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sales/shifts/current", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
-      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
 
-      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
-
-      const locationId = resolveRequestLocationId(req);
-
-      if (salesUserId) {
-        await closeDuplicateActiveShiftsForUser(salesUserId, locationId);
-      }
-
-      let activeShift;
-      if (!isSupervisor && salesUserId) {
-        [activeShift] = await db.select().from(salesShifts)
-          .where(and(
-            eq(salesShifts.salesUserId, salesUserId),
-            salesShiftIsActive,
-            eq(salesShifts.salesLocationId, locationId),
-          ))
-          .orderBy(desc(salesShifts.startTime))
-          .limit(1);
-      } else {
-        [activeShift] = await db.select().from(salesShifts)
-          .where(and(
-            salesShiftIsActive,
-            eq(salesShifts.salesLocationId, locationId),
-          ))
-          .orderBy(desc(salesShifts.startTime))
-          .limit(1);
-      }
-
-      return res.json(activeShift || null);
+      const openShift = await findOpenShiftForRequest(req, "open");
+      return res.json(openShift || null);
     } catch (error) {
       console.error("Error fetching current shift:", error);
       return res.status(500).json({ error: "فشل جلب الوردية الحالية" });
@@ -2112,8 +2145,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
 
+      if (!existingShift) {
+        const [pausedShift] = await db
+          .select()
+          .from(salesShifts)
+          .where(and(
+            eq(salesShifts.salesUserId, salesUserId),
+            salesShiftIsPaused,
+            eq(salesShifts.salesLocationId, salesLocationId),
+          ))
+          .orderBy(desc(salesShifts.startTime))
+          .limit(1);
+        if (pausedShift) {
+          existingShift = pausedShift;
+        }
+      }
+
       if (existingShift) {
-        return res.status(400).json({ error: "لديك وردية نشطة في هذا الموقع", shift: existingShift });
+        const isPaused = String(existingShift.status).toLowerCase() === "paused";
+        return res.status(400).json({
+          error: isPaused
+            ? "لديك وردية متوقفة في هذا الموقع. استأنفها أو أنهها قبل بدء وردية جديدة."
+            : "لديك وردية نشطة في هذا الموقع",
+          shift: existingShift,
+        });
       }
       
       const [newShift] = await db.insert(salesShifts).values({
@@ -2138,42 +2193,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
-      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
-      const adminId = (req.session as any).adminId;
-      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
-      const canViewAll =
-        isSupervisor ||
-        (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
-      const locationId = resolveRequestLocationId(req);
-      
-      // Get active shift
-      // Regular users can only end their own shift.
-      // Supervisors/report-enabled users may need to end the currently-active register shift
-      // even when it's owned by a different cashier account.
-      let activeShift;
-      if (!canViewAll) {
-        await closeDuplicateActiveShiftsForUser(salesUserId, locationId);
-        [activeShift] = await db.select().from(salesShifts)
-          .where(and(
-            eq(salesShifts.salesUserId, salesUserId),
-            salesShiftIsActive,
-            eq(salesShifts.salesLocationId, locationId),
-          ))
-          .orderBy(desc(salesShifts.startTime))
-          .limit(1);
-      } else {
-        [activeShift] = await db.select().from(salesShifts)
-          .where(and(
-            salesShiftIsActive,
-            eq(salesShifts.salesLocationId, locationId),
-          ))
-          .orderBy(desc(salesShifts.startTime))
-          .limit(1);
+
+      const openShift = await findOpenShiftForRequest(req, "open");
+      if (!openShift) {
+        return res.status(400).json({ error: "لا توجد وردية مفتوحة" });
       }
-      
-      if (!activeShift) {
-        return res.status(400).json({ error: "لا توجد وردية نشطة" });
-      }
+      const activeShift = openShift;
       
       const { closingCash, notes } = req.body;
       // Use DB-local Baghdad timestamp (matches timestamp columns).
@@ -2248,6 +2273,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/sales/shifts/pause", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const activeShift = await findOpenShiftForRequest(req, "active");
+      if (!activeShift) {
+        return res.status(400).json({ error: "لا توجد وردية نشطة لإيقافها" });
+      }
+
+      const [updatedShift] = await db
+        .update(salesShifts)
+        .set({
+          status: "paused",
+          notes: sql`COALESCE(${salesShifts.notes}, '') || ${"\n[paused] " + baghdadCalendarDateString(new Date())}`,
+        })
+        .where(eq(salesShifts.id, activeShift.id))
+        .returning();
+
+      return res.json({ success: true, shift: updatedShift });
+    } catch (error) {
+      console.error("Error pausing shift:", error);
+      return res.status(500).json({ error: "فشل إيقاف الوردية" });
+    }
+  });
+
+  app.post("/api/sales/shifts/resume", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const pausedShift = await findOpenShiftForRequest(req, "paused");
+      if (!pausedShift) {
+        return res.status(400).json({ error: "لا توجد وردية متوقفة لاستئنافها" });
+      }
+
+      const [updatedShift] = await db
+        .update(salesShifts)
+        .set({
+          status: "active",
+          notes: sql`COALESCE(${salesShifts.notes}, '') || ${"\n[resumed] " + baghdadCalendarDateString(new Date())}`,
+        })
+        .where(eq(salesShifts.id, pausedShift.id))
+        .returning();
+
+      return res.json({ success: true, shift: updatedShift });
+    } catch (error) {
+      console.error("Error resuming shift:", error);
+      return res.status(500).json({ error: "فشل استئناف الوردية" });
+    }
+  });
+
   // ─── Shift List & Shift Report ───────────────────────────────────────────────
 
   // GET /api/sales/shifts — list shifts for the report screen
@@ -2270,8 +2351,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions: any[] = [];
       conditions.push(eq(salesShifts.salesLocationId, locationId));
       if (canViewAll) {
-        // show both active+closed for all employees (lets supervisors pick correct active shift)
-        conditions.push(inArray(salesShifts.status, ['active', 'closed']));
+        // show open+closed for all employees (lets supervisors pick correct shift)
+        conditions.push(inArray(salesShifts.status, ['active', 'paused', 'closed']));
       } else {
         // regular user: only own closed shifts
         conditions.push(eq(salesShifts.status, 'closed'));
@@ -2281,12 +2362,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .where(and(...conditions))
         .orderBy(desc(salesShifts.startTime));
       // Defensive: even if legacy data still has duplicates, only return newest active per user at this location.
-      const newestActiveByUser = new Set<string>();
+      const newestOpenByUser = new Set<string>();
       const filtered = shifts.filter((s) => {
-        if (String(s.status).toLowerCase() !== "active") return true;
+        const st = String(s.status).toLowerCase();
+        if (st !== "active" && st !== "paused") return true;
         const key = `${s.salesUserId}:${s.salesLocationId}`;
-        if (newestActiveByUser.has(key)) return false;
-        newestActiveByUser.add(key);
+        if (newestOpenByUser.has(key)) return false;
+        newestOpenByUser.add(key);
         return true;
       });
       return res.json(filtered);
@@ -2303,35 +2385,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/sales/shifts/active-snapshot", async (req, res) => {
     try {
       const salesUserId = (req.session as any).salesUserId;
-      const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
       if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
-      const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
-      const canViewAll =
-        isSupervisor ||
-        (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
-
-      let activeShift;
-      const locationId = resolveRequestLocationId(req);
-      if (!canViewAll && salesUserId) {
-        await closeDuplicateActiveShiftsForUser(salesUserId, locationId);
-        [activeShift] = await db.select().from(salesShifts)
-          .where(and(
-            eq(salesShifts.salesUserId, salesUserId),
-            salesShiftIsActive,
-            eq(salesShifts.salesLocationId, locationId),
-          ))
-          .orderBy(desc(salesShifts.startTime)).limit(1);
-      } else {
-        [activeShift] = await db.select().from(salesShifts)
-          .where(and(
-            salesShiftIsActive,
-            eq(salesShifts.salesLocationId, locationId),
-          ))
-          .orderBy(desc(salesShifts.startTime)).limit(1);
-      }
-
+      const activeShift = await findOpenShiftForRequest(req, "open");
       if (!activeShift) return res.json(null);
 
       // Note: when supervisors/admin view the snapshot, only the most-recent active shift

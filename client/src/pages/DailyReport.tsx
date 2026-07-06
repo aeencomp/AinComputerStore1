@@ -815,11 +815,12 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     if (selectedShiftId) refetchReport();
   };
 
-  const closedShifts = shifts.filter(s => s.status === 'closed');
-  // If the API includes active shifts, avoid showing the same one twice:
-  // it already appears as the "Active Snapshot" card.
-  const otherActiveShifts = shifts.filter(
-    (s) => s.status === "active" && s.id !== (activeSnapshot?.shift?.id ?? null),
+  const closedShifts = shifts.filter(s => String(s.status).toLowerCase() === 'closed');
+  const otherOpenShifts = shifts.filter(
+    (s) => {
+      const st = String(s.status).toLowerCase();
+      return (st === "active" || st === "paused") && s.id !== (activeSnapshot?.shift?.id ?? null);
+    },
   );
 
   return (
@@ -897,9 +898,11 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
             >
               <CardContent className="p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <Radio className="h-3.5 w-3.5 text-green-500 animate-pulse" />
-                  <span className="text-xs font-semibold text-green-600">
-                    {language === "ar" ? "وردية نشطة" : "Active Shift"}
+                  <Radio className={`h-3.5 w-3.5 ${String(activeSnapshot.shift.status).toLowerCase() === 'paused' ? 'text-amber-500' : 'text-green-500 animate-pulse'}`} />
+                  <span className={`text-xs font-semibold ${String(activeSnapshot.shift.status).toLowerCase() === 'paused' ? 'text-amber-600' : 'text-green-600'}`}>
+                    {String(activeSnapshot.shift.status).toLowerCase() === 'paused'
+                      ? (language === "ar" ? "وردية متوقفة" : "Paused Shift")
+                      : (language === "ar" ? "وردية نشطة" : "Active Shift")}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mb-0.5">
@@ -918,14 +921,14 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
           )}
 
           {/* If API returns active shifts (supervisors), show them selectable too */}
-          {otherActiveShifts.length > 0 && (
+          {otherOpenShifts.length > 0 && (
             <>
               <p className="text-xs font-semibold text-muted-foreground px-1 pt-1">
-                {language === "ar" ? "ورديات نشطة" : "Active Shifts"}
-                <span className="ms-1">({otherActiveShifts.length})</span>
+                {language === "ar" ? "ورديات مفتوحة" : "Open Shifts"}
+                <span className="ms-1">({otherOpenShifts.length})</span>
               </p>
               <div className="space-y-2">
-                {otherActiveShifts.map(shift => (
+                {otherOpenShifts.map(shift => (
                   <Card
                     key={shift.id}
                     className={`cursor-pointer border-2 transition-colors hover-elevate ${
@@ -936,9 +939,11 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                   >
                     <CardContent className="p-3">
                       <div className="flex items-center gap-2 mb-1">
-                        <Radio className="h-3.5 w-3.5 text-green-500" />
-                        <span className="text-xs font-semibold text-green-600">
-                          {language === "ar" ? "نشطة" : "Active"}
+                        <Radio className={`h-3.5 w-3.5 ${String(shift.status).toLowerCase() === 'paused' ? 'text-amber-500' : 'text-green-500'}`} />
+                        <span className={`text-xs font-semibold ${String(shift.status).toLowerCase() === 'paused' ? 'text-amber-600' : 'text-green-600'}`}>
+                          {String(shift.status).toLowerCase() === 'paused'
+                            ? (language === "ar" ? "متوقفة" : "Paused")
+                            : (language === "ar" ? "نشطة" : "Active")}
                         </span>
                       </div>
                       <div className="flex items-center gap-1.5 mb-0.5">
@@ -1159,10 +1164,15 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                 <CardContent className="py-3 px-4">
                   <div className="flex flex-wrap items-center gap-4 justify-between">
                     <div className="flex items-center gap-3">
-                      {data.shift.status === 'active' ? (
+                      {String(data.shift.status).toLowerCase() === 'active' ? (
                         <Badge className="gap-1 bg-green-500/15 text-green-700 border-green-300 hover:bg-green-500/20">
                           <Radio className="h-3 w-3 animate-pulse" />
                           {language === "ar" ? "نشطة" : "Active"}
+                        </Badge>
+                      ) : String(data.shift.status).toLowerCase() === 'paused' ? (
+                        <Badge className="gap-1 bg-amber-500/15 text-amber-700 border-amber-300 hover:bg-amber-500/20">
+                          <Radio className="h-3 w-3" />
+                          {language === "ar" ? "متوقفة" : "Paused"}
                         </Badge>
                       ) : (
                         <Badge variant="secondary" className="gap-1">

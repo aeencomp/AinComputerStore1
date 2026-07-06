@@ -359,7 +359,7 @@ export default function SalesPOS({
     enabled: orderType === 'in-store' && includeSource('desktop'),
   });
 
-  const { data: currentShift, isFetched: shiftFetched } = useQuery<{ id: string } | null>({
+  const { data: currentShift, isFetched: shiftFetched } = useQuery<{ id: string; status?: string } | null>({
     queryKey: ['/api/sales/shifts/current', salesLocationId],
     queryFn: async () => {
       const r = await fetch(`/api/sales/shifts/current?locationId=${salesLocationId}`, { credentials: 'include' });
@@ -370,7 +370,9 @@ export default function SalesPOS({
     refetchInterval: 60000,
   });
 
-  const shiftClosed = shiftFetched && !currentShift;
+  const shiftStatus = String(currentShift?.status || '').toLowerCase();
+  const shiftPaused = shiftFetched && !!currentShift && shiftStatus === 'paused';
+  const shiftClosed = shiftFetched && (!currentShift || shiftPaused);
 
   const isLoading = orderType === "in-store" ? inStoreLoading : mainLoading;
 
@@ -900,10 +902,16 @@ export default function SalesPOS({
   const handleCheckout = () => {
     if (shiftClosed) {
       toast({
-        title: language === 'ar' ? 'الوردية مغلقة' : 'Shift is closed',
-        description: language === 'ar'
-          ? 'يرجى بدء الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
-          : 'Please start a shift from the sales dashboard before making sales',
+        title: shiftPaused
+          ? (language === 'ar' ? 'الوردية متوقفة' : 'Shift is paused')
+          : (language === 'ar' ? 'الوردية مغلقة' : 'Shift is closed'),
+        description: shiftPaused
+          ? (language === 'ar'
+            ? 'استأنف الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
+            : 'Resume the shift from the sales dashboard before making sales')
+          : (language === 'ar'
+            ? 'يرجى بدء الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
+            : 'Please start a shift from the sales dashboard before making sales'),
         variant: 'destructive',
       });
       return;
@@ -921,10 +929,16 @@ export default function SalesPOS({
   const confirmCheckout = () => {
     if (shiftClosed) {
       toast({
-        title: language === 'ar' ? 'الوردية مغلقة' : 'Shift is closed',
-        description: language === 'ar'
-          ? 'يرجى بدء الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
-          : 'Please start a shift from the sales dashboard before making sales',
+        title: shiftPaused
+          ? (language === 'ar' ? 'الوردية متوقفة' : 'Shift is paused')
+          : (language === 'ar' ? 'الوردية مغلقة' : 'Shift is closed'),
+        description: shiftPaused
+          ? (language === 'ar'
+            ? 'استأنف الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
+            : 'Resume the shift from the sales dashboard before making sales')
+          : (language === 'ar'
+            ? 'يرجى بدء الوردية من لوحة المبيعات قبل إجراء أي مبيعة'
+            : 'Please start a shift from the sales dashboard before making sales'),
         variant: 'destructive',
       });
       return;
@@ -1216,12 +1230,20 @@ export default function SalesPOS({
   return (
     <div className="flex flex-col gap-4 h-[calc(100vh-180px)]">
       {shiftClosed && (
-        <div className="flex items-center gap-3 rounded-lg border border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-amber-900 dark:text-amber-100">
+        <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
+          shiftPaused
+            ? 'border-blue-500/50 bg-blue-50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-100'
+            : 'border-amber-500/50 bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-100'
+        }`}>
           <AlertTriangle className="h-5 w-5 shrink-0" />
           <p className="text-sm font-medium">
-            {language === 'ar'
-              ? 'الوردية مغلقة — لا يمكن إجراء مبيعات. ابدأ الوردية من لوحة المبيعات أولاً.'
-              : 'Shift is closed — sales are blocked. Start a shift from the sales dashboard first.'}
+            {shiftPaused
+              ? (language === 'ar'
+                ? 'الوردية متوقفة — لا يمكن إجراء مبيعات. استأنف الوردية من لوحة المبيعات.'
+                : 'Shift is paused — sales are blocked. Resume the shift from the sales dashboard.')
+              : (language === 'ar'
+                ? 'الوردية مغلقة — لا يمكن إجراء مبيعات. ابدأ الوردية من لوحة المبيعات أولاً.'
+                : 'Shift is closed — sales are blocked. Start a shift from the sales dashboard first.')}
           </p>
         </div>
       )}

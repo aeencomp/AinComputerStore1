@@ -30,6 +30,7 @@ import {
   Loader2,
   PlayCircle,
   StopCircle,
+  PauseCircle,
   Timer,
   HandCoins,
   Trash2,
@@ -88,6 +89,12 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
     staleTime: 30000,
   });
 
+  const invalidateShiftQueries = () => {
+    queryClient.invalidateQueries({ queryKey: [`/api/sales/shifts/current${shiftLocQuery}`] });
+    queryClient.invalidateQueries({ queryKey: [`/api/sales/shifts/active-snapshot${shiftLocQuery}`] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts'] });
+  };
+
   const startShiftMutation = useMutation({
     mutationFn: async (data: { openingCash: string; notes: string; salesLocationId: number }) => {
       const res = await apiRequest('POST', '/api/sales/shifts/start', data);
@@ -100,7 +107,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       setShowShiftDialog(false);
       setOpeningCash("");
       setShiftNotes("");
-      queryClient.invalidateQueries({ queryKey: [`/api/sales/shifts/current${shiftLocQuery}`] });
+      invalidateShiftQueries();
     },
     onError: () => {
       toast({
@@ -126,7 +133,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       setShowShiftDialog(false);
       setClosingCash("");
       setShiftNotes("");
-      queryClient.invalidateQueries({ queryKey: [`/api/sales/shifts/current${shiftLocQuery}`] });
+      invalidateShiftQueries();
     },
     onError: () => {
       toast({
@@ -135,6 +142,46 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
       });
     },
   });
+
+  const pauseShiftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/sales/shifts/pause${shiftLocQuery}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: language === 'ar' ? 'تم إيقاف الوردية مؤقتاً' : 'Shift paused' });
+      invalidateShiftQueries();
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: 'destructive' });
+    },
+  });
+
+  const resumeShiftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest('POST', `/api/sales/shifts/resume${shiftLocQuery}`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed');
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: language === 'ar' ? 'تم استئناف الوردية' : 'Shift resumed' });
+      invalidateShiftQueries();
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: 'destructive' });
+    },
+  });
+
+  const shiftStatus = String(currentShift?.status || '').toLowerCase();
+  const isShiftPaused = !!currentShift && shiftStatus === 'paused';
+  const isShiftActive = !!currentShift && (shiftStatus === 'active' || shiftStatus === '');
 
   const handleShiftAction = () => {
     if (shiftAction === 'start') {
@@ -277,20 +324,62 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
               {new Date().toLocaleTimeString(language === 'ar' ? 'ar-IQ' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
             </Badge>
             {currentShift ? (
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 bg-green-500/10 text-green-600 border-green-200 hover:bg-green-500/20"
-                onClick={() => {
-                  setShiftAction('end');
-                  setShowShiftDialog(true);
-                }}
-                data-testid="button-end-shift"
-              >
-                <Timer className="h-3.5 w-3.5" />
-                {language === 'ar' ? 'وردية نشطة' : 'Shift Active'}
-                <StopCircle className="h-3.5 w-3.5" />
-              </Button>
+              <>
+                {isShiftActive && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 bg-amber-500/10 text-amber-700 border-amber-200 hover:bg-amber-500/20"
+                    onClick={() => pauseShiftMutation.mutate()}
+                    disabled={pauseShiftMutation.isPending}
+                    data-testid="button-pause-shift"
+                  >
+                    {pauseShiftMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <PauseCircle className="h-3.5 w-3.5" />
+                    )}
+                    {language === 'ar' ? 'إيقاف مؤقت' : 'Pause'}
+                  </Button>
+                )}
+                {isShiftPaused && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="gap-1.5 bg-blue-500/10 text-blue-600 border-blue-200 hover:bg-blue-500/20"
+                    onClick={() => resumeShiftMutation.mutate()}
+                    disabled={resumeShiftMutation.isPending}
+                    data-testid="button-resume-shift"
+                  >
+                    {resumeShiftMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <PlayCircle className="h-3.5 w-3.5" />
+                    )}
+                    {language === 'ar' ? 'استئناف' : 'Resume'}
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className={`gap-1.5 ${
+                    isShiftPaused
+                      ? 'bg-amber-500/10 text-amber-700 border-amber-200 hover:bg-amber-500/20'
+                      : 'bg-green-500/10 text-green-600 border-green-200 hover:bg-green-500/20'
+                  }`}
+                  onClick={() => {
+                    setShiftAction('end');
+                    setShowShiftDialog(true);
+                  }}
+                  data-testid="button-end-shift"
+                >
+                  <Timer className="h-3.5 w-3.5" />
+                  {isShiftPaused
+                    ? (language === 'ar' ? 'وردية متوقفة' : 'Shift Paused')
+                    : (language === 'ar' ? 'وردية نشطة' : 'Shift Active')}
+                  <StopCircle className="h-3.5 w-3.5" />
+                </Button>
+              </>
             ) : (
               <Button
                 size="sm"
