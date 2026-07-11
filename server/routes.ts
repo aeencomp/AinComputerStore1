@@ -5230,10 +5230,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-      return res.status(500).json({ error: "فشل جلب تقرير الصيانة" });
-    }
-  });
-
   app.get("/api/technician/shifts/current", async (req, res) => {
     try {
       const technicianId = (req.session as any)?.technicianId as string | undefined;
