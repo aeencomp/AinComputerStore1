@@ -33,6 +33,7 @@ const AVAILABLE_PERMISSIONS = [
   'manage_tickets',
   'manage_technicians',
   'view_revenue',
+  'view_daily_report',
 ];
 
 export default function TechnicianManagement() {

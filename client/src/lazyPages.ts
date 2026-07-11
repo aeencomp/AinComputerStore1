@@ -28,6 +28,7 @@ export const SalesPortal = lazy(() => import("@/pages/SalesPortal"));
 export const TechnicianLogin = lazy(() => import("@/pages/technician/TechnicianLogin"));
 export const TechnicianDashboard = lazy(() => import("@/pages/technician/TechnicianDashboard"));
 export const TechnicianManagement = lazy(() => import("@/pages/technician/TechnicianManagement"));
+export const TechnicianDailyReport = lazy(() => import("@/pages/technician/TechnicianDailyReport"));
 export const TicketDetail = lazy(() => import("@/pages/technician/TicketDetail"));
 export const NewRepairRequest = lazy(() => import("@/pages/technician/NewRepairRequest"));
 export const CustomerProfile = lazy(() => import("@/pages/technician/CustomerProfile"));

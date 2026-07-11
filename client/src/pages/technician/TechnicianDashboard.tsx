@@ -12,7 +12,7 @@ import { formatPosPaymentLabel } from '@/lib/posPayment';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing, BarChart3 } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
@@ -351,6 +351,7 @@ export default function TechnicianDashboard() {
 
   const isAdmin = currentTechnician.isAdmin === 1;
   const canViewRevenue = isAdmin || (currentTechnician.permissions || []).includes('view_revenue');
+  const canViewDailyReport = isAdmin || (currentTechnician.permissions || []).includes('view_daily_report');
 
   const filteredTickets = tickets?.filter((ticket) => {
     if (!showArchived && ticket.isArchived === 1) return false;
@@ -471,6 +472,14 @@ export default function TechnicianDashboard() {
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            )}
+            {canViewDailyReport && (
+              <Link href="/technician/daily-report">
+                <Button variant="outline" data-testid="button-technician-daily-report">
+                  <BarChart3 className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'تقرير اليوم' : 'Daily Report'}
+                </Button>
+              </Link>
             )}
             {isAdmin && (
               <Link href="/technician/manage">

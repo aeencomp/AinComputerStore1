@@ -170,6 +170,16 @@ function baghdadCalendarDateString(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
+async function technicianHasDailyReportAccess(req: Request): Promise<boolean> {
+  const technicianId = (req.session as any)?.technicianId as string | undefined;
+  if (!technicianId) return false;
+  const technician = await storage.getTechnician(technicianId);
+  if (!technician || technician.isActive !== 1) return false;
+  if (technician.isAdmin === 1) return true;
+  const perms = Array.isArray(technician.permissions) ? technician.permissions as string[] : [];
+  return perms.includes("view_daily_report");
+}
+
 /** Case-insensitive shift status (legacy rows may use mixed case). */
 const salesShiftIsActive = sql`lower(trim(${salesShifts.status})) = 'active'`;
 const salesShiftIsPaused = sql`lower(trim(${salesShifts.status})) = 'paused'`;
@@ -654,8 +664,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const salesUserRole = (req.session as any).salesUserRole as string | undefined;
     const adminId = (req.session as any).adminId;
     const isSupervisor = !!adminId || salesUserRole === "sales_admin";
+    const techDailyReport = await technicianHasDailyReportAccess(req);
     const canViewAll =
       isSupervisor ||
+      techDailyReport ||
       (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports === 1);
     return {
       salesUserId,
@@ -2421,11 +2433,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const techDailyReport = await technicianHasDailyReportAccess(req);
+      if (!salesUserId && !adminId && !techDailyReport) return res.status(401).json({ error: "غير مصرح" });
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
       const canViewAll =
         isSupervisor ||
+        techDailyReport ||
         (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
       const locationId = resolveRequestLocationId(req);
@@ -2467,7 +2481,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const techDailyReport = await technicianHasDailyReportAccess(req);
+      if (!salesUserId && !adminId && !techDailyReport) return res.status(401).json({ error: "غير مصرح" });
 
       const activeShift = await findOpenShiftForRequest(req, "open");
       if (!activeShift) return res.json(null);
@@ -2619,11 +2634,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
+      const techDailyReport = await technicianHasDailyReportAccess(req);
+      if (!salesUserId && !adminId && !techDailyReport) return res.status(401).json({ error: "غير مصرح" });
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
       const canViewAll =
         isSupervisor ||
+        techDailyReport ||
         (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
       const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, req.params.id));
@@ -11090,7 +11107,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionSalesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!sessionSalesUserId && !adminId) {
+      const techDailyReport = await technicianHasDailyReportAccess(req);
+      if (!sessionSalesUserId && !adminId && !techDailyReport) {
         return res.status(401).json({ error: "غير مصرح" });
       }
 

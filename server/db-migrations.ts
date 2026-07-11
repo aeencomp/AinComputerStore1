@@ -106,6 +106,25 @@ const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE sales_shifts ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP`,
   `ALTER TABLE sales_shifts ADD COLUMN IF NOT EXISTS original_end_time TIMESTAMP`,
 
+  `UPDATE technicians t
+     SET permissions = sub.merged
+     FROM (
+       SELECT id,
+         (SELECT COALESCE(jsonb_agg(DISTINCT elem), '[]'::jsonb)
+          FROM (
+            SELECT jsonb_array_elements_text(COALESCE(permissions, '[]'::jsonb)) AS elem
+            UNION ALL SELECT 'view_daily_report'
+          ) x) AS merged
+       FROM technicians
+       WHERE (
+         (lower(trim(display_name)) LIKE '%mustafa%' AND lower(trim(display_name)) LIKE '%adel%')
+         OR lower(trim(username)) LIKE '%mustafa%adel%'
+         OR lower(trim(username)) = 'mustafa'
+       )
+       AND NOT (COALESCE(permissions, '[]'::jsonb) @> '["view_daily_report"]'::jsonb)
+     ) sub
+     WHERE t.id = sub.id`,
+
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS meta_pixel_id TEXT DEFAULT ''`,
 
   `CREATE TABLE IF NOT EXISTS facebook_post_log (
