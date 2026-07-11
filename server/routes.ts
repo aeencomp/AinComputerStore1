@@ -2,6 +2,7 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, repairTicketStatusHistory, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products, salesLocations, salesUserLocations, stockTransfers, inStoreProducts } from "@shared/schema";
+import { repairTicketOnBaghdadReportDay } from "@shared/repair-sales";
 import { db } from "./db";
 import { eq, desc, asc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -23,6 +24,9 @@ import {
   buildDailyRevenueWhatsAppMessage,
   computeCombinedDailyRevenue,
   formatIqdAmount,
+  sqlBaghdadDayStart,
+  sqlBaghdadDayEnd,
+  sqlBaghdadRepairEndBound,
 } from "./daily-revenue-report";
 import { computeRepairReport } from "./repair-report";
 import {
@@ -11251,17 +11255,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const inStoreOrders = allInStoreOrders;
 
       // ── Repair ticket payments ────────────────────────────────────────────────
-      // Use the extended end so repairs settled after midnight during an open shift
-      // are also captured for this date.
-      const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
+      // Use Baghdad wall-clock SQL bounds (DB stores local time, not UTC ISO).
+      const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
+      const repairEndSql = sqlBaghdadRepairEndBound(baghdadDateStr, effectiveEnd);
+
+      const rawRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
         and(
           repairTicketIncludedInSalesReport,
-          sqlRepairTicketInSalesWindow(
-            sql`${startOfDay.toISOString()}::timestamp`,
-            sql`${effectiveEnd.toISOString()}::timestamp`,
-          ),
+          sqlRepairTicketInSalesWindow(dayStartSql, repairEndSql),
         ),
       ) : [];
+
+      const paidRepairTickets = rawRepairTickets.filter((t) =>
+        repairTicketOnBaghdadReportDay(t, baghdadDateStr, effectiveEnd),
+      );
 
       const inStoreTotalCash = inStoreOrders
         .reduce((sum, o) => sum + orderCashAmount(o), 0);

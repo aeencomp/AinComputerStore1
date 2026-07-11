@@ -1,5 +1,6 @@
 import { db } from "./db";
 import { repairTickets, salesShifts } from "@shared/schema";
+import { repairTicketOnBaghdadReportDay } from "@shared/repair-sales";
 import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
 import { LOCATION_MAIN_ID } from "./sales-locations";
 import {
@@ -9,6 +10,10 @@ import {
 } from "./shift-report";
 import { repairCashAmount, repairCardAmount } from "./order-payment";
 import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
+import {
+  sqlBaghdadDayStart,
+  sqlBaghdadRepairEndBound,
+} from "./daily-revenue-report";
 
 export type RepairReportSummary = {
   repairCount: number;
@@ -64,18 +69,22 @@ export async function computeRepairReport(baghdadDateStr: string) {
         )
       : endOfDay;
 
-  const paidRepairTickets = await db
+  const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
+  const repairEndSql = sqlBaghdadRepairEndBound(baghdadDateStr, effectiveEnd);
+
+  const rawRepairTickets = await db
     .select()
     .from(repairTickets)
     .where(
       and(
         repairTicketIncludedInSalesReport,
-        sqlRepairTicketInSalesWindow(
-          sql`${startOfDay.toISOString()}::timestamp`,
-          sql`${effectiveEnd.toISOString()}::timestamp`,
-        ),
+        sqlRepairTicketInSalesWindow(dayStartSql, repairEndSql),
       ),
     );
+
+  const paidRepairTickets = rawRepairTickets.filter((t) =>
+    repairTicketOnBaghdadReportDay(t, baghdadDateStr, effectiveEnd),
+  );
 
   const repairTotalDeferred = paidRepairTickets
     .filter((t) => t.paymentStatus === "deferred")

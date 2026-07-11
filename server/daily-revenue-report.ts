@@ -25,6 +25,7 @@ import {
   repairCardAmount,
 } from "./order-payment";
 import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
+import { repairTicketOnBaghdadReportDay } from "@shared/repair-sales";
 
 export type DailyReportSummary = {
   inStoreCount: number;
@@ -66,12 +67,27 @@ export function baghdadDateString(date?: Date): string {
 }
 
 /** DB `timestamp` columns store Baghdad wall clock — compare in SQL, not JS Date. */
-function sqlBaghdadDayStart(dateStr: string) {
+export function sqlBaghdadDayStart(dateStr: string) {
   return sql`((${dateStr}::date)::timestamp)`;
 }
 
-function sqlBaghdadDayEnd(dateStr: string) {
+export function sqlBaghdadDayEnd(dateStr: string) {
   return sql`((((${dateStr}::date) + interval '1 day')::timestamp) - interval '1 millisecond')`;
+}
+
+/** JS Date → naive Baghdad wall-clock timestamp for SQL (never use toISOString()). */
+export function sqlBaghdadWallClock(d: Date) {
+  const s = d.toLocaleString("sv-SE", { timeZone: "Asia/Baghdad" });
+  return sql`${s}::timestamp`;
+}
+
+/** Repair window end: calendar day end, extended through overnight shift if needed. */
+export function sqlBaghdadRepairEndBound(dateStr: string, extendedEnd?: Date) {
+  const dayEndSql = sqlBaghdadDayEnd(dateStr);
+  if (!extendedEnd) return dayEndSql;
+  const calendarEndMs = new Date(`${dateStr}T23:59:59.999+03:00`).getTime();
+  if (extendedEnd.getTime() <= calendarEndMs) return dayEndSql;
+  return sql`greatest(${dayEndSql}, ${sqlBaghdadWallClock(extendedEnd)})`;
 }
 
 export type DailyReportSummaryOptions = {
@@ -183,6 +199,7 @@ export async function computeDailyReportForApi(
 
   // Extend repair/withdrawal window through any shift that ran past midnight on this date
   let repairEndBound: ReturnType<typeof sqlBaghdadDayEnd> | ReturnType<typeof sql> = dayEndSql;
+  let extendedEndDate: Date | null = null;
   if (!options?.calendarDayOnly) {
     const shiftsForRepair = await db
       .select()
@@ -209,10 +226,11 @@ export async function computeDailyReportForApi(
         : new Date(shift.endTime || Date.now());
       maxEndMs = Math.max(maxEndMs, ext.getTime());
     }
-    repairEndBound = sql`${new Date(maxEndMs).toISOString()}::timestamp`;
+    extendedEndDate = new Date(maxEndMs);
+    repairEndBound = sqlBaghdadRepairEndBound(baghdadDateStr, extendedEndDate);
   }
 
-  const paidRepairTickets =
+  const rawRepairTickets =
     salesLocationId === LOCATION_MAIN_ID
       ? await db
           .select()
@@ -224,6 +242,14 @@ export async function computeDailyReportForApi(
             ),
           )
       : [];
+
+  const paidRepairTickets = rawRepairTickets.filter((t) =>
+    repairTicketOnBaghdadReportDay(
+      t,
+      baghdadDateStr,
+      options?.calendarDayOnly ? null : extendedEndDate,
+    ),
+  );
 
   const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndBound;
 

@@ -34,3 +34,18 @@ export function repairTicketEligibleForSalesReport(ticket: {
   if (ticket.paymentStatus === "deferred") return true;
   return false;
 }
+
+/** Baghdad calendar day for a repair in daily/shift reports (blocks wrong-day bleed). */
+export function repairTicketOnBaghdadReportDay(
+  ticket: RepairSalesDateFields,
+  baghdadDateStr: string,
+  extendedEnd?: Date | null,
+): boolean {
+  const salesAt = repairTicketSalesAt(ticket);
+  if (!salesAt) return false;
+  const day = salesAt.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+  if (day < baghdadDateStr) return false;
+  if (day === baghdadDateStr) return true;
+  if (extendedEnd && salesAt.getTime() <= extendedEnd.getTime()) return true;
+  return false;
+}
