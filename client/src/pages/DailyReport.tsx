@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -590,6 +590,34 @@ function buildPrintHTML(data: ShiftReportData): string {
 </html>`;
 }
 
+function mergeTodayRepairSales(
+  base: ShiftReportData,
+  daily: DailyReportApiResponse,
+): ShiftReportData {
+  const advancesTotal = base.summary.advancesTotal ?? 0;
+  const repairTotal = daily.summary.repairTotal ?? 0;
+  const inStoreTotal = base.summary.inStoreTotal ?? 0;
+  const totalWithdrawals = base.summary.totalWithdrawals ?? 0;
+  const grandTotal = inStoreTotal + repairTotal + advancesTotal;
+
+  return {
+    ...base,
+    repairSales: daily.repairSales,
+    summary: {
+      ...base.summary,
+      repairCount: daily.summary.repairCount ?? 0,
+      repairTotal,
+      repairTotalCash: daily.summary.repairTotalCash ?? 0,
+      repairTotalCard: daily.summary.repairTotalCard ?? 0,
+      repairTotalDeferred: daily.summary.repairTotalDeferred ?? 0,
+      grandTotal,
+      grandTotalCash: (base.summary.inStoreTotalCash ?? 0) + (daily.summary.repairTotalCash ?? 0),
+      grandTotalCard: (base.summary.inStoreTotalCard ?? 0) + (daily.summary.repairTotalCard ?? 0),
+      netTotal: grandTotal - totalWithdrawals,
+    },
+  };
+}
+
 export default function DailyReport({ user, salesLocationId = 1 }: DailyReportProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
@@ -697,7 +725,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     refetchInterval: 30000,
   });
 
-  // Calendar-day report fallback (when no active shift). This matches what users expect as "daily report".
+  // Calendar-day repairs (always loaded — repairs are not tied to a single cashier shift).
   const { data: dailyReportApi, isLoading: dailyLoading, refetch: refetchDaily } = useQuery<DailyReportApiResponse>({
     queryKey: ["/api/daily-report", baghdadToday, salesLocationId],
     queryFn: async () => {
@@ -705,8 +733,8 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
       if (!r.ok) throw new Error(`Failed to load daily report: ${r.status}`);
       return r.json();
     },
-    enabled: !selectedShiftId && !activeSnapshot,
     staleTime: 0,
+    refetchInterval: 30000,
   });
 
   // Full report for selected shift
@@ -827,7 +855,16 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     },
   } : null;
 
-  const data: ShiftReportData | null | undefined = selectedShiftId ? shiftReport : (activeSnapshot ?? dailyAsShift ?? null);
+  const baseData: ShiftReportData | null | undefined = selectedShiftId
+    ? shiftReport
+    : (activeSnapshot ?? dailyAsShift ?? null);
+
+  const data: ShiftReportData | null | undefined = useMemo(() => {
+    if (!baseData) return null;
+    if (selectedShiftId || !dailyReportApi) return baseData;
+    return mergeTodayRepairSales(baseData, dailyReportApi);
+  }, [baseData, dailyReportApi, selectedShiftId]);
+
   const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
   const isFetching = selectedShiftId ? reportFetching : false;
   const handlePrint = () => {
@@ -896,7 +933,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
   const handleRefresh = () => {
     refetchShifts();
     refetchSnapshot();
-    if (!selectedShiftId && !activeSnapshot) refetchDaily();
+    refetchDaily();
     if (selectedShiftId) refetchReport();
   };
 

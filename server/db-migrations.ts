@@ -99,6 +99,9 @@ const STARTUP_MIGRATIONS: string[] = [
   `UPDATE repair_tickets SET paid_at = updated_at
      WHERE payment_status = 'paid' AND paid_at IS NULL AND status <> 'delivered'`,
 
+  `UPDATE repair_tickets SET delivered_at = COALESCE(paid_at, updated_at)
+     WHERE status = 'delivered' AND delivered_at IS NULL`,
+
   `ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP`,
   `ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_by VARCHAR`,
   `ALTER TABLE orders ADD COLUMN IF NOT EXISTS void_reason TEXT`,

@@ -25,7 +25,6 @@ import {
   repairCardAmount,
 } from "./order-payment";
 import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
-import { repairTicketOnBaghdadReportDay } from "@shared/repair-sales";
 
 export type DailyReportSummary = {
   inStoreCount: number;
@@ -230,7 +229,7 @@ export async function computeDailyReportForApi(
     repairEndBound = sqlBaghdadRepairEndBound(baghdadDateStr, extendedEndDate);
   }
 
-  const rawRepairTickets =
+  const paidRepairTickets =
     salesLocationId === LOCATION_MAIN_ID
       ? await db
           .select()
@@ -242,14 +241,6 @@ export async function computeDailyReportForApi(
             ),
           )
       : [];
-
-  const paidRepairTickets = rawRepairTickets.filter((t) =>
-    repairTicketOnBaghdadReportDay(
-      t,
-      baghdadDateStr,
-      options?.calendarDayOnly ? null : extendedEndDate,
-    ),
-  );
 
   const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndBound;
 

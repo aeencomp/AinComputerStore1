@@ -1,6 +1,5 @@
 import { db } from "./db";
 import { repairTickets, salesShifts } from "@shared/schema";
-import { repairTicketOnBaghdadReportDay } from "@shared/repair-sales";
 import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
 import { LOCATION_MAIN_ID } from "./sales-locations";
 import {
@@ -72,7 +71,7 @@ export async function computeRepairReport(baghdadDateStr: string) {
   const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
   const repairEndSql = sqlBaghdadRepairEndBound(baghdadDateStr, effectiveEnd);
 
-  const rawRepairTickets = await db
+  const paidRepairTickets = await db
     .select()
     .from(repairTickets)
     .where(
@@ -81,10 +80,6 @@ export async function computeRepairReport(baghdadDateStr: string) {
         sqlRepairTicketInSalesWindow(dayStartSql, repairEndSql),
       ),
     );
-
-  const paidRepairTickets = rawRepairTickets.filter((t) =>
-    repairTicketOnBaghdadReportDay(t, baghdadDateStr, effectiveEnd),
-  );
 
   const repairTotalDeferred = paidRepairTickets
     .filter((t) => t.paymentStatus === "deferred")

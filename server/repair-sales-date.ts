@@ -6,19 +6,30 @@ export function sqlRepairTicketSalesAt() {
   return sql`case
     when ${repairTickets.status} = 'delivered' and ${repairTickets.deliveredAt} is not null then ${repairTickets.deliveredAt}
     when ${repairTickets.paymentStatus} = 'paid' and ${repairTickets.paidAt} is not null then ${repairTickets.paidAt}
-    when ${repairTickets.paymentStatus} = 'paid' then ${repairTickets.updatedAt}
+    when ${repairTickets.status} = 'delivered' and ${repairTickets.paymentStatus} = 'paid'
+      then coalesce(${repairTickets.deliveredAt}, ${repairTickets.paidAt}, ${repairTickets.updatedAt})
+    when ${repairTickets.paymentStatus} = 'paid' then coalesce(${repairTickets.paidAt}, ${repairTickets.updatedAt})
     else null
   end`;
+}
+
+/** Repair ticket is eligible to appear in sales/shift reports. */
+export function sqlRepairTicketEligibleForSalesQuery(): SQL {
+  return or(
+    and(eq(repairTickets.paymentStatus, "paid"), ne(repairTickets.status, "delivered")),
+    and(
+      eq(repairTickets.status, "delivered"),
+      or(isNotNull(repairTickets.deliveredAt), isNotNull(repairTickets.paidAt)),
+    ),
+    and(eq(repairTickets.paymentStatus, "paid"), isNotNull(repairTickets.paidAt)),
+  )!;
 }
 
 /** Repair ticket appears in sales reports and falls within [startSql, endSql]. */
 export function sqlRepairTicketInSalesWindow(startSql: SQL, endSql: SQL): SQL {
   const salesAt = sqlRepairTicketSalesAt();
   return and(
-    or(
-      and(eq(repairTickets.paymentStatus, "paid"), ne(repairTickets.status, "delivered")),
-      and(eq(repairTickets.status, "delivered"), isNotNull(repairTickets.deliveredAt)),
-    ),
+    sqlRepairTicketEligibleForSalesQuery(),
     sql`${salesAt} is not null`,
     sql`${salesAt} >= ${startSql}`,
     sql`${salesAt} <= ${endSql}`,
@@ -33,7 +44,9 @@ export function sqlMaxRepairSalesAtOnShiftDay(
   const salesAt = sql`case
     when rt.status = 'delivered' and rt.delivered_at is not null then rt.delivered_at
     when rt.payment_status = 'paid' and rt.paid_at is not null then rt.paid_at
-    when rt.payment_status = 'paid' then rt.updated_at
+    when rt.status = 'delivered' and rt.payment_status = 'paid'
+      then coalesce(rt.delivered_at, rt.paid_at, rt.updated_at)
+    when rt.payment_status = 'paid' then coalesce(rt.paid_at, rt.updated_at)
     else null
   end`;
   return sql`(
@@ -41,7 +54,8 @@ export function sqlMaxRepairSalesAtOnShiftDay(
     where coalesce(rt.excluded_from_sales_report, 0) = 0
       and (
         (rt.payment_status = 'paid' and rt.status <> 'delivered')
-        or (rt.status = 'delivered' and rt.delivered_at is not null)
+        or (rt.status = 'delivered' and (rt.delivered_at is not null or rt.paid_at is not null))
+        or (rt.payment_status = 'paid' and rt.paid_at is not null)
       )
       and ${salesAt} >= ${shiftStartSql}
       and ${salesAt} <= ${dayEndSql}

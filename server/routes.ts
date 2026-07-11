@@ -2,7 +2,6 @@ import type { Express, Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { insertCartItemSchema, insertOrderSchema, insertUserSchema, insertProductSchema, insertStoreSettingsSchema, insertRepairTicketSchema, insertAdminUserSchema, insertMarketPriceSchema, insertExternalPriceSourceSchema, insertExchangeRateSchema, orders, heldOrders, salesShifts, repairTickets, repairTicketStatusHistory, cashWithdrawals, staffAdvances, insertStaffAdvanceSchema, insertProductReviewSchema, insertDiscountCodeSchema, visitorSessions, pageViews, blockedIps, laptopBatteries, acAdapters, laptops, desktops, keyboards, lcds, laptopSaleItems, desktopSaleItems, keyboardSaleItems, lcdSaleItems, adminUsers, products, salesLocations, salesUserLocations, stockTransfers, inStoreProducts } from "@shared/schema";
-import { repairTicketOnBaghdadReportDay } from "@shared/repair-sales";
 import { db } from "./db";
 import { eq, desc, asc, and, gte, sql, count, between, isNull, isNotNull, inArray, or, lte } from "drizzle-orm";
 import { z } from "zod";
@@ -38,6 +37,7 @@ import {
   orderIncludedInSalesReport,
 } from "./shift-report";
 import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
+import { baghdadNow } from "./baghdad-time";
 import { voidOrder, restoreOrderInventory } from "./order-void";
 import {
   generateAnnouncementPost,
@@ -4754,7 +4754,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         if (req.body.status === 'delivered') {
           const existingTicket = await storage.getRepairTicket(id);
           if (existingTicket && !existingTicket.deliveredAt) {
-            updateData.deliveredAt = new Date();
+            updateData.deliveredAt = await baghdadNow();
           }
         }
       }
@@ -4820,7 +4820,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const effectiveMethod = updateData.paymentMethod ?? existing?.paymentMethod;
       const effectiveStatus = updateData.paymentStatus ?? existing?.paymentStatus;
       if (effectiveStatus === "paid" && existing?.paymentStatus !== "paid" && !existing?.paidAt) {
-        updateData.paidAt = new Date();
+        updateData.paidAt = await baghdadNow();
+      }
+      const effectiveTicketStatus = updateData.status ?? existing?.status;
+      if (
+        effectiveStatus === "paid" &&
+        effectiveTicketStatus === "delivered" &&
+        !existing?.deliveredAt &&
+        !updateData.deliveredAt
+      ) {
+        updateData.deliveredAt = updateData.paidAt ?? (await baghdadNow());
       }
       if (effectiveMethod === "split" && effectiveStatus === "paid") {
         const amount = parseFloat(
@@ -11259,16 +11268,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
       const repairEndSql = sqlBaghdadRepairEndBound(baghdadDateStr, effectiveEnd);
 
-      const rawRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
+      const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
         and(
           repairTicketIncludedInSalesReport,
           sqlRepairTicketInSalesWindow(dayStartSql, repairEndSql),
         ),
       ) : [];
-
-      const paidRepairTickets = rawRepairTickets.filter((t) =>
-        repairTicketOnBaghdadReportDay(t, baghdadDateStr, effectiveEnd),
-      );
 
       const inStoreTotalCash = inStoreOrders
         .reduce((sum, o) => sum + orderCashAmount(o), 0);
