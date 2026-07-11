@@ -468,7 +468,7 @@ export default function SalesInStoreInventory({ user, salesLocationId = 1, readO
       try {
         const fd = new FormData();
         fd.append("image", imageFile);
-        const res = await fetch("/api/sales/upload/image", { method: "POST", body: fd });
+      const res = await fetch("/api/sales/upload/image", { method: "POST", body: fd, credentials: "include" });
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
         imageUrl = data.url;

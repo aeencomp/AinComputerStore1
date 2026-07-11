@@ -25,6 +25,8 @@ import {
   HandCoins,
   MessageCircle,
   Trash2,
+  Ban,
+  RotateCcw,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
@@ -41,6 +43,7 @@ interface InStoreOrder {
   paymentMethod: string;
   paymentStatus: string;
   orderType: string;
+  status?: string;
   items: any[];
   notes?: string;
   createdAt: string;
@@ -124,7 +127,7 @@ interface DailyReportApiResponse {
 }
 
 interface DailyReportProps {
-  user: { id: string; role?: string; permissions?: { canEditReceipt?: number } };
+  user: { id: string; role?: string; permissions?: { canEditReceipt?: number; canViewReports?: number } };
   salesLocationId?: number;
 }
 
@@ -591,8 +594,49 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const canEditRepairSales = user.role === "sales_admin" || user.permissions?.canEditReceipt === 1;
+  const canVoidSales = user.role === "sales_admin" || user.permissions?.canEditReceipt === 1;
   const canSendDailyRevenueWhatsApp = user.role === "sales_admin";
+  const canReopenShift = (shift: SalesShift) =>
+    shift.salesUserId === user.id
+    || user.role === "sales_admin"
+    || user.permissions?.canViewReports === 1;
+
+  const voidOrderMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      const res = await apiRequest("POST", `/api/sales/orders/${id}/void`, { reason });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      toast({
+        title: language === "ar" ? "تم إلغاء الطلب" : "Order voided",
+        description: language === "ar" ? "تم استرجاع المخزون" : "Inventory restored",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: language === "ar" ? "فشل الإلغاء" : "Void failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const confirmVoidOrder = (order: InStoreOrder) => {
+    const msg = language === "ar"
+      ? `إلغاء الطلب ${order.orderNumber}؟`
+      : `Void order ${order.orderNumber}?`;
+    if (!window.confirm(msg)) return;
+    const reason = window.prompt(
+      language === "ar" ? "سبب الإلغاء (اختياري):" : "Void reason (optional):",
+    ) || undefined;
+    voidOrderMutation.mutate({ id: order.id, reason });
+  };
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [manualLabelName, setManualLabelName] = useState("");
   const [manualLabelDate, setManualLabelDate] = useState("");
@@ -677,9 +721,9 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     staleTime: 0,
   });
 
-  const excludeRepairFromReportMutation = useMutation({
+  const voidRepairMutation = useMutation({
     mutationFn: async (ticketId: string) => {
-      const res = await apiRequest("PATCH", `/api/sales/repair-tickets/${ticketId}/exclude-from-report`);
+      const res = await apiRequest("POST", `/api/sales/repair-tickets/${ticketId}/void`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Failed");
@@ -690,7 +734,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
       queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
       toast({
-        title: language === "ar" ? "تم إخفاء مبيعة الصيانة من التقرير" : "Repair sale hidden from report",
+        title: language === "ar" ? "تم إلغاء مبيعة الصيانة" : "Repair sale voided",
         description: language === "ar"
           ? "التذكرة ما زالت موجودة في بوابة الفني"
           : "The ticket remains in the technician portal",
@@ -699,18 +743,59 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     onError: (err: Error) => {
       toast({
         variant: "destructive",
-        title: language === "ar" ? "فشل الإخفاء" : "Hide failed",
+        title: language === "ar" ? "فشل الإلغاء" : "Void failed",
         description: err.message,
       });
     },
   });
 
-  const confirmExcludeRepair = (ticket: RepairSale) => {
+  const confirmVoidRepair = (ticket: RepairSale) => {
     const msg = language === "ar"
-      ? `إخفاء تذكرة ${ticket.ticketNumber} من تقرير المبيعات؟ (تبقى في بوابة الفني)`
-      : `Hide ticket ${ticket.ticketNumber} from sales report? (It stays in the technician portal)`;
+      ? `إلغاء مبيعة تذكرة ${ticket.ticketNumber}؟`
+      : `Void repair sale ${ticket.ticketNumber}?`;
     if (window.confirm(msg)) {
-      excludeRepairFromReportMutation.mutate(ticket.id);
+      voidRepairMutation.mutate(ticket.id);
+    }
+  };
+
+  const reopenShiftMutation = useMutation({
+    mutationFn: async (shiftId: string) => {
+      const res = await apiRequest("POST", `/api/sales/shifts/${shiftId}/reopen`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/current"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      setSelectedShiftId(null);
+      toast({
+        title: language === "ar" ? "تم إعادة فتح الوردية" : "Shift reopened",
+        description: language === "ar"
+          ? "يمكنك الآن إضافة المبيعات الناقصة من نقطة البيع، ثم إغلاق الوردية مرة أخرى"
+          : "You can add missing sales from POS, then close the shift again",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        variant: "destructive",
+        title: language === "ar" ? "فشل إعادة الفتح" : "Reopen failed",
+        description: err.message,
+      });
+    },
+  });
+
+  const confirmReopenShift = (shift: SalesShift, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const msg = language === "ar"
+      ? `إعادة فتح وردية ${shift.salesUserName} (${shift.startTime ? format(new Date(shift.startTime), "dd/MM HH:mm") : ""})؟\n\nستُضاف المبيعات الجديدة لهذه الوردية فقط.`
+      : `Reopen shift for ${shift.salesUserName} (${shift.startTime ? format(new Date(shift.startTime), "dd/MM HH:mm") : ""})?\n\nNew sales will be added to this shift only.`;
+    if (window.confirm(msg)) {
+      reopenShiftMutation.mutate(shift.id);
     }
   };
 
@@ -902,7 +987,9 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                   <span className={`text-xs font-semibold ${String(activeSnapshot.shift.status).toLowerCase() === 'paused' ? 'text-amber-600' : 'text-green-600'}`}>
                     {String(activeSnapshot.shift.status).toLowerCase() === 'paused'
                       ? (language === "ar" ? "وردية متوقفة" : "Paused Shift")
-                      : (language === "ar" ? "وردية نشطة" : "Active Shift")}
+                      : (activeSnapshot.shift as any).reopenedAt
+                        ? (language === "ar" ? "وردية معاد فتحها" : "Reopened Shift")
+                        : (language === "ar" ? "وردية نشطة" : "Active Shift")}
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mb-0.5">
@@ -1000,9 +1087,29 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                       <p className="text-sm font-bold text-primary">
                         {fmtNum(parseFloat(shift.totalSales || "0"))}
                       </p>
-                      <Badge variant="secondary" className="text-xs">
-                        {shift.totalTransactions} {language === "ar" ? "معاملة" : "txn"}
-                      </Badge>
+                      <div className="flex items-center gap-1">
+                        {canReopenShift(shift) && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs gap-1"
+                            onClick={(e) => confirmReopenShift(shift, e)}
+                            disabled={reopenShiftMutation.isPending}
+                            data-testid={`button-reopen-shift-${shift.id}`}
+                            title={language === "ar" ? "إعادة فتح لإضافة مبيعات" : "Reopen to add sales"}
+                          >
+                            {reopenShiftMutation.isPending ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <RotateCcw className="h-3 w-3" />
+                            )}
+                            {language === "ar" ? "فتح" : "Reopen"}
+                          </Button>
+                        )}
+                        <Badge variant="secondary" className="text-xs">
+                          {shift.totalTransactions} {language === "ar" ? "معاملة" : "txn"}
+                        </Badge>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
@@ -1357,6 +1464,9 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             <th className="text-end py-2 px-4 font-medium text-muted-foreground">
                               {language === "ar" ? "المبلغ" : "Amount"}
                             </th>
+                            {canVoidSales && (
+                              <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16" />
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -1386,11 +1496,31 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                                   <td className={`py-2 px-4 text-end font-semibold ${isDeferredPayment(order.paymentMethod, order.paymentStatus) ? "text-orange-600" : ""}`}>
                                     {fmtNum(parseFloat(order.total))}
                                   </td>
+                                  {canVoidSales && order.status !== "voided" && (
+                                    <td className="py-2 px-4 text-center">
+                                      <Button
+                                        size="icon"
+                                        variant="ghost"
+                                        onClick={() => confirmVoidOrder(order)}
+                                        disabled={voidOrderMutation.isPending}
+                                        title={language === "ar" ? "إلغاء الطلب" : "Void order"}
+                                        className="text-destructive hover:text-destructive"
+                                        data-testid={`button-void-order-${order.id}`}
+                                      >
+                                        {voidOrderMutation.isPending ? (
+                                          <Loader2 className="h-4 w-4 animate-spin" />
+                                        ) : (
+                                          <Ban className="h-4 w-4" />
+                                        )}
+                                      </Button>
+                                    </td>
+                                  )}
+                                  {canVoidSales && order.status === "voided" && <td />}
                                 </tr>
                                 {parsedItems.length > 0 && (
                                   <tr key={`${order.id}-items`} className="border-b last:border-0 bg-muted/20">
                                     <td />
-                                    <td colSpan={5} className="py-1 px-4 pb-2">
+                                    <td colSpan={canVoidSales ? 6 : 5} className="py-1 px-4 pb-2">
                                       <div className="flex flex-wrap gap-x-4 gap-y-1">
                                         {parsedItems.map((item, ii) => (
                                           <span key={ii} className="text-xs text-muted-foreground">
@@ -1411,7 +1541,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                         </tbody>
                         <tfoot>
                           <tr className="bg-muted/30 border-t-2 font-semibold">
-                            <td colSpan={5} className="py-2 px-4">
+                            <td colSpan={canVoidSales ? 6 : 5} className="py-2 px-4">
                               {language === "ar" ? "المجموع" : "Total"}
                               {data.summary.inStoreTotalDeferred > 0 && (
                                 <span className="text-xs text-orange-500 font-normal ms-2">
@@ -1422,6 +1552,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             <td className="py-2 px-4 text-end text-violet-600 dark:text-violet-400">
                               {fmtNum(data.summary.inStoreTotal)}
                             </td>
+                            {canVoidSales && <td />}
                           </tr>
                         </tfoot>
                       </table>
@@ -1465,7 +1596,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             <th className="text-end py-2 px-4 font-medium text-muted-foreground">
                               {language === "ar" ? "المبلغ" : "Amount"}
                             </th>
-                            {canEditRepairSales && (
+                            {canVoidSales && (
                               <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16" />
                             )}
                           </tr>
@@ -1507,21 +1638,21 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                                   <td className={`py-2 px-4 text-end font-semibold ${ticket.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
                                     {fmtNum(amount)}
                                   </td>
-                                  {canEditRepairSales && (
+                                  {canVoidSales && (
                                     <td className="py-2 px-4 text-center">
                                       <Button
                                         size="icon"
                                         variant="ghost"
-                                        onClick={() => confirmExcludeRepair(ticket)}
-                                        disabled={excludeRepairFromReportMutation.isPending}
-                                        title={language === "ar" ? "إخفاء من التقرير" : "Hide from report"}
+                                        onClick={() => confirmVoidRepair(ticket)}
+                                        disabled={voidRepairMutation.isPending}
+                                        title={language === "ar" ? "إلغاء مبيعة الصيانة" : "Void repair sale"}
                                         className="text-destructive hover:text-destructive"
-                                        data-testid={`button-hide-repair-${ticket.id}`}
+                                        data-testid={`button-void-repair-${ticket.id}`}
                                       >
-                                        {excludeRepairFromReportMutation.isPending ? (
+                                        {voidRepairMutation.isPending ? (
                                           <Loader2 className="h-4 w-4 animate-spin" />
                                         ) : (
-                                          <Trash2 className="h-4 w-4" />
+                                          <Ban className="h-4 w-4" />
                                         )}
                                       </Button>
                                     </td>
@@ -1530,7 +1661,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                                 {hasDetails && (
                                   <tr key={`${ticket.id}-detail`} className="border-b last:border-0 bg-muted/20">
                                     <td />
-                                    <td colSpan={5} className="py-1 px-4 pb-2">
+                                    <td colSpan={canVoidSales ? 6 : 5} className="py-1 px-4 pb-2">
                                       <div className="flex flex-wrap gap-x-6 gap-y-0.5">
                                         {ticket.issueDescriptionAr && (
                                           <span className="text-xs text-muted-foreground">
@@ -1554,7 +1685,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                         </tbody>
                         <tfoot>
                           <tr className="bg-muted/30 border-t-2 font-semibold">
-                            <td colSpan={canEditRepairSales ? 6 : 5} className="py-2 px-4">
+                            <td colSpan={canVoidSales ? 6 : 5} className="py-2 px-4">
                               {language === "ar" ? "المجموع" : "Total"}
                               {(data.summary.repairTotalDeferred ?? 0) > 0 && (
                                 <span className="text-xs text-orange-500 font-normal ms-2">
@@ -1565,7 +1696,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             <td className="py-2 px-4 text-end text-blue-600 dark:text-blue-400">
                               {fmtNum(data.summary.repairTotal)}
                             </td>
-                            {canEditRepairSales && <td />}
+                            {canVoidSales && <td />}
                           </tr>
                         </tfoot>
                       </table>

@@ -30,7 +30,10 @@ import {
   reconcileRecentClosedShifts,
   fetchShiftReportEndTime,
   repairTicketIncludedInSalesReport,
+  orderIncludedInSalesReport,
 } from "./shift-report";
+import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
+import { voidOrder, restoreOrderInventory } from "./order-void";
 import {
   generateAnnouncementPost,
   generateProductPost,
@@ -122,7 +125,14 @@ if (!fs.existsSync(uploadDir)) {
 
 const imageStorage = multer.diskStorage({
   destination: (_req, _file, cb) => {
-    cb(null, uploadDir);
+    try {
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      cb(null, uploadDir);
+    } catch (err) {
+      cb(err as Error, uploadDir);
+    }
   },
   filename: (_req, file, cb) => {
     const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
@@ -132,14 +142,26 @@ const imageStorage = multer.diskStorage({
 
 const imageUpload = multer({
   storage: imageStorage,
-  limits: { fileSize: 5 * 1024 * 1024 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
-    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-    if (allowedTypes.includes(file.mimetype)) {
+    const mime = (file.mimetype || "").toLowerCase();
+    const allowedTypes = [
+      "image/jpeg",
+      "image/jpg",
+      "image/pjpeg",
+      "image/png",
+      "image/x-png",
+      "image/gif",
+      "image/webp",
+      "image/avif",
+    ];
+    const ext = path.extname(file.originalname || "").toLowerCase();
+    const allowedExts = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".avif"];
+    if (allowedTypes.includes(mime) || allowedExts.includes(ext)) {
       cb(null, true);
-    } else {
-      cb(new Error("Invalid file type"));
+      return;
     }
+    cb(new Error("Invalid file type"));
   },
 });
 
@@ -732,11 +754,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }, (req, res, next) => {
     imageUpload.single("image")(req, res, (err) => {
       if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
+        console.error("[upload] admin image error:", err);
+        if ((err as { code?: string }).code === "LIMIT_FILE_SIZE") {
           return res.status(400).json({ error: "File too large. Maximum size is 5MB" });
         }
-        if (err.message === 'Invalid file type') {
-          return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, or WebP" });
+        if (err.message === "Invalid file type") {
+          return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, WebP, or AVIF" });
+        }
+        if ((err as { code?: string }).code === "ENOENT" || (err as { code?: string }).code === "EACCES") {
+          return res.status(500).json({ error: "Server cannot save uploaded files. Contact support." });
         }
         return res.status(400).json({ error: err.message || "Upload failed" });
       }
@@ -761,11 +787,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   }, (req, res, next) => {
     imageUpload.single("image")(req, res, (err) => {
       if (err) {
-        if (err.code === 'LIMIT_FILE_SIZE') {
+        console.error("[upload] admin image error:", err);
+        if ((err as { code?: string }).code === "LIMIT_FILE_SIZE") {
           return res.status(400).json({ error: "File too large. Maximum size is 5MB" });
         }
-        if (err.message === 'Invalid file type') {
-          return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, or WebP" });
+        if (err.message === "Invalid file type") {
+          return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, WebP, or AVIF" });
+        }
+        if ((err as { code?: string }).code === "ENOENT" || (err as { code?: string }).code === "EACCES") {
+          return res.status(500).json({ error: "Server cannot save uploaded files. Contact support." });
         }
         return res.status(400).json({ error: err.message || "Upload failed" });
       }
@@ -2201,36 +2231,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const activeShift = openShift;
       
       const { closingCash, notes } = req.body;
-      // Use DB-local Baghdad timestamp (matches timestamp columns).
       const endTime = sql`timezone('Asia/Baghdad', now())`;
-      
-      // In-store orders during shift window (all users)
-      const shiftOrders = await db
-        .select()
-        .from(orders)
-        .where(and(
-          inArray(orders.orderType, ['walk-in', 'in-store']),
-          sql`${orders.createdAt} >= ${activeShift.startTime}`,
-          sql`${orders.createdAt} <= ${endTime}`,
-        ));
 
-      // Repair tickets paid/delivered during this shift
-      const shiftRepairs = await db.select().from(repairTickets)
-        .where(
-          or(
-            and(
-              eq(repairTickets.paymentStatus, 'paid'),
-              sql`${repairTickets.updatedAt} >= ${activeShift.startTime}`,
-              sql`${repairTickets.updatedAt} <= ${endTime}`
-            ),
-            and(
-              eq(repairTickets.status, 'delivered'),
-              isNotNull(repairTickets.deliveredAt),
-              sql`${repairTickets.deliveredAt} >= ${activeShift.startTime}`,
-              sql`${repairTickets.deliveredAt} <= ${endTime}`
-            )
-          )
-        );
+      const report = await computeShiftReportForShift(activeShift.id);
+      const shiftOrders = report.inStoreSales;
+      const shiftRepairs = report.repairSales;
 
       // Cash-only amounts for expected cash calculation
       const cashSalesOrders = shiftOrders
@@ -2262,6 +2267,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           totalTransactions: shiftOrders.length + shiftRepairs.filter(t => t.paymentStatus !== 'deferred').length,
           notes: notes || activeShift.notes,
           status: 'closed',
+          reopenedAt: null,
+          originalEndTime: null,
         })
         .where(eq(salesShifts.id, activeShift.id))
         .returning();
@@ -2326,6 +2333,80 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error resuming shift:", error);
       return res.status(500).json({ error: "فشل استئناف الوردية" });
+    }
+  });
+
+  // Reopen a closed shift so missing sales can be added (backfill mode).
+  app.post("/api/sales/shifts/:id/reopen", async (req, res) => {
+    try {
+      const { salesUserId, canViewAll, locationId } = await sessionCanManageLocationShift(req);
+      if (!salesUserId && !canViewAll) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const shiftId = String(req.params.id || "").trim();
+      if (!shiftId) {
+        return res.status(400).json({ error: "معرف غير صالح" });
+      }
+
+      const [shift] = await db
+        .select()
+        .from(salesShifts)
+        .where(eq(salesShifts.id, shiftId))
+        .limit(1);
+      if (!shift) {
+        return res.status(404).json({ error: "الوردية غير موجودة" });
+      }
+      if (String(shift.status).toLowerCase() !== "closed") {
+        return res.status(400).json({ error: "يمكن إعادة فتح الورديات المغلقة فقط" });
+      }
+      if (shift.salesLocationId !== locationId) {
+        return res.status(403).json({ error: "الوردية ليست في هذا الموقع" });
+      }
+      if (!canViewAll && salesUserId && shift.salesUserId !== salesUserId) {
+        return res.status(403).json({ error: "لا يمكنك إعادة فتح وردية موظف آخر" });
+      }
+
+      const [existingOpen] = await db
+        .select()
+        .from(salesShifts)
+        .where(and(
+          eq(salesShifts.salesUserId, shift.salesUserId),
+          eq(salesShifts.salesLocationId, shift.salesLocationId),
+          salesShiftIsOpen,
+        ))
+        .limit(1);
+      if (existingOpen) {
+        return res.status(400).json({
+          error: "هذا الموظف لديه وردية مفتوحة بالفعل. أغلقها أو أوقفها قبل إعادة فتح وردية قديمة.",
+          shift: existingOpen,
+        });
+      }
+
+      const reopenedBy = salesUserId
+        ? (await storage.getSalesUser(salesUserId))?.name || salesUserId
+        : "admin";
+      const noteLine = `\n[reopened] ${baghdadCalendarDateString(new Date())} by ${reopenedBy}`;
+
+      const [updatedShift] = await db
+        .update(salesShifts)
+        .set({
+          status: "active",
+          endTime: null,
+          closingCash: null,
+          expectedCash: null,
+          cashDifference: null,
+          originalEndTime: shift.endTime,
+          reopenedAt: new Date(),
+          notes: sql`COALESCE(${salesShifts.notes}, '') || ${noteLine}`,
+        })
+        .where(eq(salesShifts.id, shiftId))
+        .returning();
+
+      return res.json({ success: true, shift: updatedShift });
+    } catch (error) {
+      console.error("Error reopening shift:", error);
+      return res.status(500).json({ error: "فشل إعادة فتح الوردية" });
     }
   });
 
@@ -2401,6 +2482,89 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching active snapshot:", error);
       return res.status(500).json({ error: "فشل جلب بيانات الوردية النشطة" });
+    }
+  });
+
+  // Void a POS/online order — restores inventory, keeps audit record, removes from sales reports.
+  app.post("/api/sales/orders/:id/void", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = salesUserId ? await storage.getSalesUser(salesUserId) : null;
+      const isSupervisor = !!adminId || currentUser?.role === "sales_admin";
+      const canVoid = isSupervisor || currentUser?.canEditReceipt === 1;
+      if (!canVoid) {
+        return res.status(403).json({ error: "ليس لديك صلاحية إلغاء المبيعات" });
+      }
+
+      const orderId = String(req.params.id || "").trim();
+      if (!orderId) {
+        return res.status(400).json({ error: "معرف غير صالح" });
+      }
+
+      const voidedBy = salesUserId || adminId || "unknown";
+      const voidReason = typeof req.body?.reason === "string" ? req.body.reason : undefined;
+      const updated = await voidOrder(orderId, voidedBy, voidReason);
+      if (!updated) {
+        return res.status(404).json({ error: "الطلب غير موجود" });
+      }
+
+      return res.json({ success: true, order: updated });
+    } catch (error: any) {
+      if (error?.message === "الطلب ملغى مسبقاً") {
+        return res.status(400).json({ error: error.message });
+      }
+      console.error("Error voiding order:", error);
+      return res.status(500).json({ error: "فشل إلغاء الطلب" });
+    }
+  });
+
+  // Void a technician repair sale — hides from sales reports (ticket stays in technician portal).
+  app.post("/api/sales/repair-tickets/:id/void", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = salesUserId ? await storage.getSalesUser(salesUserId) : null;
+      const isSupervisor = !!adminId || currentUser?.role === "sales_admin";
+      const canVoid = isSupervisor || currentUser?.canEditReceipt === 1;
+      if (!canVoid) {
+        return res.status(403).json({ error: "ليس لديك صلاحية إلغاء مبيعات الصيانة" });
+      }
+
+      const ticketId = String(req.params.id || "").trim();
+      if (!ticketId) {
+        return res.status(400).json({ error: "معرف غير صالح" });
+      }
+
+      const [ticket] = await db
+        .select()
+        .from(repairTickets)
+        .where(eq(repairTickets.id, ticketId))
+        .limit(1);
+      if (!ticket) {
+        return res.status(404).json({ error: "التذكرة غير موجودة" });
+      }
+      if (ticket.excludedFromSalesReport === 1) {
+        return res.status(400).json({ error: "مبيعة الصيانة ملغاة مسبقاً" });
+      }
+
+      await db
+        .update(repairTickets)
+        .set({ excludedFromSalesReport: 1 })
+        .where(eq(repairTickets.id, ticketId));
+
+      return res.json({ success: true });
+    } catch (error) {
+      console.error("Error voiding repair ticket sale:", error);
+      return res.status(500).json({ error: "فشل إلغاء مبيعة الصيانة" });
     }
   });
 
@@ -3907,71 +4071,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           deletedBy: 'admin',
         });
 
-        // Restore inventory for completed in-store / walk-in orders
-        const isPosOrder = order.orderType === 'walk-in' || order.orderType === 'in-store';
-        if (isPosOrder && order.items && order.items.length > 0) {
-          for (const rawItem of order.items) {
-            try {
-              const item = typeof rawItem === 'string' ? JSON.parse(rawItem) : rawItem;
-              const qty = parseInt(item.quantity) || 1;
-              const productIdStr = item.productId ? String(item.productId) : "";
-              const numericProductId = productIdStr && !isNaN(parseInt(productIdStr, 10)) ? parseInt(productIdStr, 10) : null;
-              const inferredSource =
-                item.productSource
-                || (item.batteryId ? "battery" : null)
-                || (item.adapterId ? "adapter" : null)
-                || (item.keyboardId ? "keyboard" : null)
-                || (item.lcdId ? "lcd" : null)
-                || (item.laptopId ? "laptop" : null)
-                || (item.desktopId ? "desktop" : null)
-                || (productIdStr.startsWith("bat-") ? "battery" : null)
-                || (productIdStr.startsWith("ada-") ? "adapter" : null)
-                || (productIdStr.startsWith("kbd-") ? "keyboard" : null)
-                || (productIdStr.startsWith("lcd-") ? "lcd" : null)
-                || (productIdStr.startsWith("lap-") ? "laptop" : null)
-                || (productIdStr.startsWith("des-") ? "desktop" : null)
-                || (numericProductId !== null ? "instore" : null);
-
-              if (inferredSource === 'battery' && (item.batteryId || productIdStr.startsWith("bat-"))) {
-                const targetId = item.batteryId || productIdStr.replace(/^bat-/, "");
-                await db.update(laptopBatteries)
-                  .set({ stockQuantity: sql`stock_quantity + ${qty}` })
-                  .where(eq(laptopBatteries.id, String(targetId)));
-              } else if (inferredSource === 'adapter' && (item.adapterId || productIdStr.startsWith("ada-"))) {
-                const targetId = item.adapterId || productIdStr.replace(/^ada-/, "");
-                await db.update(acAdapters)
-                  .set({ stockQuantity: sql`stock_quantity + ${qty}` })
-                  .where(eq(acAdapters.id, String(targetId)));
-              } else if (inferredSource === 'keyboard' && (item.keyboardId || productIdStr.startsWith("kbd-"))) {
-                const targetId = item.keyboardId || productIdStr.replace(/^kbd-/, "");
-                await db.update(keyboards)
-                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(keyboards.id, String(targetId)));
-              } else if (inferredSource === 'lcd' && (item.lcdId || productIdStr.startsWith("lcd-"))) {
-                const targetId = item.lcdId || productIdStr.replace(/^lcd-/, "");
-                await db.update(lcds)
-                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(lcds.id, String(targetId)));
-              } else if (inferredSource === 'laptop' && (item.laptopId || productIdStr.startsWith("lap-"))) {
-                const targetId = item.laptopId || productIdStr.replace(/^lap-/, "");
-                await db.update(laptops)
-                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(laptops.id, String(targetId)));
-              } else if (inferredSource === 'desktop' && (item.desktopId || productIdStr.startsWith("des-"))) {
-                const targetId = item.desktopId || productIdStr.replace(/^des-/, "");
-                await db.update(desktops)
-                  .set({ stockQuantity: sql`stock_quantity + ${qty}`, updatedAt: new Date() })
-                  .where(eq(desktops.id, String(targetId)));
-              } else if (inferredSource === 'instore' && numericProductId !== null) {
-                await storage.adjustInStoreProductStock(numericProductId, qty);
-              } else if (item.productId && isNaN(parseInt(item.productId))) {
-                // UUID productId = regular product stock
-                await storage.adjustProductStock(item.productId, qty, undefined, `Void order ${order.orderNumber}`, order.orderNumber);
-              }
-            } catch (itemErr) {
-              console.error(`Failed to restore stock for item in order ${order.orderNumber}:`, itemErr);
-            }
-          }
+        // Restore inventory for completed in-store / walk-in / online orders
+        const restorableOrder = order.orderType === 'walk-in' || order.orderType === 'in-store' || order.orderType === 'online';
+        if (restorableOrder && order.items && order.items.length > 0) {
+          await restoreOrderInventory(order, `Void order ${order.orderNumber}`);
         }
       }
       await storage.deleteOrder(id);
@@ -4701,6 +4804,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const effectiveMethod = updateData.paymentMethod ?? existing?.paymentMethod;
       const effectiveStatus = updateData.paymentStatus ?? existing?.paymentStatus;
+      if (effectiveStatus === "paid" && existing?.paymentStatus !== "paid" && !existing?.paidAt) {
+        updateData.paidAt = new Date();
+      }
       if (effectiveMethod === "split" && effectiveStatus === "paid") {
         const amount = parseFloat(
           String(
@@ -11054,6 +11160,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           const shiftOrders = await db.select().from(orders).where(and(
             inArray(orders.orderType, ['walk-in', 'in-store']),
             eq(orders.salesLocationId, salesLocationId),
+            orderIncludedInSalesReport,
             eq(orders.salespersonId, shift.salesUserId),
             gte(orders.createdAt, shift.startTime),
             lte(orders.createdAt, shiftEnd),
@@ -11069,6 +11176,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const adminOrders = await db.select().from(orders).where(and(
           inArray(orders.orderType, ['walk-in', 'in-store']),
           eq(orders.salesLocationId, salesLocationId),
+          orderIncludedInSalesReport,
           isNull(orders.salespersonId),
           gte(orders.createdAt, startOfDay),
           lte(orders.createdAt, effectiveEnd),
@@ -11087,6 +11195,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           .where(and(
             inArray(orders.orderType, ['walk-in', 'in-store']),
             eq(orders.salesLocationId, salesLocationId),
+            orderIncludedInSalesReport,
             gte(orders.createdAt, startOfDay),
             lte(orders.createdAt, effectiveEnd),
           ));
@@ -11102,6 +11211,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const calOrders = await db.select().from(orders).where(and(
           inArray(orders.orderType, ['walk-in', 'in-store']),
           eq(orders.salesLocationId, salesLocationId),
+          orderIncludedInSalesReport,
           gte(orders.createdAt, startOfDay),
           lte(orders.createdAt, endOfDay),
         ));
@@ -11116,18 +11226,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
         and(
           repairTicketIncludedInSalesReport,
-          or(
-            and(
-              eq(repairTickets.paymentStatus, 'paid'),
-              gte(repairTickets.updatedAt, startOfDay),
-              lte(repairTickets.updatedAt, effectiveEnd)
-            ),
-            and(
-              eq(repairTickets.status, 'delivered'),
-              isNotNull(repairTickets.deliveredAt),
-              gte(repairTickets.deliveredAt, startOfDay),
-              lte(repairTickets.deliveredAt, effectiveEnd)
-            )
+          sqlRepairTicketInSalesWindow(
+            sql`${startOfDay.toISOString()}::timestamp`,
+            sql`${effectiveEnd.toISOString()}::timestamp`,
           ),
         ),
       ) : [];

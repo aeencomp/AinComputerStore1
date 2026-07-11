@@ -9,6 +9,13 @@ import {
 import { and, or, inArray, eq, isNotNull, isNull, desc, sql } from "drizzle-orm";
 import { LOCATION_MAIN_ID, LOCATION_SHOP2_ID } from "./sales-locations";
 import {
+  computeShiftReportForShift,
+  fetchShiftReportEndTime,
+  orderIncludedInSalesReport,
+  repairTicketIncludedInSalesReport,
+  reconcileClosedShiftRecord,
+} from "./shift-report";
+import {
   isOrderDeferred,
   isInStoreZainCash,
   isInStoreQiCard,
@@ -17,6 +24,7 @@ import {
   repairCashAmount,
   repairCardAmount,
 } from "./order-payment";
+import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
 
 export type DailyReportSummary = {
   inStoreCount: number;
@@ -74,12 +82,12 @@ export type DailyReportSummaryOptions = {
   calendarDayOnly?: boolean;
 };
 
-/** Same logic as GET /api/daily-report — shift-aware Baghdad calendar day (SQL timestamps). */
-export async function computeDailyReportSummary(
+/** Full daily report payload for GET /api/daily-report (shift-aware Baghdad day). */
+export async function computeDailyReportForApi(
   baghdadDateStr: string,
   salesLocationId: number,
   options?: DailyReportSummaryOptions,
-): Promise<DailyReportSummary> {
+) {
   const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
   const dayEndSql = sqlBaghdadDayEnd(baghdadDateStr);
 
@@ -94,13 +102,14 @@ export async function computeDailyReportSummary(
           and(
             inArray(orders.orderType, ["walk-in", "in-store"]),
             eq(orders.salesLocationId, salesLocationId),
+            orderIncludedInSalesReport,
             sql`${orders.createdAt} >= ${dayStartSql}`,
             sql`${orders.createdAt} <= ${dayEndSql}`,
           ),
         )),
     );
   } else {
-    const shiftsOnDate = await db
+    const shiftsStartedOnDate = await db
       .select()
       .from(salesShifts)
       .where(
@@ -112,113 +121,96 @@ export async function computeDailyReportSummary(
       )
       .orderBy(desc(salesShifts.startTime));
 
-    const effectiveEndSql =
-      shiftsOnDate.length > 0
-        ? sql`(
-            select greatest(
-              ${dayEndSql},
-              coalesce(max(coalesce(end_time, timezone('Asia/Baghdad', now()))), ${dayEndSql})
-            )
-            from sales_shifts
-            where sales_location_id = ${salesLocationId}
-              and start_time >= ${dayStartSql}
-              and start_time <= ${dayEndSql}
-          )`
-        : dayEndSql;
+    // Shifts that started earlier but were still open during this day (e.g. overnight)
+    const shiftsOverlapping = await db
+      .select()
+      .from(salesShifts)
+      .where(
+        and(
+          eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.startTime} < ${dayStartSql}`,
+          or(
+            sql`${salesShifts.endTime} is null`,
+            sql`${salesShifts.endTime} >= ${dayStartSql}`,
+          ),
+        ),
+      )
+      .orderBy(desc(salesShifts.startTime));
+
+    const shiftsById = new Map<string, typeof salesShifts.$inferSelect>();
+    for (const s of [...shiftsStartedOnDate, ...shiftsOverlapping]) {
+      shiftsById.set(s.id, s);
+    }
+    const shiftsOnDate = [...shiftsById.values()];
 
     const seenOrderIds = new Set<string>();
 
-    if (shiftsOnDate.length > 0) {
-      for (const shift of shiftsOnDate) {
-        const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shift.id} limit 1)`;
-        const shiftEndSql = sql`(select coalesce(end_time, timezone('Asia/Baghdad', now())) from sales_shifts where id = ${shift.id} limit 1)`;
-        const shiftOrders = await db
-          .select()
-          .from(orders)
-          .where(
-            and(
-              inArray(orders.orderType, ["walk-in", "in-store"]),
-              eq(orders.salesLocationId, salesLocationId),
-              eq(orders.salespersonId, shift.salesUserId),
-              sql`${orders.createdAt} >= ${shiftStartSql}`,
-              sql`${orders.createdAt} <= ${shiftEndSql}`,
-            ),
-          );
-        for (const o of shiftOrders) {
-          if (!seenOrderIds.has(o.id)) {
-            seenOrderIds.add(o.id);
-            allInStoreOrders.push(o);
-          }
-        }
+    for (const shift of shiftsOnDate) {
+      if (String(shift.status).toLowerCase() === "closed") {
+        await reconcileClosedShiftRecord(shift.id);
       }
-
-      const adminOrders = await db
-        .select()
-        .from(orders)
-        .where(
-          and(
-            inArray(orders.orderType, ["walk-in", "in-store"]),
-            eq(orders.salesLocationId, salesLocationId),
-            isNull(orders.salespersonId),
-            sql`${orders.createdAt} >= ${dayStartSql}`,
-            sql`${orders.createdAt} <= ${effectiveEndSql}`,
-          ),
-        );
-      for (const o of adminOrders) {
+      const report = await computeShiftReportForShift(shift.id);
+      for (const o of report.inStoreSales) {
+        const orderDay = baghdadDateString(new Date(o.createdAt));
+        if (orderDay !== baghdadDateStr) continue;
         if (!seenOrderIds.has(o.id)) {
           seenOrderIds.add(o.id);
           allInStoreOrders.push(o);
         }
       }
+    }
 
-      const adminTaggedRows = await db
-        .select({ o: orders })
-        .from(orders)
-        .innerJoin(adminUsers, eq(orders.salespersonId, adminUsers.id))
-        .where(
-          and(
-            inArray(orders.orderType, ["walk-in", "in-store"]),
-            eq(orders.salesLocationId, salesLocationId),
-            sql`${orders.createdAt} >= ${dayStartSql}`,
-            sql`${orders.createdAt} <= ${effectiveEndSql}`,
-          ),
-        );
-      for (const row of adminTaggedRows) {
-        const o = row.o;
-        if (!seenOrderIds.has(o.id)) {
-          seenOrderIds.add(o.id);
-          allInStoreOrders.push(o);
-        }
+    // Catch any POS sale on this Baghdad calendar day not tied to a shift window
+    const calendarDayOrders = await db
+      .select()
+      .from(orders)
+      .where(
+        and(
+          inArray(orders.orderType, ["walk-in", "in-store"]),
+          eq(orders.salesLocationId, salesLocationId),
+          orderIncludedInSalesReport,
+          sql`${orders.createdAt} >= ${dayStartSql}`,
+          sql`${orders.createdAt} <= ${dayEndSql}`,
+        ),
+      );
+    for (const o of calendarDayOrders) {
+      if (!seenOrderIds.has(o.id)) {
+        seenOrderIds.add(o.id);
+        allInStoreOrders.push(o);
       }
-    } else {
-      const calOrders = await db
-        .select()
-        .from(orders)
-        .where(
-          and(
-            inArray(orders.orderType, ["walk-in", "in-store"]),
-            eq(orders.salesLocationId, salesLocationId),
-            sql`${orders.createdAt} >= ${dayStartSql}`,
-            sql`${orders.createdAt} <= ${dayEndSql}`,
-          ),
-        );
-      allInStoreOrders.push(...calOrders);
     }
   }
 
-  const repairEndSql = options?.calendarDayOnly ? dayEndSql : sql`(
-    select greatest(
-      ${dayEndSql},
-      coalesce(
-        (select max(coalesce(end_time, timezone('Asia/Baghdad', now())))
-         from sales_shifts
-         where sales_location_id = ${salesLocationId}
-           and start_time >= ${dayStartSql}
-           and start_time <= ${dayEndSql}),
-        ${dayEndSql}
-      )
-    )
-  )`;
+  // Extend repair/withdrawal window through any shift that ran past midnight on this date
+  let repairEndBound: ReturnType<typeof sqlBaghdadDayEnd> | ReturnType<typeof sql> = dayEndSql;
+  if (!options?.calendarDayOnly) {
+    const shiftsForRepair = await db
+      .select()
+      .from(salesShifts)
+      .where(
+        and(
+          eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.startTime} <= ${dayEndSql}`,
+          or(
+            sql`${salesShifts.endTime} is null`,
+            sql`${salesShifts.endTime} >= ${dayStartSql}`,
+          ),
+        ),
+      );
+    let maxEndMs = new Date(`${baghdadDateStr}T23:59:59.999+03:00`).getTime();
+    for (const shift of shiftsForRepair) {
+      const ext = String(shift.status).toLowerCase() === "closed"
+        ? await fetchShiftReportEndTime(shift.id, {
+          status: shift.status,
+          salesUserId: shift.salesUserId,
+          salesLocationId: shift.salesLocationId,
+          startTime: shift.startTime,
+        })
+        : new Date(shift.endTime || Date.now());
+      maxEndMs = Math.max(maxEndMs, ext.getTime());
+    }
+    repairEndBound = sql`${new Date(maxEndMs).toISOString()}::timestamp`;
+  }
 
   const paidRepairTickets =
     salesLocationId === LOCATION_MAIN_ID
@@ -226,23 +218,14 @@ export async function computeDailyReportSummary(
           .select()
           .from(repairTickets)
           .where(
-            or(
-              and(
-                eq(repairTickets.paymentStatus, "paid"),
-                sql`${repairTickets.updatedAt} >= ${dayStartSql}`,
-                sql`${repairTickets.updatedAt} <= ${repairEndSql}`,
-              ),
-              and(
-                eq(repairTickets.status, "delivered"),
-                isNotNull(repairTickets.deliveredAt),
-                sql`${repairTickets.deliveredAt} >= ${dayStartSql}`,
-                sql`${repairTickets.deliveredAt} <= ${repairEndSql}`,
-              ),
+            and(
+              repairTicketIncludedInSalesReport,
+              sqlRepairTicketInSalesWindow(dayStartSql, repairEndBound),
             ),
           )
       : [];
 
-  const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndSql;
+  const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndBound;
 
   const dailyWithdrawals = await db
     .select()

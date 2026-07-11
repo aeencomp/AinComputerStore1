@@ -93,6 +93,19 @@ const STARTUP_MIGRATIONS: string[] = [
 
   `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS excluded_from_sales_report INTEGER NOT NULL DEFAULT 0`,
 
+  `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`,
+  `UPDATE repair_tickets SET paid_at = delivered_at
+     WHERE payment_status = 'paid' AND paid_at IS NULL AND status = 'delivered' AND delivered_at IS NOT NULL`,
+  `UPDATE repair_tickets SET paid_at = updated_at
+     WHERE payment_status = 'paid' AND paid_at IS NULL AND status <> 'delivered'`,
+
+  `ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_at TIMESTAMP`,
+  `ALTER TABLE orders ADD COLUMN IF NOT EXISTS voided_by VARCHAR`,
+  `ALTER TABLE orders ADD COLUMN IF NOT EXISTS void_reason TEXT`,
+
+  `ALTER TABLE sales_shifts ADD COLUMN IF NOT EXISTS reopened_at TIMESTAMP`,
+  `ALTER TABLE sales_shifts ADD COLUMN IF NOT EXISTS original_end_time TIMESTAMP`,
+
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS meta_pixel_id TEXT DEFAULT ''`,
 
   `CREATE TABLE IF NOT EXISTS facebook_post_log (

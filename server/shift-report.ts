@@ -6,7 +6,7 @@ import {
   staffAdvances,
   salesShifts,
 } from "@shared/schema";
-import { and, or, inArray, eq, isNotNull, desc, sql } from "drizzle-orm";
+import { and, or, inArray, eq, isNotNull, isNull, desc, sql, ne } from "drizzle-orm";
 import { LOCATION_MAIN_ID } from "./sales-locations";
 import { baghdadDateString } from "./daily-revenue-report";
 import {
@@ -18,9 +18,17 @@ import {
   repairCashAmount,
   repairCardAmount,
 } from "./order-payment";
+import { sqlRepairTicketInSalesWindow, sqlMaxRepairSalesAtOnShiftDay } from "./repair-sales-date";
+
+/** Orders hidden from sales/shift reports (voided or cancelled). */
+export const orderIncludedInSalesReport = and(
+  ne(orders.status, "voided"),
+  ne(orders.status, "cancelled"),
+);
 
 /** Repair tickets hidden from sales/shift reports only (technician records unchanged). */
 export const repairTicketIncludedInSalesReport = eq(repairTickets.excludedFromSalesReport, 0);
+
 
 function sqlBaghdadDayEnd(dateStr: string) {
   return sql`((((${dateStr}::date) + interval '1 day')::timestamp) - interval '1 millisecond')`;
@@ -52,31 +60,83 @@ export function sqlShiftReportEnd(shiftId: string, shift: {
           (select max(o.created_at) from orders o
            where o.order_type in ('walk-in', 'in-store')
              and o.sales_location_id = ${shift.salesLocationId}
-             and o.salesperson_id = ${shift.salesUserId}
              and o.created_at >= ${shiftStartSql}
              and o.created_at <= ${dayEndSql}),
           ${shiftEndSql}
         ),
         coalesce(
-          (select max(rt.updated_at) from repair_tickets rt
-           where rt.payment_status = 'paid'
-             and coalesce(rt.excluded_from_sales_report, 0) = 0
-             and rt.updated_at >= ${shiftStartSql}
-             and rt.updated_at <= ${dayEndSql}),
-          ${shiftEndSql}
-        ),
-        coalesce(
-          (select max(rt.delivered_at) from repair_tickets rt
-           where rt.status = 'delivered'
-             and rt.delivered_at is not null
-             and coalesce(rt.excluded_from_sales_report, 0) = 0
-             and rt.delivered_at >= ${shiftStartSql}
-             and rt.delivered_at <= ${dayEndSql}),
+          ${sqlMaxRepairSalesAtOnShiftDay(shiftStartSql, dayEndSql)},
           ${shiftEndSql}
         )
       )
     )
   )`;
+}
+
+/** POS orders attributed to this shift (cashier, untagged, or admin walk-in). */
+function sqlShiftAttributedOrders(shift: { salesUserId: string }) {
+  return or(
+    eq(orders.salespersonId, shift.salesUserId),
+    isNull(orders.salespersonId),
+    sql`${orders.salespersonId} in (select id from admin_users)`,
+  );
+}
+
+/** Order createdAt window — reopened shifts only count original period + post-reopen sales. */
+function sqlShiftOrderCreatedWindow(
+  shiftId: string,
+  shift: { status: string; reopenedAt?: Date | string | null; originalEndTime?: Date | string | null },
+  shiftEndSql: ReturnType<typeof sqlShiftReportEnd>,
+) {
+  const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
+  const isReopened =
+    shift.reopenedAt &&
+    shift.originalEndTime &&
+    String(shift.status).toLowerCase() !== "closed";
+
+  if (isReopened) {
+    const reopenedSql = sql`(select reopened_at from sales_shifts where id = ${shiftId} limit 1)`;
+    const originalEndSql = sql`(select original_end_time from sales_shifts where id = ${shiftId} limit 1)`;
+    return or(
+      and(
+        sql`${orders.createdAt} >= ${shiftStartSql}`,
+        sql`${orders.createdAt} <= ${originalEndSql}`,
+      ),
+      and(
+        sql`${orders.createdAt} >= ${reopenedSql}`,
+        sql`${orders.createdAt} <= ${shiftEndSql}`,
+      ),
+    )!;
+  }
+
+  return and(
+    sql`${orders.createdAt} >= ${shiftStartSql}`,
+    sql`${orders.createdAt} <= ${shiftEndSql}`,
+  )!;
+}
+
+/** Repair sales window for reopened shifts (original period OR after reopen). */
+function sqlShiftRepairSalesWindow(
+  shiftId: string,
+  shift: { status: string; reopenedAt?: Date | string | null; originalEndTime?: Date | string | null },
+  shiftEndSql: ReturnType<typeof sqlShiftReportEnd>,
+) {
+  const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
+  const isReopened =
+    shift.reopenedAt &&
+    shift.originalEndTime &&
+    String(shift.status).toLowerCase() !== "closed";
+
+  if (isReopened) {
+    const reopenedSql = sql`(select reopened_at from sales_shifts where id = ${shiftId} limit 1)`;
+    const originalEndSql = sql`(select original_end_time from sales_shifts where id = ${shiftId} limit 1)`;
+    return or(
+      sqlRepairTicketInSalesWindow(shiftStartSql, originalEndSql),
+      sqlRepairTicketInSalesWindow(reopenedSql, shiftEndSql),
+    )!;
+  }
+
+  return sqlRepairTicketInSalesWindow(shiftStartSql, shiftEndSql);
 }
 
 export async function computeShiftReportForShift(shiftId: string) {
@@ -95,8 +155,9 @@ export async function computeShiftReportForShift(shiftId: string) {
     .where(and(
       inArray(orders.orderType, ["walk-in", "in-store"]),
       eq(orders.salesLocationId, salesLocationId),
-      sql`${orders.createdAt} >= ${shiftStartSql}`,
-      sql`${orders.createdAt} <= ${shiftEndSql}`,
+      orderIncludedInSalesReport,
+      sqlShiftAttributedOrders(shift),
+      sqlShiftOrderCreatedWindow(shiftId, shift, shiftEndSql),
     ));
 
   const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID
@@ -106,19 +167,7 @@ export async function computeShiftReportForShift(shiftId: string) {
       .where(
         and(
           repairTicketIncludedInSalesReport,
-          or(
-            and(
-              eq(repairTickets.paymentStatus, "paid"),
-              sql`${repairTickets.updatedAt} >= ${shiftStartSql}`,
-              sql`${repairTickets.updatedAt} <= ${shiftEndSql}`,
-            ),
-            and(
-              eq(repairTickets.status, "delivered"),
-              isNotNull(repairTickets.deliveredAt),
-              sql`${repairTickets.deliveredAt} >= ${shiftStartSql}`,
-              sql`${repairTickets.deliveredAt} <= ${shiftEndSql}`,
-            ),
-          ),
+          sqlShiftRepairSalesWindow(shiftId, shift, shiftEndSql),
         ),
       )
     : [];

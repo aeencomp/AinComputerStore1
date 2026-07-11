@@ -1,5 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { repairTicketSalesAt, repairTicketEligibleForSalesReport } from "@shared/repair-sales";
+import { orderIncludedInSalesReport } from "@shared/order-sales";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +23,7 @@ import {
   Calendar,
   Printer,
   Trash2,
+  Ban,
   CheckCheck,
   Clock,
   Truck,
@@ -47,6 +50,8 @@ interface Order {
   paymentStatus?: string;
   orderType: string | null;
   status: string;
+  voidedAt?: string;
+  voidReason?: string;
   createdAt: string;
   items: any[];
   notes?: string | null;
@@ -65,6 +70,7 @@ interface RepairTicket {
   paymentMethod?: string;
   status: string;
   updatedAt: string;
+  paidAt?: string;
   deliveredAt?: string;
   excludedFromSalesReport?: number;
 }
@@ -176,11 +182,11 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
   };
 
-  const canEditRepairSales = user.role === 'sales_admin' || user.permissions.canEditReceipt === 1;
+  const canVoidSales = user.role === 'sales_admin' || user.permissions.canEditReceipt === 1;
 
-  const excludeRepairFromReportMutation = useMutation({
+  const voidRepairMutation = useMutation({
     mutationFn: async (ticketId: string) => {
-      const res = await apiRequest('PATCH', `/api/sales/repair-tickets/${ticketId}/exclude-from-report`);
+      const res = await apiRequest('POST', `/api/sales/repair-tickets/${ticketId}/void`);
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || 'Failed');
@@ -190,7 +196,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     onSuccess: () => {
       invalidateOrderQueries();
       toast({
-        title: language === 'ar' ? 'تم إخفاء مبيعة الصيانة من التقرير' : 'Repair sale hidden from report',
+        title: language === 'ar' ? 'تم إلغاء مبيعة الصيانة' : 'Repair sale voided',
         description: language === 'ar'
           ? 'التذكرة ما زالت موجودة في بوابة الفني'
           : 'The ticket remains in the technician portal',
@@ -198,34 +204,54 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     },
     onError: (error: Error) => {
       toast({
-        title: language === 'ar' ? 'فشل الإخفاء' : 'Hide failed',
+        title: language === 'ar' ? 'فشل الإلغاء' : 'Void failed',
         description: error.message,
         variant: 'destructive',
       });
     },
   });
 
-  const confirmExcludeRepair = (ticket: RepairTicket) => {
+  const confirmVoidRepair = (ticket: RepairTicket) => {
     const msg = language === 'ar'
-      ? `إخفاء تذكرة ${ticket.ticketNumber} من تقرير المبيعات؟ (تبقى في بوابة الفني)`
-      : `Hide ticket ${ticket.ticketNumber} from sales report? (It stays in the technician portal)`;
+      ? `إلغاء مبيعة تذكرة ${ticket.ticketNumber}؟ (تبقى في بوابة الفني)`
+      : `Void repair sale ${ticket.ticketNumber}? (Stays in technician portal)`;
     if (window.confirm(msg)) {
-      excludeRepairFromReportMutation.mutate(ticket.id);
+      voidRepairMutation.mutate(ticket.id);
     }
   };
 
-  const deleteOrderMutation = useMutation({
-    mutationFn: async (id: string) => {
-      await apiRequest('DELETE', `/api/orders/${id}`);
+  const voidOrderMutation = useMutation({
+    mutationFn: async ({ id, reason }: { id: string; reason?: string }) => {
+      const res = await apiRequest('POST', `/api/sales/orders/${id}/void`, { reason });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || 'Failed');
+      }
+      return res.json();
     },
     onSuccess: () => {
       invalidateOrderQueries();
-      toast({ title: language === 'ar' ? 'تم حذف الطلب' : 'Order deleted' });
+      toast({ title: language === 'ar' ? 'تم إلغاء الطلب واسترجاع المخزون' : 'Order voided and inventory restored' });
     },
-    onError: () => {
-      toast({ title: language === 'ar' ? 'فشل الحذف' : 'Delete failed', variant: 'destructive' });
+    onError: (error: Error) => {
+      toast({
+        title: language === 'ar' ? 'فشل الإلغاء' : 'Void failed',
+        description: error.message,
+        variant: 'destructive',
+      });
     },
   });
+
+  const confirmVoidOrder = (order: Order) => {
+    const msg = language === 'ar'
+      ? `إلغاء الطلب ${order.orderNumber}؟ سيتم استرجاع المخزون وإزالته من التقارير.`
+      : `Void order ${order.orderNumber}? Inventory will be restored and removed from reports.`;
+    if (!window.confirm(msg)) return;
+    const reason = window.prompt(
+      language === 'ar' ? 'سبب الإلغاء (اختياري):' : 'Void reason (optional):',
+    ) || undefined;
+    voidOrderMutation.mutate({ id: order.id, reason });
+  };
 
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ id, status }: { id: string; status: string }) => {
@@ -260,13 +286,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       });
     },
   });
-
-  const confirmDelete = (order: Order) => {
-    const msg = language === 'ar'
-      ? `هل تريد حذف الطلب ${order.orderNumber}؟ لا يمكن التراجع عن هذا الإجراء.`
-      : `Delete order ${order.orderNumber}? This cannot be undone.`;
-    if (window.confirm(msg)) deleteOrderMutation.mutate(order.id);
-  };
 
   const parseOrderItems = (order: Order) => (order.items || []).map((item: any) => {
     if (typeof item === 'string') {
@@ -356,17 +375,19 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     return true;
   });
 
-  const totalRevenue = filteredOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
-  const orderCount = filteredOrders.length;
+  const activeOrders = filteredOrders.filter(order => orderIncludedInSalesReport(order));
+
+  const totalRevenue = activeOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
+  const orderCount = activeOrders.length;
   const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
-  const walkInOrders = filteredOrders.filter(o => o.orderType === 'walk-in').length;
-  const inStoreOrders = filteredOrders.filter(o => o.orderType === 'in-store').length;
-  const onlineOrders = filteredOrders.filter(o => o.orderType === 'online').length;
+  const walkInOrders = activeOrders.filter(o => o.orderType === 'walk-in').length;
+  const inStoreOrders = activeOrders.filter(o => o.orderType === 'in-store').length;
+  const onlineOrders = activeOrders.filter(o => o.orderType === 'online').length;
 
   const filteredRepairTickets = salesLocationId === 1 ? allRepairTickets.filter(t => {
-    if ((t as RepairTicket).excludedFromSalesReport === 1) return false;
-    if (t.paymentStatus !== 'paid' && t.paymentStatus !== 'deferred' && t.status !== 'delivered') return false;
-    const ticketDate = new Date(t.deliveredAt || t.updatedAt);
+    if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
+    const ticketDate = repairTicketSalesAt(t as RepairTicket);
+    if (!ticketDate) return false;
     const rangeStart = getDateRangeStart();
     if (dateRange !== 'all' && !isAfter(ticketDate, rangeStart)) return false;
     return true;
@@ -1044,6 +1065,11 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                             <CheckCheck className="h-3 w-3" />
                             {language === 'ar' ? 'مكتمل' : 'Completed'}
                           </Badge>
+                        ) : order.status === 'voided' ? (
+                          <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300 gap-1">
+                            <Ban className="h-3 w-3" />
+                            {language === 'ar' ? 'ملغى' : 'Voided'}
+                          </Badge>
                         ) : order.status === 'cancelled' ? (
                           <Badge variant="outline" className="text-xs bg-red-50 text-red-700 border-red-300">
                             {language === 'ar' ? 'ملغي' : 'Cancelled'}
@@ -1112,17 +1138,19 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                               <Edit3 className="w-4 h-4" />
                             </Button>
                           )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => confirmDelete(order)}
-                            disabled={deleteOrderMutation.isPending}
-                            data-testid={`button-delete-${order.id}`}
-                            title={language === 'ar' ? 'حذف الطلب' : 'Delete Order'}
-                            className="text-destructive hover:text-destructive"
-                          >
-                            {deleteOrderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
-                          </Button>
+                          {canVoidSales && order.status !== 'voided' && (
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => confirmVoidOrder(order)}
+                              disabled={voidOrderMutation.isPending}
+                              data-testid={`button-void-${order.id}`}
+                              title={language === 'ar' ? 'إلغاء الطلب' : 'Void Order'}
+                              className="text-destructive hover:text-destructive"
+                            >
+                              {voidOrderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Ban className="w-4 h-4" />}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1179,7 +1207,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                     <th className="text-end py-2 px-4 font-medium text-muted-foreground">
                       {language === 'ar' ? 'المبلغ' : 'Amount'}
                     </th>
-                    {canEditRepairSales && (
+                    {canVoidSales && (
                       <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16" />
                     )}
                   </tr>
@@ -1188,7 +1216,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                   {filteredRepairTickets.map((ticket, idx) => {
                     const amount = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
                     const isDeferred = ticket.paymentStatus === 'deferred';
-                    const ticketDate = new Date(ticket.deliveredAt || ticket.updatedAt);
+                    const ticketDate = repairTicketSalesAt(ticket) ?? new Date(ticket.updatedAt);
                     return (
                       <tr key={ticket.id} className="border-b last:border-0" data-testid={`row-repair-full-${ticket.id}`}>
                         <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
@@ -1226,21 +1254,21 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                         <td className={`py-2 px-4 text-end font-semibold ${isDeferred ? 'text-orange-600' : ''}`}>
                           {formatPrice(amount)} IQD
                         </td>
-                        {canEditRepairSales && (
+                        {canVoidSales && (
                           <td className="py-2 px-4 text-center">
                             <Button
                               size="icon"
                               variant="ghost"
-                              onClick={() => confirmExcludeRepair(ticket)}
-                              disabled={excludeRepairFromReportMutation.isPending}
-                              title={language === 'ar' ? 'إخفاء من التقرير' : 'Hide from report'}
+                              onClick={() => confirmVoidRepair(ticket)}
+                              disabled={voidRepairMutation.isPending}
+                              title={language === 'ar' ? 'إلغاء مبيعة الصيانة' : 'Void repair sale'}
                               className="text-destructive hover:text-destructive"
-                              data-testid={`button-hide-repair-${ticket.id}`}
+                              data-testid={`button-void-repair-${ticket.id}`}
                             >
-                              {excludeRepairFromReportMutation.isPending ? (
+                              {voidRepairMutation.isPending ? (
                                 <Loader2 className="w-4 h-4 animate-spin" />
                               ) : (
-                                <Trash2 className="w-4 h-4" />
+                                <Ban className="w-4 h-4" />
                               )}
                             </Button>
                           </td>
@@ -1251,7 +1279,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                 </tbody>
                 <tfoot>
                   <tr className="bg-muted/30 border-t-2 font-semibold">
-                    <td colSpan={canEditRepairSales ? 7 : 6} className="py-2 px-4">
+                    <td colSpan={canVoidSales ? 7 : 6} className="py-2 px-4">
                       {language === 'ar' ? 'المجموع' : 'Total'}
                       {repairTotalDeferred > 0 && (
                         <span className="text-xs text-orange-500 font-normal ms-2">

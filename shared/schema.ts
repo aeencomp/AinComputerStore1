@@ -274,6 +274,9 @@ export const orders = pgTable("orders", {
   salespersonId: varchar("salesperson_id"), // Admin who created walk-in order
   salesLocationId: integer("sales_location_id").notNull().default(1),
   notes: text("notes"), // Internal notes for the order
+  voidedAt: timestamp("voided_at"),
+  voidedBy: varchar("voided_by"),
+  voidReason: text("void_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -468,6 +471,8 @@ export const repairTickets = pgTable("repair_tickets", {
   isArchived: integer("is_archived").notNull().default(0),
   completedAt: timestamp("completed_at"),
   deliveredAt: timestamp("delivered_at"),
+  /** When payment was first marked paid — stable sales date (not updatedAt). */
+  paidAt: timestamp("paid_at"),
   /** When customer brought device in (intake time). */
   receivedAt: timestamp("received_at").defaultNow().notNull(),
   /** Last time we reminded technicians about pending ticket (for 2-day cadence). */
@@ -665,6 +670,10 @@ export const salesShifts = pgTable("sales_shifts", {
   notes: text("notes"),
   status: text("status").notNull().default("active"), // "active", "paused", "closed"
   salesLocationId: integer("sales_location_id").notNull().default(1),
+  /** When a closed shift was reopened for backfill sales. */
+  reopenedAt: timestamp("reopened_at"),
+  /** Original end_time preserved when shift is reopened. */
+  originalEndTime: timestamp("original_end_time"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

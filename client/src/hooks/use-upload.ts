@@ -69,6 +69,7 @@ export function useUpload(options: UseUploadOptions = {}) {
       const res = await fetch("/api/upload/image", {
         method: "POST",
         body: fd,
+        credentials: "include",
       });
 
       if (!res.ok) {

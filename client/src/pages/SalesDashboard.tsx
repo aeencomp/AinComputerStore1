@@ -182,6 +182,7 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
   const shiftStatus = String(currentShift?.status || '').toLowerCase();
   const isShiftPaused = !!currentShift && shiftStatus === 'paused';
   const isShiftActive = !!currentShift && (shiftStatus === 'active' || shiftStatus === '');
+  const isShiftReopened = !!currentShift && !!(currentShift as any).reopenedAt;
 
   const handleShiftAction = () => {
     if (shiftAction === 'start') {
@@ -304,6 +305,13 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
 
   return (
     <div className="space-y-6">
+      {isShiftReopened && (
+        <div className="rounded-lg border border-blue-300 bg-blue-50 dark:bg-blue-950/30 px-4 py-3 text-sm text-blue-800 dark:text-blue-200">
+          {language === 'ar'
+            ? 'وردية قديمة معاد فتحها — أضف المبيعات الناقصة من نقطة البيع، ثم أغلق الوردية عند الانتهاء.'
+            : 'Reopened shift — add missing sales from POS, then close the shift when done.'}
+        </div>
+      )}
       {/* Welcome Section */}
       <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-transparent rounded-xl p-6 border">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -376,7 +384,9 @@ export default function SalesDashboard({ user }: SalesDashboardProps) {
                   <Timer className="h-3.5 w-3.5" />
                   {isShiftPaused
                     ? (language === 'ar' ? 'وردية متوقفة' : 'Shift Paused')
-                    : (language === 'ar' ? 'وردية نشطة' : 'Shift Active')}
+                    : isShiftReopened
+                      ? (language === 'ar' ? 'وردية معاد فتحها' : 'Reopened Shift')
+                      : (language === 'ar' ? 'وردية نشطة' : 'Shift Active')}
                   <StopCircle className="h-3.5 w-3.5" />
                 </Button>
               </>

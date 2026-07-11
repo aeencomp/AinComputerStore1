@@ -28,6 +28,9 @@ fi
 echo "==> Build"
 npm run build
 
+mkdir -p uploads
+chmod 755 uploads
+
 echo "==> DB migrations run automatically on app startup (server/db-migrations.ts)"
 
 echo "==> Restart PM2"

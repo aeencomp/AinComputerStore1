@@ -5,6 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Upload, Link as LinkIcon, Loader2, X } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import {
+  imageFileTooLarge,
+  imageUploadLimits,
+  isAllowedImageFile,
+  isHeicFile,
+  uploadProductImage,
+} from "@/lib/imageUpload";
 
 interface ImageUploadProps {
   value: string;
@@ -25,15 +32,30 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-    if (!validTypes.includes(file.type)) {
-      setUploadError(language === 'ar' ? 'نوع الملف غير مدعوم. يرجى استخدام JPG, PNG, GIF, أو WebP' : 'Unsupported file type. Please use JPG, PNG, GIF, or WebP');
+    if (isHeicFile(file)) {
+      setUploadError(
+        language === "ar"
+          ? "صيغة HEIC غير مدعومة. احفظ الصورة كـ JPG من الهاتف ثم ارفعها"
+          : "HEIC is not supported. Save the photo as JPG on your phone, then upload",
+      );
       return;
     }
 
-    const maxSize = 5 * 1024 * 1024;
-    if (file.size > maxSize) {
-      setUploadError(language === 'ar' ? 'حجم الملف كبير جداً. الحد الأقصى 5 ميغابايت' : 'File too large. Maximum size is 5MB');
+    if (!isAllowedImageFile(file)) {
+      setUploadError(
+        language === "ar"
+          ? "نوع الملف غير مدعوم. يرجى استخدام JPG, PNG, GIF, أو WebP"
+          : "Unsupported file type. Please use JPG, PNG, GIF, or WebP",
+      );
+      return;
+    }
+
+    if (imageFileTooLarge(file)) {
+      setUploadError(
+        language === "ar"
+          ? "حجم الملف كبير جداً. الحد الأقصى 5 ميغابايت"
+          : "File too large. Maximum size is 5MB",
+      );
       return;
     }
 
@@ -41,36 +63,31 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
     setUploadError(null);
 
     try {
-      const fd = new FormData();
-      fd.append("image", file);
-
-      const res = await fetch("/api/upload/image", {
-        method: "POST",
-        body: fd,
-      });
-
-      if (!res.ok) {
-        let message = "Upload failed";
-        try {
-          const data = await res.json();
-          message = data?.error || message;
-        } catch {}
-        throw new Error(message);
-      }
-
-      const data = await res.json();
-      onChange(data.url);
+      const url = await uploadProductImage(file);
+      onChange(url);
       setActiveTab("url");
-    } catch (error: any) {
-      const errorMessage = error?.message || '';
-      if (errorMessage.includes('Unauthorized')) {
-        setUploadError(language === 'ar' ? 'غير مصرح. يرجى تسجيل الدخول مجدداً' : 'Unauthorized. Please log in again');
-      } else if (errorMessage.includes('File too large')) {
-        setUploadError(language === 'ar' ? 'حجم الملف كبير جداً. الحد الأقصى 5 ميغابايت' : 'File too large. Maximum size is 5MB');
-      } else if (errorMessage.includes('Invalid file type')) {
-        setUploadError(language === 'ar' ? 'نوع الملف غير مدعوم. يرجى استخدام JPG, PNG, GIF, أو WebP' : 'Invalid file type. Use JPG, PNG, GIF, or WebP');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "";
+      if (errorMessage.includes("Unauthorized")) {
+        setUploadError(
+          language === "ar"
+            ? "غير مصرح. يرجى تسجيل الدخول مجدداً"
+            : "Unauthorized. Please log in again",
+        );
+      } else if (errorMessage.includes("File too large")) {
+        setUploadError(
+          language === "ar"
+            ? "حجم الملف كبير جداً. الحد الأقصى 5 ميغابايت"
+            : "File too large. Maximum size is 5MB",
+        );
+      } else if (errorMessage.includes("Invalid file type")) {
+        setUploadError(
+          language === "ar"
+            ? "نوع الملف غير مدعوم. يرجى استخدام JPG, PNG, GIF, أو WebP"
+            : "Invalid file type. Use JPG, PNG, GIF, or WebP",
+        );
       } else {
-        setUploadError(language === 'ar' ? 'فشل رفع الصورة. حاول مرة أخرى' : 'Failed to upload image. Please try again');
+        setUploadError(errorMessage || (language === "ar" ? "فشل رفع الصورة. حاول مرة أخرى" : "Failed to upload image. Please try again"));
       }
     } finally {
       setIsUploading(false);
@@ -135,7 +152,7 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/jpeg,image/png,image/gif,image/webp"
+              accept={imageUploadLimits.accept}
               onChange={handleFileChange}
               onClick={(e) => e.stopPropagation()}
               className="hidden"
