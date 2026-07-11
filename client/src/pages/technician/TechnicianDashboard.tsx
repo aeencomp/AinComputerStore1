@@ -80,6 +80,22 @@ export default function TechnicianDashboard() {
     refetchInterval: 5 * 60 * 1000,
   });
 
+  const canViewDailyReport =
+    !!currentTechnician &&
+    (currentTechnician.isAdmin === 1 ||
+      (currentTechnician.permissions || []).includes("view_daily_report"));
+
+  const { data: repairShift } = useQuery<{ id: string; status: string } | null>({
+    queryKey: ["/api/technician/shifts/current"],
+    queryFn: async () => {
+      const res = await fetch("/api/technician/shifts/current", { credentials: "include" });
+      if (!res.ok) throw new Error("failed");
+      return res.json();
+    },
+    enabled: canViewDailyReport,
+    refetchInterval: 60000,
+  });
+
   const ackRemindersMutation = useMutation({
     mutationFn: async (payload: { pendingIds?: string[]; completedNotPickedIds?: string[] }) => {
       const res = await apiRequest('POST', '/api/admin/repair-tickets/reminders/ack', payload);
@@ -351,7 +367,6 @@ export default function TechnicianDashboard() {
 
   const isAdmin = currentTechnician.isAdmin === 1;
   const canViewRevenue = isAdmin || (currentTechnician.permissions || []).includes('view_revenue');
-  const canViewDailyReport = isAdmin || (currentTechnician.permissions || []).includes('view_daily_report');
 
   const filteredTickets = tickets?.filter((ticket) => {
     if (!showArchived && ticket.isArchived === 1) return false;
@@ -477,7 +492,13 @@ export default function TechnicianDashboard() {
               <Link href="/technician/daily-report">
                 <Button variant="outline" data-testid="button-technician-daily-report">
                   <BarChart3 className="h-4 w-4 me-2" />
-                  {language === 'ar' ? 'تقرير الصيانة' : 'Repair Report'}
+                  {language === 'ar'
+                    ? repairShift
+                      ? 'تقرير الصيانة · وردية مفتوحة'
+                      : 'تقرير الصيانة · فتح وردية'
+                    : repairShift
+                      ? 'Repair Report · Shift open'
+                      : 'Repair Report · Open shift'}
                 </Button>
               </Link>
             )}

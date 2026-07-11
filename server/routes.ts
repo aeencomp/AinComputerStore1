@@ -29,6 +29,11 @@ import {
 } from "./daily-revenue-report";
 import { computeRepairReport } from "./repair-report";
 import {
+  findTechnicianRepairShift,
+  startTechnicianRepairShift,
+  endTechnicianRepairShift,
+} from "./technician-shift";
+import {
   computeShiftReportForShift,
   reconcileClosedShiftRecord,
   reconcileRecentClosedShifts,
@@ -5222,6 +5227,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching technician repair report:", error);
       return res.status(500).json({ error: "فشل جلب تقرير الصيانة" });
+    }
+  });
+
+      return res.status(500).json({ error: "فشل جلب تقرير الصيانة" });
+    }
+  });
+
+  app.get("/api/technician/shifts/current", async (req, res) => {
+    try {
+      const technicianId = (req.session as any)?.technicianId as string | undefined;
+      if (!(await technicianHasRepairReportAccess(req)) || !technicianId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const shift = await findTechnicianRepairShift(technicianId, "open");
+      return res.json(shift || null);
+    } catch (error) {
+      console.error("Error fetching technician repair shift:", error);
+      return res.status(500).json({ error: "فشل جلب وردية الصيانة" });
+    }
+  });
+
+  app.get("/api/technician/shifts/active-snapshot", async (req, res) => {
+    try {
+      const technicianId = (req.session as any)?.technicianId as string | undefined;
+      if (!(await technicianHasRepairReportAccess(req)) || !technicianId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const shift = await findTechnicianRepairShift(technicianId, "open");
+      if (!shift) return res.json(null);
+      const { shift: _s, ...reportData } = await computeShiftReportForShift(shift.id);
+      return res.json({ shift, ...reportData });
+    } catch (error) {
+      console.error("Error fetching technician shift snapshot:", error);
+      return res.status(500).json({ error: "فشل جلب ملخص الوردية" });
+    }
+  });
+
+  app.post("/api/technician/shifts/start", async (req, res) => {
+    try {
+      const technicianId = (req.session as any)?.technicianId as string | undefined;
+      if (!(await technicianHasRepairReportAccess(req)) || !technicianId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const technician = await storage.getTechnician(technicianId);
+      if (!technician) return res.status(403).json({ error: "الفني غير موجود" });
+
+      const { openingCash, notes } = req.body ?? {};
+      const result = await startTechnicianRepairShift(
+        technicianId,
+        technician.displayName,
+        openingCash ?? "0",
+        notes,
+      );
+      if (!result.ok) {
+        return res.status(400).json({ error: result.error, shift: result.shift });
+      }
+      return res.json({ success: true, shift: result.shift });
+    } catch (error) {
+      console.error("Error starting technician repair shift:", error);
+      return res.status(500).json({ error: "فشل بدء وردية الصيانة" });
+    }
+  });
+
+  app.post("/api/technician/shifts/end", async (req, res) => {
+    try {
+      const technicianId = (req.session as any)?.technicianId as string | undefined;
+      if (!(await technicianHasRepairReportAccess(req)) || !technicianId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const { closingCash, notes } = req.body ?? {};
+      const result = await endTechnicianRepairShift(technicianId, closingCash ?? "0", notes);
+      if (!result.ok) {
+        return res.status(400).json({ error: result.error });
+      }
+      return res.json({ success: true, shift: result.shift });
+    } catch (error) {
+      console.error("Error ending technician repair shift:", error);
+      return res.status(500).json({ error: "فشل إنهاء وردية الصيانة" });
     }
   });
 

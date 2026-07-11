@@ -1,11 +1,32 @@
 import { useEffect, useState } from "react";
 import { useLocation, Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Loader2, ArrowLeft, Wrench, Banknote, CreditCard, Printer } from "lucide-react";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  Loader2,
+  ArrowLeft,
+  Wrench,
+  Banknote,
+  CreditCard,
+  Printer,
+  PlayCircle,
+  StopCircle,
+  Clock,
+} from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { format } from "date-fns";
 
@@ -44,6 +65,25 @@ interface RepairReportResponse {
     repairTotalDeferred: number;
     repairTotalCash: number;
     repairTotalCard: number;
+  };
+}
+
+interface RepairShift {
+  id: string;
+  salesUserName: string;
+  startTime: string;
+  openingCash: string;
+  status: string;
+}
+
+interface ShiftSnapshot {
+  summary: {
+    repairTotal: number;
+    repairTotalCash: number;
+    repairTotalCard: number;
+    repairCount: number;
+    grandTotal: number;
+    grandTotalCash: number;
   };
 }
 
@@ -168,7 +208,14 @@ function buildRepairPrintHTML(
 export default function TechnicianDailyReport() {
   const [, navigate] = useLocation();
   const { language } = useLanguage();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [selectedDate, setSelectedDate] = useState(baghdadToday());
+  const [showShiftDialog, setShowShiftDialog] = useState(false);
+  const [shiftAction, setShiftAction] = useState<"start" | "end">("start");
+  const [openingCash, setOpeningCash] = useState("");
+  const [closingCash, setClosingCash] = useState("");
+  const [shiftNotes, setShiftNotes] = useState("");
 
   const { data: technician, isLoading, error } = useQuery<Technician>({
     queryKey: ["/api/technician/auth/me"],
@@ -191,6 +238,94 @@ export default function TechnicianDailyReport() {
     },
     enabled: canViewRepairReport,
   });
+
+  const { data: currentShift } = useQuery<RepairShift | null>({
+    queryKey: ["/api/technician/shifts/current"],
+    queryFn: async () => {
+      const res = await fetch("/api/technician/shifts/current", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load shift");
+      return res.json();
+    },
+    enabled: canViewRepairReport,
+    refetchInterval: 30000,
+  });
+
+  const { data: activeSnapshot } = useQuery<ShiftSnapshot | null>({
+    queryKey: ["/api/technician/shifts/active-snapshot"],
+    queryFn: async () => {
+      const res = await fetch("/api/technician/shifts/active-snapshot", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load shift snapshot");
+      return res.json();
+    },
+    enabled: canViewRepairReport && !!currentShift,
+    refetchInterval: 30000,
+  });
+
+  const invalidateShiftQueries = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/technician/shifts/current"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/technician/shifts/active-snapshot"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/technician/repair-report"] });
+  };
+
+  const startShiftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/technician/shifts/start", {
+        openingCash: openingCash || "0",
+        notes: shiftNotes,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      return data;
+    },
+    onSuccess: () => {
+      toast({ title: language === "ar" ? "بدأت وردية الصيانة" : "Repair shift started" });
+      setShowShiftDialog(false);
+      setOpeningCash("");
+      setShiftNotes("");
+      invalidateShiftQueries();
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: "destructive" });
+    },
+  });
+
+  const endShiftMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/technician/shifts/end", {
+        closingCash: closingCash || "0",
+        notes: shiftNotes,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
+      return data;
+    },
+    onSuccess: (data: { shift?: { cashDifference?: string } }) => {
+      const diff = data.shift?.cashDifference ? parseFloat(data.shift.cashDifference) : 0;
+      toast({
+        title: language === "ar" ? "انتهت وردية الصيانة" : "Repair shift ended",
+        description:
+          diff !== 0
+            ? language === "ar"
+              ? `فرق الصندوق: ${fmtNum(diff)}`
+              : `Cash difference: ${diff.toLocaleString("en-US")} IQD`
+            : undefined,
+      });
+      setShowShiftDialog(false);
+      setClosingCash("");
+      setShiftNotes("");
+      invalidateShiftQueries();
+    },
+    onError: (err: Error) => {
+      toast({ title: err.message, variant: "destructive" });
+    },
+  });
+
+  const handleShiftAction = () => {
+    if (shiftAction === "start") startShiftMutation.mutate();
+    else endShiftMutation.mutate();
+  };
+
+  const isShiftOpen = !!currentShift;
 
   useEffect(() => {
     if (error) navigate("/technician/login");
@@ -241,6 +376,59 @@ export default function TechnicianDailyReport() {
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6 space-y-6">
+        <Card className={isShiftOpen ? "border-green-500/50 bg-green-50/50 dark:bg-green-950/20" : "border-amber-500/50 bg-amber-50/50 dark:bg-amber-950/20"}>
+          <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Clock className={`h-5 w-5 ${isShiftOpen ? "text-green-600" : "text-amber-600"}`} />
+              <div>
+                <p className="font-semibold text-sm">
+                  {isShiftOpen
+                    ? language === "ar"
+                      ? "وردية الصيانة مفتوحة"
+                      : "Repair shift open"
+                    : language === "ar"
+                      ? "وردية الصيانة مغلقة"
+                      : "Repair shift closed"}
+                </p>
+                {isShiftOpen && currentShift?.startTime && (
+                  <p className="text-xs text-muted-foreground">
+                    {language === "ar" ? "بدأت:" : "Started:"}{" "}
+                    {format(new Date(currentShift.startTime), "dd/MM/yyyy HH:mm")}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              {!isShiftOpen ? (
+                <Button
+                  className="gap-2 bg-green-600 hover:bg-green-700"
+                  onClick={() => {
+                    setShiftAction("start");
+                    setShowShiftDialog(true);
+                  }}
+                  data-testid="button-start-repair-shift"
+                >
+                  <PlayCircle className="h-4 w-4" />
+                  {language === "ar" ? "فتح الوردية" : "Open Shift"}
+                </Button>
+              ) : (
+                <Button
+                  variant="destructive"
+                  className="gap-2"
+                  onClick={() => {
+                    setShiftAction("end");
+                    setShowShiftDialog(true);
+                  }}
+                  data-testid="button-close-repair-shift"
+                >
+                  <StopCircle className="h-4 w-4" />
+                  {language === "ar" ? "إغلاق الوردية" : "Close Shift"}
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold flex items-center gap-2">
@@ -461,6 +649,111 @@ export default function TechnicianDailyReport() {
           </>
         )}
       </div>
+
+      <Dialog open={showShiftDialog} onOpenChange={setShowShiftDialog}>
+        <DialogContent className="sm:max-w-md" dir={language === "ar" ? "rtl" : "ltr"}>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {shiftAction === "start" ? (
+                <>
+                  <PlayCircle className="h-5 w-5 text-green-500" />
+                  {language === "ar" ? "فتح وردية الصيانة" : "Open Repair Shift"}
+                </>
+              ) : (
+                <>
+                  <StopCircle className="h-5 w-5 text-red-500" />
+                  {language === "ar" ? "إغلاق وردية الصيانة" : "Close Repair Shift"}
+                </>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {shiftAction === "start" ? (
+              <div className="space-y-2">
+                <Label>{language === "ar" ? "النقد الافتتاحي (د.ع)" : "Opening cash (IQD)"}</Label>
+                <Input
+                  type="number"
+                  value={openingCash}
+                  onChange={(e) => setOpeningCash(e.target.value)}
+                  placeholder={language === "ar" ? "مبلغ الصندوق" : "Drawer amount"}
+                  data-testid="input-repair-opening-cash"
+                />
+              </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label>{language === "ar" ? "النقد الختامي (د.ع)" : "Closing cash (IQD)"}</Label>
+                  <Input
+                    type="number"
+                    value={closingCash}
+                    onChange={(e) => setClosingCash(e.target.value)}
+                    placeholder={language === "ar" ? "عدّ النقد" : "Count cash"}
+                    data-testid="input-repair-closing-cash"
+                  />
+                </div>
+                {activeSnapshot?.summary && (
+                  <div className="p-3 rounded-lg bg-muted text-sm space-y-1.5">
+                    <div className="flex justify-between font-medium">
+                      <span className="text-muted-foreground">
+                        {language === "ar" ? "إجمالي الصيانة:" : "Repair total:"}
+                      </span>
+                      <span>{fmtNum(activeSnapshot.summary.repairTotal)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        {language === "ar" ? "نقداً:" : "Cash:"}
+                      </span>
+                      <span>{fmtNum(activeSnapshot.summary.repairTotalCash)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-muted-foreground">
+                        {language === "ar" ? "بطاقة:" : "Card:"}
+                      </span>
+                      <span>{fmtNum(activeSnapshot.summary.repairTotalCard)}</span>
+                    </div>
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>{language === "ar" ? "عدد التذاكر:" : "Tickets:"}</span>
+                      <span>{activeSnapshot.summary.repairCount}</span>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+            <div className="space-y-2">
+              <Label>{language === "ar" ? "ملاحظات (اختياري)" : "Notes (optional)"}</Label>
+              <Textarea
+                value={shiftNotes}
+                onChange={(e) => setShiftNotes(e.target.value)}
+                rows={2}
+                data-testid="input-repair-shift-notes"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowShiftDialog(false)}>
+              {language === "ar" ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button
+              onClick={handleShiftAction}
+              disabled={startShiftMutation.isPending || endShiftMutation.isPending}
+              className={shiftAction === "start" ? "bg-green-600 hover:bg-green-700" : ""}
+              variant={shiftAction === "end" ? "destructive" : "default"}
+              data-testid="button-confirm-repair-shift"
+            >
+              {(startShiftMutation.isPending || endShiftMutation.isPending) && (
+                <Loader2 className="h-4 w-4 animate-spin me-2" />
+              )}
+              {shiftAction === "start"
+                ? language === "ar"
+                  ? "فتح الوردية"
+                  : "Open Shift"
+                : language === "ar"
+                  ? "إغلاق الوردية"
+                  : "Close Shift"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
