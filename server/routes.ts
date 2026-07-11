@@ -24,6 +24,7 @@ import {
   computeCombinedDailyRevenue,
   formatIqdAmount,
 } from "./daily-revenue-report";
+import { computeRepairReport } from "./repair-report";
 import {
   computeShiftReportForShift,
   reconcileClosedShiftRecord,
@@ -170,7 +171,7 @@ function baghdadCalendarDateString(d: Date): string {
   return d.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
-async function technicianHasDailyReportAccess(req: Request): Promise<boolean> {
+async function technicianHasRepairReportAccess(req: Request): Promise<boolean> {
   const technicianId = (req.session as any)?.technicianId as string | undefined;
   if (!technicianId) return false;
   const technician = await storage.getTechnician(technicianId);
@@ -664,10 +665,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const salesUserRole = (req.session as any).salesUserRole as string | undefined;
     const adminId = (req.session as any).adminId;
     const isSupervisor = !!adminId || salesUserRole === "sales_admin";
-    const techDailyReport = await technicianHasDailyReportAccess(req);
     const canViewAll =
       isSupervisor ||
-      techDailyReport ||
       (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports === 1);
     return {
       salesUserId,
@@ -2433,13 +2432,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
-      const techDailyReport = await technicianHasDailyReportAccess(req);
-      if (!salesUserId && !adminId && !techDailyReport) return res.status(401).json({ error: "غير مصرح" });
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
       const canViewAll =
         isSupervisor ||
-        techDailyReport ||
         (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
       const locationId = resolveRequestLocationId(req);
@@ -2481,8 +2478,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      const techDailyReport = await technicianHasDailyReportAccess(req);
-      if (!salesUserId && !adminId && !techDailyReport) return res.status(401).json({ error: "غير مصرح" });
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
       const activeShift = await findOpenShiftForRequest(req, "open");
       if (!activeShift) return res.json(null);
@@ -2634,13 +2630,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const salesUserId = (req.session as any).salesUserId;
       const salesUserRole = (req.session as any).salesUserRole as string | undefined;
       const adminId = (req.session as any).adminId;
-      const techDailyReport = await technicianHasDailyReportAccess(req);
-      if (!salesUserId && !adminId && !techDailyReport) return res.status(401).json({ error: "غير مصرح" });
+      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
 
       const isSupervisor = !!adminId || salesUserRole === 'sales_admin';
       const canViewAll =
         isSupervisor ||
-        techDailyReport ||
         (!!salesUserId && (await storage.getSalesUser(salesUserId))?.canViewReports);
 
       const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, req.params.id));
@@ -5196,6 +5190,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching current technician:", error);
       return res.status(500).json({ error: "خطأ في جلب بيانات الفني" });
+    }
+  });
+
+  app.get("/api/technician/repair-report", async (req, res) => {
+    try {
+      if (!(await technicianHasRepairReportAccess(req))) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const dateParam = req.query.date as string | undefined;
+      const baghdadDateStr =
+        dateParam || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+
+      const report = await computeRepairReport(baghdadDateStr);
+      res.set("Cache-Control", "no-store");
+      return res.json(report);
+    } catch (error) {
+      console.error("Error fetching technician repair report:", error);
+      return res.status(500).json({ error: "فشل جلب تقرير الصيانة" });
     }
   });
 
@@ -11107,8 +11120,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const sessionSalesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      const techDailyReport = await technicianHasDailyReportAccess(req);
-      if (!sessionSalesUserId && !adminId && !techDailyReport) {
+      if (!sessionSalesUserId && !adminId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
 

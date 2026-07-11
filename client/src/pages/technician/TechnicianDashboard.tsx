@@ -477,7 +477,7 @@ export default function TechnicianDashboard() {
               <Link href="/technician/daily-report">
                 <Button variant="outline" data-testid="button-technician-daily-report">
                   <BarChart3 className="h-4 w-4 me-2" />
-                  {language === 'ar' ? 'تقرير اليوم' : 'Daily Report'}
+                  {language === 'ar' ? 'تقرير الصيانة' : 'Repair Report'}
                 </Button>
               </Link>
             )}
