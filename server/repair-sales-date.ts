@@ -40,14 +40,12 @@ export function sqlRepairTicketIncludedInStoreSales(): SQL {
   )!;
 }
 
-/** Technician portal repair payments + collections during technician shifts. */
+/** Technician portal repair payments + collections during technician shifts.
+ *  excluded_from_sales_report only hides from store reports — technician report still includes these. */
 export function sqlRepairTicketIncludedInTechnicianSales(): SQL {
-  return and(
-    eq(repairTickets.excludedFromSalesReport, 0),
-    or(
-      eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
-      sqlRepairTicketPaidDuringTechnicianShift(),
-    ),
+  return or(
+    eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
+    sqlRepairTicketPaidDuringTechnicianShift(),
   )!;
 }
 

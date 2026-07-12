@@ -2664,7 +2664,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       await db
         .update(repairTickets)
-        .set({ excludedFromSalesReport: 1 })
+        .set({
+          excludedFromSalesReport: 1,
+          repairPaymentSource: "technician",
+        })
         .where(eq(repairTickets.id, ticketId));
 
       return res.json({ success: true });

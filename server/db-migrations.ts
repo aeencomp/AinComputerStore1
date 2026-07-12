@@ -82,6 +82,12 @@ const STARTUP_MIGRATIONS: string[] = [
            AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) >= ss.start_time
            AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
        )`,
+
+  `UPDATE repair_tickets
+     SET repair_payment_source = 'technician'
+     WHERE excluded_from_sales_report = 1
+       AND repair_payment_source = 'sales'
+       AND payment_status IN ('paid', 'deferred')`,
   `UPDATE staff_advances SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
 
   `UPDATE orders SET payment_status = 'deferred'
