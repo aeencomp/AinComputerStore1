@@ -18,7 +18,8 @@ const ALLOWED_EXTENSIONS = new Set([
   ".avif",
 ]);
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_IMAGE_MB = 20;
+const MAX_IMAGE_BYTES = MAX_IMAGE_MB * 1024 * 1024;
 
 export function imageExtension(name: string): string {
   const i = name.lastIndexOf(".");
@@ -74,7 +75,12 @@ export async function uploadProductImage(
   return data.url as string;
 }
 
+export function imageMaxSizeLabel(language?: "ar" | "en"): string {
+  return language === "ar" ? `${MAX_IMAGE_MB} ميغابايت` : `${MAX_IMAGE_MB}MB`;
+}
+
 export const imageUploadLimits = {
   maxBytes: MAX_IMAGE_BYTES,
+  maxMb: MAX_IMAGE_MB,
   accept: "image/jpeg,image/png,image/gif,image/webp,image/avif,.jpg,.jpeg,.png,.gif,.webp,.avif",
 };

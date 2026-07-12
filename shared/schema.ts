@@ -544,6 +544,7 @@ export const TECHNICIAN_PERMISSIONS = {
   MANAGE_TECHNICIANS: 'manage_technicians',
   VIEW_REVENUE: 'view_revenue',
   VIEW_DAILY_REPORT: 'view_daily_report',
+  VIEW_WITHDRAWALS: 'view_withdrawals',
 } as const;
 
 export type TechnicianPermission = typeof TECHNICIAN_PERMISSIONS[keyof typeof TECHNICIAN_PERMISSIONS];

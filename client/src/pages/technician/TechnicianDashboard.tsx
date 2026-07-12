@@ -12,7 +12,7 @@ import { formatPosPaymentLabel } from '@/lib/posPayment';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing, BarChart3 } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing, BarChart3, TrendingDown } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
@@ -84,6 +84,11 @@ export default function TechnicianDashboard() {
     !!currentTechnician &&
     (currentTechnician.isAdmin === 1 ||
       (currentTechnician.permissions || []).includes("view_daily_report"));
+
+  const canViewWithdrawals =
+    !!currentTechnician &&
+    (currentTechnician.isAdmin === 1 ||
+      (currentTechnician.permissions || []).includes("view_withdrawals"));
 
   const { data: repairShift } = useQuery<{ id: string; status: string } | null>({
     queryKey: ["/api/technician/shifts/current"],
@@ -499,6 +504,14 @@ export default function TechnicianDashboard() {
                     : repairShift
                       ? 'Repair Report · Shift open'
                       : 'Repair Report · Open shift'}
+                </Button>
+              </Link>
+            )}
+            {canViewWithdrawals && (
+              <Link href="/technician/withdrawals">
+                <Button variant="outline" data-testid="button-technician-withdrawals">
+                  <TrendingDown className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'السحوبات' : 'Withdrawals'}
                 </Button>
               </Link>
             )}

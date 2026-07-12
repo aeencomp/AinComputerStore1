@@ -6,6 +6,7 @@ import { Upload, X, Loader2, Plus } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   imageFileTooLarge,
+  imageMaxSizeLabel,
   imageUploadLimits,
   isAllowedImageFile,
   isHeicFile,
@@ -67,8 +68,8 @@ export function MultiImageUpload({ values, onChange, label, maxImages = 10 }: Mu
       if (imageFileTooLarge(file)) {
         errors.push(
           language === "ar"
-            ? `${file.name}: أكبر من 5 ميغابايت`
-            : `${file.name}: larger than 5MB`,
+            ? `${file.name}: أكبر من ${imageMaxSizeLabel("ar")}`
+            : `${file.name}: larger than ${imageMaxSizeLabel("en")}`,
         );
         continue;
       }
@@ -196,8 +197,8 @@ export function MultiImageUpload({ values, onChange, label, maxImages = 10 }: Mu
                 </p>
                 <p className="text-xs text-muted-foreground">
                   {language === "ar"
-                    ? `JPG, PNG, GIF, WebP — حتى 5 ميغابايت · ${values.length}/${maxImages}`
-                    : `JPG, PNG, GIF, WebP — up to 5MB · ${values.length}/${maxImages}`}
+                    ? `JPG, PNG, GIF, WebP — حتى ${imageMaxSizeLabel("ar")} · ${values.length}/${maxImages}`
+                    : `JPG, PNG, GIF, WebP — up to ${imageMaxSizeLabel("en")} · ${values.length}/${maxImages}`}
                 </p>
               </div>
             )}

@@ -7,6 +7,7 @@ import { Upload, Link as LinkIcon, Loader2, X } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
   imageFileTooLarge,
+  imageMaxSizeLabel,
   imageUploadLimits,
   isAllowedImageFile,
   isHeicFile,
@@ -53,8 +54,8 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
     if (imageFileTooLarge(file)) {
       setUploadError(
         language === "ar"
-          ? "حجم الملف كبير جداً. الحد الأقصى 5 ميغابايت"
-          : "File too large. Maximum size is 5MB",
+          ? `حجم الملف كبير جداً. الحد الأقصى ${imageMaxSizeLabel("ar")}`
+          : `File too large. Maximum size is ${imageMaxSizeLabel("en")}`,
       );
       return;
     }
@@ -77,8 +78,8 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
       } else if (errorMessage.includes("File too large")) {
         setUploadError(
           language === "ar"
-            ? "حجم الملف كبير جداً. الحد الأقصى 5 ميغابايت"
-            : "File too large. Maximum size is 5MB",
+            ? `حجم الملف كبير جداً. الحد الأقصى ${imageMaxSizeLabel("ar")}`
+            : `File too large. Maximum size is ${imageMaxSizeLabel("en")}`,
         );
       } else if (errorMessage.includes("Invalid file type")) {
         setUploadError(
@@ -178,7 +179,9 @@ export function ImageUpload({ value, onChange, placeholder, label, required }: I
                     {language === 'ar' ? 'اضغط لاختيار صورة' : 'Click to select image'}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {language === 'ar' ? 'JPG, PNG, GIF, WebP - حتى 5 ميغابايت' : 'JPG, PNG, GIF, WebP - up to 5MB'}
+                    {language === 'ar'
+                      ? `JPG, PNG, GIF, WebP - حتى ${imageMaxSizeLabel("ar")}`
+                      : `JPG, PNG, GIF, WebP - up to ${imageMaxSizeLabel("en")}`}
                   </p>
                 </div>
               )}

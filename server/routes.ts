@@ -152,7 +152,7 @@ const imageStorage = multer.diskStorage({
 
 const imageUpload = multer({
   storage: imageStorage,
-  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  limits: { fileSize: 20 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, cb) => {
     const mime = (file.mimetype || "").toLowerCase();
     const allowedTypes = [
@@ -188,6 +188,22 @@ async function technicianHasRepairReportAccess(req: Request): Promise<boolean> {
   if (technician.isAdmin === 1) return true;
   const perms = Array.isArray(technician.permissions) ? technician.permissions as string[] : [];
   return perms.includes("view_daily_report");
+}
+
+async function technicianCanViewWithdrawals(req: Request): Promise<boolean> {
+  const technicianId = (req.session as any)?.technicianId as string | undefined;
+  if (!technicianId) return false;
+  const technician = await storage.getTechnician(technicianId);
+  if (!technician || technician.isActive !== 1) return false;
+  if (technician.isAdmin === 1) return true;
+  const perms = Array.isArray(technician.permissions) ? technician.permissions as string[] : [];
+  return perms.includes("view_withdrawals");
+}
+
+async function canAccessWithdrawals(req: Request): Promise<boolean> {
+  if ((req.session as any).adminId) return true;
+  if (await salesUserCanViewWithdrawals(req)) return true;
+  return technicianCanViewWithdrawals(req);
 }
 
 /** Case-insensitive shift status (legacy rows may use mixed case). */
@@ -776,7 +792,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (err) {
         console.error("[upload] admin image error:", err);
         if ((err as { code?: string }).code === "LIMIT_FILE_SIZE") {
-          return res.status(400).json({ error: "File too large. Maximum size is 5MB" });
+          return res.status(400).json({ error: "File too large. Maximum size is 20MB" });
         }
         if (err.message === "Invalid file type") {
           return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, WebP, or AVIF" });
@@ -809,7 +825,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (err) {
         console.error("[upload] admin image error:", err);
         if ((err as { code?: string }).code === "LIMIT_FILE_SIZE") {
-          return res.status(400).json({ error: "File too large. Maximum size is 5MB" });
+          return res.status(400).json({ error: "File too large. Maximum size is 20MB" });
         }
         if (err.message === "Invalid file type") {
           return res.status(400).json({ error: "Invalid file type. Use JPG, PNG, GIF, WebP, or AVIF" });
@@ -10738,8 +10754,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+      const technicianId = (req.session as any).technicianId;
+      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await canAccessWithdrawals(req))) {
         return res.status(403).json({ error: "ليس لديك صلاحية عرض السحوبات" });
       }
 
@@ -10755,7 +10772,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calendar day in Asia/Baghdad (avoids server-local timestamp mismatch with naive timestamps)
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
-        : (salesUserId ? resolveRequestLocationId(req) : null);
+        : (salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
 
       const dateClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr2}::date`;
       const locClause = locationId && !Number.isNaN(locationId)
@@ -10778,8 +10795,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+      const technicianId = (req.session as any).technicianId;
+      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await canAccessWithdrawals(req))) {
         return res.status(403).json({ error: "ليس لديك صلاحية عرض السحوبات" });
       }
 
@@ -10796,7 +10814,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
-        : (salesUserId ? resolveRequestLocationId(req) : null);
+        : (salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
       const employeeFilter = String(req.query.employeeName || "").trim();
 
       const dateFromClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${fromDate}::date`;
@@ -10900,8 +10918,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+      const technicianId = (req.session as any).technicianId;
+      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await canAccessWithdrawals(req))) {
         return res.status(403).json({ error: "ليس لديك صلاحية إدارة السحوبات" });
       }
 
@@ -10928,7 +10947,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const salesLocationId = b.salesLocationId != null
         ? parseInt(String(b.salesLocationId), 10)
-        : resolveRequestLocationId(req);
+        : (salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
 
       const [row] = await db
         .insert(cashWithdrawals)
@@ -10958,8 +10977,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+      const technicianId = (req.session as any).technicianId;
+      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await canAccessWithdrawals(req))) {
         return res.status(403).json({ error: "ليس لديك صلاحية تعديل السحوبات" });
       }
 
@@ -10989,8 +11009,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      if (!salesUserId && !adminId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+      const technicianId = (req.session as any).technicianId;
+      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
+      if (!adminId && !(await canAccessWithdrawals(req))) {
         return res.status(403).json({ error: "ليس لديك صلاحية حذف السحوبات" });
       }
 

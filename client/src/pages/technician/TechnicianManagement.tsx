@@ -34,6 +34,7 @@ const AVAILABLE_PERMISSIONS = [
   'manage_technicians',
   'view_revenue',
   'view_daily_report',
+  'view_withdrawals',
 ];
 
 export default function TechnicianManagement() {

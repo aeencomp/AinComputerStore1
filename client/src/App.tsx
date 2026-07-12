@@ -82,6 +82,7 @@ function Router() {
         <Route path="/technician" component={Lazy.TechnicianDashboard} />
         <Route path="/technician/manage" component={Lazy.TechnicianManagement} />
         <Route path="/technician/daily-report" component={Lazy.TechnicianDailyReport} />
+        <Route path="/technician/withdrawals" component={Lazy.TechnicianWithdrawals} />
         <Route path="/technician/tickets/:id" component={Lazy.TicketDetail} />
         <Route path="/technician/new-request" component={Lazy.NewRepairRequest} />
         <Route path="/technician/customer/:customerId" component={Lazy.CustomerProfile} />
