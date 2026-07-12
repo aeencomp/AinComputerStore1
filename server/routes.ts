@@ -4920,7 +4920,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const becomingDeferred = effectiveStatus === "deferred" && existing?.paymentStatus !== "deferred";
       const becomingDelivered =
         updateData.status === "delivered" && existing?.status !== "delivered";
-      if (technicianId && (effectiveStatus === "paid" || effectiveStatus === "deferred")) {
+      if (
+        technicianId &&
+        !salesUserId &&
+        (effectiveStatus === "paid" || effectiveStatus === "deferred")
+      ) {
         updateData.repairPaymentSource = "technician";
       } else if (
         (becomingPaid || becomingDeferred || becomingDelivered) &&

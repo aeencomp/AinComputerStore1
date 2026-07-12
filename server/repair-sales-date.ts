@@ -28,11 +28,16 @@ export function sqlRepairTicketPaidDuringTechnicianShift(): SQL {
   )`;
 }
 
-/** Store / cashier repair payments — complement of technician scope (no overlap). */
+/** Store / cashier repair payments (excludes technician portal & technician shifts). */
 export function sqlRepairTicketIncludedInStoreSales(): SQL {
   return and(
     eq(repairTickets.excludedFromSalesReport, 0),
-    sql`not (${sqlRepairTicketIncludedInTechnicianSales()})`,
+    ne(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
+    or(
+      eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_SALES),
+      isNull(repairTickets.repairPaymentSource),
+    ),
+    sql`not (${sqlRepairTicketPaidDuringTechnicianShift()})`,
   )!;
 }
 
