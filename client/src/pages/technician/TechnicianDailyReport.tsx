@@ -489,6 +489,11 @@ export default function TechnicianDailyReport() {
                 <CardContent className="pt-4">
                   <p className="text-xs text-muted-foreground">
                     {language === "ar" ? "إجمالي الصيانة" : "Repair Total"}
+                    {(summary?.totalWithdrawals ?? 0) > 0 && (
+                      <span className="block text-[10px]">
+                        {language === "ar" ? "قبل السحوبات" : "Before withdrawals"}
+                      </span>
+                    )}
                   </p>
                   <p className="text-lg font-bold text-blue-600">{fmtNum(summary?.repairTotal ?? 0)}</p>
                 </CardContent>
@@ -539,6 +544,9 @@ export default function TechnicianDailyReport() {
                   <CardContent className="pt-4">
                     <p className="text-xs text-muted-foreground">
                       {language === "ar" ? "الصافي" : "Net"}
+                      <span className="block text-[10px]">
+                        {language === "ar" ? "بعد السحوبات" : "After withdrawals"}
+                      </span>
                     </p>
                     <p className="text-lg font-bold">{fmtNum(summary?.netTotal ?? 0)}</p>
                   </CardContent>
