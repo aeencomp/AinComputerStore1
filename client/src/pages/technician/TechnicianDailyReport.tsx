@@ -59,12 +59,22 @@ interface RepairSale {
 interface RepairReportResponse {
   date: string;
   repairSales: RepairSale[];
+  withdrawals?: Array<{
+    id: number;
+    amount: string;
+    reason: string | null;
+    employeeName: string;
+    createdAt: string;
+  }>;
   summary: {
     repairCount: number;
     repairTotal: number;
     repairTotalDeferred: number;
     repairTotalCash: number;
     repairTotalCard: number;
+    totalWithdrawals: number;
+    withdrawalCount: number;
+    netTotal: number;
   };
 }
 
@@ -84,7 +94,10 @@ interface ShiftSnapshot {
     repairCount: number;
     grandTotal: number;
     grandTotalCash: number;
+    totalWithdrawals?: number;
+    netTotal?: number;
   };
+  withdrawals?: Array<{ id: number; amount: string; employeeName: string; reason: string | null }>;
 }
 
 function baghdadToday(): string {
@@ -181,6 +194,11 @@ function buildRepairPrintHTML(
     <div class="summary-box"><div class="label">بطاقة</div><div class="value">${fmtNum(summary.repairTotalCard)}</div></div>
     <div class="summary-box"><div class="label">عدد السجلات</div><div class="value">${summary.repairCount}</div></div>
   </div>
+  ${summary.totalWithdrawals > 0 ? `
+  <div class="summary-grid" style="grid-template-columns:1fr 1fr">
+    <div class="summary-box"><div class="label">السحوبات (${summary.withdrawalCount})</div><div class="value" style="color:#c2410c">- ${fmtNum(summary.totalWithdrawals)}</div></div>
+    <div class="summary-box"><div class="label">الصافي</div><div class="value" style="color:#111">${fmtNum(summary.netTotal)}</div></div>
+  </div>` : ""}
   <div class="section-title">مدفوعات التصليح (${repairSales.length})</div>
   ${
     repairSales.length === 0
@@ -347,6 +365,7 @@ export default function TechnicianDailyReport() {
 
   const summary = report?.summary;
   const repairSales = report?.repairSales ?? [];
+  const withdrawals = report?.withdrawals ?? [];
 
   const dateLabel = report?.date
     ? format(new Date(report.date), "dd/MM/yyyy")
@@ -501,6 +520,66 @@ export default function TechnicianDailyReport() {
                 </CardContent>
               </Card>
             </div>
+
+            {(summary?.totalWithdrawals ?? 0) > 0 && (
+              <div className="grid grid-cols-2 gap-4">
+                <Card>
+                  <CardContent className="pt-4">
+                    <p className="text-xs text-muted-foreground">
+                      {language === "ar"
+                        ? `السحوبات (${summary?.withdrawalCount ?? 0})`
+                        : `Withdrawals (${summary?.withdrawalCount ?? 0})`}
+                    </p>
+                    <p className="text-lg font-bold text-orange-600">
+                      − {fmtNum(summary?.totalWithdrawals ?? 0)}
+                    </p>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-4">
+                    <p className="text-xs text-muted-foreground">
+                      {language === "ar" ? "الصافي" : "Net"}
+                    </p>
+                    <p className="text-lg font-bold">{fmtNum(summary?.netTotal ?? 0)}</p>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {withdrawals.length > 0 && (
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base">
+                    {language === "ar" ? "السحوبات" : "Withdrawals"}
+                    <Badge variant="secondary" className="ms-2">{withdrawals.length}</Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b bg-muted/50">
+                          <th className="text-start py-2 px-4">{language === "ar" ? "الموظف" : "Employee"}</th>
+                          <th className="text-start py-2 px-4">{language === "ar" ? "السبب" : "Reason"}</th>
+                          <th className="text-end py-2 px-4">{language === "ar" ? "المبلغ" : "Amount"}</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {withdrawals.map((w) => (
+                          <tr key={w.id} className="border-b">
+                            <td className="py-2 px-4">{w.employeeName}</td>
+                            <td className="py-2 px-4 text-muted-foreground">{w.reason || "—"}</td>
+                            <td className="py-2 px-4 text-end text-orange-600 font-medium">
+                              − {fmtNum(parseFloat(w.amount))}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             <Card>
               <CardHeader className="pb-3">
@@ -715,6 +794,24 @@ export default function TechnicianDailyReport() {
                       <span>{language === "ar" ? "عدد التذاكر:" : "Tickets:"}</span>
                       <span>{activeSnapshot.summary.repairCount}</span>
                     </div>
+                    {(activeSnapshot.summary.totalWithdrawals ?? 0) > 0 && (
+                      <>
+                        <div className="flex justify-between text-xs">
+                          <span className="text-muted-foreground">
+                            {language === "ar" ? "السحوبات:" : "Withdrawals:"}
+                          </span>
+                          <span className="text-orange-600">
+                            − {fmtNum(activeSnapshot.summary.totalWithdrawals ?? 0)}
+                          </span>
+                        </div>
+                        <div className="flex justify-between font-medium">
+                          <span className="text-muted-foreground">
+                            {language === "ar" ? "الصافي:" : "Net:"}
+                          </span>
+                          <span>{fmtNum(activeSnapshot.summary.netTotal ?? 0)}</span>
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
               </>

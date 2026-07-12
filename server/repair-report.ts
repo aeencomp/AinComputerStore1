@@ -1,18 +1,21 @@
 import { db } from "./db";
-import { repairTickets, salesShifts } from "@shared/schema";
+import { cashWithdrawals, repairTickets, salesShifts } from "@shared/schema";
 import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
 import { LOCATION_MAIN_ID } from "./sales-locations";
 import {
   fetchShiftReportEndTime,
   reconcileClosedShiftRecord,
-  repairTicketIncludedInSalesReport,
 } from "./shift-report";
 import { repairCashAmount, repairCardAmount } from "./order-payment";
-import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
+import {
+  sqlRepairTicketInSalesWindow,
+  sqlRepairTicketIncludedInTechnicianSales,
+} from "./repair-sales-date";
 import {
   sqlBaghdadDayStart,
   sqlBaghdadRepairEndBound,
 } from "./daily-revenue-report";
+import { WITHDRAWAL_SOURCE_TECHNICIAN } from "@shared/schema";
 
 export type RepairReportSummary = {
   repairCount: number;
@@ -20,9 +23,12 @@ export type RepairReportSummary = {
   repairTotalDeferred: number;
   repairTotalCash: number;
   repairTotalCard: number;
+  totalWithdrawals: number;
+  withdrawalCount: number;
+  netTotal: number;
 };
 
-/** Repair payments only — shift-aware Baghdad day (matches daily report repair section). */
+/** Technician-portal repair payments only — shift-aware Baghdad day. */
 export async function computeRepairReport(baghdadDateStr: string) {
   const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
   const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
@@ -33,6 +39,7 @@ export async function computeRepairReport(baghdadDateStr: string) {
     .where(
       and(
         eq(salesShifts.salesLocationId, LOCATION_MAIN_ID),
+        sql`${salesShifts.salesUserId} like 'tech:%'`,
         gte(salesShifts.startTime, startOfDay),
         lte(salesShifts.startTime, endOfDay),
       ),
@@ -76,10 +83,22 @@ export async function computeRepairReport(baghdadDateStr: string) {
     .from(repairTickets)
     .where(
       and(
-        repairTicketIncludedInSalesReport,
+        sqlRepairTicketIncludedInTechnicianSales(),
         sqlRepairTicketInSalesWindow(dayStartSql, repairEndSql),
       ),
     );
+
+  const dailyWithdrawals = await db
+    .select()
+    .from(cashWithdrawals)
+    .where(
+      and(
+        eq(cashWithdrawals.source, WITHDRAWAL_SOURCE_TECHNICIAN),
+        eq(cashWithdrawals.salesLocationId, LOCATION_MAIN_ID),
+        sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr}::date`,
+      ),
+    )
+    .orderBy(desc(cashWithdrawals.createdAt));
 
   const repairTotalDeferred = paidRepairTickets
     .filter((t) => t.paymentStatus === "deferred")
@@ -89,16 +108,21 @@ export async function computeRepairReport(baghdadDateStr: string) {
     .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
   const repairTotalCash = paidRepairTickets.reduce((sum, t) => sum + repairCashAmount(t), 0);
   const repairTotalCard = paidRepairTickets.reduce((sum, t) => sum + repairCardAmount(t), 0);
+  const totalWithdrawals = dailyWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
 
   return {
     date: startOfDay.toISOString(),
     repairSales: paidRepairTickets,
+    withdrawals: dailyWithdrawals,
     summary: {
       repairCount: paidRepairTickets.filter((t) => t.paymentStatus !== "deferred").length,
       repairTotal,
       repairTotalDeferred,
       repairTotalCash,
       repairTotalCard,
+      totalWithdrawals,
+      withdrawalCount: dailyWithdrawals.length,
+      netTotal: repairTotal - totalWithdrawals,
     } satisfies RepairReportSummary,
   };
 }

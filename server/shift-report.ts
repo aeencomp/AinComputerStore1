@@ -18,7 +18,12 @@ import {
   repairCashAmount,
   repairCardAmount,
 } from "./order-payment";
-import { sqlRepairTicketInSalesWindow, sqlMaxRepairSalesAtOnShiftDay } from "./repair-sales-date";
+import {
+  sqlRepairTicketInSalesWindow,
+  sqlMaxRepairSalesAtOnShiftDay,
+  sqlRepairTicketIncludedInStoreSales,
+  sqlRepairTicketIncludedInTechnicianSales,
+} from "./repair-sales-date";
 
 /** Orders hidden from sales/shift reports (voided or cancelled). */
 export const orderIncludedInSalesReport = and(
@@ -27,7 +32,11 @@ export const orderIncludedInSalesReport = and(
 );
 
 /** Repair tickets hidden from sales/shift reports only (technician records unchanged). */
-export const repairTicketIncludedInSalesReport = eq(repairTickets.excludedFromSalesReport, 0);
+export const repairTicketIncludedInSalesReport = sqlRepairTicketIncludedInStoreSales();
+
+export function isTechnicianShiftOwnerId(salesUserId: string | null | undefined): boolean {
+  return String(salesUserId ?? "").startsWith("tech:");
+}
 
 
 function sqlBaghdadDayEnd(dateStr: string) {
@@ -145,20 +154,27 @@ export async function computeShiftReportForShift(shiftId: string) {
     throw new Error("الوردية غير موجودة");
   }
 
+  const isTechnicianShift = isTechnicianShiftOwnerId(shift.salesUserId);
   const salesLocationId = shift.salesLocationId ?? LOCATION_MAIN_ID;
   const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
   const shiftEndSql = sqlShiftReportEnd(shiftId, shift);
+  const repairScope = isTechnicianShift
+    ? sqlRepairTicketIncludedInTechnicianSales()
+    : sqlRepairTicketIncludedInStoreSales();
+  const withdrawalSource = isTechnicianShift ? "technician" : "sales";
 
-  const inStoreOrders = await db
-    .select()
-    .from(orders)
-    .where(and(
-      inArray(orders.orderType, ["walk-in", "in-store"]),
-      eq(orders.salesLocationId, salesLocationId),
-      orderIncludedInSalesReport,
-      sqlShiftAttributedOrders(shift),
-      sqlShiftOrderCreatedWindow(shiftId, shift, shiftEndSql),
-    ));
+  const inStoreOrders = isTechnicianShift
+    ? []
+    : await db
+      .select()
+      .from(orders)
+      .where(and(
+        inArray(orders.orderType, ["walk-in", "in-store"]),
+        eq(orders.salesLocationId, salesLocationId),
+        orderIncludedInSalesReport,
+        sqlShiftAttributedOrders(shift),
+        sqlShiftOrderCreatedWindow(shiftId, shift, shiftEndSql),
+      ));
 
   const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID
     ? await db
@@ -166,7 +182,7 @@ export async function computeShiftReportForShift(shiftId: string) {
       .from(repairTickets)
       .where(
         and(
-          repairTicketIncludedInSalesReport,
+          repairScope,
           sqlShiftRepairSalesWindow(shiftId, shift, shiftEndSql),
         ),
       )
@@ -176,22 +192,24 @@ export async function computeShiftReportForShift(shiftId: string) {
     .select()
     .from(cashWithdrawals)
     .where(and(
-      eq(cashWithdrawals.source, "sales"),
+      eq(cashWithdrawals.source, withdrawalSource),
       eq(cashWithdrawals.salesLocationId, salesLocationId),
       sql`${cashWithdrawals.createdAt} >= ${shiftStartSql}`,
       sql`${cashWithdrawals.createdAt} <= ${shiftEndSql}`,
     ))
     .orderBy(desc(cashWithdrawals.createdAt));
 
-  const dailyAdvances = await db
-    .select()
-    .from(staffAdvances)
-    .where(and(
-      eq(staffAdvances.salesLocationId, salesLocationId),
-      sql`${staffAdvances.createdAt} >= ${shiftStartSql}`,
-      sql`${staffAdvances.createdAt} <= ${shiftEndSql}`,
-    ))
-    .orderBy(desc(staffAdvances.createdAt));
+  const dailyAdvances = isTechnicianShift
+    ? []
+    : await db
+      .select()
+      .from(staffAdvances)
+      .where(and(
+        eq(staffAdvances.salesLocationId, salesLocationId),
+        sql`${staffAdvances.createdAt} >= ${shiftStartSql}`,
+        sql`${staffAdvances.createdAt} <= ${shiftEndSql}`,
+      ))
+      .orderBy(desc(staffAdvances.createdAt));
 
   const inStoreTotalCash = inStoreOrders.reduce((s, o) => s + orderCashAmount(o), 0);
   const inStoreTotalCard = inStoreOrders.reduce((s, o) => s + orderCardAmount(o), 0);

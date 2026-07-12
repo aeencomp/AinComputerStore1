@@ -130,6 +130,7 @@ export async function computeDailyReportForApi(
       .where(
         and(
           eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.salesUserId} not like 'tech:%'`,
           sql`${salesShifts.startTime} >= ${dayStartSql}`,
           sql`${salesShifts.startTime} <= ${dayEndSql}`,
         ),
@@ -143,6 +144,7 @@ export async function computeDailyReportForApi(
       .where(
         and(
           eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.salesUserId} not like 'tech:%'`,
           sql`${salesShifts.startTime} < ${dayStartSql}`,
           or(
             sql`${salesShifts.endTime} is null`,
@@ -206,6 +208,7 @@ export async function computeDailyReportForApi(
       .where(
         and(
           eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.salesUserId} not like 'tech:%'`,
           sql`${salesShifts.startTime} <= ${dayEndSql}`,
           or(
             sql`${salesShifts.endTime} is null`,

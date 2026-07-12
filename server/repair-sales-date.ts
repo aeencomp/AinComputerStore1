@@ -1,5 +1,27 @@
 import { repairTickets } from "@shared/schema";
-import { sql, and, or, eq, isNotNull, ne, type SQL } from "drizzle-orm";
+import { sql, and, or, eq, isNotNull, ne, isNull, type SQL } from "drizzle-orm";
+
+export const REPAIR_PAYMENT_SOURCE_SALES = "sales" as const;
+export const REPAIR_PAYMENT_SOURCE_TECHNICIAN = "technician" as const;
+
+/** Store / cashier repair payments (excludes technician portal). */
+export function sqlRepairTicketIncludedInStoreSales(): SQL {
+  return and(
+    eq(repairTickets.excludedFromSalesReport, 0),
+    or(
+      eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_SALES),
+      isNull(repairTickets.repairPaymentSource),
+    ),
+  )!;
+}
+
+/** Technician portal repair payments only. */
+export function sqlRepairTicketIncludedInTechnicianSales(): SQL {
+  return and(
+    eq(repairTickets.excludedFromSalesReport, 0),
+    eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
+  )!;
+}
 
 /** SQL expression: stable timestamp when a repair counts in sales (not updatedAt for delivered). */
 export function sqlRepairTicketSalesAt() {
@@ -52,6 +74,7 @@ export function sqlMaxRepairSalesAtOnShiftDay(
   return sql`(
     select max(${salesAt}) from repair_tickets rt
     where coalesce(rt.excluded_from_sales_report, 0) = 0
+      and coalesce(rt.repair_payment_source, 'sales') = 'sales'
       and (
         (rt.payment_status = 'paid' and rt.status <> 'delivered')
         or (rt.status = 'delivered' and (rt.delivered_at is not null or rt.paid_at is not null))

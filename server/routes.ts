@@ -4880,6 +4880,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) {
         updateData.deliveredAt = updateData.paidAt ?? (await baghdadNow());
       }
+
+      const technicianId = (req.session as any).technicianId as string | undefined;
+      const salesUserId = (req.session as any).salesUserId as string | undefined;
+      const paymentTagged =
+        updateData.paymentStatus === "paid" ||
+        updateData.paymentStatus === "deferred" ||
+        (updateData.status === "delivered" && effectiveStatus === "paid");
+      const paymentWasUntagged =
+        existing?.repairPaymentSource == null ||
+        existing?.repairPaymentSource === "sales";
+      if (paymentTagged && paymentWasUntagged) {
+        if (technicianId && !salesUserId) {
+          updateData.repairPaymentSource = "technician";
+        } else if (salesUserId || (req.session as any).adminId) {
+          updateData.repairPaymentSource = "sales";
+        }
+      }
+
       if (effectiveMethod === "split" && effectiveStatus === "paid") {
         const amount = parseFloat(
           String(
@@ -11282,6 +11300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const shiftsOnDate = await db.select().from(salesShifts)
         .where(and(
           eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.salesUserId} not like 'tech:%'`,
           gte(salesShifts.startTime, startOfDay),
           lte(salesShifts.startTime, endOfDay),
         ))

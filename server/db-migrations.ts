@@ -67,6 +67,20 @@ const STARTUP_MIGRATIONS: string[] = [
 
   `ALTER TABLE cash_withdrawals ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'sales'`,
   `UPDATE cash_withdrawals SET source = 'sales' WHERE source IS NULL OR trim(source) = ''`,
+
+  `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS repair_payment_source TEXT NOT NULL DEFAULT 'sales'`,
+  `UPDATE repair_tickets SET repair_payment_source = 'sales' WHERE repair_payment_source IS NULL OR trim(repair_payment_source) = ''`,
+  `UPDATE repair_tickets rt
+     SET repair_payment_source = 'technician'
+     WHERE rt.repair_payment_source = 'sales'
+       AND rt.payment_status IN ('paid', 'deferred')
+       AND EXISTS (
+         SELECT 1 FROM sales_shifts ss
+         WHERE ss.sales_user_id LIKE 'tech:%'
+           AND ss.sales_location_id = 1
+           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) >= ss.start_time
+           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
+       )`,
   `UPDATE staff_advances SET sales_location_id = 1 WHERE sales_location_id IS NULL`,
 
   `UPDATE orders SET payment_status = 'deferred'
