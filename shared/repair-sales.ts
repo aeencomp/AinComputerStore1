@@ -1,3 +1,6 @@
+export const REPAIR_PAYMENT_SOURCE_SALES = "sales" as const;
+export const REPAIR_PAYMENT_SOURCE_TECHNICIAN = "technician" as const;
+
 /** Fields needed to determine when a repair ticket counts in sales reports. */
 export type RepairSalesDateFields = {
   status: string;
@@ -40,10 +43,21 @@ export function repairTicketEligibleForSalesReport(ticket: {
   status: string;
   paymentStatus?: string | null;
   excludedFromSalesReport?: number | null;
+  repairPaymentSource?: string | null;
 }): boolean {
-  if (ticket.excludedFromSalesReport === 1) return false;
+  if (!repairTicketIncludedInStoreSalesReport(ticket)) return false;
   if (ticket.status === "delivered") return true;
   if (ticket.paymentStatus === "paid") return true;
   if (ticket.paymentStatus === "deferred") return true;
   return false;
+}
+
+/** Store / cashier reports only — excludes technician portal repair payments. */
+export function repairTicketIncludedInStoreSalesReport(ticket: {
+  excludedFromSalesReport?: number | null;
+  repairPaymentSource?: string | null;
+}): boolean {
+  if (ticket.excludedFromSalesReport === 1) return false;
+  if (ticket.repairPaymentSource === REPAIR_PAYMENT_SOURCE_TECHNICIAN) return false;
+  return true;
 }

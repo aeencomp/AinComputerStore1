@@ -1,5 +1,5 @@
 import { repairTickets } from "@shared/schema";
-import { sql, and, or, eq, isNotNull, ne, isNull, type SQL } from "drizzle-orm";
+import { sql, and, or, eq, ne, isNotNull, isNull, type SQL } from "drizzle-orm";
 
 export const REPAIR_PAYMENT_SOURCE_SALES = "sales" as const;
 export const REPAIR_PAYMENT_SOURCE_TECHNICIAN = "technician" as const;
@@ -32,6 +32,7 @@ export function sqlRepairTicketPaidDuringTechnicianShift(): SQL {
 export function sqlRepairTicketIncludedInStoreSales(): SQL {
   return and(
     eq(repairTickets.excludedFromSalesReport, 0),
+    ne(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
     or(
       eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_SALES),
       isNull(repairTickets.repairPaymentSource),
@@ -48,12 +49,9 @@ export function sqlRepairTicketIncludedInTechnicianSales(): SQL {
   )!;
 }
 
-/** Technician daily calendar report — all repair payments for the day (pre-separation scope). */
+/** Technician daily calendar report (same scope as shift technician repairs). */
 export function sqlRepairTicketIncludedInTechnicianDailyReport(): SQL {
-  return or(
-    eq(repairTickets.excludedFromSalesReport, 0),
-    eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
-  )!;
+  return sqlRepairTicketIncludedInTechnicianSales();
 }
 
 /** SQL expression: stable timestamp when a repair counts in sales (not updatedAt for delivered). */

@@ -28,7 +28,7 @@ export type RepairReportSummary = {
   netTotal: number;
 };
 
-/** Technician daily repair report — all calendar-day payments; withdrawals stay technician-only. */
+/** Technician daily repair report — technician payments only; withdrawals stay technician-only. */
 export async function computeRepairReport(baghdadDateStr: string) {
   const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
   const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
@@ -39,6 +39,7 @@ export async function computeRepairReport(baghdadDateStr: string) {
     .where(
       and(
         eq(salesShifts.salesLocationId, LOCATION_MAIN_ID),
+        sql`${salesShifts.salesUserId} like 'tech:%'`,
         gte(salesShifts.startTime, startOfDay),
         lte(salesShifts.startTime, endOfDay),
       ),
