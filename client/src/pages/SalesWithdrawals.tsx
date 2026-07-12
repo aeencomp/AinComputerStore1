@@ -98,6 +98,21 @@ export default function SalesWithdrawals({ user, apiBase = "/api/instore/withdra
   const { language, isRTL } = useLanguage();
   const { toast } = useToast();
   const reportApi = `${apiBase}/report-by-employee`;
+  const isTechnicianWithdrawals = apiBase.includes("/technician/");
+
+  const invalidateReportQueries = () => {
+    queryClient.invalidateQueries({ queryKey: [apiBase] });
+    queryClient.invalidateQueries({ queryKey: [reportApi] });
+    if (isTechnicianWithdrawals) {
+      queryClient.invalidateQueries({ queryKey: ["/api/technician/repair-report"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/technician/shifts/active-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/technician/shifts/current"] });
+    } else {
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+    }
+  };
 
   const canViewWithdrawals =
     user.role === 'sales_admin' || user.permissions.canViewWithdrawals === 1;
@@ -181,13 +196,7 @@ export default function SalesWithdrawals({ user, apiBase = "/api/instore/withdra
           return [row, ...list];
         },
       );
-      queryClient.invalidateQueries({ queryKey: [apiBase] });
-      queryClient.invalidateQueries({
-        queryKey: [reportApi],
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+      invalidateReportQueries();
       setAmount("");
       setReason("");
       toast({
@@ -208,13 +217,7 @@ export default function SalesWithdrawals({ user, apiBase = "/api/instore/withdra
     mutationFn: ({ id, data }: { id: number; data: { amount: string; reason: string; employeeName: string } }) =>
       apiRequest("PATCH", `${apiBase}/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [apiBase] });
-      queryClient.invalidateQueries({
-        queryKey: [reportApi],
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+      invalidateReportQueries();
       setEditingId(null);
       toast({
         title: language === "ar" ? "تم التعديل" : "Updated",
@@ -234,13 +237,7 @@ export default function SalesWithdrawals({ user, apiBase = "/api/instore/withdra
     mutationFn: (id: number) =>
       apiRequest("DELETE", `${apiBase}/${id}`).then(r => r.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: [apiBase] });
-      queryClient.invalidateQueries({
-        queryKey: [reportApi],
-      });
-      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+      invalidateReportQueries();
       toast({ title: language === "ar" ? "تم الحذف" : "Deleted" });
     },
   });

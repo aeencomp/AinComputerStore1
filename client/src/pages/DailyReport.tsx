@@ -597,12 +597,13 @@ function mergeTodayRepairSales(
   const advancesTotal = base.summary.advancesTotal ?? 0;
   const repairTotal = daily.summary.repairTotal ?? 0;
   const inStoreTotal = base.summary.inStoreTotal ?? 0;
-  const totalWithdrawals = base.summary.totalWithdrawals ?? 0;
+  const totalWithdrawals = daily.summary.totalWithdrawals ?? 0;
   const grandTotal = inStoreTotal + repairTotal + advancesTotal;
 
   return {
     ...base,
     repairSales: daily.repairSales,
+    withdrawals: daily.withdrawals ?? [],
     summary: {
       ...base.summary,
       repairCount: daily.summary.repairCount ?? 0,
@@ -610,6 +611,8 @@ function mergeTodayRepairSales(
       repairTotalCash: daily.summary.repairTotalCash ?? 0,
       repairTotalCard: daily.summary.repairTotalCard ?? 0,
       repairTotalDeferred: daily.summary.repairTotalDeferred ?? 0,
+      totalWithdrawals,
+      withdrawalCount: daily.summary.withdrawalCount ?? 0,
       grandTotal,
       grandTotalCash: (base.summary.inStoreTotalCash ?? 0) + (daily.summary.repairTotalCash ?? 0),
       grandTotalCard: (base.summary.inStoreTotalCard ?? 0) + (daily.summary.repairTotalCard ?? 0),
