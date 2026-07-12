@@ -60,6 +60,7 @@ export default function TechnicianWithdrawals() {
       </div>
       <div className="max-w-5xl mx-auto px-4 py-6">
         <SalesWithdrawals
+          apiBase="/api/technician/withdrawals"
           user={{
             name: technician.displayName,
             username: technician.username,

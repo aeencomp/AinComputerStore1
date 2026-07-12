@@ -76,6 +76,8 @@ interface SalesWithdrawalsProps {
       canViewWithdrawals: number;
     };
   };
+  /** Defaults to sales portal withdrawals API */
+  apiBase?: string;
 }
 
 function describeApiError(err: Error): string {
@@ -92,9 +94,10 @@ function describeApiError(err: Error): string {
   return raw;
 }
 
-export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
+export default function SalesWithdrawals({ user, apiBase = "/api/instore/withdrawals" }: SalesWithdrawalsProps) {
   const { language, isRTL } = useLanguage();
   const { toast } = useToast();
+  const reportApi = `${apiBase}/report-by-employee`;
 
   const canViewWithdrawals =
     user.role === 'sales_admin' || user.permissions.canViewWithdrawals === 1;
@@ -126,7 +129,7 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   const [editEmployee, setEditEmployee] = useState("");
 
   const reportQueryKey = [
-    "/api/instore/withdrawals/report-by-employee",
+    reportApi,
     reportFrom,
     reportTo,
     reportEmployee,
@@ -137,7 +140,7 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
     queryFn: async () => {
       const params = new URLSearchParams({ from: reportFrom, to: reportTo });
       if (reportEmployee !== "all") params.set("employeeName", reportEmployee);
-      const r = await fetch(`/api/instore/withdrawals/report-by-employee?${params}`, {
+      const r = await fetch(`${reportApi}?${params}`, {
         credentials: "include",
       });
       if (!r.ok) {
@@ -150,9 +153,9 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
   });
 
   const { data: withdrawals = [], isLoading } = useQuery<CashWithdrawal[]>({
-    queryKey: ["/api/instore/withdrawals", selectedDate],
+    queryKey: [apiBase, selectedDate],
     queryFn: async () => {
-      const r = await fetch(`/api/instore/withdrawals?date=${selectedDate}`, {
+      const r = await fetch(`${apiBase}?date=${selectedDate}`, {
         credentials: "include",
       });
       if (!r.ok) {
@@ -165,22 +168,22 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
 
   const addMutation = useMutation({
     mutationFn: async (data: { amount: string; reason: string; employeeName: string }) => {
-      const res = await apiRequest("POST", "/api/instore/withdrawals", data);
+      const res = await apiRequest("POST", apiBase, data);
       return res.json() as Promise<CashWithdrawal>;
     },
     onSuccess: (row) => {
       const dateKey = selectedDate;
       queryClient.setQueryData<CashWithdrawal[]>(
-        ["/api/instore/withdrawals", dateKey],
+        [apiBase, dateKey],
         (prev) => {
           const list = prev ?? [];
           if (list.some((w) => w.id === row.id)) return list;
           return [row, ...list];
         },
       );
-      queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: [apiBase] });
       queryClient.invalidateQueries({
-        queryKey: ["/api/instore/withdrawals/report-by-employee"],
+        queryKey: [reportApi],
       });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
@@ -203,11 +206,11 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
 
   const editMutation = useMutation({
     mutationFn: ({ id, data }: { id: number; data: { amount: string; reason: string; employeeName: string } }) =>
-      apiRequest("PATCH", `/api/instore/withdrawals/${id}`, data),
+      apiRequest("PATCH", `${apiBase}/${id}`, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: [apiBase] });
       queryClient.invalidateQueries({
-        queryKey: ["/api/instore/withdrawals/report-by-employee"],
+        queryKey: [reportApi],
       });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
@@ -229,11 +232,11 @@ export default function SalesWithdrawals({ user }: SalesWithdrawalsProps) {
 
   const deleteMutation = useMutation({
     mutationFn: (id: number) =>
-      apiRequest("DELETE", `/api/instore/withdrawals/${id}`).then(r => r.json()),
+      apiRequest("DELETE", `${apiBase}/${id}`).then(r => r.json()),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/instore/withdrawals"] });
+      queryClient.invalidateQueries({ queryKey: [apiBase] });
       queryClient.invalidateQueries({
-        queryKey: ["/api/instore/withdrawals/report-by-employee"],
+        queryKey: [reportApi],
       });
       queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
       queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });

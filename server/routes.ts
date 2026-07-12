@@ -207,11 +207,31 @@ async function canAccessWithdrawals(req: Request): Promise<boolean> {
 }
 
 function withdrawalSourceForRequest(req: Request): "sales" | "technician" {
-  const technicianId = (req.session as any).technicianId as string | undefined;
+  const url = String(req.originalUrl || req.url || "");
+  if (url.includes("/api/technician/withdrawals")) return "technician";
+  return "sales";
+}
+
+async function assertWithdrawalAccess(req: Request, res: Response): Promise<boolean> {
+  const source = withdrawalSourceForRequest(req);
+  if (source === "technician") {
+    if (!(await technicianCanViewWithdrawals(req))) {
+      res.status(401).json({ error: "غير مصرح" });
+      return false;
+    }
+    return true;
+  }
   const salesUserId = (req.session as any).salesUserId as string | undefined;
   const adminId = (req.session as any).adminId as string | undefined;
-  if (technicianId && !salesUserId && !adminId) return "technician";
-  return "sales";
+  if (!salesUserId && !adminId) {
+    res.status(401).json({ error: "غير مصرح" });
+    return false;
+  }
+  if (!adminId && !(await salesUserCanViewWithdrawals(req))) {
+    res.status(403).json({ error: "ليس لديك صلاحية عرض السحوبات" });
+    return false;
+  }
+  return true;
 }
 
 /** Case-insensitive shift status (legacy rows may use mixed case). */
@@ -10758,15 +10778,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Daily Report API - combines in-store sales + repair ticket payments for a given date
   // ─── Cash Withdrawals ────────────────────────────────────────────────────────
-  app.get("/api/instore/withdrawals", async (req, res) => {
+  app.get(["/api/instore/withdrawals", "/api/technician/withdrawals"], async (req, res) => {
     try {
+      if (!(await assertWithdrawalAccess(req, res))) return;
+
       const salesUserId = (req.session as any).salesUserId;
-      const adminId = (req.session as any).adminId;
-      const technicianId = (req.session as any).technicianId;
-      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await canAccessWithdrawals(req))) {
-        return res.status(403).json({ error: "ليس لديك صلاحية عرض السحوبات" });
-      }
+      const source = withdrawalSourceForRequest(req);
 
       const { db } = await import("./db");
       const { cashWithdrawals } = await import("../shared/schema");
@@ -10780,7 +10797,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Calendar day in Asia/Baghdad (avoids server-local timestamp mismatch with naive timestamps)
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
-        : (salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
+        : (source === "sales" && salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
 
       const dateClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr2}::date`;
       const sourceClause = eq(cashWithdrawals.source, withdrawalSourceForRequest(req));
@@ -10800,15 +10817,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/instore/withdrawals/report-by-employee", async (req, res) => {
+  app.get(["/api/instore/withdrawals/report-by-employee", "/api/technician/withdrawals/report-by-employee"], async (req, res) => {
     try {
+      if (!(await assertWithdrawalAccess(req, res))) return;
+
       const salesUserId = (req.session as any).salesUserId;
-      const adminId = (req.session as any).adminId;
-      const technicianId = (req.session as any).technicianId;
-      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await canAccessWithdrawals(req))) {
-        return res.status(403).json({ error: "ليس لديك صلاحية عرض السحوبات" });
-      }
+      const source = withdrawalSourceForRequest(req);
 
       const todayBaghdad = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
       const parseDate = (raw: unknown, fallback: string) => {
@@ -10823,7 +10837,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
-        : (salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
+        : (source === "sales" && salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
       const employeeFilter = String(req.query.employeeName || "").trim();
 
       const dateFromClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${fromDate}::date`;
@@ -10928,15 +10942,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/instore/withdrawals", async (req, res) => {
+  app.post(["/api/instore/withdrawals", "/api/technician/withdrawals"], async (req, res) => {
     try {
+      if (!(await assertWithdrawalAccess(req, res))) return;
+
       const salesUserId = (req.session as any).salesUserId;
-      const adminId = (req.session as any).adminId;
-      const technicianId = (req.session as any).technicianId;
-      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await canAccessWithdrawals(req))) {
-        return res.status(403).json({ error: "ليس لديك صلاحية إدارة السحوبات" });
-      }
+      const source = withdrawalSourceForRequest(req);
 
       // Do not require an open shift to save a withdrawal. Shift matching was fragile
       // (supervisor vs cashier, session role casing, concurrent shifts) and blocked valid saves.
@@ -10961,7 +10972,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const salesLocationId = b.salesLocationId != null
         ? parseInt(String(b.salesLocationId), 10)
-        : (salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
+        : (source === "sales" && salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
 
       const [row] = await db
         .insert(cashWithdrawals)
@@ -10970,7 +10981,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           employeeName: parsed.data.employeeName,
           reason: parsed.data.reason,
           salesLocationId: Number.isNaN(salesLocationId) ? LOCATION_MAIN_ID : salesLocationId,
-          source: withdrawalSourceForRequest(req),
+          source,
           createdAt: new Date(),
         })
         .returning();
@@ -10988,15 +10999,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/instore/withdrawals/:id", async (req, res) => {
+  app.patch(["/api/instore/withdrawals/:id", "/api/technician/withdrawals/:id"], async (req, res) => {
     try {
-      const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      const technicianId = (req.session as any).technicianId;
-      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await canAccessWithdrawals(req))) {
-        return res.status(403).json({ error: "ليس لديك صلاحية تعديل السحوبات" });
-      }
+      if (!(await assertWithdrawalAccess(req, res))) return;
 
       const recordId = parseInt(req.params.id);
       const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
@@ -11023,15 +11029,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/instore/withdrawals/:id", async (req, res) => {
+  app.delete(["/api/instore/withdrawals/:id", "/api/technician/withdrawals/:id"], async (req, res) => {
     try {
-      const salesUserId = (req.session as any).salesUserId;
       const adminId = (req.session as any).adminId;
-      const technicianId = (req.session as any).technicianId;
-      if (!salesUserId && !adminId && !technicianId) return res.status(401).json({ error: "غير مصرح" });
-      if (!adminId && !(await canAccessWithdrawals(req))) {
-        return res.status(403).json({ error: "ليس لديك صلاحية حذف السحوبات" });
-      }
+      if (!(await assertWithdrawalAccess(req, res))) return;
 
       const recordId = parseInt(req.params.id);
       // Fetch record to get its timestamp
