@@ -153,7 +153,12 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   });
 
   const { data: allRepairTickets = [] } = useQuery<RepairTicket[]>({
-    queryKey: ['/api/repair-tickets'],
+    queryKey: ['/api/sales/repair-tickets'],
+    queryFn: async () => {
+      const res = await fetch('/api/sales/repair-tickets', { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to load repair tickets');
+      return res.json();
+    },
   });
 
   const { data: monthlyCashflow, isLoading: cashflowLoading } = useQuery<MonthlyCashflowResponse>({
@@ -179,7 +184,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     queryClient.invalidateQueries({ queryKey: ['/api/orders', salesLocationId] });
     queryClient.invalidateQueries({ queryKey: ['/api/daily-report'] });
     queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/sales/repair-tickets'] });
   };
 
   const canVoidSales = user.role === 'sales_admin' || user.permissions.canEditReceipt === 1;

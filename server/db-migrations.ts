@@ -83,6 +83,19 @@ const STARTUP_MIGRATIONS: string[] = [
            AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
        )`,
 
+  `UPDATE repair_tickets rt
+     SET repair_payment_source = 'technician'
+     WHERE rt.repair_payment_source = 'sales'
+       AND rt.payment_status IN ('paid', 'deferred')
+       AND coalesce(rt.excluded_from_sales_report, 0) = 0
+       AND EXISTS (
+         SELECT 1 FROM sales_shifts ss
+         WHERE ss.sales_user_id LIKE 'tech:%'
+           AND ss.sales_location_id = 1
+           AND (coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) AT TIME ZONE 'Asia/Baghdad')::date
+             = (ss.start_time AT TIME ZONE 'Asia/Baghdad')::date
+       )`,
+
   `UPDATE repair_tickets
      SET repair_payment_source = 'technician'
      WHERE excluded_from_sales_report = 1

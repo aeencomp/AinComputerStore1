@@ -41,7 +41,7 @@ import {
   repairTicketIncludedInSalesReport,
   orderIncludedInSalesReport,
 } from "./shift-report";
-import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
+import { sqlRepairTicketInSalesWindow, sqlRepairTicketEligibleForSalesQuery } from "./repair-sales-date";
 import { baghdadNow } from "./baghdad-time";
 import { voidOrder, restoreOrderInventory } from "./order-void";
 import {
@@ -4602,6 +4602,33 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Store portal only — excludes technician repair payments.
+  app.get("/api/sales/repair-tickets", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      const adminId = (req.session as any).adminId;
+      if (!salesUserId && !adminId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const tickets = await db
+        .select()
+        .from(repairTickets)
+        .where(
+          and(
+            repairTicketIncludedInSalesReport,
+            sqlRepairTicketEligibleForSalesQuery(),
+          ),
+        )
+        .orderBy(desc(repairTickets.updatedAt));
+
+      return res.json(tickets);
+    } catch (error) {
+      console.error("Error fetching store repair tickets:", error);
+      return res.status(500).json({ error: "فشل جلب مبيعات الصيانة" });
+    }
+  });
+
   app.get("/api/repair-tickets/lookup/phone/:phone", async (req, res) => {
     try {
       const { phone } = req.params;
@@ -4893,7 +4920,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const becomingDeferred = effectiveStatus === "deferred" && existing?.paymentStatus !== "deferred";
       const becomingDelivered =
         updateData.status === "delivered" && existing?.status !== "delivered";
-      if (technicianId && (becomingPaid || becomingDeferred || becomingDelivered)) {
+      if (technicianId && (effectiveStatus === "paid" || effectiveStatus === "deferred")) {
         updateData.repairPaymentSource = "technician";
       } else if (
         (becomingPaid || becomingDeferred || becomingDelivered) &&
