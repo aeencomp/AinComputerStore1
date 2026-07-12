@@ -82,12 +82,13 @@ export function sqlShiftReportEnd(shiftId: string, shift: {
   )`;
 }
 
-/** POS orders attributed to this shift (cashier, untagged, or admin walk-in). */
+/** POS orders attributed to this shift (cashier, untagged, admin, or manager/sales_admin). */
 function sqlShiftAttributedOrders(shift: { salesUserId: string }) {
   return or(
     eq(orders.salespersonId, shift.salesUserId),
     isNull(orders.salespersonId),
     sql`${orders.salespersonId} in (select id from admin_users)`,
+    sql`${orders.salespersonId} in (select id from sales_users where role = 'sales_admin')`,
   );
 }
 

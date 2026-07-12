@@ -2541,7 +2541,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // is returned. If multiple employees have concurrent open shifts, the others are not
       // included in this endpoint. For a full view, supervisors can navigate to each
       // individual shift via GET /api/sales/shifts/:id/report.
-      // Orders are always scoped to the shift owner so totals are per-employee accurate.
+      // Orders include the shift owner, untagged/admin POS, and manager (sales_admin) sales.
       const { shift: _reportShift, ...reportData } = await computeShiftReportForShift(activeShift.id);
       return res.json({ shift: activeShift, ...reportData });
     } catch (error) {

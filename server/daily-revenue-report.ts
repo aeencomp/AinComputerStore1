@@ -124,60 +124,9 @@ export async function computeDailyReportForApi(
         )),
     );
   } else {
-    const shiftsStartedOnDate = await db
-      .select()
-      .from(salesShifts)
-      .where(
-        and(
-          eq(salesShifts.salesLocationId, salesLocationId),
-          sql`${salesShifts.salesUserId} not like 'tech:%'`,
-          sql`${salesShifts.startTime} >= ${dayStartSql}`,
-          sql`${salesShifts.startTime} <= ${dayEndSql}`,
-        ),
-      )
-      .orderBy(desc(salesShifts.startTime));
-
-    // Shifts that started earlier but were still open during this day (e.g. overnight)
-    const shiftsOverlapping = await db
-      .select()
-      .from(salesShifts)
-      .where(
-        and(
-          eq(salesShifts.salesLocationId, salesLocationId),
-          sql`${salesShifts.salesUserId} not like 'tech:%'`,
-          sql`${salesShifts.startTime} < ${dayStartSql}`,
-          or(
-            sql`${salesShifts.endTime} is null`,
-            sql`${salesShifts.endTime} >= ${dayStartSql}`,
-          ),
-        ),
-      )
-      .orderBy(desc(salesShifts.startTime));
-
-    const shiftsById = new Map<string, typeof salesShifts.$inferSelect>();
-    for (const s of [...shiftsStartedOnDate, ...shiftsOverlapping]) {
-      shiftsById.set(s.id, s);
-    }
-    const shiftsOnDate = Array.from(shiftsById.values());
-
     const seenOrderIds = new Set<string>();
 
-    for (const shift of shiftsOnDate) {
-      if (String(shift.status).toLowerCase() === "closed") {
-        await reconcileClosedShiftRecord(shift.id);
-      }
-      const report = await computeShiftReportForShift(shift.id);
-      for (const o of report.inStoreSales) {
-        const orderDay = baghdadDateString(new Date(o.createdAt));
-        if (orderDay !== baghdadDateStr) continue;
-        if (!seenOrderIds.has(o.id)) {
-          seenOrderIds.add(o.id);
-          allInStoreOrders.push(o);
-        }
-      }
-    }
-
-    // Catch any POS sale on this Baghdad calendar day not tied to a shift window
+    // 1) Every POS sale on this Baghdad calendar day (store-wide, all cashiers + manager)
     const calendarDayOrders = await db
       .select()
       .from(orders)
@@ -191,9 +140,34 @@ export async function computeDailyReportForApi(
         ),
       );
     for (const o of calendarDayOrders) {
-      if (!seenOrderIds.has(o.id)) {
-        seenOrderIds.add(o.id);
-        allInStoreOrders.push(o);
+      seenOrderIds.add(o.id);
+      allInStoreOrders.push(o);
+    }
+
+    // 2) Post-midnight sales from shifts that started on this date (clock date may be next day)
+    const shiftsStartedOnDate = await db
+      .select()
+      .from(salesShifts)
+      .where(
+        and(
+          eq(salesShifts.salesLocationId, salesLocationId),
+          sql`${salesShifts.salesUserId} not like 'tech:%'`,
+          sql`${salesShifts.startTime} >= ${dayStartSql}`,
+          sql`${salesShifts.startTime} <= ${dayEndSql}`,
+        ),
+      )
+      .orderBy(desc(salesShifts.startTime));
+
+    for (const shift of shiftsStartedOnDate) {
+      if (String(shift.status).toLowerCase() === "closed") {
+        await reconcileClosedShiftRecord(shift.id);
+      }
+      const report = await computeShiftReportForShift(shift.id);
+      for (const o of report.inStoreSales) {
+        if (!seenOrderIds.has(o.id)) {
+          seenOrderIds.add(o.id);
+          allInStoreOrders.push(o);
+        }
       }
     }
   }
