@@ -22,6 +22,7 @@ import {
   baghdadDateString,
   buildDailyRevenueWhatsAppMessage,
   computeCombinedDailyRevenue,
+  computeDailyReportForApi,
   formatIqdAmount,
   sqlBaghdadDayStart,
   sqlBaghdadDayEnd,
@@ -11315,219 +11316,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const dateParam = req.query.date as string;
-      // Parse as Baghdad timezone (UTC+3) so dates match the Iraq calendar day
-      const baghdadDateStr = dateParam || new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
-      const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
-      const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
-
-      const { db } = await import("./db");
-      const { orders, repairTickets, cashWithdrawals, salesShifts } = await import("../shared/schema");
-      const { and, or, gte, lte, inArray, eq, isNotNull, isNull, desc } = await import("drizzle-orm");
+      const baghdadDateStr = dateParam || baghdadDateString();
       const requestedLocationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
         : resolveRequestLocationId(req);
       const salesLocationId = Number.isNaN(requestedLocationId) ? LOCATION_MAIN_ID : requestedLocationId;
 
-      // ── Shift-aware day boundary ──────────────────────────────────────────────
-      // Find all shifts that STARTED on the requested calendar date (Baghdad TZ).
-      // Sales made after midnight but still within a shift that started on this date
-      // should be counted for this date, not the next one.
-      const shiftsOnDate = await db.select().from(salesShifts)
-        .where(and(
-          eq(salesShifts.salesLocationId, salesLocationId),
-          sql`${salesShifts.salesUserId} not like 'tech:%'`,
-          gte(salesShifts.startTime, startOfDay),
-          lte(salesShifts.startTime, endOfDay),
-        ))
-        .orderBy(desc(salesShifts.startTime));
-
-      // Compute extended shift ends (restores sales after premature auto-close)
-      const now = new Date();
-      const extendedShiftEnds = new Map<string, Date>();
-      for (const shift of shiftsOnDate) {
-        if (String(shift.status).toLowerCase() === "closed") {
-          await reconcileClosedShiftRecord(shift.id);
-          extendedShiftEnds.set(
-            shift.id,
-            await fetchShiftReportEndTime(shift.id, {
-              status: shift.status,
-              salesUserId: shift.salesUserId,
-              salesLocationId: shift.salesLocationId,
-              startTime: shift.startTime,
-            }),
-          );
-        } else {
-          extendedShiftEnds.set(shift.id, shift.endTime || now);
-        }
-      }
-
-      const effectiveEnd = shiftsOnDate.length > 0
-        ? new Date(Math.max(
-          endOfDay.getTime(),
-          ...[...extendedShiftEnds.values()].map(d => d.getTime()),
-        ))
-        : endOfDay;
-
-      // ── In-store orders (shift-scoped) ────────────────────────────────────────
-      // For each shift, collect orders within that shift's actual time window
-      // so post-midnight sales are tied to the shift start date, not the clock date.
-      const allInStoreOrders: any[] = [];
-      const seenOrderIds = new Set<string>();
-
-      if (shiftsOnDate.length > 0) {
-        for (const shift of shiftsOnDate) {
-          const shiftEnd = extendedShiftEnds.get(shift.id) || shift.endTime || now;
-
-          const shiftOrders = await db.select().from(orders).where(and(
-            inArray(orders.orderType, ['walk-in', 'in-store']),
-            eq(orders.salesLocationId, salesLocationId),
-            orderIncludedInSalesReport,
-            eq(orders.salespersonId, shift.salesUserId),
-            gte(orders.createdAt, shift.startTime),
-            lte(orders.createdAt, shiftEnd),
-          ));
-          for (const o of shiftOrders) {
-            if (!seenOrderIds.has(o.id)) {
-              seenOrderIds.add(o.id);
-              allInStoreOrders.push(o);
-            }
-          }
-        }
-        // Also include orders with no salesperson (direct admin) within calendar day
-        const adminOrders = await db.select().from(orders).where(and(
-          inArray(orders.orderType, ['walk-in', 'in-store']),
-          eq(orders.salesLocationId, salesLocationId),
-          orderIncludedInSalesReport,
-          isNull(orders.salespersonId),
-          gte(orders.createdAt, startOfDay),
-          lte(orders.createdAt, effectiveEnd),
-        ));
-        for (const o of adminOrders) {
-          if (!seenOrderIds.has(o.id)) {
-            seenOrderIds.add(o.id);
-            allInStoreOrders.push(o);
-          }
-        }
-        // Admin POS tags salespersonId with admin_users.id (not sales_users.id) — include once per day
-        const adminTaggedRows = await db
-          .select({ o: orders })
-          .from(orders)
-          .innerJoin(adminUsers, eq(orders.salespersonId, adminUsers.id))
-          .where(and(
-            inArray(orders.orderType, ['walk-in', 'in-store']),
-            eq(orders.salesLocationId, salesLocationId),
-            orderIncludedInSalesReport,
-            gte(orders.createdAt, startOfDay),
-            lte(orders.createdAt, effectiveEnd),
-          ));
-        for (const row of adminTaggedRows) {
-          const o = row.o;
-          if (!seenOrderIds.has(o.id)) {
-            seenOrderIds.add(o.id);
-            allInStoreOrders.push(o);
-          }
-        }
-      } else {
-        // No shifts started on this date — fall back to plain calendar day window
-        const calOrders = await db.select().from(orders).where(and(
-          inArray(orders.orderType, ['walk-in', 'in-store']),
-          eq(orders.salesLocationId, salesLocationId),
-          orderIncludedInSalesReport,
-          gte(orders.createdAt, startOfDay),
-          lte(orders.createdAt, endOfDay),
-        ));
-        for (const o of calOrders) { allInStoreOrders.push(o); }
-      }
-
-      const inStoreOrders = allInStoreOrders;
-
-      // ── Repair ticket payments ────────────────────────────────────────────────
-      // Use Baghdad wall-clock SQL bounds (DB stores local time, not UTC ISO).
-      const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
-      const repairEndSql = sqlBaghdadRepairEndBound(baghdadDateStr, effectiveEnd);
-
-      const paidRepairTickets = salesLocationId === LOCATION_MAIN_ID ? await db.select().from(repairTickets).where(
-        and(
-          repairTicketIncludedInSalesReport,
-          sqlRepairTicketInSalesWindow(dayStartSql, repairEndSql),
-        ),
-      ) : [];
-
-      const inStoreTotalCash = inStoreOrders
-        .reduce((sum, o) => sum + orderCashAmount(o), 0);
-      const inStoreTotalCard = inStoreOrders
-        .reduce((sum, o) => sum + orderCardAmount(o), 0);
-      const inStoreTotalZain = inStoreOrders
-        .filter(o => isInStoreZainCash(o))
-        .reduce((sum, o) => sum + parseFloat(o.total), 0);
-      const inStoreTotalQi = inStoreOrders
-        .filter(o => isInStoreQiCard(o))
-        .reduce((sum, o) => sum + parseFloat(o.total), 0);
-      const inStoreTotalDeferred = inStoreOrders
-        .filter(o => isOrderDeferred(o))
-        .reduce((sum, o) => sum + parseFloat(o.total), 0);
-      const inStoreTotal = inStoreOrders
-        .filter(o => !isOrderDeferred(o))
-        .reduce((sum, o) => sum + parseFloat(o.total), 0);
-
-      // Withdrawals — use the effective (extended) window
-      const dailyWithdrawals = await db.select().from(cashWithdrawals)
-        .where(and(
-          eq(cashWithdrawals.source, "sales"),
-          eq(cashWithdrawals.salesLocationId, salesLocationId),
-          gte(cashWithdrawals.createdAt, startOfDay),
-          lte(cashWithdrawals.createdAt, effectiveEnd),
-        ))
-        .orderBy(desc(cashWithdrawals.createdAt));
-      const totalWithdrawals = dailyWithdrawals.reduce((sum, w) => sum + parseFloat(w.amount), 0);
-
-      // Repair totals — deferred (آجل) are excluded from revenue
-      const repairTotalDeferred = paidRepairTickets
-        .filter(t => t.paymentStatus === 'deferred')
-        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
-      const repairTotal = paidRepairTickets
-        .filter(t => t.paymentStatus !== 'deferred')
-        .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
-      const repairTotalCash = paidRepairTickets
-        .reduce((sum, t) => sum + repairCashAmount(t), 0);
-      const repairTotalCard = paidRepairTickets
-        .reduce((sum, t) => sum + repairCardAmount(t), 0);
-      const repairTotalZain = 0;
-      const repairTotalQi = 0;
-
-      res.set('Cache-Control', 'no-store');
-      res.json({
-        date: startOfDay.toISOString(),
-        inStoreSales: inStoreOrders,
-        repairSales: paidRepairTickets,
-        withdrawals: dailyWithdrawals,
-        summary: {
-          inStoreCount: inStoreOrders.length,
-          inStoreTotal,
-          inStoreTotalCash,
-          inStoreTotalCard,
-          inStoreTotalZain,
-          inStoreTotalQi,
-          inStoreTotalDeferred,
-          repairCount: paidRepairTickets.filter(t => t.paymentStatus !== 'deferred').length,
-          repairTotal,
-          repairTotalDeferred,
-          repairTotalCash,
-          repairTotalCard,
-          repairTotalZain,
-          repairTotalQi,
-          totalWithdrawals,
-          withdrawalCount: dailyWithdrawals.length,
-          grandTotal: inStoreTotal + repairTotal,
-          grandTotalCash: inStoreTotalCash + repairTotalCash,
-          grandTotalCard: inStoreTotalCard + repairTotalCard,
-          grandTotalZain: inStoreTotalZain + repairTotalZain,
-          grandTotalQi: inStoreTotalQi + repairTotalQi,
-          netTotal: (inStoreTotal + repairTotal) - totalWithdrawals,
-        }
-      });
+      const report = await computeDailyReportForApi(baghdadDateStr, salesLocationId);
+      res.set("Cache-Control", "no-store");
+      res.json(report);
     } catch (err) {
-      console.error('Daily report error:', err);
+      console.error("Daily report error:", err);
       res.status(500).json({ error: "خطأ في جلب التقرير اليومي" });
     }
   });

@@ -158,7 +158,7 @@ export async function computeDailyReportForApi(
     for (const s of [...shiftsStartedOnDate, ...shiftsOverlapping]) {
       shiftsById.set(s.id, s);
     }
-    const shiftsOnDate = [...shiftsById.values()];
+    const shiftsOnDate = Array.from(shiftsById.values());
 
     const seenOrderIds = new Set<string>();
 
@@ -257,7 +257,8 @@ export async function computeDailyReportForApi(
         sql`${cashWithdrawals.createdAt} >= ${dayStartSql}`,
         sql`${cashWithdrawals.createdAt} <= ${withdrawalEndSql}`,
       ),
-    );
+    )
+    .orderBy(desc(cashWithdrawals.createdAt));
 
   const inStoreOrders = allInStoreOrders;
   const inStoreTotalCash = inStoreOrders.reduce((sum, o) => sum + orderCashAmount(o), 0);
@@ -288,7 +289,7 @@ export async function computeDailyReportForApi(
 
   const grandTotal = inStoreTotal + repairTotal;
 
-  return {
+  const summary: DailyReportSummary = {
     inStoreCount: inStoreOrders.length,
     inStoreTotal,
     inStoreTotalCash,
@@ -312,6 +313,24 @@ export async function computeDailyReportForApi(
     grandTotalQi: inStoreTotalQi,
     netTotal: grandTotal - totalWithdrawals,
   };
+
+  return {
+    date: new Date(`${baghdadDateStr}T00:00:00+03:00`).toISOString(),
+    inStoreSales: inStoreOrders,
+    repairSales: paidRepairTickets,
+    withdrawals: dailyWithdrawals,
+    summary,
+  };
+}
+
+/** Summary-only helper (e.g. owner WhatsApp revenue digest). */
+export async function computeDailyReportSummary(
+  baghdadDateStr: string,
+  salesLocationId: number,
+  options?: DailyReportSummaryOptions,
+): Promise<DailyReportSummary> {
+  const report = await computeDailyReportForApi(baghdadDateStr, salesLocationId, options);
+  return report.summary;
 }
 
 export async function computeCombinedDailyRevenue(

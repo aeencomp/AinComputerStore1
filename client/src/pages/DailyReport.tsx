@@ -590,22 +590,30 @@ function buildPrintHTML(data: ShiftReportData): string {
 </html>`;
 }
 
-function mergeTodayRepairSales(
+function mergeTodayDailyReport(
   base: ShiftReportData,
   daily: DailyReportApiResponse,
 ): ShiftReportData {
   const advancesTotal = base.summary.advancesTotal ?? 0;
+  const inStoreTotal = daily.summary.inStoreTotal ?? 0;
   const repairTotal = daily.summary.repairTotal ?? 0;
-  const inStoreTotal = base.summary.inStoreTotal ?? 0;
   const totalWithdrawals = daily.summary.totalWithdrawals ?? 0;
   const grandTotal = inStoreTotal + repairTotal + advancesTotal;
 
   return {
     ...base,
+    inStoreSales: daily.inStoreSales,
     repairSales: daily.repairSales,
     withdrawals: daily.withdrawals ?? [],
     summary: {
       ...base.summary,
+      inStoreCount: daily.summary.inStoreCount ?? 0,
+      inStoreTotal,
+      inStoreTotalCash: daily.summary.inStoreTotalCash ?? 0,
+      inStoreTotalCard: daily.summary.inStoreTotalCard ?? 0,
+      inStoreTotalZain: daily.summary.inStoreTotalZain ?? 0,
+      inStoreTotalQi: daily.summary.inStoreTotalQi ?? 0,
+      inStoreTotalDeferred: daily.summary.inStoreTotalDeferred ?? 0,
       repairCount: daily.summary.repairCount ?? 0,
       repairTotal,
       repairTotalCash: daily.summary.repairTotalCash ?? 0,
@@ -614,8 +622,10 @@ function mergeTodayRepairSales(
       totalWithdrawals,
       withdrawalCount: daily.summary.withdrawalCount ?? 0,
       grandTotal,
-      grandTotalCash: (base.summary.inStoreTotalCash ?? 0) + (daily.summary.repairTotalCash ?? 0),
-      grandTotalCard: (base.summary.inStoreTotalCard ?? 0) + (daily.summary.repairTotalCard ?? 0),
+      grandTotalCash: (daily.summary.inStoreTotalCash ?? 0) + (daily.summary.repairTotalCash ?? 0),
+      grandTotalCard: (daily.summary.inStoreTotalCard ?? 0) + (daily.summary.repairTotalCard ?? 0),
+      grandTotalZain: daily.summary.grandTotalZain ?? 0,
+      grandTotalQi: daily.summary.grandTotalQi ?? 0,
       netTotal: grandTotal - totalWithdrawals,
     },
   };
@@ -865,7 +875,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
   const data: ShiftReportData | null | undefined = useMemo(() => {
     if (!baseData) return null;
     if (selectedShiftId || !dailyReportApi) return baseData;
-    return mergeTodayRepairSales(baseData, dailyReportApi);
+    return mergeTodayDailyReport(baseData, dailyReportApi);
   }, [baseData, dailyReportApi, selectedShiftId]);
 
   const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
