@@ -4,49 +4,20 @@ import { sql, and, or, eq, ne, isNotNull, isNull, type SQL } from "drizzle-orm";
 export const REPAIR_PAYMENT_SOURCE_SALES = "sales" as const;
 export const REPAIR_PAYMENT_SOURCE_TECHNICIAN = "technician" as const;
 
-/** Stable payment timestamp for shift attribution (matches sales window logic). */
-export function sqlRepairTicketSalesAtForShift() {
-  return sql`coalesce(
-    case when ${repairTickets.status} = 'delivered' and ${repairTickets.deliveredAt} is not null then ${repairTickets.deliveredAt} end,
-    case when ${repairTickets.paymentStatus} = 'paid' and ${repairTickets.paidAt} is not null then ${repairTickets.paidAt} end,
-    ${repairTickets.paidAt},
-    ${repairTickets.deliveredAt},
-    ${repairTickets.updatedAt}
-  )`;
-}
-
-/** Paid/collected while a technician repair shift was open. */
-export function sqlRepairTicketPaidDuringTechnicianShift(): SQL {
-  const salesAt = sqlRepairTicketSalesAtForShift();
-  return sql`exists (
-    select 1 from sales_shifts ss
-    where ss.sales_user_id like 'tech:%'
-      and ss.sales_location_id = 1
-      and ${salesAt} is not null
-      and ${salesAt} >= ss.start_time
-      and ${salesAt} <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
-  )`;
-}
-
-/** Store / cashier repair payments (excludes technician portal & technician shifts). */
+/** Store / cashier repair payments — tagged at payment time only (repair_payment_source). */
 export function sqlRepairTicketIncludedInStoreSales(): SQL {
   return and(
     eq(repairTickets.excludedFromSalesReport, 0),
-    ne(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
     or(
       eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_SALES),
       isNull(repairTickets.repairPaymentSource),
     ),
-    sql`not (${sqlRepairTicketPaidDuringTechnicianShift()})`,
   )!;
 }
 
-/** Technician portal repair payments + collections during technician shifts. */
+/** Technician portal repair payments only. */
 export function sqlRepairTicketIncludedInTechnicianSales(): SQL {
-  return or(
-    eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
-    sqlRepairTicketPaidDuringTechnicianShift(),
-  )!;
+  return eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN);
 }
 
 /** Technician daily calendar report (same scope as shift technician repairs). */

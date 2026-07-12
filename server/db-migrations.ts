@@ -183,6 +183,20 @@ const STARTUP_MIGRATIONS: string[] = [
      ) sub
      WHERE t.id = sub.id`,
 
+  // Restore store repair sales wrongly tagged as technician while a cashier shift was open.
+  `UPDATE repair_tickets rt
+     SET repair_payment_source = 'sales'
+     WHERE rt.repair_payment_source = 'technician'
+       AND coalesce(rt.excluded_from_sales_report, 0) = 0
+       AND rt.payment_status IN ('paid', 'deferred')
+       AND EXISTS (
+         SELECT 1 FROM sales_shifts ss
+         WHERE ss.sales_user_id NOT LIKE 'tech:%'
+           AND coalesce(ss.sales_location_id, 1) = 1
+           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) >= ss.start_time
+           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
+       )`,
+
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS meta_pixel_id TEXT DEFAULT ''`,
 
   `CREATE TABLE IF NOT EXISTS facebook_post_log (

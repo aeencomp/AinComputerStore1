@@ -874,9 +874,16 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
 
   const data: ShiftReportData | null | undefined = useMemo(() => {
     if (!baseData) return null;
-    if (selectedShiftId || !dailyReportApi) return baseData;
+    if (!dailyReportApi) return baseData;
+
+    const reportBaghdadDay = baseData.shift?.startTime
+      ? new Date(baseData.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" })
+      : baghdadToday;
+
+    if (reportBaghdadDay !== baghdadToday) return baseData;
+
     return mergeTodayDailyReport(baseData, dailyReportApi);
-  }, [baseData, dailyReportApi, selectedShiftId]);
+  }, [baseData, dailyReportApi, baghdadToday]);
 
   const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
   const isFetching = selectedShiftId ? reportFetching : false;
