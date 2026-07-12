@@ -40,12 +40,19 @@ export function sqlRepairTicketIncludedInStoreSales(): SQL {
   )!;
 }
 
-/** Technician portal repair payments + collections during technician shifts.
- *  excluded_from_sales_report only hides from store reports — technician report still includes these. */
+/** Technician portal repair payments + collections during technician shifts. */
 export function sqlRepairTicketIncludedInTechnicianSales(): SQL {
   return or(
     eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
     sqlRepairTicketPaidDuringTechnicianShift(),
+  )!;
+}
+
+/** Technician daily calendar report — all repair payments for the day (pre-separation scope). */
+export function sqlRepairTicketIncludedInTechnicianDailyReport(): SQL {
+  return or(
+    eq(repairTickets.excludedFromSalesReport, 0),
+    eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN),
   )!;
 }
 
