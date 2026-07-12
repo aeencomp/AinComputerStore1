@@ -1338,12 +1338,20 @@ export type InsertInStoreProduct = z.infer<typeof insertInStoreProductSchema>;
 export type InStoreProduct = typeof inStoreProducts.$inferSelect;
 
 // ─── Cash Withdrawals — Daily cash withdrawals by employees ───────────────────
+export const WITHDRAWAL_SOURCE_SALES = "sales" as const;
+export const WITHDRAWAL_SOURCE_TECHNICIAN = "technician" as const;
+export type WithdrawalSource =
+  | typeof WITHDRAWAL_SOURCE_SALES
+  | typeof WITHDRAWAL_SOURCE_TECHNICIAN;
+
 export const cashWithdrawals = pgTable("cash_withdrawals", {
   id: serial("id").primaryKey(),
   amount: decimal("amount", { precision: 10, scale: 2 }).notNull(),
   reason: text("reason"),
   employeeName: text("employee_name").notNull(),
   salesLocationId: integer("sales_location_id").notNull().default(1),
+  /** sales = cashier portal; technician = repair portal */
+  source: text("source").notNull().default(WITHDRAWAL_SOURCE_SALES),
   /** timestamptz so list filters and JS Dates agree across server TZ / Postgres */
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
@@ -1351,6 +1359,7 @@ export const cashWithdrawals = pgTable("cash_withdrawals", {
 export const insertCashWithdrawalSchema = createInsertSchema(cashWithdrawals).omit({
   id: true,
   createdAt: true,
+  source: true,
 });
 
 export type InsertCashWithdrawal = z.infer<typeof insertCashWithdrawalSchema>;

@@ -54,7 +54,7 @@ export default function TechnicianWithdrawals() {
           </Link>
           <TrendingDown className="h-5 w-5 text-orange-600" />
           <h1 className="text-lg font-semibold">
-            {language === "ar" ? "سحوبات المبيعات" : "Sales Withdrawals"}
+            {language === "ar" ? "سحوبات الصيانة" : "Repair Withdrawals"}
           </h1>
         </div>
       </div>

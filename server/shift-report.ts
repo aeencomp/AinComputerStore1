@@ -176,6 +176,7 @@ export async function computeShiftReportForShift(shiftId: string) {
     .select()
     .from(cashWithdrawals)
     .where(and(
+      eq(cashWithdrawals.source, "sales"),
       eq(cashWithdrawals.salesLocationId, salesLocationId),
       sql`${cashWithdrawals.createdAt} >= ${shiftStartSql}`,
       sql`${cashWithdrawals.createdAt} <= ${shiftEndSql}`,

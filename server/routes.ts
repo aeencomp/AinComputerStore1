@@ -206,6 +206,14 @@ async function canAccessWithdrawals(req: Request): Promise<boolean> {
   return technicianCanViewWithdrawals(req);
 }
 
+function withdrawalSourceForRequest(req: Request): "sales" | "technician" {
+  const technicianId = (req.session as any).technicianId as string | undefined;
+  const salesUserId = (req.session as any).salesUserId as string | undefined;
+  const adminId = (req.session as any).adminId as string | undefined;
+  if (technicianId && !salesUserId && !adminId) return "technician";
+  return "sales";
+}
+
 /** Case-insensitive shift status (legacy rows may use mixed case). */
 const salesShiftIsActive = sql`lower(trim(${salesShifts.status})) = 'active'`;
 const salesShiftIsPaused = sql`lower(trim(${salesShifts.status})) = 'paused'`;
@@ -10775,6 +10783,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : (salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
 
       const dateClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr2}::date`;
+      const sourceClause = eq(cashWithdrawals.source, withdrawalSourceForRequest(req));
       const locClause = locationId && !Number.isNaN(locationId)
         ? eq(cashWithdrawals.salesLocationId, locationId)
         : undefined;
@@ -10782,7 +10791,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rows = await db
         .select()
         .from(cashWithdrawals)
-        .where(locClause ? and(dateClause, locClause) : dateClause)
+        .where(locClause ? and(dateClause, sourceClause, locClause) : and(dateClause, sourceClause))
         .orderBy(desc(cashWithdrawals.createdAt));
       res.json(rows);
     } catch (err) {
@@ -10819,6 +10828,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const dateFromClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${fromDate}::date`;
       const dateToClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date <= ${toDate}::date`;
+      const sourceClause = eq(cashWithdrawals.source, withdrawalSourceForRequest(req));
       const locClause = locationId && !Number.isNaN(locationId)
         ? eq(cashWithdrawals.salesLocationId, locationId)
         : undefined;
@@ -10826,7 +10836,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const rows = await db
         .select()
         .from(cashWithdrawals)
-        .where(locClause ? and(dateFromClause, dateToClause, locClause) : and(dateFromClause, dateToClause))
+        .where(
+          locClause
+            ? and(dateFromClause, dateToClause, sourceClause, locClause)
+            : and(dateFromClause, dateToClause, sourceClause),
+        )
         .orderBy(desc(cashWithdrawals.createdAt));
 
       type WithdrawalLine = {
@@ -10956,6 +10970,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           employeeName: parsed.data.employeeName,
           reason: parsed.data.reason,
           salesLocationId: Number.isNaN(salesLocationId) ? LOCATION_MAIN_ID : salesLocationId,
+          source: withdrawalSourceForRequest(req),
           createdAt: new Date(),
         })
         .returning();
@@ -10986,6 +11001,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recordId = parseInt(req.params.id);
       const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
       if (!record) return res.status(404).json({ error: "السجل غير موجود" });
+      if (!adminId && record.source !== withdrawalSourceForRequest(req)) {
+        return res.status(403).json({ error: "غير مصرح" });
+      }
 
       const recordTime = new Date(record.createdAt);
       if (await isCashWithdrawalEditBlocked(recordTime)) {
@@ -11019,6 +11037,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Fetch record to get its timestamp
       const [record] = await db.select().from(cashWithdrawals).where(eq(cashWithdrawals.id, recordId)).limit(1);
       if (!record) return res.status(404).json({ error: "السجل غير موجود" });
+      if (!adminId && record.source !== withdrawalSourceForRequest(req)) {
+        return res.status(403).json({ error: "غير مصرح" });
+      }
 
       const recordTime = new Date(record.createdAt);
       if (await isCashWithdrawalEditBlocked(recordTime)) {
@@ -11093,6 +11114,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         .from(cashWithdrawals)
         .where(
           and(
+            eq(cashWithdrawals.source, "sales"),
             eq(cashWithdrawals.salesLocationId, Number.isNaN(locationId) ? LOCATION_MAIN_ID : locationId),
             sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date >= ${startDate}::date`,
             sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date <= ${endDate}::date`,
@@ -11396,6 +11418,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Withdrawals — use the effective (extended) window
       const dailyWithdrawals = await db.select().from(cashWithdrawals)
         .where(and(
+          eq(cashWithdrawals.source, "sales"),
           eq(cashWithdrawals.salesLocationId, salesLocationId),
           gte(cashWithdrawals.createdAt, startOfDay),
           lte(cashWithdrawals.createdAt, effectiveEnd),

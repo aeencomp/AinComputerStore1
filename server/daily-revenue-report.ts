@@ -249,6 +249,7 @@ export async function computeDailyReportForApi(
     .from(cashWithdrawals)
     .where(
       and(
+        eq(cashWithdrawals.source, "sales"),
         eq(cashWithdrawals.salesLocationId, salesLocationId),
         sql`${cashWithdrawals.createdAt} >= ${dayStartSql}`,
         sql`${cashWithdrawals.createdAt} <= ${withdrawalEndSql}`,
