@@ -74,6 +74,7 @@ const STARTUP_MIGRATIONS: string[] = [
      SET repair_payment_source = 'technician'
      WHERE rt.repair_payment_source = 'sales'
        AND rt.payment_status IN ('paid', 'deferred')
+       AND coalesce(rt.excluded_from_sales_report, 0) = 0
        AND EXISTS (
          SELECT 1 FROM sales_shifts ss
          WHERE ss.sales_user_id LIKE 'tech:%'

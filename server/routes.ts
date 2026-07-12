@@ -4883,19 +4883,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const technicianId = (req.session as any).technicianId as string | undefined;
       const salesUserId = (req.session as any).salesUserId as string | undefined;
-      const paymentTagged =
-        updateData.paymentStatus === "paid" ||
-        updateData.paymentStatus === "deferred" ||
-        (updateData.status === "delivered" && effectiveStatus === "paid");
-      const paymentWasUntagged =
-        existing?.repairPaymentSource == null ||
-        existing?.repairPaymentSource === "sales";
-      if (paymentTagged && paymentWasUntagged) {
-        if (technicianId && !salesUserId) {
-          updateData.repairPaymentSource = "technician";
-        } else if (salesUserId || (req.session as any).adminId) {
-          updateData.repairPaymentSource = "sales";
-        }
+      const becomingPaid = effectiveStatus === "paid" && existing?.paymentStatus !== "paid";
+      const becomingDeferred = effectiveStatus === "deferred" && existing?.paymentStatus !== "deferred";
+      const becomingDelivered =
+        updateData.status === "delivered" && existing?.status !== "delivered";
+      if (technicianId && (becomingPaid || becomingDeferred || becomingDelivered)) {
+        updateData.repairPaymentSource = "technician";
+      } else if (
+        (becomingPaid || becomingDeferred || becomingDelivered) &&
+        (salesUserId || (req.session as any).adminId)
+      ) {
+        updateData.repairPaymentSource = "sales";
       }
 
       if (effectiveMethod === "split" && effectiveStatus === "paid") {
