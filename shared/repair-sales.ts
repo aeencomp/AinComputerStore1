@@ -52,12 +52,18 @@ export function repairTicketEligibleForSalesReport(ticket: {
   return false;
 }
 
-/** Store / cashier reports only — excludes technician portal repair payments. */
+/** Store / cashier reports only — repair_payment_source must be sales. */
 export function repairTicketIncludedInStoreSalesReport(ticket: {
   excludedFromSalesReport?: number | null;
   repairPaymentSource?: string | null;
 }): boolean {
   if (ticket.excludedFromSalesReport === 1) return false;
-  if (ticket.repairPaymentSource === REPAIR_PAYMENT_SOURCE_TECHNICIAN) return false;
-  return true;
+  return ticket.repairPaymentSource === REPAIR_PAYMENT_SOURCE_SALES;
+}
+
+/** Technician portal reports only — repair_payment_source must be technician. */
+export function repairTicketIncludedInTechnicianSalesReport(ticket: {
+  repairPaymentSource?: string | null;
+}): boolean {
+  return ticket.repairPaymentSource === REPAIR_PAYMENT_SOURCE_TECHNICIAN;
 }

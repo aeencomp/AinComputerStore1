@@ -41,6 +41,7 @@ import {
   fetchShiftReportEndTime,
   repairTicketIncludedInSalesReport,
   orderIncludedInSalesReport,
+  isTechnicianShiftOwnerId,
 } from "./shift-report";
 import { sqlRepairTicketInSalesWindow, sqlRepairTicketEligibleForSalesQuery } from "./repair-sales-date";
 import { baghdadNow } from "./baghdad-time";
@@ -240,6 +241,8 @@ const salesShiftIsActive = sql`lower(trim(${salesShifts.status})) = 'active'`;
 const salesShiftIsPaused = sql`lower(trim(${salesShifts.status})) = 'paused'`;
 const salesShiftIsOpen = sql`lower(trim(${salesShifts.status})) in ('active', 'paused')`;
 const salesShiftIsClosed = sql`lower(trim(${salesShifts.status})) = 'closed'`;
+/** Cashier/store shifts only — technician repair shifts use tech:{id} owner ids. */
+const sqlStoreSalesShiftOwner = sql`${salesShifts.salesUserId} not like 'tech:%'`;
 
 async function autoCloseShiftRecord(shiftId: string, reason: string): Promise<void> {
   const endTime = sql`timezone('Asia/Baghdad', now())`;
@@ -748,6 +751,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eq(salesShifts.salesUserId, salesUserId),
           statusFilter,
           eq(salesShifts.salesLocationId, locationId),
+          sqlStoreSalesShiftOwner,
         ))
         .orderBy(desc(salesShifts.startTime))
         .limit(1);
@@ -760,6 +764,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       .where(and(
         statusFilter,
         eq(salesShifts.salesLocationId, locationId),
+        sqlStoreSalesShiftOwner,
       ))
       .orderBy(desc(salesShifts.startTime))
       .limit(1);
@@ -2496,6 +2501,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const locationId = resolveRequestLocationId(req);
       const conditions: any[] = [];
       conditions.push(eq(salesShifts.salesLocationId, locationId));
+      conditions.push(sqlStoreSalesShiftOwner);
       if (canViewAll) {
         // show open+closed for all employees (lets supervisors pick correct shift)
         conditions.push(inArray(salesShifts.status, ['active', 'paused', 'closed']));
@@ -2699,6 +2705,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const [shift] = await db.select().from(salesShifts).where(eq(salesShifts.id, req.params.id));
       if (!shift) return res.status(404).json({ error: "الوردية غير موجودة" });
+      if (isTechnicianShiftOwnerId(shift.salesUserId)) {
+        return res.status(404).json({ error: "الوردية غير موجودة" });
+      }
 
       // Regular sales users can only view their own shifts
       if (!canViewAll && salesUserId && shift.salesUserId !== salesUserId) {
@@ -4917,10 +4926,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const technicianId = (req.session as any).technicianId as string | undefined;
       const salesUserId = (req.session as any).salesUserId as string | undefined;
-      const becomingPaid = effectiveStatus === "paid" && existing?.paymentStatus !== "paid";
-      const becomingDeferred = effectiveStatus === "deferred" && existing?.paymentStatus !== "deferred";
-      const becomingDelivered =
-        updateData.status === "delivered" && existing?.status !== "delivered";
       if (
         technicianId &&
         !salesUserId &&
@@ -4928,8 +4933,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) {
         updateData.repairPaymentSource = "technician";
       } else if (
-        (becomingPaid || becomingDeferred || becomingDelivered) &&
-        (salesUserId || (req.session as any).adminId)
+        (salesUserId || (req.session as any).adminId) &&
+        (effectiveStatus === "paid" || effectiveStatus === "deferred")
       ) {
         updateData.repairPaymentSource = "sales";
       }

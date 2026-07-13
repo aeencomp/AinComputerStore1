@@ -1,21 +1,18 @@
 import { repairTickets } from "@shared/schema";
-import { sql, and, or, eq, ne, isNotNull, isNull, type SQL } from "drizzle-orm";
+import { sql, and, or, eq, ne, isNotNull, type SQL } from "drizzle-orm";
 
 export const REPAIR_PAYMENT_SOURCE_SALES = "sales" as const;
 export const REPAIR_PAYMENT_SOURCE_TECHNICIAN = "technician" as const;
 
-/** Store / cashier repair payments — tagged at payment time only (repair_payment_source). */
+/** Store / cashier repair payments only (strict — never technician-tagged). */
 export function sqlRepairTicketIncludedInStoreSales(): SQL {
   return and(
     eq(repairTickets.excludedFromSalesReport, 0),
-    or(
-      eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_SALES),
-      isNull(repairTickets.repairPaymentSource),
-    ),
+    eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_SALES),
   )!;
 }
 
-/** Technician portal repair payments only. */
+/** Technician portal repair payments only (strict — never store-tagged). */
 export function sqlRepairTicketIncludedInTechnicianSales(): SQL {
   return eq(repairTickets.repairPaymentSource, REPAIR_PAYMENT_SOURCE_TECHNICIAN);
 }

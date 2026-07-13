@@ -70,30 +70,6 @@ const STARTUP_MIGRATIONS: string[] = [
 
   `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS repair_payment_source TEXT NOT NULL DEFAULT 'sales'`,
   `UPDATE repair_tickets SET repair_payment_source = 'sales' WHERE repair_payment_source IS NULL OR trim(repair_payment_source) = ''`,
-  `UPDATE repair_tickets rt
-     SET repair_payment_source = 'technician'
-     WHERE rt.repair_payment_source = 'sales'
-       AND rt.payment_status IN ('paid', 'deferred')
-       AND coalesce(rt.excluded_from_sales_report, 0) = 0
-       AND EXISTS (
-         SELECT 1 FROM sales_shifts ss
-         WHERE ss.sales_user_id LIKE 'tech:%'
-           AND ss.sales_location_id = 1
-           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) >= ss.start_time
-           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
-       )`,
-
-  `UPDATE repair_tickets rt
-     SET repair_payment_source = 'sales'
-     WHERE rt.repair_payment_source = 'technician'
-       AND coalesce(rt.excluded_from_sales_report, 0) = 0
-       AND NOT EXISTS (
-         SELECT 1 FROM sales_shifts ss
-         WHERE ss.sales_user_id LIKE 'tech:%'
-           AND ss.sales_location_id = 1
-           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) >= ss.start_time
-           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
-       )`,
 
   `UPDATE repair_tickets
      SET repair_payment_source = 'technician'
@@ -182,20 +158,6 @@ const STARTUP_MIGRATIONS: string[] = [
        AND NOT (COALESCE(permissions, '[]'::jsonb) @> '["view_withdrawals"]'::jsonb)
      ) sub
      WHERE t.id = sub.id`,
-
-  // Restore store repair sales wrongly tagged as technician while a cashier shift was open.
-  `UPDATE repair_tickets rt
-     SET repair_payment_source = 'sales'
-     WHERE rt.repair_payment_source = 'technician'
-       AND coalesce(rt.excluded_from_sales_report, 0) = 0
-       AND rt.payment_status IN ('paid', 'deferred')
-       AND EXISTS (
-         SELECT 1 FROM sales_shifts ss
-         WHERE ss.sales_user_id NOT LIKE 'tech:%'
-           AND coalesce(ss.sales_location_id, 1) = 1
-           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) >= ss.start_time
-           AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
-       )`,
 
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS meta_pixel_id TEXT DEFAULT ''`,
 
