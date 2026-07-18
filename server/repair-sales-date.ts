@@ -79,6 +79,14 @@ export function sqlRepairTicketInSalesWindow(startSql: SQL, endSql: SQL): SQL {
   )!;
 }
 
+/** Store daily/shift reports — store-tagged repairs only, within [startSql, endSql]. */
+export function sqlRepairTicketInStoreSalesWindow(startSql: SQL, endSql: SQL): SQL {
+  return and(
+    sqlRepairTicketIncludedInStoreSales(),
+    sqlRepairTicketInSalesWindow(startSql, endSql),
+  )!;
+}
+
 /** Max repair sales timestamp on a shift day (for extending closed-shift report windows). */
 export function sqlMaxRepairSalesAtOnShiftDay(
   shiftStartSql: SQL,

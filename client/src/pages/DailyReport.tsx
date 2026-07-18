@@ -31,6 +31,7 @@ import {
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import type { SalesShift } from "@shared/schema";
+import { repairTicketIncludedInStoreSalesReport } from "@shared/repair-sales";
 
 interface InStoreOrder {
   id: string;
@@ -66,6 +67,8 @@ interface RepairSale {
   status: string;
   deliveredAt?: string;
   updatedAt: string;
+  excludedFromSalesReport?: number | null;
+  repairPaymentSource?: string | null;
 }
 
 interface DailyReportSummary {
@@ -600,7 +603,7 @@ function mergeTodayDailyReport(
   const totalWithdrawals = daily.summary.totalWithdrawals ?? 0;
   const grandTotal = inStoreTotal + repairTotal + advancesTotal;
 
-  return {
+  return filterStoreOnlyDailyReport({
     ...base,
     inStoreSales: daily.inStoreSales,
     repairSales: daily.repairSales,
@@ -626,6 +629,48 @@ function mergeTodayDailyReport(
       grandTotalCard: (daily.summary.inStoreTotalCard ?? 0) + (daily.summary.repairTotalCard ?? 0),
       grandTotalZain: daily.summary.grandTotalZain ?? 0,
       grandTotalQi: daily.summary.grandTotalQi ?? 0,
+      netTotal: grandTotal - totalWithdrawals,
+    },
+  });
+}
+
+/** Strip technician-tagged repairs from the store daily report (POS + store repairs only). */
+function filterStoreOnlyDailyReport(data: ShiftReportData): ShiftReportData {
+  const repairSales = data.repairSales.filter((t) =>
+    repairTicketIncludedInStoreSalesReport(t),
+  );
+  if (repairSales.length === data.repairSales.length) return data;
+
+  const repairTotalDeferred = repairSales
+    .filter((t) => t.paymentStatus === "deferred")
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
+  const repairTotal = repairSales
+    .filter((t) => t.paymentStatus !== "deferred")
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
+  const repairTotalCash = repairSales
+    .filter((t) => t.paymentStatus === "paid" && (t.paymentMethod === "cash" || !t.paymentMethod))
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
+  const repairTotalCard = repairSales
+    .filter((t) => t.paymentStatus === "paid" && t.paymentMethod === "card")
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
+  const advancesTotal = data.summary.advancesTotal ?? 0;
+  const inStoreTotal = data.summary.inStoreTotal ?? 0;
+  const totalWithdrawals = data.summary.totalWithdrawals ?? 0;
+  const grandTotal = inStoreTotal + repairTotal + advancesTotal;
+
+  return {
+    ...data,
+    repairSales,
+    summary: {
+      ...data.summary,
+      repairCount: repairSales.filter((t) => t.paymentStatus !== "deferred").length,
+      repairTotal,
+      repairTotalDeferred,
+      repairTotalCash,
+      repairTotalCard,
+      grandTotal,
+      grandTotalCash: (data.summary.inStoreTotalCash ?? 0) + repairTotalCash,
+      grandTotalCard: (data.summary.inStoreTotalCard ?? 0) + repairTotalCard,
       netTotal: grandTotal - totalWithdrawals,
     },
   };
@@ -914,13 +959,15 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
 
   const data: ShiftReportData | null | undefined = useMemo(() => {
     if (!baseData) return null;
-    if (!dailyReportApi) return baseData;
+    if (!dailyReportApi) return filterStoreOnlyDailyReport(baseData);
 
     const reportBaghdadDay = baseData.shift?.startTime
       ? new Date(baseData.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" })
       : baghdadToday;
 
-    if (reportBaghdadDay !== baghdadToday) return baseData;
+    if (reportBaghdadDay !== baghdadToday) {
+      return filterStoreOnlyDailyReport(baseData);
+    }
 
     return mergeTodayDailyReport(baseData, dailyReportApi);
   }, [baseData, dailyReportApi, baghdadToday]);

@@ -12,7 +12,6 @@ import {
   computeShiftReportForShift,
   fetchShiftReportEndTime,
   orderIncludedInSalesReport,
-  repairTicketIncludedInSalesReport,
   reconcileClosedShiftRecord,
 } from "./shift-report";
 import {
@@ -24,7 +23,7 @@ import {
   repairCashAmount,
   repairCardAmount,
 } from "./order-payment";
-import { sqlRepairTicketInSalesWindow } from "./repair-sales-date";
+import { sqlRepairTicketInStoreSalesWindow } from "./repair-sales-date";
 
 export type DailyReportSummary = {
   inStoreCount: number;
@@ -211,12 +210,7 @@ export async function computeDailyReportForApi(
       ? await db
           .select()
           .from(repairTickets)
-          .where(
-            and(
-              repairTicketIncludedInSalesReport,
-              sqlRepairTicketInSalesWindow(dayStartSql, repairEndBound),
-            ),
-          )
+          .where(sqlRepairTicketInStoreSalesWindow(dayStartSql, repairEndBound))
       : [];
 
   const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndBound;

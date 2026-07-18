@@ -4929,13 +4929,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId as string | undefined;
       if (
         technicianId &&
-        !salesUserId &&
         (effectiveStatus === "paid" || effectiveStatus === "deferred")
       ) {
+        // Technician portal always wins — even if a sales session is also active.
         updateData.repairPaymentSource = "technician";
       } else if (
         (salesUserId || adminId) &&
-        !technicianId &&
         (effectiveStatus === "paid" || effectiveStatus === "deferred")
       ) {
         updateData.repairPaymentSource = "sales";

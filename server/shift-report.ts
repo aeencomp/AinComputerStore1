@@ -21,8 +21,9 @@ import {
 import {
   sqlRepairTicketInSalesWindow,
   sqlMaxRepairSalesAtOnShiftDay,
-  sqlRepairTicketIncludedInStoreSales,
   sqlRepairTicketIncludedInTechnicianSales,
+  sqlRepairTicketIncludedInStoreSales,
+  sqlRepairTicketInStoreSalesWindow,
 } from "./repair-sales-date";
 
 /** Orders hidden from sales/shift reports (voided or cancelled). */
@@ -125,6 +126,30 @@ function sqlShiftOrderCreatedWindow(
   )!;
 }
 
+/** Store shift repair window — store-tagged repairs only. */
+function sqlShiftRepairStoreSalesWindow(
+  shiftId: string,
+  shift: { status: string; reopenedAt?: Date | string | null; originalEndTime?: Date | string | null },
+  shiftEndSql: ReturnType<typeof sqlShiftReportEnd>,
+) {
+  const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
+  const isReopened =
+    shift.reopenedAt &&
+    shift.originalEndTime &&
+    String(shift.status).toLowerCase() !== "closed";
+
+  if (isReopened) {
+    const reopenedSql = sql`(select reopened_at from sales_shifts where id = ${shiftId} limit 1)`;
+    const originalEndSql = sql`(select original_end_time from sales_shifts where id = ${shiftId} limit 1)`;
+    return or(
+      sqlRepairTicketInStoreSalesWindow(shiftStartSql, originalEndSql),
+      sqlRepairTicketInStoreSalesWindow(reopenedSql, shiftEndSql),
+    )!;
+  }
+
+  return sqlRepairTicketInStoreSalesWindow(shiftStartSql, shiftEndSql);
+}
+
 /** Repair sales window for reopened shifts (original period OR after reopen). */
 function sqlShiftRepairSalesWindow(
   shiftId: string,
@@ -159,9 +184,6 @@ export async function computeShiftReportForShift(shiftId: string) {
   const salesLocationId = shift.salesLocationId ?? LOCATION_MAIN_ID;
   const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
   const shiftEndSql = sqlShiftReportEnd(shiftId, shift);
-  const repairScope = isTechnicianShift
-    ? sqlRepairTicketIncludedInTechnicianSales()
-    : sqlRepairTicketIncludedInStoreSales();
   const withdrawalSource = isTechnicianShift ? "technician" : "sales";
 
   const inStoreOrders = isTechnicianShift
@@ -182,10 +204,12 @@ export async function computeShiftReportForShift(shiftId: string) {
       .select()
       .from(repairTickets)
       .where(
-        and(
-          repairScope,
-          sqlShiftRepairSalesWindow(shiftId, shift, shiftEndSql),
-        ),
+        isTechnicianShift
+          ? and(
+            sqlRepairTicketIncludedInTechnicianSales(),
+            sqlShiftRepairSalesWindow(shiftId, shift, shiftEndSql),
+          )
+          : sqlShiftRepairStoreSalesWindow(shiftId, shift, shiftEndSql),
       )
     : [];
 
