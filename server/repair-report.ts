@@ -1,18 +1,16 @@
 import { db } from "./db";
 import { cashWithdrawals, repairTickets, salesShifts } from "@shared/schema";
-import { and, eq, gte, lte, desc, sql } from "drizzle-orm";
+import { and, eq, desc, sql } from "drizzle-orm";
 import { LOCATION_MAIN_ID } from "./sales-locations";
 import {
   fetchShiftReportEndTime,
   reconcileClosedShiftRecord,
 } from "./shift-report";
 import { repairCashAmount, repairCardAmount } from "./order-payment";
-import {
-  sqlRepairTicketInSalesWindow,
-  sqlRepairTicketIncludedInTechnicianDailyReport,
-} from "./repair-sales-date";
+import { sqlRepairTicketInTechnicianReportWindow } from "./repair-sales-date";
 import {
   sqlBaghdadDayStart,
+  sqlBaghdadDayEnd,
   sqlBaghdadRepairEndBound,
 } from "./daily-revenue-report";
 import { WITHDRAWAL_SOURCE_TECHNICIAN } from "@shared/schema";
@@ -32,6 +30,8 @@ export type RepairReportSummary = {
 export async function computeRepairReport(baghdadDateStr: string) {
   const startOfDay = new Date(`${baghdadDateStr}T00:00:00+03:00`);
   const endOfDay = new Date(`${baghdadDateStr}T23:59:59.999+03:00`);
+  const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
+  const dayEndSql = sqlBaghdadDayEnd(baghdadDateStr);
 
   const shiftsOnDate = await db
     .select()
@@ -40,8 +40,8 @@ export async function computeRepairReport(baghdadDateStr: string) {
       and(
         eq(salesShifts.salesLocationId, LOCATION_MAIN_ID),
         sql`${salesShifts.salesUserId} like 'tech:%'`,
-        gte(salesShifts.startTime, startOfDay),
-        lte(salesShifts.startTime, endOfDay),
+        sql`${salesShifts.startTime} >= ${dayStartSql}`,
+        sql`${salesShifts.startTime} <= ${dayEndSql}`,
       ),
     )
     .orderBy(desc(salesShifts.startTime));
@@ -75,17 +75,13 @@ export async function computeRepairReport(baghdadDateStr: string) {
         )
       : endOfDay;
 
-  const dayStartSql = sqlBaghdadDayStart(baghdadDateStr);
   const repairEndSql = sqlBaghdadRepairEndBound(baghdadDateStr, effectiveEnd);
 
   const paidRepairTickets = await db
     .select()
     .from(repairTickets)
     .where(
-      and(
-        sqlRepairTicketIncludedInTechnicianDailyReport(),
-        sqlRepairTicketInSalesWindow(dayStartSql, repairEndSql),
-      ),
+      sqlRepairTicketInTechnicianReportWindow(dayStartSql, repairEndSql),
     );
 
   const dailyWithdrawals = await db

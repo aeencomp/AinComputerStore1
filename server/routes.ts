@@ -4926,6 +4926,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const technicianId = (req.session as any).technicianId as string | undefined;
       const salesUserId = (req.session as any).salesUserId as string | undefined;
+      const adminId = (req.session as any).adminId as string | undefined;
       if (
         technicianId &&
         !salesUserId &&
@@ -4933,7 +4934,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       ) {
         updateData.repairPaymentSource = "technician";
       } else if (
-        (salesUserId || (req.session as any).adminId) &&
+        (salesUserId || adminId) &&
+        !technicianId &&
         (effectiveStatus === "paid" || effectiveStatus === "deferred")
       ) {
         updateData.repairPaymentSource = "sales";

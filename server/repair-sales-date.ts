@@ -43,6 +43,28 @@ export function sqlRepairTicketEligibleForSalesQuery(): SQL {
       or(isNotNull(repairTickets.deliveredAt), isNotNull(repairTickets.paidAt)),
     ),
     and(eq(repairTickets.paymentStatus, "paid"), isNotNull(repairTickets.paidAt)),
+    eq(repairTickets.paymentStatus, "deferred"),
+  )!;
+}
+
+/** Technician report window — paid/delivered/deferred with technician payment source. */
+export function sqlRepairTicketInTechnicianReportWindow(startSql: SQL, endSql: SQL): SQL {
+  const salesAt = sqlRepairTicketSalesAt();
+  return and(
+    sqlRepairTicketIncludedInTechnicianSales(),
+    or(
+      and(
+        ne(repairTickets.paymentStatus, "deferred"),
+        sql`${salesAt} is not null`,
+        sql`${salesAt} >= ${startSql}`,
+        sql`${salesAt} <= ${endSql}`,
+      ),
+      and(
+        eq(repairTickets.paymentStatus, "deferred"),
+        sql`${repairTickets.updatedAt} >= ${startSql}`,
+        sql`${repairTickets.updatedAt} <= ${endSql}`,
+      ),
+    ),
   )!;
 }
 

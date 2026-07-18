@@ -678,6 +678,46 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     ) || undefined;
     voidOrderMutation.mutate({ id: order.id, reason });
   };
+
+  const deleteAdvanceMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("DELETE", `/api/instore/staff-advances/${id}`);
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/sales/shifts/active-snapshot"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/daily-report"] });
+      toast({
+        title: language === "ar" ? "تم حذف السلفة" : "Advance removed",
+      });
+    },
+    onError: (err: Error) => {
+      toast({
+        title: language === "ar" ? "فشل الحذف" : "Delete failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    },
+  });
+
+  const confirmDeleteAdvance = (advance: StaffAdvance) => {
+    const msg = language === "ar"
+      ? `حذف سلفة ${advance.staffName} (${fmtNum(parseFloat(advance.amount))})؟`
+      : `Remove advance for ${advance.staffName} (${fmtNum(parseFloat(advance.amount))})?`;
+    if (window.confirm(msg)) {
+      deleteAdvanceMutation.mutate(advance.id);
+    }
+  };
+
+  const shiftAllowsAdvanceEdits = (shift?: SalesShift | null) => {
+    const st = String(shift?.status ?? "").toLowerCase();
+    return st === "active" || st === "paused";
+  };
   const [selectedShiftId, setSelectedShiftId] = useState<string | null>(null);
   const [manualLabelName, setManualLabelName] = useState("");
   const [manualLabelDate, setManualLabelDate] = useState("");
@@ -1833,6 +1873,9 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             <th className="py-2 px-4 text-start">{language === "ar" ? "السبب" : "Reason"}</th>
                             <th className="py-2 px-4 text-start">{language === "ar" ? "الوقت" : "Time"}</th>
                             <th className="py-2 px-4 text-end">{language === "ar" ? "المبلغ" : "Amount"}</th>
+                            {shiftAllowsAdvanceEdits(data.shift) && (
+                              <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16" />
+                            )}
                           </tr>
                         </thead>
                         <tbody>
@@ -1847,12 +1890,31 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                               <td className="py-2 px-4 text-end font-semibold text-emerald-600 dark:text-emerald-400">
                                 + {fmtNum(parseFloat(a.amount))}
                               </td>
+                              {shiftAllowsAdvanceEdits(data.shift) && (
+                                <td className="py-2 px-4 text-center">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => confirmDeleteAdvance(a)}
+                                    disabled={deleteAdvanceMutation.isPending}
+                                    title={language === "ar" ? "حذف السلفة" : "Remove advance"}
+                                    className="text-destructive hover:text-destructive"
+                                    data-testid={`button-delete-advance-${a.id}`}
+                                  >
+                                    {deleteAdvanceMutation.isPending ? (
+                                      <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                      <Trash2 className="h-4 w-4" />
+                                    )}
+                                  </Button>
+                                </td>
+                              )}
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr className="bg-emerald-50/50 dark:bg-emerald-900/10 border-t-2 font-semibold">
-                            <td colSpan={4} className="py-2 px-4">{language === "ar" ? "إجمالي السلف" : "Total Advances"}</td>
+                            <td colSpan={shiftAllowsAdvanceEdits(data.shift) ? 5 : 4} className="py-2 px-4">{language === "ar" ? "إجمالي السلف" : "Total Advances"}</td>
                             <td className="py-2 px-4 text-end text-emerald-600 dark:text-emerald-400">
                               + {fmtNum(data.summary.advancesTotal ?? 0)}
                             </td>
