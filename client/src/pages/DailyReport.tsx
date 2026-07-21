@@ -31,7 +31,6 @@ import {
 import { format } from "date-fns";
 import { ar } from "date-fns/locale";
 import type { SalesShift } from "@shared/schema";
-import { repairTicketIncludedInStoreSalesReport } from "@shared/repair-sales";
 
 interface InStoreOrder {
   id: string;
@@ -456,11 +455,6 @@ function buildPrintHTML(data: ShiftReportData): string {
       <div class="sub">${summary.inStoreCount} فاتورة${summary.inStoreTotalCash > 0 ? ` · نقداً: ${fmtNum(summary.inStoreTotalCash)}` : ""}${(summary.inStoreTotalCard ?? 0) > 0 ? ` · بطاقة: ${fmtNum(summary.inStoreTotalCard)}` : ""}${summary.inStoreTotalDeferred > 0 ? ` · آجل: ${fmtNum(summary.inStoreTotalDeferred)}` : ""}</div>
     </div>
     <div class="summary-box">
-      <div class="label">مدفوعات التصليح</div>
-      <div class="value blue">${fmtNum(summary.repairTotal)}</div>
-      <div class="sub">${summary.repairCount} تذكرة</div>
-    </div>
-    <div class="summary-box">
       <div class="label">الإجمالي المحصّل</div>
       <div class="value primary">${fmtNum(summary.grandTotal)}</div>
       <div class="sub">&nbsp;</div>
@@ -503,28 +497,6 @@ function buildPrintHTML(data: ShiftReportData): string {
         <tr>
           <td colspan="5">المجموع ${summary.inStoreTotalDeferred > 0 ? `<span style="font-size:10px;font-weight:400;color:#c2410c;margin-right:8px">(آجل غير محسوب: ${fmtNum(summary.inStoreTotalDeferred)})</span>` : ""}</td>
           <td style="color:#7c3aed">${fmtNum(summary.inStoreTotal)}</td>
-        </tr>
-      </tfoot>
-    </table>`}
-
-  <div class="section-title">
-    <span class="icon-dot" style="background:#2563eb"></span>
-    مدفوعات التصليح
-    <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${repairSales.filter(t => t.paymentStatus !== 'deferred').length} سجل</span>
-  </div>
-  ${repairSales.length === 0
-    ? `<div class="empty-msg">لا توجد مدفوعات تصليح في هذه الوردية</div>`
-    : `<table>
-      <thead>
-        <tr>
-          <th>#</th><th>رقم التذكرة</th><th>العميل</th><th>الجهاز</th><th>طريقة الدفع</th><th>المبلغ</th>
-        </tr>
-      </thead>
-      <tbody>${repairRows}</tbody>
-      <tfoot>
-        <tr>
-          <td colspan="5">المجموع ${(summary.repairTotalDeferred ?? 0) > 0 ? `<span style="font-size:10px;font-weight:400;color:#c2410c;margin-right:8px">(آجل غير محسوب: ${fmtNum(summary.repairTotalDeferred)})</span>` : ""}</td>
-          <td style="color:#2563eb">${fmtNum(summary.repairTotal)}</td>
         </tr>
       </tfoot>
     </table>`}
@@ -599,14 +571,12 @@ function mergeTodayDailyReport(
 ): ShiftReportData {
   const advancesTotal = base.summary.advancesTotal ?? 0;
   const inStoreTotal = daily.summary.inStoreTotal ?? 0;
-  const repairTotal = daily.summary.repairTotal ?? 0;
   const totalWithdrawals = daily.summary.totalWithdrawals ?? 0;
-  const grandTotal = inStoreTotal + repairTotal + advancesTotal;
+  const grandTotal = inStoreTotal + advancesTotal;
 
-  return filterStoreOnlyDailyReport({
+  return stripRepairsFromInStoreReport({
     ...base,
     inStoreSales: daily.inStoreSales,
-    repairSales: daily.repairSales,
     withdrawals: daily.withdrawals ?? [],
     summary: {
       ...base.summary,
@@ -617,16 +587,16 @@ function mergeTodayDailyReport(
       inStoreTotalZain: daily.summary.inStoreTotalZain ?? 0,
       inStoreTotalQi: daily.summary.inStoreTotalQi ?? 0,
       inStoreTotalDeferred: daily.summary.inStoreTotalDeferred ?? 0,
-      repairCount: daily.summary.repairCount ?? 0,
-      repairTotal,
-      repairTotalCash: daily.summary.repairTotalCash ?? 0,
-      repairTotalCard: daily.summary.repairTotalCard ?? 0,
-      repairTotalDeferred: daily.summary.repairTotalDeferred ?? 0,
+      repairCount: 0,
+      repairTotal: 0,
+      repairTotalCash: 0,
+      repairTotalCard: 0,
+      repairTotalDeferred: 0,
       totalWithdrawals,
       withdrawalCount: daily.summary.withdrawalCount ?? 0,
       grandTotal,
-      grandTotalCash: (daily.summary.inStoreTotalCash ?? 0) + (daily.summary.repairTotalCash ?? 0),
-      grandTotalCard: (daily.summary.inStoreTotalCard ?? 0) + (daily.summary.repairTotalCard ?? 0),
+      grandTotalCash: daily.summary.inStoreTotalCash ?? 0,
+      grandTotalCard: daily.summary.inStoreTotalCard ?? 0,
       grandTotalZain: daily.summary.grandTotalZain ?? 0,
       grandTotalQi: daily.summary.grandTotalQi ?? 0,
       netTotal: grandTotal - totalWithdrawals,
@@ -634,43 +604,48 @@ function mergeTodayDailyReport(
   });
 }
 
-/** Strip technician-tagged repairs from the store daily report (POS + store repairs only). */
-function filterStoreOnlyDailyReport(data: ShiftReportData): ShiftReportData {
-  const repairSales = data.repairSales.filter((t) =>
-    repairTicketIncludedInStoreSalesReport(t),
-  );
-  if (repairSales.length === data.repairSales.length) return data;
+/** In-store daily report is POS-only — no repair rows or repair totals. */
+function stripRepairsFromInStoreReport(data: ShiftReportData): ShiftReportData {
+  if (data.repairSales.length === 0 && (data.summary.repairTotal ?? 0) === 0) {
+    const advancesTotal = data.summary.advancesTotal ?? 0;
+    const inStoreTotal = data.summary.inStoreTotal ?? 0;
+    const grandTotal = inStoreTotal + advancesTotal;
+    return {
+      ...data,
+      repairSales: [],
+      summary: {
+        ...data.summary,
+        repairCount: 0,
+        repairTotal: 0,
+        repairTotalDeferred: 0,
+        repairTotalCash: 0,
+        repairTotalCard: 0,
+        grandTotal,
+        grandTotalCash: data.summary.inStoreTotalCash ?? 0,
+        grandTotalCard: data.summary.inStoreTotalCard ?? 0,
+        netTotal: grandTotal - (data.summary.totalWithdrawals ?? 0),
+      },
+    };
+  }
 
-  const repairTotalDeferred = repairSales
-    .filter((t) => t.paymentStatus === "deferred")
-    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
-  const repairTotal = repairSales
-    .filter((t) => t.paymentStatus !== "deferred")
-    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
-  const repairTotalCash = repairSales
-    .filter((t) => t.paymentStatus === "paid" && (t.paymentMethod === "cash" || !t.paymentMethod))
-    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
-  const repairTotalCard = repairSales
-    .filter((t) => t.paymentStatus === "paid" && t.paymentMethod === "card")
-    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
   const advancesTotal = data.summary.advancesTotal ?? 0;
   const inStoreTotal = data.summary.inStoreTotal ?? 0;
   const totalWithdrawals = data.summary.totalWithdrawals ?? 0;
-  const grandTotal = inStoreTotal + repairTotal + advancesTotal;
+  const grandTotal = inStoreTotal + advancesTotal;
 
   return {
     ...data,
-    repairSales,
+    repairSales: [],
     summary: {
       ...data.summary,
-      repairCount: repairSales.filter((t) => t.paymentStatus !== "deferred").length,
-      repairTotal,
-      repairTotalDeferred,
-      repairTotalCash,
-      repairTotalCard,
+      repairCount: 0,
+      repairTotal: 0,
+      repairTotalDeferred: 0,
+      repairTotalCash: 0,
+      repairTotalCard: 0,
       grandTotal,
-      grandTotalCash: (data.summary.inStoreTotalCash ?? 0) + repairTotalCash,
-      grandTotalCard: (data.summary.inStoreTotalCard ?? 0) + repairTotalCard,
+      grandTotalCash: data.summary.inStoreTotalCash ?? 0,
+      grandTotalCard: data.summary.inStoreTotalCard ?? 0,
       netTotal: grandTotal - totalWithdrawals,
     },
   };
@@ -925,7 +900,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     }
   };
 
-  const dailyAsShift: ShiftReportData | null = dailyReportApi ? {
+  const dailyAsShift: ShiftReportData | null = dailyReportApi ? stripRepairsFromInStoreReport({
     shift: {
       id: `daily-${baghdadToday}`,
       salesUserId: "daily",
@@ -936,22 +911,31 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
       closingCash: null,
       expectedCash: null,
       cashDifference: null,
-      totalSales: String(dailyReportApi.summary.grandTotal ?? 0),
-      totalTransactions: (dailyReportApi.summary.inStoreCount ?? 0) + (dailyReportApi.summary.repairCount ?? 0),
+      totalSales: String(dailyReportApi.summary.inStoreTotal ?? 0),
+      totalTransactions: dailyReportApi.summary.inStoreCount ?? 0,
       notes: null,
       status: "closed",
       createdAt: new Date().toISOString(),
     } as unknown as SalesShift,
     inStoreSales: dailyReportApi.inStoreSales,
-    repairSales: dailyReportApi.repairSales,
+    repairSales: [],
     withdrawals: dailyReportApi.withdrawals,
     advances: [],
     summary: {
       ...dailyReportApi.summary,
+      repairCount: 0,
+      repairTotal: 0,
+      repairTotalDeferred: 0,
+      repairTotalCash: 0,
+      repairTotalCard: 0,
+      grandTotal: dailyReportApi.summary.inStoreTotal ?? 0,
+      grandTotalCash: dailyReportApi.summary.inStoreTotalCash ?? 0,
+      grandTotalCard: dailyReportApi.summary.inStoreTotalCard ?? 0,
       advancesTotal: 0,
       advancesCount: 0,
+      netTotal: (dailyReportApi.summary.inStoreTotal ?? 0) - (dailyReportApi.summary.totalWithdrawals ?? 0),
     },
-  } : null;
+  }) : null;
 
   const baseData: ShiftReportData | null | undefined = selectedShiftId
     ? shiftReport
@@ -959,14 +943,14 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
 
   const data: ShiftReportData | null | undefined = useMemo(() => {
     if (!baseData) return null;
-    if (!dailyReportApi) return filterStoreOnlyDailyReport(baseData);
+    if (!dailyReportApi) return stripRepairsFromInStoreReport(baseData);
 
     const reportBaghdadDay = baseData.shift?.startTime
       ? new Date(baseData.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" })
       : baghdadToday;
 
     if (reportBaghdadDay !== baghdadToday) {
-      return filterStoreOnlyDailyReport(baseData);
+      return stripRepairsFromInStoreReport(baseData);
     }
 
     return mergeTodayDailyReport(baseData, dailyReportApi);
@@ -1475,31 +1459,9 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                   </CardContent>
                 </Card>
 
-                <Card>
-                  <CardContent className="pt-4 pb-3">
-                    <p className="text-xs text-muted-foreground mb-1">
-                      {language === "ar" ? "مجموع التصليح" : "Repair Total"}
-                    </p>
-                    <p className="text-lg font-bold text-blue-600 dark:text-blue-400" data-testid="text-repair-total">
-                      {fmtNum(data.summary.repairTotal)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-0.5">
-                      {data.summary.repairCount} {language === "ar" ? "تذكرة" : "ticket"}
-                    </p>
-                  </CardContent>
-                </Card>
-
                 <Card className="col-span-2 border-primary/30">
                   <CardContent className="pt-4 pb-4">
                     <div className="space-y-1.5 mb-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">
-                          {language === "ar" ? "متجر + تصليح" : "Store + Repair"}
-                        </span>
-                        <span className="font-medium">
-                          {fmtNum((data.summary.inStoreTotal ?? 0) + (data.summary.repairTotal ?? 0))}
-                        </span>
-                      </div>
                       {(data.summary.advancesTotal ?? 0) > 0 && (
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
@@ -1695,150 +1657,6 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                             </td>
                             <td className="py-2 px-4 text-end text-violet-600 dark:text-violet-400">
                               {fmtNum(data.summary.inStoreTotal)}
-                            </td>
-                            {canVoidSales && <td />}
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Repair Sales */}
-              <Card>
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Wrench className="h-5 w-5 text-blue-500" />
-                    {language === "ar" ? "مدفوعات التصليح" : "Repair Payments"}
-                    <Badge variant="secondary" className="ms-auto">{data.repairSales.length}</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-0">
-                  {data.repairSales.length === 0 ? (
-                    <p className="text-center text-muted-foreground py-8 text-sm">
-                      {language === "ar" ? "لا توجد مدفوعات تصليح في هذه الوردية" : "No repair payments in this shift"}
-                    </p>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b bg-muted/50">
-                            <th className="text-start py-2 px-4 font-medium text-muted-foreground">#</th>
-                            <th className="text-start py-2 px-4 font-medium text-muted-foreground">
-                              {language === "ar" ? "رقم التذكرة" : "Ticket #"}
-                            </th>
-                            <th className="text-start py-2 px-4 font-medium text-muted-foreground">
-                              {language === "ar" ? "العميل" : "Customer"}
-                            </th>
-                            <th className="text-start py-2 px-4 font-medium text-muted-foreground">
-                              {language === "ar" ? "الجهاز" : "Device"}
-                            </th>
-                            <th className="text-start py-2 px-4 font-medium text-muted-foreground">
-                              {language === "ar" ? "طريقة الدفع" : "Payment"}
-                            </th>
-                            <th className="text-end py-2 px-4 font-medium text-muted-foreground">
-                              {language === "ar" ? "المبلغ" : "Amount"}
-                            </th>
-                            {canVoidSales && (
-                              <th className="text-center py-2 px-4 font-medium text-muted-foreground w-16" />
-                            )}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.repairSales.map((ticket, idx) => {
-                            const amount = parseFloat(ticket.finalCost || ticket.costEstimate || "0");
-                            const deviceStr = [ticket.deviceBrand, ticket.deviceModel, ticket.deviceType].filter(Boolean).join(" ");
-                            const hasDetails = ticket.issueDescriptionAr || ticket.technicianNotes;
-                            return (
-                              <>
-                                <tr key={ticket.id} className="border-b" data-testid={`row-repair-${ticket.id}`}>
-                                  <td className="py-2 px-4 text-muted-foreground">{idx + 1}</td>
-                                  <td className="py-2 px-4 font-mono text-xs">{ticket.ticketNumber}</td>
-                                  <td className="py-2 px-4">
-                                    <div>{ticket.customerName}</div>
-                                    {ticket.customerPhone && (
-                                      <div className="text-xs text-muted-foreground">{ticket.customerPhone}</div>
-                                    )}
-                                  </td>
-                                  <td className="py-2 px-4 text-muted-foreground">{deviceStr}</td>
-                                  <td className="py-2 px-4">
-                                    <div className="flex flex-wrap gap-1">
-                                      {ticket.paymentStatus === 'deferred'
-                                        ? <Badge variant="outline" className="text-orange-600 border-orange-400">آجل</Badge>
-                                        : ticket.status === 'delivered'
-                                          ? <Badge variant="outline" className="text-emerald-700 border-emerald-400">مُسلَّم</Badge>
-                                          : <Badge variant="outline" className="text-green-700 border-green-400">مدفوع</Badge>
-                                      }
-                                      {ticket.paymentStatus !== 'deferred' && (
-                                        <Badge variant="outline" className="text-xs">
-                                          {ticket.paymentMethod === 'split'
-                                            ? `نقد ${(parseFloat((ticket as any).cashPaidAmount || '0') || 0).toLocaleString('en-US')} + بطاقة ${(parseFloat((ticket as any).cardPaidAmount || '0') || 0).toLocaleString('en-US')}`
-                                            : ticket.paymentMethod === 'card' ? 'بطاقة' : 'نقداً'}
-                                        </Badge>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className={`py-2 px-4 text-end font-semibold ${ticket.paymentStatus === 'deferred' ? 'text-orange-600' : ''}`}>
-                                    {fmtNum(amount)}
-                                  </td>
-                                  {canVoidSales && (
-                                    <td className="py-2 px-4 text-center">
-                                      <Button
-                                        size="icon"
-                                        variant="ghost"
-                                        onClick={() => confirmVoidRepair(ticket)}
-                                        disabled={voidRepairMutation.isPending}
-                                        title={language === "ar" ? "إلغاء مبيعة الصيانة" : "Void repair sale"}
-                                        className="text-destructive hover:text-destructive"
-                                        data-testid={`button-void-repair-${ticket.id}`}
-                                      >
-                                        {voidRepairMutation.isPending ? (
-                                          <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                          <Ban className="h-4 w-4" />
-                                        )}
-                                      </Button>
-                                    </td>
-                                  )}
-                                </tr>
-                                {hasDetails && (
-                                  <tr key={`${ticket.id}-detail`} className="border-b last:border-0 bg-muted/20">
-                                    <td />
-                                    <td colSpan={canVoidSales ? 6 : 5} className="py-1 px-4 pb-2">
-                                      <div className="flex flex-wrap gap-x-6 gap-y-0.5">
-                                        {ticket.issueDescriptionAr && (
-                                          <span className="text-xs text-muted-foreground">
-                                            <span className="font-medium text-foreground/70">{language === "ar" ? "المشكلة:" : "Issue:"}</span>{" "}
-                                            {ticket.issueDescriptionAr}
-                                          </span>
-                                        )}
-                                        {ticket.technicianNotes && (
-                                          <span className="text-xs text-muted-foreground">
-                                            <span className="font-medium text-foreground/70">{language === "ar" ? "ملاحظات الفني:" : "Tech notes:"}</span>{" "}
-                                            {ticket.technicianNotes}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </>
-                            );
-                          })}
-                        </tbody>
-                        <tfoot>
-                          <tr className="bg-muted/30 border-t-2 font-semibold">
-                            <td colSpan={canVoidSales ? 6 : 5} className="py-2 px-4">
-                              {language === "ar" ? "المجموع" : "Total"}
-                              {(data.summary.repairTotalDeferred ?? 0) > 0 && (
-                                <span className="text-xs text-orange-500 font-normal ms-2">
-                                  (آجل غير محسوب: {fmtNum(data.summary.repairTotalDeferred)})
-                                </span>
-                              )}
-                            </td>
-                            <td className="py-2 px-4 text-end text-blue-600 dark:text-blue-400">
-                              {fmtNum(data.summary.repairTotal)}
                             </td>
                             {canVoidSales && <td />}
                           </tr>

@@ -4929,9 +4929,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const adminId = (req.session as any).adminId as string | undefined;
       if (
         technicianId &&
-        (effectiveStatus === "paid" || effectiveStatus === "deferred")
+        (
+          effectiveTicketStatus === "delivered" ||
+          effectiveStatus === "paid" ||
+          effectiveStatus === "deferred"
+        )
       ) {
-        // Technician portal always wins — even if a sales session is also active.
+        // Technician portal always wins — incl. 0 IQD delivered without payment.
         updateData.repairPaymentSource = "technician";
       } else if (
         (salesUserId || adminId) &&
@@ -11328,7 +11332,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         : resolveRequestLocationId(req);
       const salesLocationId = Number.isNaN(requestedLocationId) ? LOCATION_MAIN_ID : requestedLocationId;
 
-      const report = await computeDailyReportForApi(baghdadDateStr, salesLocationId);
+      const report = await computeDailyReportForApi(baghdadDateStr, salesLocationId, {
+        excludeRepairs: true,
+      });
       res.set("Cache-Control", "no-store");
       res.json(report);
     } catch (err) {

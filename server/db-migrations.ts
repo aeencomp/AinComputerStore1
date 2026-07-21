@@ -173,6 +173,20 @@ const STARTUP_MIGRATIONS: string[] = [
            AND coalesce(rt.paid_at, rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
        )`,
 
+  // 0 IQD delivered during technician shift — tag as technician for repair report.
+  `UPDATE repair_tickets rt
+     SET repair_payment_source = 'technician'
+     WHERE rt.repair_payment_source = 'sales'
+       AND rt.status = 'delivered'
+       AND coalesce(nullif(trim(rt.final_cost), '')::numeric, nullif(trim(rt.cost_estimate), '')::numeric, 0) = 0
+       AND EXISTS (
+         SELECT 1 FROM sales_shifts ss
+         WHERE ss.sales_user_id LIKE 'tech:%'
+           AND coalesce(ss.sales_location_id, 1) = 1
+           AND coalesce(rt.delivered_at, rt.updated_at) >= ss.start_time
+           AND coalesce(rt.delivered_at, rt.updated_at) <= coalesce(ss.end_time, timezone('Asia/Baghdad', now()))
+       )`,
+
   `ALTER TABLE store_settings ADD COLUMN IF NOT EXISTS meta_pixel_id TEXT DEFAULT ''`,
 
   `CREATE TABLE IF NOT EXISTS facebook_post_log (

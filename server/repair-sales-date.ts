@@ -47,24 +47,23 @@ export function sqlRepairTicketEligibleForSalesQuery(): SQL {
   )!;
 }
 
-/** Technician report window — paid/delivered/deferred with technician payment source. */
+/** When a technician-tagged repair counts for daily/shift reports (incl. 0 IQD delivered). */
+export function sqlRepairTicketTechnicianActivityAt() {
+  return sql`coalesce(${repairTickets.deliveredAt}, ${repairTickets.paidAt}, ${repairTickets.updatedAt})`;
+}
+
+/** Technician report window — paid, delivered (incl. 0 IQD), or deferred. */
 export function sqlRepairTicketInTechnicianReportWindow(startSql: SQL, endSql: SQL): SQL {
-  const salesAt = sqlRepairTicketSalesAt();
+  const activityAt = sqlRepairTicketTechnicianActivityAt();
   return and(
     sqlRepairTicketIncludedInTechnicianSales(),
     or(
-      and(
-        ne(repairTickets.paymentStatus, "deferred"),
-        sql`${salesAt} is not null`,
-        sql`${salesAt} >= ${startSql}`,
-        sql`${salesAt} <= ${endSql}`,
-      ),
-      and(
-        eq(repairTickets.paymentStatus, "deferred"),
-        sql`${repairTickets.updatedAt} >= ${startSql}`,
-        sql`${repairTickets.updatedAt} <= ${endSql}`,
-      ),
-    ),
+      eq(repairTickets.paymentStatus, "deferred"),
+      eq(repairTickets.status, "delivered"),
+      eq(repairTickets.paymentStatus, "paid"),
+    )!,
+    sql`${activityAt} >= ${startSql}`,
+    sql`${activityAt} <= ${endSql}`,
   )!;
 }
 
@@ -85,6 +84,11 @@ export function sqlRepairTicketInStoreSalesWindow(startSql: SQL, endSql: SQL): S
     sqlRepairTicketIncludedInStoreSales(),
     sqlRepairTicketInSalesWindow(startSql, endSql),
   )!;
+}
+
+/** Technician shift report — same scope as calendar technician daily report. */
+export function sqlRepairTicketInTechnicianShiftWindow(startSql: SQL, endSql: SQL): SQL {
+  return sqlRepairTicketInTechnicianReportWindow(startSql, endSql);
 }
 
 /** Max repair sales timestamp on a shift day (for extending closed-shift report windows). */

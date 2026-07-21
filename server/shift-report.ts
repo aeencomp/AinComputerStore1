@@ -24,6 +24,7 @@ import {
   sqlRepairTicketIncludedInTechnicianSales,
   sqlRepairTicketIncludedInStoreSales,
   sqlRepairTicketInStoreSalesWindow,
+  sqlRepairTicketInTechnicianShiftWindow,
 } from "./repair-sales-date";
 
 /** Orders hidden from sales/shift reports (voided or cancelled). */
@@ -150,6 +151,30 @@ function sqlShiftRepairStoreSalesWindow(
   return sqlRepairTicketInStoreSalesWindow(shiftStartSql, shiftEndSql);
 }
 
+/** Technician shift repair window (incl. 0 IQD delivered). */
+function sqlShiftRepairTechnicianSalesWindow(
+  shiftId: string,
+  shift: { status: string; reopenedAt?: Date | string | null; originalEndTime?: Date | string | null },
+  shiftEndSql: ReturnType<typeof sqlShiftReportEnd>,
+) {
+  const shiftStartSql = sql`(select start_time from sales_shifts where id = ${shiftId} limit 1)`;
+  const isReopened =
+    shift.reopenedAt &&
+    shift.originalEndTime &&
+    String(shift.status).toLowerCase() !== "closed";
+
+  if (isReopened) {
+    const reopenedSql = sql`(select reopened_at from sales_shifts where id = ${shiftId} limit 1)`;
+    const originalEndSql = sql`(select original_end_time from sales_shifts where id = ${shiftId} limit 1)`;
+    return or(
+      sqlRepairTicketInTechnicianShiftWindow(shiftStartSql, originalEndSql),
+      sqlRepairTicketInTechnicianShiftWindow(reopenedSql, shiftEndSql),
+    )!;
+  }
+
+  return sqlRepairTicketInTechnicianShiftWindow(shiftStartSql, shiftEndSql);
+}
+
 /** Repair sales window for reopened shifts (original period OR after reopen). */
 function sqlShiftRepairSalesWindow(
   shiftId: string,
@@ -205,10 +230,7 @@ export async function computeShiftReportForShift(shiftId: string) {
       .from(repairTickets)
       .where(
         isTechnicianShift
-          ? and(
-            sqlRepairTicketIncludedInTechnicianSales(),
-            sqlShiftRepairSalesWindow(shiftId, shift, shiftEndSql),
-          )
+          ? sqlShiftRepairTechnicianSalesWindow(shiftId, shift, shiftEndSql)
           : sqlShiftRepairStoreSalesWindow(shiftId, shift, shiftEndSql),
       )
     : [];

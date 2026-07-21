@@ -111,7 +111,7 @@ export async function computeRepairReport(baghdadDateStr: string) {
     repairSales: paidRepairTickets,
     withdrawals: dailyWithdrawals,
     summary: {
-      repairCount: paidRepairTickets.filter((t) => t.paymentStatus !== "deferred").length,
+      repairCount: paidRepairTickets.length,
       repairTotal,
       repairTotalDeferred,
       repairTotalCash,

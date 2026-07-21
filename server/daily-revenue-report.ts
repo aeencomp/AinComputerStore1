@@ -94,6 +94,8 @@ export type DailyReportSummaryOptions = {
    * Shift report UI: shift-aware attribution (default).
    */
   calendarDayOnly?: boolean;
+  /** Store portal daily report — POS + withdrawals only (no repair rows). */
+  excludeRepairs?: boolean;
 };
 
 /** Full daily report payload for GET /api/daily-report (shift-aware Baghdad day). */
@@ -206,12 +208,12 @@ export async function computeDailyReportForApi(
   }
 
   const paidRepairTickets =
-    salesLocationId === LOCATION_MAIN_ID
-      ? await db
+    options?.excludeRepairs || salesLocationId !== LOCATION_MAIN_ID
+      ? []
+      : await db
           .select()
           .from(repairTickets)
-          .where(sqlRepairTicketInStoreSalesWindow(dayStartSql, repairEndBound))
-      : [];
+          .where(sqlRepairTicketInStoreSalesWindow(dayStartSql, repairEndBound));
 
   const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndBound;
 
