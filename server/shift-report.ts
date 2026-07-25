@@ -21,6 +21,7 @@ import {
 import {
   sqlRepairTicketInSalesWindow,
   sqlMaxRepairSalesAtOnShiftDay,
+  sqlMaxTechnicianRepairActivityOnShiftDay,
   sqlRepairTicketIncludedInTechnicianSales,
   sqlRepairTicketIncludedInStoreSales,
   sqlRepairTicketInStoreSalesWindow,
@@ -61,6 +62,22 @@ export function sqlShiftReportEnd(shiftId: string, shift: {
 
   const shiftDay = baghdadDateString(new Date(shift.startTime));
   const dayEndSql = sqlBaghdadDayEnd(shiftDay);
+  const isTechnicianShift = isTechnicianShiftOwnerId(shift.salesUserId);
+
+  if (isTechnicianShift) {
+    return sql`(
+      select least(
+        ${dayEndSql},
+        greatest(
+          ${shiftEndSql},
+          coalesce(
+            ${sqlMaxTechnicianRepairActivityOnShiftDay(shiftStartSql, dayEndSql)},
+            ${shiftEndSql}
+          )
+        )
+      )
+    )`;
+  }
 
   return sql`(
     select least(

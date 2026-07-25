@@ -91,6 +91,25 @@ export function sqlRepairTicketInTechnicianShiftWindow(startSql: SQL, endSql: SQ
   return sqlRepairTicketInTechnicianReportWindow(startSql, endSql);
 }
 
+/** Max technician repair activity on a shift day (for extending closed technician shift windows). */
+export function sqlMaxTechnicianRepairActivityOnShiftDay(
+  shiftStartSql: SQL,
+  dayEndSql: SQL,
+): SQL {
+  const activityAt = sql`coalesce(rt.delivered_at, rt.paid_at, rt.updated_at)`;
+  return sql`(
+    select max(${activityAt}) from repair_tickets rt
+    where rt.repair_payment_source = 'technician'
+      and (
+        rt.payment_status = 'deferred'
+        or rt.status = 'delivered'
+        or rt.payment_status = 'paid'
+      )
+      and ${activityAt} >= ${shiftStartSql}
+      and ${activityAt} <= ${dayEndSql}
+  )`;
+}
+
 /** Max repair sales timestamp on a shift day (for extending closed-shift report windows). */
 export function sqlMaxRepairSalesAtOnShiftDay(
   shiftStartSql: SQL,

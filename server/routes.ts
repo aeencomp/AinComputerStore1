@@ -5329,7 +5329,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const baghdadDateStr =
         dateParam || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
-      const report = await computeRepairReport(baghdadDateStr);
+      const technicianId = (req.session as any)?.technicianId as string | undefined;
+      const report = await computeRepairReport(baghdadDateStr, { technicianId });
       res.set("Cache-Control", "no-store");
       return res.json(report);
     } catch (error) {

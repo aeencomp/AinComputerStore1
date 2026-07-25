@@ -112,6 +112,7 @@ function buildRepairPrintHTML(
   dateLabel: string,
   repairSales: RepairSale[],
   summary: RepairReportResponse["summary"],
+  withdrawals: RepairReportResponse["withdrawals"] = [],
 ) {
   const repairRows = repairSales.map((t, i) => {
     const amount = parseFloat(t.finalCost || t.costEstimate || "0");
@@ -153,6 +154,15 @@ function buildRepairPrintHTML(
         <td style="text-align:end;font-weight:600${isDeferred ? ";color:#c2410c" : ""}">${fmtNum(amount)}</td>
       </tr>${detailRow}`;
   }).join("");
+
+  const withdrawalRows = (withdrawals ?? []).map((w, i) => `
+    <tr>
+      <td>${i + 1}</td>
+      <td>${w.employeeName}</td>
+      <td>${w.reason || "—"}</td>
+      <td style="color:#666">${format(new Date(w.createdAt), "HH:mm")}</td>
+      <td style="text-align:end;font-weight:600;color:#c2410c">${fmtNum(parseFloat(w.amount))}</td>
+    </tr>`).join("");
 
   return `<!DOCTYPE html>
 <html dir="rtl" lang="ar">
@@ -199,6 +209,22 @@ function buildRepairPrintHTML(
     <div class="summary-box"><div class="label">السحوبات (${summary.withdrawalCount})</div><div class="value" style="color:#c2410c">- ${fmtNum(summary.totalWithdrawals)}</div></div>
     <div class="summary-box"><div class="label">الصافي</div><div class="value" style="color:#111">${fmtNum(summary.netTotal)}</div></div>
   </div>` : ""}
+  ${(withdrawals ?? []).length > 0 ? `
+  <div class="section-title">السحوبات (${withdrawals!.length})</div>
+  <table>
+    <thead>
+      <tr>
+        <th>#</th><th>الموظف</th><th>السبب</th><th>الوقت</th><th>المبلغ</th>
+      </tr>
+    </thead>
+    <tbody>${withdrawalRows}</tbody>
+    <tfoot>
+      <tr>
+        <td colspan="4">إجمالي السحوبات</td>
+        <td style="color:#c2410c">${fmtNum(summary.totalWithdrawals)}</td>
+      </tr>
+    </tfoot>
+  </table>` : ""}
   <div class="section-title">مدفوعات التصليح (${repairSales.length})</div>
   ${
     repairSales.length === 0
@@ -373,7 +399,7 @@ export default function TechnicianDailyReport() {
 
   const handlePrint = () => {
     if (!report?.summary) return;
-    const html = buildRepairPrintHTML(dateLabel, repairSales, report.summary);
+    const html = buildRepairPrintHTML(dateLabel, repairSales, report.summary, report.withdrawals);
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(html);
