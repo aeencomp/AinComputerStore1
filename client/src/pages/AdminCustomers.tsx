@@ -1,11 +1,11 @@
 import { useState, useEffect } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -33,7 +33,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil, Trash2, Users, Loader2 } from "lucide-react";
+import { Pencil, Trash2, Users, Loader2, Search } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import { AdminNav } from "@/components/AdminNav";
 
 interface AdminUser {
@@ -46,9 +47,12 @@ interface AdminUser {
 interface Customer {
   id: string;
   name: string;
-  email: string;
+  email?: string;
   phone: string;
   createdAt: string;
+  source: "repair" | "account" | "order";
+  customerId?: string;
+  editable?: boolean;
 }
 
 export default function AdminCustomers() {
@@ -57,6 +61,7 @@ export default function AdminCustomers() {
   const { toast } = useToast();
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -132,11 +137,28 @@ export default function AdminCustomers() {
     setEditingCustomer(customer);
     setFormData({
       name: customer.name,
-      email: customer.email,
+      email: customer.email || "",
       phone: customer.phone,
       password: "",
     });
   };
+
+  const sourceLabel = (source: Customer["source"]) => {
+    if (source === "repair") return t("admin.customers.sourceRepair");
+    if (source === "account") return t("admin.customers.sourceAccount");
+    return t("admin.customers.sourceOrder");
+  };
+
+  const filteredCustomers = customers.filter((customer) => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      customer.name.toLowerCase().includes(q) ||
+      customer.phone.includes(q) ||
+      (customer.email?.toLowerCase().includes(q) ?? false) ||
+      (customer.customerId?.toLowerCase().includes(q) ?? false)
+    );
+  });
 
   const handleSubmit = () => {
     if (!editingCustomer) return;
@@ -190,13 +212,41 @@ export default function AdminCustomers() {
     <div className="min-h-screen bg-background" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <AdminNav currentAdmin={currentAdmin} />
 
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">{t("admin.customers.title")}</h1>
+            <p className="text-muted-foreground">{t("admin.customers.subtitle")}</p>
+          </div>
+          <Badge variant="secondary" className="w-fit text-sm px-3 py-1">
+            {t("admin.customers.customersCount")}: {customers.length}
+          </Badge>
+        </div>
+
+        <div className="relative max-w-md">
+          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("admin.customers.searchPlaceholder")}
+            className="ps-9"
+            data-testid="input-customer-search"
+          />
+        </div>
+
         {customers.length === 0 ? (
           <Card>
             <CardContent className="py-16 text-center">
               <Users className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">{t('admin.customers.noCustomers')}</h3>
               <p className="text-muted-foreground">{t('admin.customers.noCustomersDesc')}</p>
+            </CardContent>
+          </Card>
+        ) : filteredCustomers.length === 0 ? (
+          <Card>
+            <CardContent className="py-16 text-center">
+              <Search className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
+              <h3 className="text-lg font-semibold mb-2">{t('admin.customers.noSearchResults')}</h3>
             </CardContent>
           </Card>
         ) : (
@@ -206,20 +256,20 @@ export default function AdminCustomers() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('admin.customers.name')}</TableHead>
-                    <TableHead>{t('admin.customers.email')}</TableHead>
                     <TableHead>{t('admin.customers.phone')}</TableHead>
                     <TableHead>{t('admin.customers.registeredAt')}</TableHead>
+                    <TableHead>{t('admin.customers.source')}</TableHead>
                     <TableHead className="text-end">{t('admin.customers.actions')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {customers.map((customer) => (
-                    <TableRow key={customer.id} data-testid={`row-customer-${customer.id}`}>
+                  {filteredCustomers.map((customer) => (
+                    <TableRow key={`${customer.source}-${customer.id}`} data-testid={`row-customer-${customer.id}`}>
                       <TableCell className="font-medium" data-testid={`text-customer-name-${customer.id}`}>
-                        {customer.name}
-                      </TableCell>
-                      <TableCell data-testid={`text-customer-email-${customer.id}`}>
-                        {customer.email}
+                        <div>{customer.name}</div>
+                        {customer.customerId && (
+                          <div className="text-xs text-muted-foreground">{customer.customerId}</div>
+                        )}
                       </TableCell>
                       <TableCell data-testid={`text-customer-phone-${customer.id}`}>
                         {customer.phone}
@@ -227,27 +277,34 @@ export default function AdminCustomers() {
                       <TableCell>
                         {formatDate(customer.createdAt)}
                       </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{sourceLabel(customer.source)}</Badge>
+                      </TableCell>
                       <TableCell className="text-end">
-                        <div className="flex gap-2 justify-end">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEdit(customer)}
-                            data-testid={`button-edit-customer-${customer.id}`}
-                          >
-                            <Pencil className="h-4 w-4 me-1" />
-                            {t('admin.customers.edit')}
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="sm"
-                            onClick={() => handleDelete(customer.id)}
-                            data-testid={`button-delete-customer-${customer.id}`}
-                          >
-                            <Trash2 className="h-4 w-4 me-1" />
-                            {t('admin.customers.delete')}
-                          </Button>
-                        </div>
+                        {customer.editable ? (
+                          <div className="flex gap-2 justify-end">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEdit(customer)}
+                              data-testid={`button-edit-customer-${customer.id}`}
+                            >
+                              <Pencil className="h-4 w-4 me-1" />
+                              {t('admin.customers.edit')}
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              onClick={() => handleDelete(customer.id)}
+                              data-testid={`button-delete-customer-${customer.id}`}
+                            >
+                              <Trash2 className="h-4 w-4 me-1" />
+                              {t('admin.customers.delete')}
+                            </Button>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">—</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

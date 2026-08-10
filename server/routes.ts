@@ -33,6 +33,7 @@ import {
   findTechnicianRepairShift,
   startTechnicianRepairShift,
   endTechnicianRepairShift,
+  technicianShiftOwnerId,
 } from "./technician-shift";
 import {
   computeShiftReportForShift,
@@ -5587,15 +5588,104 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/admin/customers", async (req, res) => {
+  app.get("/api/admin/customers", async (req: any, res) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
     try {
-      const users = await storage.getUsers();
-      // Remove passwords from response
-      const usersWithoutPasswords = users.map(u => {
-        const { password: _, ...user } = u;
-        return user;
-      });
-      return res.json(usersWithoutPasswords);
+      const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
+      const sourcePriority: Record<string, number> = { repair: 3, account: 2, order: 1 };
+
+      type AdminCustomerRow = {
+        id: string;
+        name: string;
+        phone: string;
+        email?: string;
+        createdAt: string;
+        source: "repair" | "account" | "order";
+        customerId?: string;
+        editable: boolean;
+      };
+
+      const normalizePhone = (phone: string) => phone.trim().replace(/\s+/g, "");
+      const phoneMap = new Map<string, AdminCustomerRow>();
+
+      const mergeCustomer = (existing: AdminCustomerRow, incoming: AdminCustomerRow): AdminCustomerRow => {
+        const earliestCreatedAt =
+          new Date(incoming.createdAt) < new Date(existing.createdAt) ? incoming.createdAt : existing.createdAt;
+        const preferred = sourcePriority[incoming.source] > sourcePriority[existing.source] ? incoming : existing;
+        return {
+          ...preferred,
+          createdAt: earliestCreatedAt,
+          email: preferred.email || existing.email || incoming.email,
+        };
+      };
+
+      const upsertCustomer = (phone: string, row: AdminCustomerRow) => {
+        const key = normalizePhone(phone);
+        if (!key) return;
+        const existing = phoneMap.get(key);
+        if (!existing) {
+          phoneMap.set(key, { ...row, phone: phone.trim() });
+          return;
+        }
+        phoneMap.set(key, mergeCustomer(existing, { ...row, phone: phone.trim() }));
+      };
+
+      for (const c of await storage.listRepairCustomers()) {
+        if (!c.phone?.trim()) continue;
+        upsertCustomer(c.phone, {
+          id: c.id,
+          name: c.name,
+          phone: c.phone,
+          email: c.email || undefined,
+          createdAt: new Date(c.createdAt).toISOString(),
+          source: "repair",
+          customerId: c.customerId,
+          editable: false,
+        });
+      }
+
+      for (const u of await storage.getUsers()) {
+        if (!u.phone?.trim()) continue;
+        upsertCustomer(u.phone, {
+          id: u.id,
+          name: u.name || u.email,
+          phone: u.phone,
+          email: u.email,
+          createdAt: new Date(u.createdAt).toISOString(),
+          source: "account",
+          editable: true,
+        });
+      }
+
+      for (const o of await storage.getOrders()) {
+        if (!o.customerPhone?.trim()) continue;
+        const key = normalizePhone(o.customerPhone);
+        if (phoneMap.has(key)) continue;
+        phoneMap.set(key, {
+          id: `order-${o.id}`,
+          name: o.customerName || o.customerPhone.trim(),
+          phone: o.customerPhone.trim(),
+          email: o.customerEmail || undefined,
+          createdAt: new Date(o.createdAt).toISOString(),
+          source: "order",
+          editable: false,
+        });
+      }
+
+      let customers = Array.from(phoneMap.values()).sort(
+        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      );
+
+      if (search) {
+        customers = customers.filter(c =>
+          c.name.toLowerCase().includes(search) ||
+          c.phone.includes(search) ||
+          (c.email?.toLowerCase().includes(search) ?? false) ||
+          (c.customerId?.toLowerCase().includes(search) ?? false)
+        );
+      }
+
+      return res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
       return res.status(500).json({ error: "Failed to fetch customers" });
@@ -10859,21 +10949,44 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? rawDate
         : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
-      // Calendar day in Asia/Baghdad (avoids server-local timestamp mismatch with naive timestamps)
+      const dayStartSql = sqlBaghdadDayStart(baghdadDateStr2);
+      const dayEndSql = sqlBaghdadDayEnd(baghdadDateStr2);
+
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
         : (source === "sales" && salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
 
-      const dateClause = sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${baghdadDateStr2}::date`;
       const sourceClause = eq(cashWithdrawals.source, withdrawalSourceForRequest(req));
       const locClause = locationId && !Number.isNaN(locationId)
         ? eq(cashWithdrawals.salesLocationId, locationId)
         : undefined;
 
+      const dateClause = and(
+        sql`${cashWithdrawals.createdAt} >= ${dayStartSql}`,
+        sql`${cashWithdrawals.createdAt} <= ${dayEndSql}`,
+      );
+
+      const conditions = [dateClause, sourceClause];
+      if (locClause) conditions.push(locClause);
+
+      const technicianId = (req.session as any)?.technicianId as string | undefined;
+      if (source === "technician" && technicianId) {
+        const ownerId = technicianShiftOwnerId(technicianId);
+        conditions.push(
+          sql`exists (
+            select 1 from sales_shifts ss
+            where ss.sales_user_id = ${ownerId}
+              and coalesce(ss.sales_location_id, 1) = ${LOCATION_MAIN_ID}
+              and ${cashWithdrawals.createdAt} >= ss.start_time
+              and ${cashWithdrawals.createdAt} <= coalesce(ss.end_time, ${dayEndSql})
+          )`,
+        );
+      }
+
       const rows = await db
         .select()
         .from(cashWithdrawals)
-        .where(locClause ? and(dateClause, sourceClause, locClause) : and(dateClause, sourceClause))
+        .where(and(...conditions))
         .orderBy(desc(cashWithdrawals.createdAt));
       res.json(rows);
     } catch (err) {

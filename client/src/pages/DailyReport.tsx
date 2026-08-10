@@ -501,17 +501,17 @@ function buildPrintHTML(data: ShiftReportData): string {
       </tfoot>
     </table>`}
 
-  ${withdrawals.length > 0 ? `
+  ${(withdrawals.length > 0 || (summary.totalWithdrawals ?? 0) > 0) ? `
   <div class="section-title">
     <span class="icon-dot" style="background:#c2410c"></span>
     السحوبات
     <span style="margin-right:auto;font-size:10px;font-weight:400;color:#666">${withdrawals.length} سجل</span>
   </div>
-  <table>
+  ${withdrawals.length > 0 ? `<table>
     <thead><tr><th>#</th><th>الموظف</th><th>السبب</th><th>الوقت</th><th>المبلغ</th></tr></thead>
     <tbody>${withdrawalRows}</tbody>
     <tfoot><tr><td colspan="4">إجمالي السحوبات</td><td style="color:#c2410c">${fmtNum(summary.totalWithdrawals)}</td></tr></tfoot>
-  </table>` : ""}
+  </table>` : `<div class="empty-msg">إجمالي السحوبات: ${fmtNum(summary.totalWithdrawals ?? 0)} (لا توجد تفاصيل مسجّلة)</div>`}` : ""}
 
   ${advances.length > 0 ? `
   <div class="section-title">
@@ -956,11 +956,43 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
     return mergeTodayDailyReport(baseData, dailyReportApi);
   }, [baseData, dailyReportApi, baghdadToday]);
 
+  const reportBaghdadDay = useMemo(() => {
+    if (data?.shift?.startTime) {
+      return new Date(data.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+    }
+    return baghdadToday;
+  }, [data?.shift?.startTime, baghdadToday]);
+
+  const { data: withdrawalsForDay = [] } = useQuery<Withdrawal[]>({
+    queryKey: ["/api/instore/withdrawals", reportBaghdadDay, salesLocationId],
+    queryFn: async () => {
+      const r = await fetch(
+        `/api/instore/withdrawals?date=${reportBaghdadDay}&locationId=${salesLocationId}`,
+        { credentials: "include" },
+      );
+      if (!r.ok) throw new Error(`Failed to load withdrawals: ${r.status}`);
+      return r.json();
+    },
+    enabled: !!data,
+    staleTime: 0,
+  });
+
+  const effectiveWithdrawals = useMemo(() => {
+    if (!data) return [];
+    if ((data.withdrawals?.length ?? 0) > 0) return data.withdrawals;
+    return withdrawalsForDay;
+  }, [data, withdrawalsForDay]);
+
+  const printData = useMemo(() => {
+    if (!data) return null;
+    return { ...data, withdrawals: effectiveWithdrawals };
+  }, [data, effectiveWithdrawals]);
+
   const isLoading = selectedShiftId ? reportLoading : (snapshotLoading || dailyLoading);
   const isFetching = selectedShiftId ? reportFetching : false;
   const handlePrint = () => {
-    if (!data) return;
-    const html = buildPrintHTML(data);
+    if (!printData) return;
+    const html = buildPrintHTML(printData);
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(html);
@@ -1668,16 +1700,23 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
               </Card>
 
               {/* Withdrawals */}
-              {(data.withdrawals?.length ?? 0) > 0 && (
+              {((data.summary.totalWithdrawals ?? 0) > 0 || effectiveWithdrawals.length > 0) && (
                 <Card>
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <TrendingDown className="h-5 w-5 text-orange-500" />
                       {language === "ar" ? "السحوبات" : "Withdrawals"}
-                      <Badge variant="secondary" className="ms-auto">{data.withdrawals.length}</Badge>
+                      <Badge variant="secondary" className="ms-auto">{effectiveWithdrawals.length}</Badge>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="p-0">
+                    {effectiveWithdrawals.length === 0 ? (
+                      <p className="text-center text-muted-foreground py-6 text-sm">
+                        {language === "ar"
+                          ? `إجمالي السحوبات: ${fmtNum(data.summary.totalWithdrawals)}`
+                          : `Withdrawals total: ${fmtNum(data.summary.totalWithdrawals)}`}
+                      </p>
+                    ) : (
                     <div className="overflow-x-auto">
                       <table className="w-full text-sm">
                         <thead>
@@ -1690,7 +1729,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                           </tr>
                         </thead>
                         <tbody>
-                          {data.withdrawals.map((w, i) => (
+                          {effectiveWithdrawals.map((w, i) => (
                             <tr key={w.id} className="border-b last:border-0 hover:bg-muted/10">
                               <td className="py-2 px-4 text-muted-foreground">{i + 1}</td>
                               <td className="py-2 px-4 font-medium">{w.employeeName}</td>
@@ -1714,6 +1753,7 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
                         </tfoot>
                       </table>
                     </div>
+                    )}
                   </CardContent>
                 </Card>
               )}

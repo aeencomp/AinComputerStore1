@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation, Link } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -209,9 +209,9 @@ function buildRepairPrintHTML(
     <div class="summary-box"><div class="label">السحوبات (${summary.withdrawalCount})</div><div class="value" style="color:#c2410c">- ${fmtNum(summary.totalWithdrawals)}</div></div>
     <div class="summary-box"><div class="label">الصافي</div><div class="value" style="color:#111">${fmtNum(summary.netTotal)}</div></div>
   </div>` : ""}
-  ${(withdrawals ?? []).length > 0 ? `
-  <div class="section-title">السحوبات (${withdrawals!.length})</div>
-  <table>
+  ${(withdrawals.length > 0 || summary.totalWithdrawals > 0) ? `
+  <div class="section-title">السحوبات (${withdrawals.length || summary.withdrawalCount})</div>
+  ${withdrawals.length > 0 ? `<table>
     <thead>
       <tr>
         <th>#</th><th>الموظف</th><th>السبب</th><th>الوقت</th><th>المبلغ</th>
@@ -224,7 +224,7 @@ function buildRepairPrintHTML(
         <td style="color:#c2410c">${fmtNum(summary.totalWithdrawals)}</td>
       </tr>
     </tfoot>
-  </table>` : ""}
+  </table>` : `<div class="empty-msg">إجمالي السحوبات: ${fmtNum(summary.totalWithdrawals)} (لا توجد تفاصيل مسجّلة)</div>`}` : ""}
   <div class="section-title">مدفوعات التصليح (${repairSales.length})</div>
   ${
     repairSales.length === 0
@@ -393,13 +393,31 @@ export default function TechnicianDailyReport() {
   const repairSales = report?.repairSales ?? [];
   const withdrawals = report?.withdrawals ?? [];
 
+  const { data: withdrawalsForDay = [] } = useQuery<NonNullable<RepairReportResponse["withdrawals"]>>({
+    queryKey: ["/api/technician/withdrawals", selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/technician/withdrawals?date=${selectedDate}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to load withdrawals");
+      return res.json();
+    },
+    enabled: canViewRepairReport,
+    staleTime: 0,
+  });
+
+  const effectiveWithdrawals = useMemo(() => {
+    if (withdrawals.length > 0) return withdrawals;
+    return withdrawalsForDay;
+  }, [withdrawals, withdrawalsForDay]);
+
   const dateLabel = report?.date
     ? format(new Date(report.date), "dd/MM/yyyy")
     : format(new Date(`${selectedDate}T12:00:00+03:00`), "dd/MM/yyyy");
 
   const handlePrint = () => {
     if (!report?.summary) return;
-    const html = buildRepairPrintHTML(dateLabel, repairSales, report.summary, report.withdrawals);
+    const html = buildRepairPrintHTML(dateLabel, repairSales, report.summary, effectiveWithdrawals);
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(html);
@@ -580,37 +598,61 @@ export default function TechnicianDailyReport() {
               </div>
             )}
 
-            {withdrawals.length > 0 && (
+            {((summary?.totalWithdrawals ?? 0) > 0 || effectiveWithdrawals.length > 0) && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
                     {language === "ar" ? "السحوبات" : "Withdrawals"}
-                    <Badge variant="secondary" className="ms-2">{withdrawals.length}</Badge>
+                    <Badge variant="secondary" className="ms-2">{effectiveWithdrawals.length}</Badge>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-0">
+                  {effectiveWithdrawals.length === 0 ? (
+                    <p className="text-center text-muted-foreground py-6 text-sm">
+                      {language === "ar"
+                        ? `إجمالي السحوبات: ${fmtNum(summary?.totalWithdrawals ?? 0)}`
+                        : `Withdrawals total: ${fmtNum(summary?.totalWithdrawals ?? 0)}`}
+                    </p>
+                  ) : (
                   <div className="overflow-x-auto">
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="border-b bg-muted/50">
+                          <th className="text-start py-2 px-4">#</th>
                           <th className="text-start py-2 px-4">{language === "ar" ? "الموظف" : "Employee"}</th>
                           <th className="text-start py-2 px-4">{language === "ar" ? "السبب" : "Reason"}</th>
+                          <th className="text-start py-2 px-4">{language === "ar" ? "الوقت" : "Time"}</th>
                           <th className="text-end py-2 px-4">{language === "ar" ? "المبلغ" : "Amount"}</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {withdrawals.map((w) => (
+                        {effectiveWithdrawals.map((w, i) => (
                           <tr key={w.id} className="border-b">
+                            <td className="py-2 px-4 text-muted-foreground">{i + 1}</td>
                             <td className="py-2 px-4">{w.employeeName}</td>
                             <td className="py-2 px-4 text-muted-foreground">{w.reason || "—"}</td>
+                            <td className="py-2 px-4 text-muted-foreground text-xs">
+                              {format(new Date(w.createdAt), "HH:mm")}
+                            </td>
                             <td className="py-2 px-4 text-end text-orange-600 font-medium">
                               − {fmtNum(parseFloat(w.amount))}
                             </td>
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-muted/30 border-t-2 font-semibold">
+                          <td colSpan={4} className="py-2 px-4">
+                            {language === "ar" ? "إجمالي السحوبات" : "Total Withdrawals"}
+                          </td>
+                          <td className="py-2 px-4 text-end text-orange-600">
+                            − {fmtNum(summary?.totalWithdrawals ?? 0)}
+                          </td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
+                  )}
                 </CardContent>
               </Card>
             )}
