@@ -28,6 +28,7 @@ import {
   sqlBaghdadDayEnd,
   sqlBaghdadRepairEndBound,
 } from "./daily-revenue-report";
+import { formatCustomerExportDate, listAdminCustomers } from "./admin-customers";
 import { computeRepairReport } from "./repair-report";
 import {
   findTechnicianRepairShift,
@@ -5591,104 +5592,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/customers", async (req: any, res) => {
     if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
     try {
-      const search = typeof req.query.search === "string" ? req.query.search.toLowerCase().trim() : "";
-      const sourcePriority: Record<string, number> = { repair: 3, account: 2, order: 1 };
-
-      type AdminCustomerRow = {
-        id: string;
-        name: string;
-        phone: string;
-        email?: string;
-        createdAt: string;
-        source: "repair" | "account" | "order";
-        customerId?: string;
-        editable: boolean;
-      };
-
-      const normalizePhone = (phone: string) => phone.trim().replace(/\s+/g, "");
-      const phoneMap = new Map<string, AdminCustomerRow>();
-
-      const mergeCustomer = (existing: AdminCustomerRow, incoming: AdminCustomerRow): AdminCustomerRow => {
-        const earliestCreatedAt =
-          new Date(incoming.createdAt) < new Date(existing.createdAt) ? incoming.createdAt : existing.createdAt;
-        const preferred = sourcePriority[incoming.source] > sourcePriority[existing.source] ? incoming : existing;
-        return {
-          ...preferred,
-          createdAt: earliestCreatedAt,
-          email: preferred.email || existing.email || incoming.email,
-        };
-      };
-
-      const upsertCustomer = (phone: string, row: AdminCustomerRow) => {
-        const key = normalizePhone(phone);
-        if (!key) return;
-        const existing = phoneMap.get(key);
-        if (!existing) {
-          phoneMap.set(key, { ...row, phone: phone.trim() });
-          return;
-        }
-        phoneMap.set(key, mergeCustomer(existing, { ...row, phone: phone.trim() }));
-      };
-
-      for (const c of await storage.listRepairCustomers()) {
-        if (!c.phone?.trim()) continue;
-        upsertCustomer(c.phone, {
-          id: c.id,
-          name: c.name,
-          phone: c.phone,
-          email: c.email || undefined,
-          createdAt: new Date(c.createdAt).toISOString(),
-          source: "repair",
-          customerId: c.customerId,
-          editable: false,
-        });
-      }
-
-      for (const u of await storage.getUsers()) {
-        if (!u.phone?.trim()) continue;
-        upsertCustomer(u.phone, {
-          id: u.id,
-          name: u.name || u.email,
-          phone: u.phone,
-          email: u.email,
-          createdAt: new Date(u.createdAt).toISOString(),
-          source: "account",
-          editable: true,
-        });
-      }
-
-      for (const o of await storage.getOrders()) {
-        if (!o.customerPhone?.trim()) continue;
-        const key = normalizePhone(o.customerPhone);
-        if (phoneMap.has(key)) continue;
-        phoneMap.set(key, {
-          id: `order-${o.id}`,
-          name: o.customerName || o.customerPhone.trim(),
-          phone: o.customerPhone.trim(),
-          email: o.customerEmail || undefined,
-          createdAt: new Date(o.createdAt).toISOString(),
-          source: "order",
-          editable: false,
-        });
-      }
-
-      let customers = Array.from(phoneMap.values()).sort(
-        (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      );
-
-      if (search) {
-        customers = customers.filter(c =>
-          c.name.toLowerCase().includes(search) ||
-          c.phone.includes(search) ||
-          (c.email?.toLowerCase().includes(search) ?? false) ||
-          (c.customerId?.toLowerCase().includes(search) ?? false)
-        );
-      }
-
+      const search = typeof req.query.search === "string" ? req.query.search : "";
+      const customers = await listAdminCustomers(search);
       return res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
       return res.status(500).json({ error: "Failed to fetch customers" });
+    }
+  });
+
+  app.get("/api/admin/customers/export", async (req: any, res) => {
+    if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
+    try {
+      const source = req.query.source;
+      if (source !== "repair" && source !== "order") {
+        return res.status(400).json({ error: "source must be repair or order" });
+      }
+
+      const search = typeof req.query.search === "string" ? req.query.search : "";
+      const language = req.query.lang === "ar" ? "ar" : "en";
+      const customers = (await listAdminCustomers(search)).filter(c => c.source === source);
+
+      if (customers.length === 0) {
+        return res.status(404).json({ error: "No records to export" });
+      }
+
+      const isAr = language === "ar";
+      const rows = customers.map((customer) => ({
+        [isAr ? "الاسم" : "Name"]: customer.name,
+        [isAr ? "رقم الهاتف" : "Phone"]: customer.phone,
+        [isAr ? "تاريخ الإضافة" : "Date Added"]: formatCustomerExportDate(customer.createdAt, language),
+        ...(source === "repair"
+          ? { [isAr ? "رقم العميل" : "Customer ID"]: customer.customerId || "" }
+          : {}),
+        [isAr ? "البريد الإلكتروني" : "Email"]: customer.email || "",
+      }));
+
+      const XLSX = await import("xlsx");
+      const worksheet = XLSX.utils.json_to_sheet(rows);
+      worksheet["!cols"] = [
+        { wch: 28 },
+        { wch: 18 },
+        { wch: 14 },
+        ...(source === "repair" ? [{ wch: 12 }] : []),
+        { wch: 28 },
+      ];
+
+      const workbook = XLSX.utils.book_new();
+      const sheetName = source === "repair"
+        ? (isAr ? "عملاء الصيانة" : "Repair Customers")
+        : (isAr ? "عملاء الطلبات" : "Order Customers");
+      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
+
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const filename = source === "repair"
+        ? `repair-customers-${dateStamp}.xlsx`
+        : `order-customers-${dateStamp}.xlsx`;
+
+      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting customers:", error);
+      return res.status(500).json({ error: "Failed to export customers" });
     }
   });
 

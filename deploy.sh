@@ -26,6 +26,7 @@ if ! npm ci --no-audit --no-fund; then
 fi
 
 echo "==> Build"
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
 npm run build
 
 mkdir -p uploads

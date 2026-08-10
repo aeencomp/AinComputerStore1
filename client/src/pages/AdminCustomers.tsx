@@ -42,7 +42,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import * as XLSX from "xlsx";
 import { AdminNav } from "@/components/AdminNav";
 
 interface AdminUser {
@@ -75,6 +74,7 @@ export default function AdminCustomers() {
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [exportSource, setExportSource] = useState<"repair" | "order">("repair");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -174,13 +174,6 @@ export default function AdminCustomers() {
     );
   });
 
-  const formatDateForExport = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(
-      language === "ar" ? "ar-IQ" : "en-US",
-      { year: "numeric", month: "2-digit", day: "2-digit" }
-    );
-  };
-
   const getCustomersForExport = (source: "repair" | "order") => {
     return customers.filter((customer) => {
       if (customer.source !== source) return false;
@@ -195,7 +188,7 @@ export default function AdminCustomers() {
     });
   };
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
     const toExport = getCustomersForExport(exportSource);
     if (toExport.length === 0) {
       toast({
@@ -205,40 +198,49 @@ export default function AdminCustomers() {
       return;
     }
 
-    const isAr = language === "ar";
-    const rows = toExport.map((customer) => ({
-      [isAr ? "الاسم" : "Name"]: customer.name,
-      [isAr ? "رقم الهاتف" : "Phone"]: customer.phone,
-      [isAr ? "تاريخ الإضافة" : "Date Added"]: formatDateForExport(customer.createdAt),
-      ...(exportSource === "repair"
-        ? { [isAr ? "رقم العميل" : "Customer ID"]: customer.customerId || "" }
-        : {}),
-      [isAr ? "البريد الإلكتروني" : "Email"]: customer.email || "",
-    }));
+    setExporting(true);
+    try {
+      const params = new URLSearchParams({
+        source: exportSource,
+        lang: language === "ar" ? "ar" : "en",
+      });
+      if (searchQuery.trim()) {
+        params.set("search", searchQuery.trim());
+      }
 
-    const worksheet = XLSX.utils.json_to_sheet(rows);
-    worksheet["!cols"] = [
-      { wch: 28 },
-      { wch: 18 },
-      { wch: 14 },
-      ...(exportSource === "repair" ? [{ wch: 12 }] : []),
-      { wch: 28 },
-    ];
+      const response = await fetch(`/api/admin/customers/export?${params.toString()}`, {
+        credentials: "include",
+      });
 
-    const workbook = XLSX.utils.book_new();
-    const sheetName = exportSource === "repair"
-      ? (isAr ? "عملاء الصيانة" : "Repair Customers")
-      : (isAr ? "عملاء الطلبات" : "Order Customers");
-    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
+      if (!response.ok) {
+        throw new Error("Export failed");
+      }
 
-    const dateStamp = new Date().toISOString().slice(0, 10);
-    const filename = exportSource === "repair"
-      ? `repair-customers-${dateStamp}.xlsx`
-      : `order-customers-${dateStamp}.xlsx`;
+      const blob = await response.blob();
+      const dateStamp = new Date().toISOString().slice(0, 10);
+      const filename = exportSource === "repair"
+        ? `repair-customers-${dateStamp}.xlsx`
+        : `order-customers-${dateStamp}.xlsx`;
 
-    XLSX.writeFile(workbook, filename);
-    setExportDialogOpen(false);
-    toast({ title: t("admin.customers.exportSuccess") });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+
+      setExportDialogOpen(false);
+      toast({ title: t("admin.customers.exportSuccess") });
+    } catch {
+      toast({
+        title: t("admin.customers.exportError"),
+        variant: "destructive",
+      });
+    } finally {
+      setExporting(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -446,9 +448,18 @@ export default function AdminCustomers() {
             <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
               {t("admin.customers.cancel")}
             </Button>
-            <Button onClick={handleExportExcel} data-testid="button-confirm-export">
-              <Download className="h-4 w-4 me-2" />
-              {t("admin.customers.exportExcel")}
+            <Button onClick={handleExportExcel} disabled={exporting} data-testid="button-confirm-export">
+              {exporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 me-2 animate-spin" />
+                  {t("admin.customers.exporting")}
+                </>
+              ) : (
+                <>
+                  <Download className="h-4 w-4 me-2" />
+                  {t("admin.customers.exportExcel")}
+                </>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
