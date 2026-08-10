@@ -33,8 +33,16 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Pencil, Trash2, Users, Loader2, Search } from "lucide-react";
+import { Pencil, Trash2, Users, Loader2, Search, Download } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import * as XLSX from "xlsx";
 import { AdminNav } from "@/components/AdminNav";
 
 interface AdminUser {
@@ -55,6 +63,8 @@ interface Customer {
   editable?: boolean;
 }
 
+type SourceFilter = "all" | "repair" | "order";
+
 export default function AdminCustomers() {
   const [, setLocation] = useLocation();
   const { t, language } = useLanguage();
@@ -62,6 +72,9 @@ export default function AdminCustomers() {
   const [editingCustomer, setEditingCustomer] = useState<Customer | null>(null);
   const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
+  const [exportSource, setExportSource] = useState<"repair" | "order">("repair");
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -150,6 +163,7 @@ export default function AdminCustomers() {
   };
 
   const filteredCustomers = customers.filter((customer) => {
+    if (sourceFilter !== "all" && customer.source !== sourceFilter) return false;
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase().trim();
     return (
@@ -159,6 +173,73 @@ export default function AdminCustomers() {
       (customer.customerId?.toLowerCase().includes(q) ?? false)
     );
   });
+
+  const formatDateForExport = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString(
+      language === "ar" ? "ar-IQ" : "en-US",
+      { year: "numeric", month: "2-digit", day: "2-digit" }
+    );
+  };
+
+  const getCustomersForExport = (source: "repair" | "order") => {
+    return customers.filter((customer) => {
+      if (customer.source !== source) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase().trim();
+      return (
+        customer.name.toLowerCase().includes(q) ||
+        customer.phone.includes(q) ||
+        (customer.email?.toLowerCase().includes(q) ?? false) ||
+        (customer.customerId?.toLowerCase().includes(q) ?? false)
+      );
+    });
+  };
+
+  const handleExportExcel = () => {
+    const toExport = getCustomersForExport(exportSource);
+    if (toExport.length === 0) {
+      toast({
+        title: t("admin.customers.exportEmpty"),
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const isAr = language === "ar";
+    const rows = toExport.map((customer) => ({
+      [isAr ? "الاسم" : "Name"]: customer.name,
+      [isAr ? "رقم الهاتف" : "Phone"]: customer.phone,
+      [isAr ? "تاريخ الإضافة" : "Date Added"]: formatDateForExport(customer.createdAt),
+      ...(exportSource === "repair"
+        ? { [isAr ? "رقم العميل" : "Customer ID"]: customer.customerId || "" }
+        : {}),
+      [isAr ? "البريد الإلكتروني" : "Email"]: customer.email || "",
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(rows);
+    worksheet["!cols"] = [
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 14 },
+      ...(exportSource === "repair" ? [{ wch: 12 }] : []),
+      { wch: 28 },
+    ];
+
+    const workbook = XLSX.utils.book_new();
+    const sheetName = exportSource === "repair"
+      ? (isAr ? "عملاء الصيانة" : "Repair Customers")
+      : (isAr ? "عملاء الطلبات" : "Order Customers");
+    XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
+
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    const filename = exportSource === "repair"
+      ? `repair-customers-${dateStamp}.xlsx`
+      : `order-customers-${dateStamp}.xlsx`;
+
+    XLSX.writeFile(workbook, filename);
+    setExportDialogOpen(false);
+    toast({ title: t("admin.customers.exportSuccess") });
+  };
 
   const handleSubmit = () => {
     if (!editingCustomer) return;
@@ -223,15 +304,39 @@ export default function AdminCustomers() {
           </Badge>
         </div>
 
-        <div className="relative max-w-md">
-          <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("admin.customers.searchPlaceholder")}
-            className="ps-9"
-            data-testid="input-customer-search"
-          />
+        <div className="flex flex-col lg:flex-row lg:items-center gap-4">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute start-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("admin.customers.searchPlaceholder")}
+              className="ps-9"
+              data-testid="input-customer-search"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <Select value={sourceFilter} onValueChange={(v) => setSourceFilter(v as SourceFilter)}>
+              <SelectTrigger className="w-[180px]" data-testid="select-source-filter">
+                <SelectValue placeholder={t("admin.customers.filterSource")} />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">{t("admin.customers.filterAll")}</SelectItem>
+                <SelectItem value="repair">{t("admin.customers.sourceRepair")}</SelectItem>
+                <SelectItem value="order">{t("admin.customers.sourceOrder")}</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              onClick={() => setExportDialogOpen(true)}
+              data-testid="button-export-customers"
+            >
+              <Download className="h-4 w-4 me-2" />
+              {t("admin.customers.exportExcel")}
+            </Button>
+          </div>
         </div>
 
         {customers.length === 0 ? (
@@ -314,6 +419,40 @@ export default function AdminCustomers() {
           </Card>
         )}
       </main>
+
+      <Dialog open={exportDialogOpen} onOpenChange={setExportDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("admin.customers.exportTitle")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>{t("admin.customers.exportPickSource")}</Label>
+              <Select value={exportSource} onValueChange={(v) => setExportSource(v as "repair" | "order")}>
+                <SelectTrigger data-testid="select-export-source">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="repair">{t("admin.customers.sourceRepair")}</SelectItem>
+                  <SelectItem value="order">{t("admin.customers.sourceOrder")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              {t("admin.customers.exportCount")}: {getCustomersForExport(exportSource).length}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
+              {t("admin.customers.cancel")}
+            </Button>
+            <Button onClick={handleExportExcel} data-testid="button-confirm-export">
+              <Download className="h-4 w-4 me-2" />
+              {t("admin.customers.exportExcel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!editingCustomer} onOpenChange={(open) => !open && setEditingCustomer(null)}>
         <DialogContent>
