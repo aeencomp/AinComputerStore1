@@ -31,6 +31,7 @@ import {
 import { listAdminCustomers } from "./admin-customers";
 import {
   buildContactsCsv,
+  buildContactsVcf,
   buildCustomersExcelBuffer,
   exportFilename,
   getCustomersForExport,
@@ -5613,7 +5614,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
     try {
       const source = req.query.source as CustomerExportSource;
-      const format = (req.query.format === "contacts" ? "contacts" : "xlsx") as CustomerExportFormat;
+      const formatParam = req.query.format;
+      const format = (
+        formatParam === "contacts" || formatParam === "vcf" ? formatParam : "xlsx"
+      ) as CustomerExportFormat;
       if (source !== "repair" && source !== "order" && source !== "all") {
         return res.status(400).json({ error: "source must be repair, order, or all" });
       }
@@ -5633,6 +5637,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         res.setHeader("Content-Type", "text/csv; charset=utf-8");
         res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
         return res.send(csv);
+      }
+
+      if (format === "vcf") {
+        const vcf = buildContactsVcf(customers);
+        res.setHeader("Content-Type", "text/vcard; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        return res.send(vcf);
       }
 
       const buffer = await buildCustomersExcelBuffer(customers, source, language);

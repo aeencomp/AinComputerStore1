@@ -45,9 +45,11 @@ import {
 import { AdminNav } from "@/components/AdminNav";
 import {
   buildContactsCsv,
+  buildContactsVcf,
   downloadTextFile,
   exportFilename,
   getCustomersForExport,
+  type ExportFormat,
   type ExportSource,
 } from "@/lib/customerExport";
 import { fetchWithTimeout } from "@/lib/queryClient";
@@ -71,7 +73,6 @@ interface Customer {
 }
 
 type SourceFilter = "all" | "repair" | "order";
-type ExportFormat = "xlsx" | "contacts";
 
 export default function AdminCustomers() {
   const [, setLocation] = useLocation();
@@ -82,7 +83,7 @@ export default function AdminCustomers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
   const [exportSource, setExportSource] = useState<ExportSource>("all");
-  const [exportFormat, setExportFormat] = useState<ExportFormat>("contacts");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("vcf");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [formData, setFormData] = useState({
@@ -205,6 +206,14 @@ export default function AdminCustomers() {
         downloadTextFile(csv, filename, "text/csv;charset=utf-8");
         setExportDialogOpen(false);
         toast({ title: t("admin.customers.exportContactsSuccess") });
+        return;
+      }
+
+      if (exportFormat === "vcf") {
+        const vcf = buildContactsVcf(toExport);
+        downloadTextFile(vcf, filename, "text/vcard;charset=utf-8");
+        setExportDialogOpen(false);
+        toast({ title: t("admin.customers.exportVcfSuccess") });
         return;
       }
 
@@ -454,14 +463,17 @@ export default function AdminCustomers() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="vcf">{t("admin.customers.exportVcf")}</SelectItem>
                   <SelectItem value="contacts">{t("admin.customers.exportContacts")}</SelectItem>
                   <SelectItem value="xlsx">{t("admin.customers.exportExcel")}</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                {exportFormat === "contacts"
-                  ? t("admin.customers.exportContactsHint")
-                  : t("admin.customers.exportExcelHint")}
+                {exportFormat === "vcf"
+                  ? t("admin.customers.exportVcfHint")
+                  : exportFormat === "contacts"
+                    ? t("admin.customers.exportContactsHint")
+                    : t("admin.customers.exportExcelHint")}
               </p>
             </div>
             <p className="text-sm text-muted-foreground">
