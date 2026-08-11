@@ -122,7 +122,20 @@ export function normalizeContactPhone(phone: string): string {
 export type ContactExportRow = {
   name: string;
   phone: string;
+  createdAt: string;
 };
+
+export function formatContactDate(dateString: string): string {
+  const date = new Date(dateString);
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const year = date.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
+export function formatContactDisplayName(name: string, createdAt: string): string {
+  return `${name.trim()} - ${formatContactDate(createdAt)}`;
+}
 
 /** Dedupe by phone, normalize numbers, sort by name for contact exports. */
 export function prepareContactsList(customers: AdminCustomerRow[]): ContactExportRow[] {
@@ -135,12 +148,20 @@ export function prepareContactsList(customers: AdminCustomerRow[]): ContactExpor
     if (!name) continue;
 
     const existing = byPhone.get(phone);
-    if (!existing || name.length > existing.name.length) {
-      byPhone.set(phone, { name, phone });
+    const createdAt = customer.createdAt;
+    if (
+      !existing ||
+      new Date(createdAt).getTime() < new Date(existing.createdAt).getTime() ||
+      (createdAt === existing.createdAt && name.length > existing.name.length)
+    ) {
+      byPhone.set(phone, { name, phone, createdAt });
     }
   }
 
-  return Array.from(byPhone.values()).sort((a, b) =>
-    a.name.localeCompare(b.name, "ar", { sensitivity: "base" })
-  );
+  return Array.from(byPhone.values())
+    .map((contact) => ({
+      ...contact,
+      name: formatContactDisplayName(contact.name, contact.createdAt),
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name, "ar", { sensitivity: "base" }));
 }

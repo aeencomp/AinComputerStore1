@@ -40,7 +40,8 @@ function escapeVcardValue(value: string): string {
 }
 
 function splitContactName(name: string): { family: string; given: string } {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const baseName = name.split(" - ")[0]?.trim() || name.trim();
+  const parts = baseName.split(/\s+/).filter(Boolean);
   if (parts.length === 0) {
     return { family: "", given: "" };
   }
