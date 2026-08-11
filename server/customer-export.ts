@@ -1,4 +1,3 @@
-import * as XLSX from "xlsx";
 import {
   type AdminCustomerRow,
   formatCustomerExportDate,
@@ -32,11 +31,12 @@ export function buildContactsCsv(customers: AdminCustomerRow[]): string {
   return `\uFEFF${[header, ...rows].join("\r\n")}`;
 }
 
-export function buildCustomersExcelBuffer(
+export async function buildCustomersExcelBuffer(
   customers: AdminCustomerRow[],
   source: CustomerExportSource,
   language: "ar" | "en",
-): Buffer {
+): Promise<Buffer> {
+  const XLSX = await import("xlsx");
   const isAr = language === "ar";
   const rows = customers.map((customer) => ({
     [isAr ? "الاسم" : "Name"]: customer.name,

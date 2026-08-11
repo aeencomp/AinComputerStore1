@@ -5635,7 +5635,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.send(csv);
       }
 
-      const buffer = buildCustomersExcelBuffer(customers, source, language);
+      const buffer = await buildCustomersExcelBuffer(customers, source, language);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       return res.send(buffer);
