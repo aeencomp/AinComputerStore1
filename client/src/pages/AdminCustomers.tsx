@@ -43,6 +43,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AdminNav } from "@/components/AdminNav";
+import {
+  buildContactsCsv,
+  downloadTextFile,
+  exportFilename,
+  getCustomersForExport,
+  type ExportSource,
+} from "@/lib/customerExport";
+import { fetchWithTimeout } from "@/lib/queryClient";
 
 interface AdminUser {
   id: string;
@@ -63,6 +71,7 @@ interface Customer {
 }
 
 type SourceFilter = "all" | "repair" | "order";
+type ExportFormat = "xlsx" | "contacts";
 
 export default function AdminCustomers() {
   const [, setLocation] = useLocation();
@@ -72,7 +81,8 @@ export default function AdminCustomers() {
   const [deleteCustomerId, setDeleteCustomerId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState<SourceFilter>("all");
-  const [exportSource, setExportSource] = useState<"repair" | "order">("repair");
+  const [exportSource, setExportSource] = useState<ExportSource>("all");
+  const [exportFormat, setExportFormat] = useState<ExportFormat>("contacts");
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [formData, setFormData] = useState({
@@ -174,22 +184,10 @@ export default function AdminCustomers() {
     );
   });
 
-  const getCustomersForExport = (source: "repair" | "order") => {
-    return customers.filter((customer) => {
-      if (customer.source !== source) return false;
-      if (!searchQuery.trim()) return true;
-      const q = searchQuery.toLowerCase().trim();
-      return (
-        customer.name.toLowerCase().includes(q) ||
-        customer.phone.includes(q) ||
-        (customer.email?.toLowerCase().includes(q) ?? false) ||
-        (customer.customerId?.toLowerCase().includes(q) ?? false)
-      );
-    });
-  };
+  const exportPreviewCount = getCustomersForExport(customers, exportSource, searchQuery).length;
 
-  const handleExportExcel = async () => {
-    const toExport = getCustomersForExport(exportSource);
+  const handleExport = async () => {
+    const toExport = getCustomersForExport(customers, exportSource, searchQuery);
     if (toExport.length === 0) {
       toast({
         title: t("admin.customers.exportEmpty"),
@@ -200,28 +198,35 @@ export default function AdminCustomers() {
 
     setExporting(true);
     try {
+      const filename = exportFilename(exportSource, exportFormat);
+
+      if (exportFormat === "contacts") {
+        const csv = buildContactsCsv(toExport);
+        downloadTextFile(csv, filename, "text/csv;charset=utf-8");
+        setExportDialogOpen(false);
+        toast({ title: t("admin.customers.exportContactsSuccess") });
+        return;
+      }
+
       const params = new URLSearchParams({
         source: exportSource,
+        format: "xlsx",
         lang: language === "ar" ? "ar" : "en",
       });
       if (searchQuery.trim()) {
         params.set("search", searchQuery.trim());
       }
 
-      const response = await fetch(`/api/admin/customers/export?${params.toString()}`, {
+      const response = await fetchWithTimeout(`/api/admin/customers/export?${params.toString()}`, {
         credentials: "include",
       });
 
       if (!response.ok) {
-        throw new Error("Export failed");
+        const message = await response.text();
+        throw new Error(message || "Export failed");
       }
 
       const blob = await response.blob();
-      const dateStamp = new Date().toISOString().slice(0, 10);
-      const filename = exportSource === "repair"
-        ? `repair-customers-${dateStamp}.xlsx`
-        : `order-customers-${dateStamp}.xlsx`;
-
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
@@ -233,7 +238,8 @@ export default function AdminCustomers() {
 
       setExportDialogOpen(false);
       toast({ title: t("admin.customers.exportSuccess") });
-    } catch {
+    } catch (error) {
+      console.error("Customer export failed:", error);
       toast({
         title: t("admin.customers.exportError"),
         variant: "destructive",
@@ -336,7 +342,7 @@ export default function AdminCustomers() {
               data-testid="button-export-customers"
             >
               <Download className="h-4 w-4 me-2" />
-              {t("admin.customers.exportExcel")}
+              {t("admin.customers.export")}
             </Button>
           </div>
         </div>
@@ -430,25 +436,43 @@ export default function AdminCustomers() {
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>{t("admin.customers.exportPickSource")}</Label>
-              <Select value={exportSource} onValueChange={(v) => setExportSource(v as "repair" | "order")}>
+              <Select value={exportSource} onValueChange={(v) => setExportSource(v as ExportSource)}>
                 <SelectTrigger data-testid="select-export-source">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="all">{t("admin.customers.exportAll")}</SelectItem>
                   <SelectItem value="repair">{t("admin.customers.sourceRepair")}</SelectItem>
                   <SelectItem value="order">{t("admin.customers.sourceOrder")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
+            <div className="space-y-2">
+              <Label>{t("admin.customers.exportPickFormat")}</Label>
+              <Select value={exportFormat} onValueChange={(v) => setExportFormat(v as ExportFormat)}>
+                <SelectTrigger data-testid="select-export-format">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="contacts">{t("admin.customers.exportContacts")}</SelectItem>
+                  <SelectItem value="xlsx">{t("admin.customers.exportExcel")}</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                {exportFormat === "contacts"
+                  ? t("admin.customers.exportContactsHint")
+                  : t("admin.customers.exportExcelHint")}
+              </p>
+            </div>
             <p className="text-sm text-muted-foreground">
-              {t("admin.customers.exportCount")}: {getCustomersForExport(exportSource).length}
+              {t("admin.customers.exportCount")}: {exportPreviewCount}
             </p>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setExportDialogOpen(false)}>
               {t("admin.customers.cancel")}
             </Button>
-            <Button onClick={handleExportExcel} disabled={exporting} data-testid="button-confirm-export">
+            <Button onClick={handleExport} disabled={exporting} data-testid="button-confirm-export">
               {exporting ? (
                 <>
                   <Loader2 className="h-4 w-4 me-2 animate-spin" />
@@ -457,7 +481,7 @@ export default function AdminCustomers() {
               ) : (
                 <>
                   <Download className="h-4 w-4 me-2" />
-                  {t("admin.customers.exportExcel")}
+                  {t("admin.customers.export")}
                 </>
               )}
             </Button>

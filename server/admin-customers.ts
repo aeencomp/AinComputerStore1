@@ -105,3 +105,42 @@ export function formatCustomerExportDate(dateString: string, language: "ar" | "e
     { year: "numeric", month: "2-digit", day: "2-digit" }
   );
 }
+
+/** Normalize Iraqi phone numbers for contact import (07XXXXXXXXX). */
+export function normalizeContactPhone(phone: string): string {
+  let digits = phone.replace(/[^\d+]/g, "");
+  if (digits.startsWith("+964")) {
+    digits = `0${digits.slice(4)}`;
+  } else if (digits.startsWith("964")) {
+    digits = `0${digits.slice(3)}`;
+  } else if (/^7\d{9}$/.test(digits)) {
+    digits = `0${digits}`;
+  }
+  return digits;
+}
+
+export type ContactExportRow = {
+  name: string;
+  phone: string;
+};
+
+/** Dedupe by phone, normalize numbers, sort by name for contact exports. */
+export function prepareContactsList(customers: AdminCustomerRow[]): ContactExportRow[] {
+  const byPhone = new Map<string, ContactExportRow>();
+
+  for (const customer of customers) {
+    const phone = normalizeContactPhone(customer.phone);
+    if (!phone) continue;
+    const name = customer.name.trim();
+    if (!name) continue;
+
+    const existing = byPhone.get(phone);
+    if (!existing || name.length > existing.name.length) {
+      byPhone.set(phone, { name, phone });
+    }
+  }
+
+  return Array.from(byPhone.values()).sort((a, b) =>
+    a.name.localeCompare(b.name, "ar", { sensitivity: "base" })
+  );
+}

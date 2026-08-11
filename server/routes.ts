@@ -28,7 +28,15 @@ import {
   sqlBaghdadDayEnd,
   sqlBaghdadRepairEndBound,
 } from "./daily-revenue-report";
-import { formatCustomerExportDate, listAdminCustomers } from "./admin-customers";
+import { listAdminCustomers } from "./admin-customers";
+import {
+  buildContactsCsv,
+  buildCustomersExcelBuffer,
+  exportFilename,
+  getCustomersForExport,
+  type CustomerExportFormat,
+  type CustomerExportSource,
+} from "./customer-export";
 import { computeRepairReport } from "./repair-report";
 import {
   findTechnicianRepairShift,
@@ -5604,52 +5612,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/customers/export", async (req: any, res) => {
     if (!req.session.adminId) return res.status(401).json({ error: "Unauthorized" });
     try {
-      const source = req.query.source;
-      if (source !== "repair" && source !== "order") {
-        return res.status(400).json({ error: "source must be repair or order" });
+      const source = req.query.source as CustomerExportSource;
+      const format = (req.query.format === "contacts" ? "contacts" : "xlsx") as CustomerExportFormat;
+      if (source !== "repair" && source !== "order" && source !== "all") {
+        return res.status(400).json({ error: "source must be repair, order, or all" });
       }
 
       const search = typeof req.query.search === "string" ? req.query.search : "";
       const language = req.query.lang === "ar" ? "ar" : "en";
-      const customers = (await listAdminCustomers(search)).filter(c => c.source === source);
+      const customers = await getCustomersForExport(source, search);
 
       if (customers.length === 0) {
         return res.status(404).json({ error: "No records to export" });
       }
 
-      const isAr = language === "ar";
-      const rows = customers.map((customer) => ({
-        [isAr ? "الاسم" : "Name"]: customer.name,
-        [isAr ? "رقم الهاتف" : "Phone"]: customer.phone,
-        [isAr ? "تاريخ الإضافة" : "Date Added"]: formatCustomerExportDate(customer.createdAt, language),
-        ...(source === "repair"
-          ? { [isAr ? "رقم العميل" : "Customer ID"]: customer.customerId || "" }
-          : {}),
-        [isAr ? "البريد الإلكتروني" : "Email"]: customer.email || "",
-      }));
+      const filename = exportFilename(source, format);
 
-      const XLSX = await import("xlsx");
-      const worksheet = XLSX.utils.json_to_sheet(rows);
-      worksheet["!cols"] = [
-        { wch: 28 },
-        { wch: 18 },
-        { wch: 14 },
-        ...(source === "repair" ? [{ wch: 12 }] : []),
-        { wch: 28 },
-      ];
+      if (format === "contacts") {
+        const csv = buildContactsCsv(customers);
+        res.setHeader("Content-Type", "text/csv; charset=utf-8");
+        res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+        return res.send(csv);
+      }
 
-      const workbook = XLSX.utils.book_new();
-      const sheetName = source === "repair"
-        ? (isAr ? "عملاء الصيانة" : "Repair Customers")
-        : (isAr ? "عملاء الطلبات" : "Order Customers");
-      XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
-
-      const dateStamp = new Date().toISOString().slice(0, 10);
-      const filename = source === "repair"
-        ? `repair-customers-${dateStamp}.xlsx`
-        : `order-customers-${dateStamp}.xlsx`;
-
-      const buffer = XLSX.write(workbook, { type: "buffer", bookType: "xlsx" });
+      const buffer = buildCustomersExcelBuffer(customers, source, language);
       res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
       res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
       return res.send(buffer);
