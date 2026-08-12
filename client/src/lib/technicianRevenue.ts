@@ -21,7 +21,7 @@ function baghdadDayKey(date: Date | string | null | undefined): string | null {
   return parsed.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
-/** When a technician repair counts for daily revenue (Baghdad calendar day). */
+/** Technician daily report — technician-tagged payments only. */
 export function getTechnicianDailyActivityDay(ticket: RepairTicket): string | null {
   if (ticket.repairPaymentSource !== "technician") return null;
   if (ticket.isArchived === 1) return null;
@@ -45,6 +45,7 @@ export function getTechnicianDailyActivityDay(ticket: RepairTicket): string | nu
   return null;
 }
 
+/** Dashboard stats — all repair tickets visible in the technician portal. */
 export function computeTechnicianRevenueStats(tickets: RepairTicket[] | undefined): TechnicianRevenueStats {
   const empty: TechnicianRevenueStats = {
     totalRevenue: 0,
@@ -67,8 +68,6 @@ export function computeTechnicianRevenueStats(tickets: RepairTicket[] | undefine
   let deferredCount = 0;
 
   for (const ticket of tickets) {
-    if (ticket.repairPaymentSource !== "technician") continue;
-
     const cost = ticketCost(ticket);
     const archived = ticket.isArchived === 1;
 
@@ -77,22 +76,19 @@ export function computeTechnicianRevenueStats(tickets: RepairTicket[] | undefine
       if (ticket.status === "pending") pendingCount++;
     }
 
-    if (ticket.status === "completed" || ticket.status === "delivered") {
+    if (ticket.status === "completed") {
       totalRevenue += cost;
-    }
-
-    const activityDay = getTechnicianDailyActivityDay(ticket);
-    if (activityDay === baghdadToday) {
-      dailyRevenue += cost;
-    }
-
-    if (!archived && ticket.status === "completed") {
-      completedCount++;
-      completedRevenue += cost;
-    }
-
-    if (!archived && ticket.status === "delivered") {
-      deliveredCount++;
+      const completedDay = baghdadDayKey(ticket.completedAt || ticket.updatedAt);
+      if (completedDay === baghdadToday) dailyRevenue += cost;
+      if (!archived) {
+        completedCount++;
+        completedRevenue += cost;
+      }
+    } else if (ticket.status === "delivered") {
+      totalRevenue += cost;
+      const deliveredDay = baghdadDayKey(ticket.deliveredAt || ticket.updatedAt);
+      if (deliveredDay === baghdadToday) dailyRevenue += cost;
+      if (!archived) deliveredCount++;
     }
   }
 
