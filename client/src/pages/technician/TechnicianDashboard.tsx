@@ -15,6 +15,7 @@ import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing, BarChart3, TrendingDown } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
+import TicketDetailDialog from '@/components/TicketDetailDialog';
 import { computeTechnicianRevenueStats } from '@/lib/technicianRevenue';
 import { IntercomWidget } from '@/components/IntercomWidget';
 import {
