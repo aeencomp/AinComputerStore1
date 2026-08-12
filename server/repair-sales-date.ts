@@ -49,10 +49,15 @@ export function sqlRepairTicketEligibleForSalesQuery(): SQL {
 
 /** When a technician-tagged repair counts for daily/shift reports (incl. 0 IQD delivered). */
 export function sqlRepairTicketTechnicianActivityAt() {
-  return sql`coalesce(${repairTickets.deliveredAt}, ${repairTickets.paidAt}, ${repairTickets.updatedAt})`;
+  return sql`case
+    when ${repairTickets.status} = 'delivered' and ${repairTickets.deliveredAt} is not null then ${repairTickets.deliveredAt}
+    when ${repairTickets.paymentStatus} = 'paid' and ${repairTickets.paidAt} is not null then ${repairTickets.paidAt}
+    when ${repairTickets.status} = 'completed' and ${repairTickets.completedAt} is not null then ${repairTickets.completedAt}
+    else coalesce(${repairTickets.deliveredAt}, ${repairTickets.paidAt}, ${repairTickets.updatedAt})
+  end`;
 }
 
-/** Technician report window — paid, delivered (incl. 0 IQD), or deferred. */
+/** Technician report window — paid, delivered (incl. 0 IQD), deferred, or completed awaiting pickup. */
 export function sqlRepairTicketInTechnicianReportWindow(startSql: SQL, endSql: SQL): SQL {
   const activityAt = sqlRepairTicketTechnicianActivityAt();
   return and(
@@ -61,6 +66,7 @@ export function sqlRepairTicketInTechnicianReportWindow(startSql: SQL, endSql: S
       eq(repairTickets.paymentStatus, "deferred"),
       eq(repairTickets.status, "delivered"),
       eq(repairTickets.paymentStatus, "paid"),
+      eq(repairTickets.status, "completed"),
     )!,
     sql`${activityAt} >= ${startSql}`,
     sql`${activityAt} <= ${endSql}`,
@@ -96,7 +102,14 @@ export function sqlMaxTechnicianRepairActivityOnShiftDay(
   shiftStartSql: SQL,
   dayEndSql: SQL,
 ): SQL {
-  const activityAt = sql`coalesce(rt.delivered_at, rt.paid_at, rt.updated_at)`;
+  const activityAt = sql`coalesce(
+    case when rt.status = 'delivered' and rt.delivered_at is not null then rt.delivered_at end,
+    case when rt.payment_status = 'paid' and rt.paid_at is not null then rt.paid_at end,
+    case when rt.status = 'completed' and rt.completed_at is not null then rt.completed_at end,
+    rt.delivered_at,
+    rt.paid_at,
+    rt.updated_at
+  )`;
   return sql`(
     select max(${activityAt}) from repair_tickets rt
     where rt.repair_payment_source = 'technician'
@@ -104,6 +117,7 @@ export function sqlMaxTechnicianRepairActivityOnShiftDay(
         rt.payment_status = 'deferred'
         or rt.status = 'delivered'
         or rt.payment_status = 'paid'
+        or rt.status = 'completed'
       )
       and ${activityAt} >= ${shiftStartSql}
       and ${activityAt} <= ${dayEndSql}

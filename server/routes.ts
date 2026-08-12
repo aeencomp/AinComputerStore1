@@ -10933,20 +10933,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const conditions = [dateClause, sourceClause];
       if (locClause) conditions.push(locClause);
 
-      const technicianId = (req.session as any)?.technicianId as string | undefined;
-      if (source === "technician" && technicianId) {
-        const ownerId = technicianShiftOwnerId(technicianId);
-        conditions.push(
-          sql`exists (
-            select 1 from sales_shifts ss
-            where ss.sales_user_id = ${ownerId}
-              and coalesce(ss.sales_location_id, 1) = ${LOCATION_MAIN_ID}
-              and ${cashWithdrawals.createdAt} >= ss.start_time
-              and ${cashWithdrawals.createdAt} <= coalesce(ss.end_time, ${dayEndSql})
-          )`,
-        );
-      }
-
       const rows = await db
         .select()
         .from(cashWithdrawals)

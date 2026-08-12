@@ -112,19 +112,6 @@ export async function computeRepairReport(
     sql`${cashWithdrawals.createdAt} <= ${withdrawalEndSql}`,
   ];
 
-  if (options?.technicianId) {
-    const ownerId = technicianShiftOwnerId(options.technicianId);
-    withdrawalConditions.push(
-      sql`exists (
-        select 1 from sales_shifts ss
-        where ss.sales_user_id = ${ownerId}
-          and coalesce(ss.sales_location_id, 1) = ${LOCATION_MAIN_ID}
-          and ${cashWithdrawals.createdAt} >= ss.start_time
-          and ${cashWithdrawals.createdAt} <= coalesce(ss.end_time, ${dayEndSql})
-      )`,
-    );
-  }
-
   const dailyWithdrawals = await db
     .select()
     .from(cashWithdrawals)

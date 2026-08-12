@@ -15,7 +15,7 @@ import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing, BarChart3, TrendingDown } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
-import TicketDetailDialog from '@/components/TicketDetailDialog';
+import { computeTechnicianRevenueStats } from '@/lib/technicianRevenue';
 import { IntercomWidget } from '@/components/IntercomWidget';
 import {
   AlertDialog,
@@ -268,43 +268,7 @@ export default function TechnicianDashboard() {
     },
   });
 
-  const stats = useMemo(() => {
-    if (!tickets) return { totalRevenue: 0, dailyRevenue: 0, completedCount: 0, completedRevenue: 0, pendingCount: 0, deliveredCount: 0, deferredCount: 0 };
-    let totalRevenue = 0;
-    let dailyRevenue = 0;
-    let completedCount = 0;
-    let completedRevenue = 0;
-    let pendingCount = 0;
-    let deliveredCount = 0;
-    let deferredCount = 0;
-    const baghdadToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
-    for (const ticket of tickets) {
-      const cost = parseFloat(ticket.finalCost || ticket.costEstimate || '0');
-      if (ticket.status === 'completed') {
-        totalRevenue += cost;
-        const completedDate = (ticket as any).completedAt || ticket.updatedAt;
-        const dayKey = new Date(completedDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
-        if (dayKey === baghdadToday) dailyRevenue += cost;
-        if (ticket.isArchived !== 1) {
-          completedCount++;
-          completedRevenue += cost;
-        }
-      } else if (ticket.status === 'delivered') {
-        totalRevenue += cost;
-        const deliveredDate = ticket.deliveredAt || ticket.updatedAt;
-        const dayKey = new Date(deliveredDate).toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' });
-        if (dayKey === baghdadToday) dailyRevenue += cost;
-        if (ticket.isArchived !== 1) {
-          deliveredCount++;
-        }
-      }
-      if (ticket.isArchived !== 1) {
-        if (ticket.paymentStatus === 'deferred') deferredCount++;
-        if (ticket.status === 'pending') pendingCount++;
-      }
-    }
-    return { totalRevenue, dailyRevenue, completedCount, completedRevenue, pendingCount, deliveredCount, deferredCount };
-  }, [tickets]);
+  const stats = useMemo(() => computeTechnicianRevenueStats(tickets), [tickets]);
 
   const archivedCount = useMemo(() => {
     return tickets?.filter(t => t.isArchived === 1).length || 0;
@@ -592,7 +556,7 @@ export default function TechnicianDashboard() {
                   <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'مكتملة' : 'Completed'}</p>
+                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'بانتظار الاستلام' : 'Awaiting Pickup'}</p>
                   <p className="text-lg font-bold" data-testid="text-completed-count">
                     {canViewRevenue
                       ? (language === 'ar'

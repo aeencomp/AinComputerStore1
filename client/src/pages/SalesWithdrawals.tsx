@@ -196,6 +196,7 @@ export default function SalesWithdrawals({ user, apiBase = "/api/instore/withdra
           return [row, ...list];
         },
       );
+      queryClient.invalidateQueries({ queryKey: [apiBase] });
       invalidateReportQueries();
       setAmount("");
       setReason("");
