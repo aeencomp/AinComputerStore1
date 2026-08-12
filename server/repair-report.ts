@@ -15,6 +15,7 @@ import {
   sqlBaghdadDayStart,
   sqlBaghdadDayEnd,
   sqlBaghdadRepairEndBound,
+  sqlCashWithdrawalOnBaghdadDate,
 } from "./daily-revenue-report";
 import { WITHDRAWAL_SOURCE_TECHNICIAN } from "@shared/schema";
 import { technicianShiftOwnerId } from "./technician-shift";
@@ -108,8 +109,7 @@ export async function computeRepairReport(
   const withdrawalConditions: SQL[] = [
     eq(cashWithdrawals.source, WITHDRAWAL_SOURCE_TECHNICIAN),
     eq(cashWithdrawals.salesLocationId, LOCATION_MAIN_ID),
-    sql`${cashWithdrawals.createdAt} >= ${dayStartSql}`,
-    sql`${cashWithdrawals.createdAt} <= ${withdrawalEndSql}`,
+    sqlCashWithdrawalOnBaghdadDate(baghdadDateStr),
   ];
 
   const dailyWithdrawals = await db

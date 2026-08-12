@@ -283,6 +283,44 @@ export default function TechnicianDailyReport() {
     enabled: canViewRepairReport,
   });
 
+  const { data: withdrawalsForDay = [] } = useQuery<NonNullable<RepairReportResponse["withdrawals"]>>({
+    queryKey: ["/api/technician/withdrawals", selectedDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/technician/withdrawals?date=${selectedDate}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to load withdrawals");
+      return res.json();
+    },
+    enabled: canViewRepairReport,
+    staleTime: 0,
+  });
+
+  const summary = report?.summary;
+  const repairSales = report?.repairSales ?? [];
+  const withdrawals = report?.withdrawals ?? [];
+
+  const effectiveWithdrawals = useMemo(() => {
+    if (withdrawals.length > 0) return withdrawals;
+    return withdrawalsForDay;
+  }, [withdrawals, withdrawalsForDay]);
+
+  const effectiveSummary = useMemo(() => {
+    if (!summary) return undefined;
+    const withdrawalTotal = effectiveWithdrawals.reduce(
+      (sum, w) => sum + parseFloat(w.amount || "0"),
+      0,
+    );
+    if (withdrawalTotal <= 0) return summary;
+    if ((summary.totalWithdrawals ?? 0) > 0 && summary.withdrawalCount > 0) return summary;
+    return {
+      ...summary,
+      totalWithdrawals: withdrawalTotal,
+      withdrawalCount: effectiveWithdrawals.length,
+      netTotal: (summary.repairTotal ?? 0) - withdrawalTotal,
+    };
+  }, [summary, effectiveWithdrawals]);
+
   const { data: currentShift } = useQuery<RepairShift | null>({
     queryKey: ["/api/technician/shifts/current"],
     queryFn: async () => {
@@ -389,35 +427,13 @@ export default function TechnicianDailyReport() {
     );
   }
 
-  const summary = report?.summary;
-  const repairSales = report?.repairSales ?? [];
-  const withdrawals = report?.withdrawals ?? [];
-
-  const { data: withdrawalsForDay = [] } = useQuery<NonNullable<RepairReportResponse["withdrawals"]>>({
-    queryKey: ["/api/technician/withdrawals", selectedDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/technician/withdrawals?date=${selectedDate}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to load withdrawals");
-      return res.json();
-    },
-    enabled: canViewRepairReport,
-    staleTime: 0,
-  });
-
-  const effectiveWithdrawals = useMemo(() => {
-    if (withdrawals.length > 0) return withdrawals;
-    return withdrawalsForDay;
-  }, [withdrawals, withdrawalsForDay]);
-
   const dateLabel = report?.date
     ? format(new Date(report.date), "dd/MM/yyyy")
     : format(new Date(`${selectedDate}T12:00:00+03:00`), "dd/MM/yyyy");
 
   const handlePrint = () => {
-    if (!report?.summary) return;
-    const html = buildRepairPrintHTML(dateLabel, repairSales, report.summary, effectiveWithdrawals);
+    if (!effectiveSummary) return;
+    const html = buildRepairPrintHTML(dateLabel, repairSales, effectiveSummary, effectiveWithdrawals);
     const win = window.open("", "_blank", "width=900,height=700");
     if (!win) return;
     win.document.write(html);
@@ -533,13 +549,13 @@ export default function TechnicianDailyReport() {
                 <CardContent className="pt-4">
                   <p className="text-xs text-muted-foreground">
                     {language === "ar" ? "إجمالي الصيانة" : "Repair Total"}
-                    {(summary?.totalWithdrawals ?? 0) > 0 && (
+                    {(effectiveSummary?.totalWithdrawals ?? 0) > 0 && (
                       <span className="block text-[10px]">
                         {language === "ar" ? "قبل السحوبات" : "Before withdrawals"}
                       </span>
                     )}
                   </p>
-                  <p className="text-lg font-bold text-blue-600">{fmtNum(summary?.repairTotal ?? 0)}</p>
+                  <p className="text-lg font-bold text-blue-600">{fmtNum(effectiveSummary?.repairTotal ?? 0)}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -548,7 +564,7 @@ export default function TechnicianDailyReport() {
                     <Banknote className="h-3 w-3" />
                     {language === "ar" ? "نقداً" : "Cash"}
                   </p>
-                  <p className="text-lg font-bold">{fmtNum(summary?.repairTotalCash ?? 0)}</p>
+                  <p className="text-lg font-bold">{fmtNum(effectiveSummary?.repairTotalCash ?? 0)}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -557,7 +573,7 @@ export default function TechnicianDailyReport() {
                     <CreditCard className="h-3 w-3" />
                     {language === "ar" ? "بطاقة" : "Card"}
                   </p>
-                  <p className="text-lg font-bold">{fmtNum(summary?.repairTotalCard ?? 0)}</p>
+                  <p className="text-lg font-bold">{fmtNum(effectiveSummary?.repairTotalCard ?? 0)}</p>
                 </CardContent>
               </Card>
               <Card>
@@ -565,22 +581,22 @@ export default function TechnicianDailyReport() {
                   <p className="text-xs text-muted-foreground">
                     {language === "ar" ? "عدد السجلات" : "Records"}
                   </p>
-                  <p className="text-lg font-bold">{summary?.repairCount ?? 0}</p>
+                  <p className="text-lg font-bold">{effectiveSummary?.repairCount ?? 0}</p>
                 </CardContent>
               </Card>
             </div>
 
-            {(summary?.totalWithdrawals ?? 0) > 0 && (
+            {(effectiveSummary?.totalWithdrawals ?? 0) > 0 && (
               <div className="grid grid-cols-2 gap-4">
                 <Card>
                   <CardContent className="pt-4">
                     <p className="text-xs text-muted-foreground">
                       {language === "ar"
-                        ? `السحوبات (${summary?.withdrawalCount ?? 0})`
-                        : `Withdrawals (${summary?.withdrawalCount ?? 0})`}
+                        ? `السحوبات (${effectiveSummary?.withdrawalCount ?? 0})`
+                        : `Withdrawals (${effectiveSummary?.withdrawalCount ?? 0})`}
                     </p>
                     <p className="text-lg font-bold text-orange-600">
-                      − {fmtNum(summary?.totalWithdrawals ?? 0)}
+                      − {fmtNum(effectiveSummary?.totalWithdrawals ?? 0)}
                     </p>
                   </CardContent>
                 </Card>
@@ -592,13 +608,13 @@ export default function TechnicianDailyReport() {
                         {language === "ar" ? "بعد السحوبات" : "After withdrawals"}
                       </span>
                     </p>
-                    <p className="text-lg font-bold">{fmtNum(summary?.netTotal ?? 0)}</p>
+                    <p className="text-lg font-bold">{fmtNum(effectiveSummary?.netTotal ?? 0)}</p>
                   </CardContent>
                 </Card>
               </div>
             )}
 
-            {((summary?.totalWithdrawals ?? 0) > 0 || effectiveWithdrawals.length > 0) && (
+            {((effectiveSummary?.totalWithdrawals ?? 0) > 0 || effectiveWithdrawals.length > 0) && (
               <Card>
                 <CardHeader className="pb-3">
                   <CardTitle className="text-base">
@@ -610,8 +626,8 @@ export default function TechnicianDailyReport() {
                   {effectiveWithdrawals.length === 0 ? (
                     <p className="text-center text-muted-foreground py-6 text-sm">
                       {language === "ar"
-                        ? `إجمالي السحوبات: ${fmtNum(summary?.totalWithdrawals ?? 0)}`
-                        : `Withdrawals total: ${fmtNum(summary?.totalWithdrawals ?? 0)}`}
+                        ? `إجمالي السحوبات: ${fmtNum(effectiveSummary?.totalWithdrawals ?? 0)}`
+                        : `Withdrawals total: ${fmtNum(effectiveSummary?.totalWithdrawals ?? 0)}`}
                     </p>
                   ) : (
                   <div className="overflow-x-auto">
@@ -646,7 +662,7 @@ export default function TechnicianDailyReport() {
                             {language === "ar" ? "إجمالي السحوبات" : "Total Withdrawals"}
                           </td>
                           <td className="py-2 px-4 text-end text-orange-600">
-                            − {fmtNum(summary?.totalWithdrawals ?? 0)}
+                            − {fmtNum(effectiveSummary?.totalWithdrawals ?? 0)}
                           </td>
                         </tr>
                       </tfoot>
@@ -784,15 +800,15 @@ export default function TechnicianDailyReport() {
                         <tr className="bg-muted/30 border-t-2 font-semibold">
                           <td colSpan={5} className="py-2 px-4">
                             {language === "ar" ? "المجموع" : "Total"}
-                            {(summary?.repairTotalDeferred ?? 0) > 0 && (
+                            {(effectiveSummary?.repairTotalDeferred ?? 0) > 0 && (
                               <span className="text-xs text-orange-500 font-normal ms-2">
                                 ({language === "ar" ? "آجل غير محسوب" : "Deferred excluded"}:{" "}
-                                {fmtNum(summary?.repairTotalDeferred ?? 0)})
+                                {fmtNum(effectiveSummary?.repairTotalDeferred ?? 0)})
                               </span>
                             )}
                           </td>
                           <td className="py-2 px-4 text-end text-blue-600 dark:text-blue-400">
-                            {fmtNum(summary?.repairTotal ?? 0)}
+                            {fmtNum(effectiveSummary?.repairTotal ?? 0)}
                           </td>
                         </tr>
                       </tfoot>

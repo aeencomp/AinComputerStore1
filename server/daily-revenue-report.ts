@@ -73,6 +73,30 @@ export function sqlBaghdadDayEnd(dateStr: string) {
   return sql`((((${dateStr}::date) + interval '1 day')::timestamp) - interval '1 millisecond')`;
 }
 
+/** Filter withdrawal timestamptz rows to a Baghdad calendar date. */
+export function sqlCashWithdrawalOnBaghdadDate(dateStr: string) {
+  return sql`(${cashWithdrawals.createdAt} AT TIME ZONE 'Asia/Baghdad')::date = ${dateStr}::date`;
+}
+
+/** Timestamptz lower bound for a Baghdad calendar day (for range queries). */
+export function sqlTimestamptzBaghdadDayStart(dateStr: string) {
+  return sql`((${dateStr}::date)::timestamp AT TIME ZONE 'Asia/Baghdad')`;
+}
+
+/** Timestamptz upper bound for a Baghdad calendar day (for range queries). */
+export function sqlTimestamptzBaghdadDayEnd(dateStr: string) {
+  return sql`((((${dateStr}::date) + interval '1 day')::timestamp) - interval '1 millisecond') AT TIME ZONE 'Asia/Baghdad'`;
+}
+
+/** Timestamptz repair/withdrawal window end, extended through overnight shift if needed. */
+export function sqlTimestamptzBaghdadRepairEndBound(dateStr: string, extendedEnd?: Date) {
+  const dayEndSql = sqlTimestamptzBaghdadDayEnd(dateStr);
+  if (!extendedEnd) return dayEndSql;
+  const calendarEndMs = new Date(`${dateStr}T23:59:59.999+03:00`).getTime();
+  if (extendedEnd.getTime() <= calendarEndMs) return dayEndSql;
+  return sql`greatest(${dayEndSql}, ${sqlBaghdadWallClock(extendedEnd)} AT TIME ZONE 'Asia/Baghdad')`;
+}
+
 /** JS Date → naive Baghdad wall-clock timestamp for SQL (never use toISOString()). */
 export function sqlBaghdadWallClock(d: Date) {
   const s = d.toLocaleString("sv-SE", { timeZone: "Asia/Baghdad" });
@@ -215,7 +239,9 @@ export async function computeDailyReportForApi(
           .from(repairTickets)
           .where(sqlRepairTicketInStoreSalesWindow(dayStartSql, repairEndBound));
 
-  const withdrawalEndSql = options?.calendarDayOnly ? dayEndSql : repairEndBound;
+  const withdrawalEndSql = options?.calendarDayOnly
+    ? sqlTimestamptzBaghdadDayEnd(baghdadDateStr)
+    : sqlTimestamptzBaghdadRepairEndBound(baghdadDateStr, extendedEndDate);
 
   const dailyWithdrawals = await db
     .select()
@@ -224,7 +250,7 @@ export async function computeDailyReportForApi(
       and(
         eq(cashWithdrawals.source, "sales"),
         eq(cashWithdrawals.salesLocationId, salesLocationId),
-        sql`${cashWithdrawals.createdAt} >= ${dayStartSql}`,
+        sql`${cashWithdrawals.createdAt} >= ${sqlTimestamptzBaghdadDayStart(baghdadDateStr)}`,
         sql`${cashWithdrawals.createdAt} <= ${withdrawalEndSql}`,
       ),
     )

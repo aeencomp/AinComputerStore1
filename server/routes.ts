@@ -27,6 +27,7 @@ import {
   sqlBaghdadDayStart,
   sqlBaghdadDayEnd,
   sqlBaghdadRepairEndBound,
+  sqlCashWithdrawalOnBaghdadDate,
 } from "./daily-revenue-report";
 import { listAdminCustomers } from "./admin-customers";
 import {
@@ -10913,9 +10914,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? rawDate
         : new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
-      const dayStartSql = sqlBaghdadDayStart(baghdadDateStr2);
-      const dayEndSql = sqlBaghdadDayEnd(baghdadDateStr2);
-
       const locationId = req.query.locationId != null
         ? parseInt(String(req.query.locationId), 10)
         : (source === "sales" && salesUserId ? resolveRequestLocationId(req) : LOCATION_MAIN_ID);
@@ -10925,10 +10923,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ? eq(cashWithdrawals.salesLocationId, locationId)
         : undefined;
 
-      const dateClause = and(
-        sql`${cashWithdrawals.createdAt} >= ${dayStartSql}`,
-        sql`${cashWithdrawals.createdAt} <= ${dayEndSql}`,
-      );
+      const dateClause = sqlCashWithdrawalOnBaghdadDate(baghdadDateStr2);
 
       const conditions = [dateClause, sourceClause];
       if (locClause) conditions.push(locClause);
