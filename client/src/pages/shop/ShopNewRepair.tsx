@@ -19,6 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { BrandSelect } from '@/components/BrandSelect';
+import { repairReceiptPolicyBoxCss, repairReceiptTermsSectionHtml } from '@/lib/repairReceiptTerms';
 
 export default function ShopNewRepair() {
   const [, navigate] = useLocation();
@@ -220,7 +221,11 @@ export default function ShopNewRepair() {
             .info-label { font-weight: 900; }
             .problem-box { background: #f0f0f0; padding: 10px; border-radius: 4px; margin-top: 8px; font-size: 12px; border: 1px solid #999; }
             .terms { margin-top: 14px; padding-top: 10px; border-top: 2px solid #000; }
+            .terms-title { font-weight: 900; font-size: 12px; margin-bottom: 6px; }
+            .terms-list { font-size: 10px; font-weight: 600; color: #000; padding-${isRTL ? 'right' : 'left'}: 10px; }
+            .terms-list li { margin: 4px 0; }
             .footer { text-align: center; margin-top: 14px; padding-top: 10px; border-top: 3px solid #000; font-size: 12px; font-weight: 900; }
+            ${repairReceiptPolicyBoxCss()}
           </style>
         </head>
         <body>
@@ -250,6 +255,7 @@ export default function ShopNewRepair() {
             <div class="section-title">${isRTL ? 'وصف المشكلة' : 'Problem Description'}</div>
             <div class="problem-box">${createdTicket.issueDescriptionAr}</div>
           </div>
+          ${repairReceiptTermsSectionHtml(isRTL)}
           <div class="footer">
             <div>${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
           </div>

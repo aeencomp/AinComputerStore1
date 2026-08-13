@@ -19,7 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { BrandSelect } from '@/components/BrandSelect';
-import { repairReceiptStandardTermsHtml } from '@/lib/repairReceiptTerms';
+import { repairReceiptPolicyBoxCss, repairReceiptPolicyBoxHtml, repairReceiptTermsSectionHtml } from '@/lib/repairReceiptTerms';
 import {
   Dialog,
   DialogContent,
@@ -416,6 +416,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
           .footer { text-align: center; margin-top: 14px; padding-top: 10px; border-top: 3px solid #000; font-size: 12px; font-weight: 900; }
           .track-info { margin-top: 10px; padding: 8px; background: #e0e0e0; border-radius: 4px; text-align: center; font-size: 11px; font-weight: 700; border: 1px solid #666; }
           .date-time { text-align: center; font-size: 11px; font-weight: 700; color: #000; margin: 10px 0; }
+          ${repairReceiptPolicyBoxCss()}
         </style>
       </head>
       <body>
@@ -427,6 +428,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
 
         <div class="receipt-title">${isRTL ? 'إيصال استلام جهاز للصيانة' : 'Device Repair Receipt'}</div>
         <div class="ticket-number">${ticket.ticketNumber}</div>
+
+        ${repairReceiptPolicyBoxHtml(isRTL)}
 
         ${totalTickets > 1 ? `
           <div style="text-align:center;margin:8px 0;padding:6px 10px;background:#fff3cd;border:2px solid #ffc107;border-radius:6px;font-size:15px;font-weight:900;color:#856404;">
@@ -510,12 +513,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
             }).join('')}
           </div>` : ''}
 
-        <div class="terms">
-          <div class="terms-title">${isRTL ? 'الشروط والأحكام:' : 'Terms & Conditions:'}</div>
-          <ul class="terms-list">
-            ${repairReceiptStandardTermsHtml(isRTL)}
-          </ul>
-        </div>
+        ${repairReceiptTermsSectionHtml(isRTL)}
 
         <div class="track-info">
           ${isRTL ? 'امسح رمز QR أعلاه لتتبع حالة جهازك مباشرة' : 'Scan the QR code above to track your device status directly'}
@@ -581,6 +579,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
           .divider { border-top: 2px dashed #666; margin: 8px 0; }
           .footer { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 3px solid #000; font-size: 11px; font-weight: 900; }
           .keep-note { text-align: center; margin-top: 6px; padding: 5px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px; font-size: 10px; font-weight: 700; }
+          ${repairReceiptPolicyBoxCss()}
         </style>
       </head><body>
         <div class="header">
@@ -596,6 +595,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         </div>
         <div class="total-badge">${isRTL ? `إجمالي الطلبات النشطة: ${dialogActiveTickets.length}` : `Total Active Repairs: ${dialogActiveTickets.length}`}</div>
         ${deviceSections}
+        ${repairReceiptPolicyBoxHtml(isRTL)}
         <div class="keep-note">${isRTL ? 'احتفظ بهذه الورقة لاستلام جميع أجهزتك' : 'Keep this sheet to collect all your devices'}</div>
         <div class="footer">${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
       </body></html>`);

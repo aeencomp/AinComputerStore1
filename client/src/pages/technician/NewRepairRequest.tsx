@@ -20,7 +20,7 @@ import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Label } from '@/components/ui/label';
 import { BrandSelect } from '@/components/BrandSelect';
-import { repairReceiptStandardTermsHtml } from '@/lib/repairReceiptTerms';
+import { repairReceiptPolicyBoxCss, repairReceiptPolicyBoxHtml, repairReceiptTermsSectionHtml } from '@/lib/repairReceiptTerms';
 
 interface Technician {
   id: string;
@@ -416,6 +416,7 @@ export default function NewRepairRequest() {
               color: #000;
               margin: 10px 0;
             }
+            ${repairReceiptPolicyBoxCss()}
           </style>
         </head>
         <body>
@@ -428,6 +429,8 @@ export default function NewRepairRequest() {
           <div class="receipt-title">${isRTL ? 'إيصال استلام جهاز للصيانة' : 'Device Repair Receipt'}</div>
           
           <div class="ticket-number">${createdTicket.ticketNumber}</div>
+
+          ${repairReceiptPolicyBoxHtml(isRTL)}
           
           ${activeTickets.length > 1 ? (() => {
             const idx = activeTickets.findIndex(t => t.id === createdTicket.id) + 1;
@@ -517,12 +520,7 @@ export default function NewRepairRequest() {
             </div>`;
           })() : ''}
           
-          <div class="terms">
-            <div class="terms-title">${isRTL ? 'الشروط والأحكام:' : 'Terms & Conditions:'}</div>
-            <ul class="terms-list">
-              ${repairReceiptStandardTermsHtml(isRTL)}
-            </ul>
-          </div>
+          ${repairReceiptTermsSectionHtml(isRTL)}
           
           <div class="track-info">
             ${isRTL ? 'امسح رمز QR أعلاه لتتبع حالة جهازك مباشرة' : 'Scan the QR code above to track your device status directly'}
@@ -601,6 +599,7 @@ export default function NewRepairRequest() {
           .divider { border-top: 2px dashed #666; margin: 8px 0; }
           .footer { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 3px solid #000; font-size: 11px; font-weight: 900; }
           .keep-note { text-align: center; margin-top: 6px; padding: 5px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px; font-size: 10px; font-weight: 700; }
+          ${repairReceiptPolicyBoxCss()}
         </style>
       </head>
       <body>
@@ -617,6 +616,7 @@ export default function NewRepairRequest() {
         </div>
         <div class="total-badge">${isRTL ? `إجمالي الطلبات النشطة: ${activeTickets.length}` : `Total Active Repairs: ${activeTickets.length}`}</div>
         ${deviceSections}
+        ${repairReceiptPolicyBoxHtml(isRTL)}
         <div class="keep-note">${isRTL ? 'احتفظ بهذه الورقة لاستلام جميع أجهزتك' : 'Keep this sheet to collect all your devices'}</div>
         <div class="footer">${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
       </body>

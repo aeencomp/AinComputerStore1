@@ -14,7 +14,7 @@ import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { ArrowLeft, Trash2, Printer, Lock, Banknote, CreditCard, Split } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPosPaymentLabel } from '@/lib/posPayment';
-import { repairReceiptUnder25kPolicyLine } from '@/lib/repairReceiptTerms';
+import { repairReceiptPolicyBoxCss, repairReceiptPolicyBoxHtml } from '@/lib/repairReceiptTerms';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -415,7 +415,7 @@ export default function TicketDetail() {
           .notes { font-size: 10px; font-weight: 600; margin-top: 4px; padding: 5px; background: #f0f0f0; border-radius: 3px; }
           .footer { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 3px solid #000; font-size: 11px; font-weight: 900; }
           .keep-note { text-align: center; margin-top: 6px; padding: 5px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px; font-size: 10px; font-weight: 700; }
-          .policy-note { text-align: center; margin-top: 6px; padding: 5px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; font-size: 10px; font-weight: 700; line-height: 1.4; }
+          ${repairReceiptPolicyBoxCss()}
         </style>
       </head><body>
         <div class="header">
@@ -436,7 +436,7 @@ export default function TicketDetail() {
         <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ التسليم:' : 'Delivery Date:'}</span><span>${deliveryDate}</span></div>
         ${ticket.finalCost ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span><span>${Number(ticket.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ticket.costEstimate ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة التقديرية:' : 'Est. Cost:'}</span><span>${Number(ticket.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
         ${ticket.technicianNotes ? `<div class="notes"><span style="font-weight:900;">${isRTL ? 'ملاحظات:' : 'Notes:'}</span> ${ticket.technicianNotes}</div>` : ''}
-        <div class="policy-note">${repairReceiptUnder25kPolicyLine(isRTL)}</div>
+        ${repairReceiptPolicyBoxHtml(isRTL)}
         <div class="keep-note">${isRTL ? 'احتفظ بهذا الوصل لاستلام جهازك' : 'Keep this receipt to collect your device'}</div>
         <div class="footer">${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
       </body></html>`);
