@@ -19,7 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { BrandSelect } from '@/components/BrandSelect';
-import { repairReceiptPolicyBoxCss, repairReceiptTermsSectionHtml } from '@/lib/repairReceiptTerms';
+import { repairReceiptTermsSectionHtml } from '@/lib/repairReceiptTerms';
 
 export default function ShopNewRepair() {
   const [, navigate] = useLocation();
@@ -225,7 +225,6 @@ export default function ShopNewRepair() {
             .terms-list { font-size: 10px; font-weight: 600; color: #000; padding-${isRTL ? 'right' : 'left'}: 10px; }
             .terms-list li { margin: 4px 0; }
             .footer { text-align: center; margin-top: 14px; padding-top: 10px; border-top: 3px solid #000; font-size: 12px; font-weight: 900; }
-            ${repairReceiptPolicyBoxCss()}
           </style>
         </head>
         <body>

@@ -14,7 +14,7 @@ import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { ArrowLeft, Trash2, Printer, Lock, Banknote, CreditCard, Split } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPosPaymentLabel } from '@/lib/posPayment';
-import { repairReceiptPolicyBoxCss, repairReceiptPolicyBoxHtml } from '@/lib/repairReceiptTerms';
+import { repairReceiptTermsSectionHtml } from '@/lib/repairReceiptTerms';
 import JsBarcode from 'jsbarcode';
 import { format } from 'date-fns';
 import { apiRequest, queryClient } from '@/lib/queryClient';
@@ -413,9 +413,12 @@ export default function TicketDetail() {
           .date-row { display: flex; justify-content: space-between; font-size: 12px; font-weight: 800; margin: 4px 0; padding: 4px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 3px; }
           .cost-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 900; margin: 4px 0; padding: 5px; background: #d4edda; border: 2px solid #28a745; border-radius: 3px; color: #155724; }
           .notes { font-size: 10px; font-weight: 600; margin-top: 4px; padding: 5px; background: #f0f0f0; border-radius: 3px; }
+          .terms { margin-top: 10px; padding-top: 8px; border-top: 2px solid #000; }
+          .terms-title { font-weight: 900; font-size: 11px; margin-bottom: 5px; }
+          .terms-list { font-size: 10px; font-weight: 600; color: #000; padding-${isRTL ? 'right' : 'left'}: 10px; }
+          .terms-list li { margin: 4px 0; }
           .footer { text-align: center; margin-top: 10px; padding-top: 8px; border-top: 3px solid #000; font-size: 11px; font-weight: 900; }
           .keep-note { text-align: center; margin-top: 6px; padding: 5px; background: #d4edda; border: 1px solid #28a745; border-radius: 3px; font-size: 10px; font-weight: 700; }
-          ${repairReceiptPolicyBoxCss()}
         </style>
       </head><body>
         <div class="header">
@@ -436,7 +439,7 @@ export default function TicketDetail() {
         <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ التسليم:' : 'Delivery Date:'}</span><span>${deliveryDate}</span></div>
         ${ticket.finalCost ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span><span>${Number(ticket.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ticket.costEstimate ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة التقديرية:' : 'Est. Cost:'}</span><span>${Number(ticket.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
         ${ticket.technicianNotes ? `<div class="notes"><span style="font-weight:900;">${isRTL ? 'ملاحظات:' : 'Notes:'}</span> ${ticket.technicianNotes}</div>` : ''}
-        ${repairReceiptPolicyBoxHtml(isRTL)}
+        ${repairReceiptTermsSectionHtml(isRTL)}
         <div class="keep-note">${isRTL ? 'احتفظ بهذا الوصل لاستلام جهازك' : 'Keep this receipt to collect your device'}</div>
         <div class="footer">${isRTL ? 'شكراً لثقتكم بنا' : 'Thank you for trusting us'}</div>
       </body></html>`);
