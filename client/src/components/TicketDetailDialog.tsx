@@ -19,6 +19,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { BrandSelect } from '@/components/BrandSelect';
+import { repairReceiptStandardTermsHtml } from '@/lib/repairReceiptTerms';
 import {
   Dialog,
   DialogContent,
@@ -512,10 +513,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         <div class="terms">
           <div class="terms-title">${isRTL ? 'الشروط والأحكام:' : 'Terms & Conditions:'}</div>
           <ul class="terms-list">
-            <li>${isRTL ? 'يرجى الاحتفاظ بهذا الإيصال لاستلام الجهاز' : 'Please keep this receipt to collect your device'}</li>
-            <li>${isRTL ? 'مدة الصيانة تعتمد على نوع العطل وتوفر القطع' : 'Repair time depends on issue type and parts availability'}</li>
-            <li>${isRTL ? 'سيتم التواصل معكم عند الانتهاء' : 'We will contact you when ready'}</li>
-            <li>${isRTL ? 'الأجهزة غير المستلمة خلال 30 يوم لا نتحمل مسؤوليتها' : 'We are not responsible for devices not collected within 30 days'}</li>
+            ${repairReceiptStandardTermsHtml(isRTL)}
           </ul>
         </div>
 
