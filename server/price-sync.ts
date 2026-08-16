@@ -1,16 +1,33 @@
 import { db } from "./db";
 import { products } from "@shared/schema";
-import { eq, or, inArray } from "drizzle-orm";
-import https from "https";
+import { eq, or, inArray, like } from "drizzle-orm";
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const SYNC_STALE_MS = 15 * 60 * 1000;
 const MARKUP_PERCENTAGE = 0;
 const GLOBALIRAQ_API = "https://globaliraq.iq/products.json?limit=250";
+const MAX_PAGES = 50;
+
+const LAPTOP_CATEGORIES = [
+  "laptops",
+  "gaming-laptops",
+  "business-laptops",
+  "student-laptops",
+  "workstation-laptops",
+  "ultrabooks",
+  "2-in-1-laptops",
+];
+
+interface ShopifyVariant {
+  price: string;
+  compare_at_price: string | null;
+  sku?: string | null;
+}
 
 interface ShopifyProduct {
   title: string;
   handle: string;
-  variants: Array<{ price: string; compare_at_price: string | null }>;
+  variants: ShopifyVariant[];
 }
 
 interface SyncLog {
@@ -18,6 +35,7 @@ interface SyncLog {
   nextSync: Date | null;
   updatedCount: number;
   totalMatched: number;
+  fetchedCount: number;
   errors: string[];
   status: "idle" | "running" | "success" | "error";
 }
@@ -27,53 +45,84 @@ let syncLog: SyncLog = {
   nextSync: null,
   updatedCount: 0,
   totalMatched: 0,
+  fetchedCount: 0,
   errors: [],
   status: "idle",
 };
 
 let isRunning = false;
+let syncStartedAt: number | null = null;
 let syncInterval: NodeJS.Timeout | null = null;
 let initialTimeout: NodeJS.Timeout | null = null;
 let schedulerStarted = false;
 
-function fetchJSON(url: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    https.get(url, { headers: { "User-Agent": "Mozilla/5.0" } }, (res) => {
-      if (res.statusCode !== 200) {
-        return reject(new Error(`HTTP ${res.statusCode} for ${url}`));
-      }
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk) => chunks.push(chunk));
-      res.on("end", () => {
-        try {
-          resolve(JSON.parse(Buffer.concat(chunks).toString()));
-        } catch (e) {
-          reject(new Error("Failed to parse JSON"));
-        }
+async function fetchJSON(url: string, retries = 3): Promise<any> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= retries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const res = await fetch(url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (compatible; AinComputerStore/1.0)",
+          Accept: "application/json",
+        },
       });
-      res.on("error", reject);
-    }).on("error", reject);
-  });
+      clearTimeout(timeout);
+
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status} for ${url}`);
+      }
+
+      return await res.json();
+    } catch (err: any) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt < retries) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+
+  throw lastError ?? new Error(`Failed to fetch ${url}`);
 }
 
 async function fetchAllGlobalIraqProducts(): Promise<ShopifyProduct[]> {
   const allProducts: ShopifyProduct[] = [];
   let page = 1;
 
-  while (true) {
+  while (page <= MAX_PAGES) {
     const url = `${GLOBALIRAQ_API}&page=${page}`;
     const data = await fetchJSON(url);
-    const pageProducts = data.products || [];
+    const pageProducts: ShopifyProduct[] = data.products || [];
 
     if (pageProducts.length === 0) break;
     allProducts.push(...pageProducts);
     page++;
 
     if (pageProducts.length < 250) break;
-    if (page > 10) break;
   }
 
   return allProducts;
+}
+
+function buildGlobalSkuIndex(globalProducts: ShopifyProduct[]): Map<string, ShopifyProduct> {
+  const index = new Map<string, ShopifyProduct>();
+  for (const product of globalProducts) {
+    for (const variant of product.variants || []) {
+      const sku = variant.sku?.trim().toLowerCase();
+      if (sku) index.set(sku, product);
+    }
+  }
+  return index;
+}
+
+function globalPriceToStorePrice(rawPrice: string): number | null {
+  const globalPrice = parseFloat(rawPrice);
+  if (isNaN(globalPrice) || globalPrice <= 0) return null;
+  const priceInThousands = Math.round((globalPrice / 1000) * 100) / 100;
+  return Math.round(priceInThousands * (1 + MARKUP_PERCENTAGE) * 100) / 100;
 }
 
 function extractFullModelCode(name: string): string | null {
@@ -128,7 +177,7 @@ function extractProductFamily(name: string): string | null {
 
   for (const pattern of families) {
     const match = name.match(pattern);
-    if (match) return match[1].toLowerCase().replace(/\s+/g, ' ');
+    if (match) return match[1].toLowerCase().replace(/\s+/g, " ");
   }
   return null;
 }
@@ -196,7 +245,7 @@ function matchProducts(
     "inch", "ips", "oled", "wqxga", "wuxga", "fhd", "black", "gray", "grey",
     "white", "silver", "eclipse", "mecha", "amd", "ryzen", "graphics",
     "chip", "lenovo", "asus", "acer", "msi", "dell", "apple", "microsoft",
-    "gaming", "pro", "laptop"
+    "gaming", "pro", "laptop",
   ]);
 
   let bestMatch: ShopifyProduct | null = null;
@@ -227,36 +276,83 @@ function matchProducts(
   return bestMatch;
 }
 
-export async function syncPrices(): Promise<SyncLog> {
+function findGlobalMatch(
+  ourProduct: { nameEn: string | null; sku: string | null },
+  globalProducts: ShopifyProduct[],
+  skuIndex: Map<string, ShopifyProduct>,
+  matcher: (name: string, globals: ShopifyProduct[]) => ShopifyProduct | null,
+): ShopifyProduct | null {
+  const sku = ourProduct.sku?.trim().toLowerCase();
+  if (sku) {
+    const skuMatch = skuIndex.get(sku);
+    if (skuMatch) return skuMatch;
+  }
+
+  if (!ourProduct.nameEn) return null;
+  return matcher(ourProduct.nameEn, globalProducts);
+}
+
+function beginSync(log: SyncLog): boolean {
   if (isRunning) {
-    return syncLog;
+    const stale = !syncStartedAt || Date.now() - syncStartedAt > SYNC_STALE_MS;
+    if (!stale) return false;
+    console.warn("[Price Sync] Previous sync looked stale — restarting");
   }
 
   isRunning = true;
-  syncLog = {
-    lastSync: new Date(),
-    nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
-    updatedCount: 0,
-    totalMatched: 0,
-    errors: [],
-    status: "running",
-  };
+  syncStartedAt = Date.now();
+  syncLog = log;
+  return true;
+}
+
+function endSync() {
+  isRunning = false;
+  syncStartedAt = null;
+}
+
+export async function syncPrices(): Promise<SyncLog> {
+  if (
+    !beginSync({
+      lastSync: new Date(),
+      nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
+      updatedCount: 0,
+      totalMatched: 0,
+      fetchedCount: 0,
+      errors: [],
+      status: "running",
+    })
+  ) {
+    return syncLog;
+  }
 
   try {
     console.log("[Price Sync] Starting price sync from globaliraq.iq...");
 
     const globalProducts = await fetchAllGlobalIraqProducts();
+    syncLog.fetchedCount = globalProducts.length;
     console.log(
-      `[Price Sync] Fetched ${globalProducts.length} products from globaliraq.iq`
+      `[Price Sync] Fetched ${globalProducts.length} products from globaliraq.iq`,
     );
+
+    if (globalProducts.length === 0) {
+      throw new Error("No products returned from globaliraq.iq");
+    }
+
+    const skuIndex = buildGlobalSkuIndex(globalProducts);
 
     const ourProducts = await db
       .select()
       .from(products)
-      .where(eq(products.badge, "جديد"));
+      .where(
+        or(
+          eq(products.badge, "جديد"),
+          inArray(products.category, LAPTOP_CATEGORIES),
+          like(products.category, "%laptop%"),
+        )!,
+      );
 
     console.log(
-      `[Price Sync] Found ${ourProducts.length} synced products in our database`
+      `[Price Sync] Found ${ourProducts.length} laptop products in our database`,
     );
 
     let updated = 0;
@@ -264,24 +360,23 @@ export async function syncPrices(): Promise<SyncLog> {
 
     for (const ourProduct of ourProducts) {
       try {
-        const match = matchProducts(ourProduct.nameEn, globalProducts);
-        if (!match) {
-          continue;
-        }
+        const match = findGlobalMatch(
+          ourProduct,
+          globalProducts,
+          skuIndex,
+          matchProducts,
+        );
+        if (!match) continue;
 
         matched++;
 
-        const globalPrice = parseFloat(match.variants[0].price);
-        if (isNaN(globalPrice) || globalPrice <= 0) {
+        const markedUpPrice = globalPriceToStorePrice(match.variants[0]?.price || "");
+        if (markedUpPrice == null) {
           syncLog.errors.push(
-            `Invalid price for ${ourProduct.nameEn}: ${match.variants[0].price}`
+            `Invalid price for ${ourProduct.nameEn}: ${match.variants[0]?.price}`,
           );
           continue;
         }
-
-        const priceInThousands = Math.round((globalPrice / 1000) * 100) / 100;
-        const markedUpPrice =
-          Math.round(priceInThousands * (1 + MARKUP_PERCENTAGE) * 100) / 100;
 
         const currentPrice = parseFloat(ourProduct.price?.toString() || "0");
         if (Math.abs(currentPrice - markedUpPrice) < 0.01) {
@@ -297,12 +392,12 @@ export async function syncPrices(): Promise<SyncLog> {
           .where(eq(products.id, ourProduct.id));
 
         console.log(
-          `[Price Sync] Updated ${ourProduct.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`
+          `[Price Sync] Updated ${ourProduct.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`,
         );
         updated++;
       } catch (err: any) {
         syncLog.errors.push(
-          `Error updating ${ourProduct.nameEn}: ${err.message}`
+          `Error updating ${ourProduct.nameEn}: ${err.message}`,
         );
       }
     }
@@ -311,14 +406,14 @@ export async function syncPrices(): Promise<SyncLog> {
     syncLog.totalMatched = matched;
     syncLog.status = "success";
     console.log(
-      `[Price Sync] Complete. Matched: ${matched}, Updated: ${updated}, Errors: ${syncLog.errors.length}`
+      `[Price Sync] Complete. Matched: ${matched}, Updated: ${updated}, Errors: ${syncLog.errors.length}`,
     );
   } catch (err: any) {
     syncLog.status = "error";
     syncLog.errors.push(`Sync failed: ${err.message}`);
     console.error("[Price Sync] Failed:", err.message);
   } finally {
-    isRunning = false;
+    endSync();
   }
 
   return syncLog;
@@ -383,25 +478,24 @@ let desktopSyncLog: SyncLog = {
   nextSync: null,
   updatedCount: 0,
   totalMatched: 0,
+  fetchedCount: 0,
   errors: [],
   status: "idle",
 };
 
 let isDesktopRunning = false;
+let desktopSyncStartedAt: number | null = null;
 let desktopSyncInterval: NodeJS.Timeout | null = null;
 let desktopInitialTimeout: NodeJS.Timeout | null = null;
 let desktopSchedulerStarted = false;
 
 function extractDesktopModelCode(name: string): string | null {
-  // AIO HP model e.g. "24-CR0323NH", "27-CR0156NH"
   const hpAio = name.match(/\b(\d{2}-[A-Z]{2}\d{4}[A-Z0-9]*)\b/i);
   if (hpAio) return hpAio[1].toLowerCase();
 
-  // Lenovo IdeaCentre paren code e.g. "(LAAX)", "(MCAK)", "(0WGR)"
   const parenCode = extractParenCode(name);
   if (parenCode) return parenCode;
 
-  // General model code fallback
   return extractFullModelCode(name);
 }
 
@@ -420,7 +514,6 @@ function matchDesktopProducts(
     }
   }
 
-  // Fallback: word-overlap matching (same as laptop sync but with desktop-adjusted thresholds)
   const normalize = (s: string) =>
     s.toLowerCase()
       .replace(/[–—]/g, "-")
@@ -458,24 +551,51 @@ function matchDesktopProducts(
   return bestMatch;
 }
 
-export async function syncDesktopPrices(): Promise<SyncLog> {
-  if (isDesktopRunning) return desktopSyncLog;
+function beginDesktopSync(log: SyncLog): boolean {
+  if (isDesktopRunning) {
+    const stale = !desktopSyncStartedAt || Date.now() - desktopSyncStartedAt > SYNC_STALE_MS;
+    if (!stale) return false;
+    console.warn("[Desktop Sync] Previous sync looked stale — restarting");
+  }
 
   isDesktopRunning = true;
-  desktopSyncLog = {
-    lastSync: new Date(),
-    nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
-    updatedCount: 0,
-    totalMatched: 0,
-    errors: [],
-    status: "running",
-  };
+  desktopSyncStartedAt = Date.now();
+  desktopSyncLog = log;
+  return true;
+}
+
+function endDesktopSync() {
+  isDesktopRunning = false;
+  desktopSyncStartedAt = null;
+}
+
+export async function syncDesktopPrices(): Promise<SyncLog> {
+  if (
+    !beginDesktopSync({
+      lastSync: new Date(),
+      nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
+      updatedCount: 0,
+      totalMatched: 0,
+      fetchedCount: 0,
+      errors: [],
+      status: "running",
+    })
+  ) {
+    return desktopSyncLog;
+  }
 
   try {
     console.log("[Desktop Sync] Starting price sync for desktops & AIOs...");
 
     const globalProducts = await fetchAllGlobalIraqProducts();
+    desktopSyncLog.fetchedCount = globalProducts.length;
     console.log(`[Desktop Sync] Fetched ${globalProducts.length} products from globaliraq.iq`);
+
+    if (globalProducts.length === 0) {
+      throw new Error("No products returned from globaliraq.iq");
+    }
+
+    const skuIndex = buildGlobalSkuIndex(globalProducts);
 
     const ourProducts = await db
       .select()
@@ -488,20 +608,22 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
     let matched = 0;
 
     for (const ourProduct of ourProducts) {
-      if (!ourProduct.nameEn) continue;
       try {
-        const match = matchDesktopProducts(ourProduct.nameEn, globalProducts);
+        const match = findGlobalMatch(
+          ourProduct,
+          globalProducts,
+          skuIndex,
+          matchDesktopProducts,
+        );
         if (!match) continue;
 
         matched++;
 
-        const globalPrice = parseFloat(match.variants[0].price);
-        if (isNaN(globalPrice) || globalPrice <= 0) {
-          desktopSyncLog.errors.push(`Invalid price for ${ourProduct.nameEn}: ${match.variants[0].price}`);
+        const priceInThousands = globalPriceToStorePrice(match.variants[0]?.price || "");
+        if (priceInThousands == null) {
+          desktopSyncLog.errors.push(`Invalid price for ${ourProduct.nameEn}: ${match.variants[0]?.price}`);
           continue;
         }
-
-        const priceInThousands = Math.round((globalPrice / 1000) * 100) / 100;
 
         const currentPrice = parseFloat(ourProduct.price?.toString() || "0");
         if (Math.abs(currentPrice - priceInThousands) < 0.01) continue;
@@ -530,7 +652,7 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
     desktopSyncLog.errors.push(`Sync failed: ${err.message}`);
     console.error("[Desktop Sync] Failed:", err.message);
   } finally {
-    isDesktopRunning = false;
+    endDesktopSync();
   }
 
   return desktopSyncLog;

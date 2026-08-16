@@ -104,6 +104,7 @@ function PriceSyncCard() {
     nextSync: string | null;
     updatedCount: number;
     totalMatched: number;
+    fetchedCount?: number;
     errors: string[];
     status: string;
   }>({
@@ -154,7 +155,7 @@ function PriceSyncCard() {
             مزامنة الأسعار - GlobalIraq
           </CardTitle>
           <CardDescription>
-            مزامنة تلقائية كل 6 ساعات مع زيادة 5%
+            مزامنة تلقائية كل 6 ساعات مع globaliraq.iq
           </CardDescription>
         </div>
         <Button
@@ -200,6 +201,10 @@ function PriceSyncCard() {
             <p className="font-medium">{formatDate(status?.nextSync ?? null)}</p>
           </div>
           <div>
+            <p className="text-muted-foreground">منتجات GlobalIraq</p>
+            <p className="font-medium">{status?.fetchedCount ?? 0}</p>
+          </div>
+          <div>
             <p className="text-muted-foreground">المنتجات المحدثة</p>
             <p className="font-medium">{status?.updatedCount ?? 0} / {status?.totalMatched ?? 0}</p>
           </div>
@@ -224,6 +229,7 @@ function DesktopSyncCard() {
     nextSync: string | null;
     updatedCount: number;
     totalMatched: number;
+    fetchedCount?: number;
     errors: string[];
     status: string;
   }>({
@@ -315,6 +321,10 @@ function DesktopSyncCard() {
           <div>
             <p className="text-muted-foreground">المزامنة القادمة</p>
             <p className="font-medium">{formatDate(status?.nextSync ?? null)}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">منتجات GlobalIraq</p>
+            <p className="font-medium">{status?.fetchedCount ?? 0}</p>
           </div>
           <div>
             <p className="text-muted-foreground">المنتجات المحدثة</p>
