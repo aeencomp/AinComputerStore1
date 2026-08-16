@@ -239,6 +239,7 @@ function DesktopSyncCard() {
     lastSync: string | null;
     nextSync: string | null;
     updatedCount: number;
+    createdCount?: number;
     totalMatched: number;
     fetchedCount?: number;
     errors: string[];
@@ -256,9 +257,15 @@ function DesktopSyncCard() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/desktop-sync/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      const created = data.createdCount ?? 0;
+      const updated = data.updatedCount ?? 0;
+      const matched = data.totalMatched ?? 0;
+      const fetched = data.fetchedCount ?? 0;
       toast({
-        title: "تم مزامنة الأسعار",
-        description: `تم تحديث ${data.updatedCount} منتج من أصل ${data.totalMatched} منتج متطابق`,
+        title: "تمت مزامنة الأجهزة المكتبية",
+        description: created > 0 || updated > 0
+          ? `أُضيف ${created} جهاز جديد، وتم تحديث ${updated} سعر (${matched} موجود مسبقاً من ${fetched} على GlobalIraq)`
+          : `جميع الأسعار محدّثة — ${matched} جهاز متطابق من ${fetched} على GlobalIraq`,
       });
     },
     onError: () => {
@@ -288,7 +295,7 @@ function DesktopSyncCard() {
             مزامنة أسعار الأجهزة المكتبية والكل في واحد
           </CardTitle>
           <CardDescription>
-            مزامنة تلقائية كل 6 ساعات لأجهزة الديسك توب، الألعاب، العمل، والكل في واحد
+            استيراد أجهزة GlobalIraq المكتبية والكل في واحد وتحديث الأسعار كل 6 ساعات
           </CardDescription>
         </div>
         <Button
@@ -334,12 +341,16 @@ function DesktopSyncCard() {
             <p className="font-medium">{formatDate(status?.nextSync ?? null)}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">منتجات GlobalIraq</p>
+            <p className="text-muted-foreground">أجهزة GlobalIraq</p>
             <p className="font-medium">{status?.fetchedCount ?? 0}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">المنتجات المحدثة</p>
-            <p className="font-medium">{status?.updatedCount ?? 0} / {status?.totalMatched ?? 0}</p>
+            <p className="text-muted-foreground">مضاف / محدّث</p>
+            <p className="font-medium">{status?.createdCount ?? 0} / {status?.updatedCount ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">موجود مسبقاً</p>
+            <p className="font-medium">{status?.totalMatched ?? 0}</p>
           </div>
         </div>
         {status?.errors && status.errors.length > 0 && (

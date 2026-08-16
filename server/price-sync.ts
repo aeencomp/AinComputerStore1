@@ -1,6 +1,6 @@
 import { db } from "./db";
 import { products } from "@shared/schema";
-import { eq, inArray } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const SYNC_STALE_MS = 15 * 60 * 1000;
@@ -16,6 +16,15 @@ const LAPTOP_CATEGORIES = [
   "workstation-laptops",
   "ultrabooks",
   "2-in-1-laptops",
+];
+
+const DESKTOP_CATEGORIES = [
+  "all-in-one",
+  "desktops",
+  "gaming-pcs",
+  "office-pcs",
+  "workstations",
+  "mini-pcs",
 ];
 
 interface ShopifyVariant {
@@ -40,6 +49,8 @@ interface ShopifyProduct {
 }
 
 const GLOBAL_LAPTOP_TYPES = ["Gaming Laptop", "Office Laptop"];
+
+const GLOBAL_DESKTOP_TYPES = ["All in One", "all in one", "Desktop System"];
 
 interface SyncLog {
   lastSync: Date | null;
@@ -120,17 +131,6 @@ async function fetchAllGlobalIraqProducts(): Promise<ShopifyProduct[]> {
   return allProducts;
 }
 
-function buildGlobalSkuIndex(globalProducts: ShopifyProduct[]): Map<string, ShopifyProduct> {
-  const index = new Map<string, ShopifyProduct>();
-  for (const product of globalProducts) {
-    for (const variant of product.variants || []) {
-      const sku = variant.sku?.trim().toLowerCase();
-      if (sku) index.set(sku, product);
-    }
-  }
-  return index;
-}
-
 function globalPriceToStorePrice(rawPrice: string): number | null {
   const globalPrice = parseFloat(rawPrice);
   if (isNaN(globalPrice) || globalPrice <= 0) return null;
@@ -142,8 +142,34 @@ function isGlobalIraqLaptop(product: ShopifyProduct): boolean {
   return GLOBAL_LAPTOP_TYPES.includes(product.product_type || "");
 }
 
+function isGlobalIraqDesktop(product: ShopifyProduct): boolean {
+  return GLOBAL_DESKTOP_TYPES.includes(product.product_type || "");
+}
+
 function globalLaptopCategory(productType: string): string {
   return productType === "Gaming Laptop" ? "gaming-laptops" : "business-laptops";
+}
+
+function globalDesktopCategory(product: ShopifyProduct): string {
+  const type = (product.product_type || "").toLowerCase();
+  const title = product.title.toLowerCase();
+
+  if (type.includes("all in one") || title.includes("all in one")) {
+    return "all-in-one";
+  }
+  if (title.includes("mini pc") || title.includes("micro plus")) {
+    return "mini-pcs";
+  }
+  if (/gaming|rog |tuf |predator|omen|victus|nitro/i.test(title)) {
+    return "gaming-pcs";
+  }
+  if (/workstation|precision|thinkstation|z[\d]/i.test(title)) {
+    return "workstations";
+  }
+  if (/optiplex|thinkcentre|ideacentre|office|prodesk|elitedesk|vostro/i.test(title)) {
+    return "office-pcs";
+  }
+  return "desktops";
 }
 
 function stripHtml(html: string): string {
@@ -165,6 +191,10 @@ function isLaptopCategory(category: string): boolean {
   );
 }
 
+function isDesktopCategory(category: string): boolean {
+  return DESKTOP_CATEGORIES.includes(category);
+}
+
 function buildOurSkuIndex<T extends { sku: string | null }>(
   ourProducts: T[],
 ): Map<string, T> {
@@ -178,9 +208,10 @@ function buildOurSkuIndex<T extends { sku: string | null }>(
 
 function findOurProductForGlobal(
   globalProduct: ShopifyProduct,
-  ourLaptops: { id: string; nameEn: string; sku: string | null }[],
-  ourSkuIndex: Map<string, (typeof ourLaptops)[number]>,
-): (typeof ourLaptops)[number] | null {
+  ourProducts: { id: string; nameEn: string; sku: string | null; price?: string | null }[],
+  ourSkuIndex: Map<string, (typeof ourProducts)[number]>,
+  matcher: (ourName: string, globals: ShopifyProduct[]) => ShopifyProduct | null = matchProducts,
+): (typeof ourProducts)[number] | null {
   const variant = getPrimaryVariant(globalProduct);
   const sku = variant?.sku?.trim().toLowerCase();
   if (sku) {
@@ -188,9 +219,9 @@ function findOurProductForGlobal(
     if (bySku) return bySku;
   }
 
-  for (const ourProduct of ourLaptops) {
+  for (const ourProduct of ourProducts) {
     if (!ourProduct.nameEn) continue;
-    const match = matchProducts(ourProduct.nameEn, [globalProduct]);
+    const match = matcher(ourProduct.nameEn, [globalProduct]);
     if (match) return ourProduct;
   }
 
@@ -346,22 +377,6 @@ function matchProducts(
   }
 
   return bestMatch;
-}
-
-function findGlobalMatch(
-  ourProduct: { nameEn: string | null; sku: string | null },
-  globalProducts: ShopifyProduct[],
-  skuIndex: Map<string, ShopifyProduct>,
-  matcher: (name: string, globals: ShopifyProduct[]) => ShopifyProduct | null,
-): ShopifyProduct | null {
-  const sku = ourProduct.sku?.trim().toLowerCase();
-  if (sku) {
-    const skuMatch = skuIndex.get(sku);
-    if (skuMatch) return skuMatch;
-  }
-
-  if (!ourProduct.nameEn) return null;
-  return matcher(ourProduct.nameEn, globalProducts);
 }
 
 function beginSync(log: SyncLog): boolean {
@@ -595,15 +610,6 @@ export function stopPriceSync() {
 
 // ─── Desktop & All-in-One Sync ───────────────────────────────────────────────
 
-const DESKTOP_CATEGORIES = [
-  "all-in-one",
-  "desktops",
-  "gaming-pcs",
-  "office-pcs",
-  "workstations",
-  "mini-pcs",
-];
-
 let desktopSyncLog: SyncLog = {
   lastSync: null,
   nextSync: null,
@@ -720,66 +726,145 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
   try {
     console.log("[Desktop Sync] Starting price sync for desktops & AIOs...");
 
-    const globalProducts = await fetchAllGlobalIraqProducts();
-    desktopSyncLog.fetchedCount = globalProducts.length;
-    console.log(`[Desktop Sync] Fetched ${globalProducts.length} products from globaliraq.iq`);
+    const allGlobalProducts = await fetchAllGlobalIraqProducts();
+    const globalDesktops = allGlobalProducts.filter(isGlobalIraqDesktop);
+    desktopSyncLog.fetchedCount = globalDesktops.length;
+    console.log(
+      `[Desktop Sync] Fetched ${allGlobalProducts.length} products (${globalDesktops.length} desktops/AIOs) from globaliraq.iq`,
+    );
 
-    if (globalProducts.length === 0) {
-      throw new Error("No products returned from globaliraq.iq");
+    if (globalDesktops.length === 0) {
+      throw new Error("No desktop/AIO products returned from globaliraq.iq");
     }
 
-    const skuIndex = buildGlobalSkuIndex(globalProducts);
+    const allOurProducts = await db.select().from(products);
+    const ourDesktops = allOurProducts.filter((p) => isDesktopCategory(p.category));
+    const ourSkuIndex = buildOurSkuIndex(allOurProducts);
 
-    const ourProducts = await db
-      .select()
-      .from(products)
-      .where(inArray(products.category, DESKTOP_CATEGORIES));
-
-    console.log(`[Desktop Sync] Found ${ourProducts.length} desktop/AIO products in our database`);
+    console.log(
+      `[Desktop Sync] ${ourDesktops.length} desktop/AIO products in our database, syncing ${globalDesktops.length} from GlobalIraq`,
+    );
 
     let updated = 0;
     let matched = 0;
+    let created = 0;
 
-    for (const ourProduct of ourProducts) {
+    for (const globalProduct of globalDesktops) {
       try {
-        const match = findGlobalMatch(
-          ourProduct,
-          globalProducts,
-          skuIndex,
-          matchDesktopProducts,
-        );
-        if (!match) continue;
-
-        matched++;
-
-        const priceInThousands = globalPriceToStorePrice(match.variants[0]?.price || "");
-        if (priceInThousands == null) {
-          desktopSyncLog.errors.push(`Invalid price for ${ourProduct.nameEn}: ${match.variants[0]?.price}`);
+        const variant = getPrimaryVariant(globalProduct);
+        if (!variant) {
+          desktopSyncLog.errors.push(`No variant for ${globalProduct.title}`);
           continue;
         }
 
-        const currentPrice = parseFloat(ourProduct.price?.toString() || "0");
-        if (Math.abs(currentPrice - priceInThousands) < 0.01) continue;
+        const markedUpPrice = globalPriceToStorePrice(variant.price || "");
+        if (markedUpPrice == null) {
+          desktopSyncLog.errors.push(
+            `Invalid price for ${globalProduct.title}: ${variant.price}`,
+          );
+          continue;
+        }
 
-        await db
-          .update(products)
-          .set({
-            price: priceInThousands.toString(),
-            oldPrice: currentPrice > priceInThousands ? currentPrice.toString() : null,
+        const comparePrice = variant.compare_at_price
+          ? globalPriceToStorePrice(variant.compare_at_price)
+          : null;
+        const oldPrice =
+          comparePrice != null && comparePrice > markedUpPrice
+            ? comparePrice.toString()
+            : null;
+
+        const existing = findOurProductForGlobal(
+          globalProduct,
+          ourDesktops,
+          ourSkuIndex,
+          matchDesktopProducts,
+        );
+
+        if (existing) {
+          matched++;
+
+          const currentPrice = parseFloat(existing.price?.toString() || "0");
+          const sku = variant.sku?.trim() || null;
+          const needsPriceUpdate = Math.abs(currentPrice - markedUpPrice) >= 0.01;
+          const needsSku = sku && existing.sku !== sku;
+
+          if (needsPriceUpdate || needsSku) {
+            await db
+              .update(products)
+              .set({
+                ...(needsPriceUpdate && {
+                  price: markedUpPrice.toString(),
+                  oldPrice:
+                    currentPrice > markedUpPrice
+                      ? currentPrice.toString()
+                      : oldPrice,
+                }),
+                ...(needsSku && { sku }),
+              })
+              .where(eq(products.id, existing.id));
+
+            if (needsPriceUpdate) {
+              console.log(
+                `[Desktop Sync] Updated ${existing.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`,
+              );
+              updated++;
+            }
+          }
+          continue;
+        }
+
+        const imageUrls =
+          globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
+        const primaryImage = imageUrls[0];
+        if (!primaryImage) {
+          desktopSyncLog.errors.push(`No image for ${globalProduct.title}`);
+          continue;
+        }
+
+        const description =
+          stripHtml(globalProduct.body_html || "") || globalProduct.title;
+        const sku = variant.sku?.trim() || null;
+
+        const [inserted] = await db
+          .insert(products)
+          .values({
+            nameEn: globalProduct.title,
+            nameAr: globalProduct.title,
+            descriptionEn: description.slice(0, 2000),
+            descriptionAr: description.slice(0, 2000),
+            price: markedUpPrice.toString(),
+            oldPrice,
+            category: globalDesktopCategory(globalProduct),
+            image: primaryImage,
+            images: imageUrls.slice(1),
+            specs: specsFromTitle(globalProduct.title),
+            badge: "جديد",
+            sku,
+            inStock: variant.available !== false ? 1 : 0,
           })
-          .where(eq(products.id, ourProduct.id));
+          .returning();
 
-        console.log(`[Desktop Sync] Updated ${ourProduct.nameEn.substring(0, 50)}: ${currentPrice} → ${priceInThousands}`);
-        updated++;
+        ourDesktops.push(inserted);
+        if (sku) ourSkuIndex.set(sku.toLowerCase(), inserted);
+
+        console.log(
+          `[Desktop Sync] Added ${globalProduct.title.substring(0, 50)} @ ${markedUpPrice}`,
+        );
+        created++;
       } catch (err: any) {
-        desktopSyncLog.errors.push(`Error updating ${ourProduct.nameEn}: ${err.message}`);
+        desktopSyncLog.errors.push(
+          `Error processing ${globalProduct.title}: ${err.message}`,
+        );
       }
     }
 
     desktopSyncLog.updatedCount = updated;
+    desktopSyncLog.createdCount = created;
     desktopSyncLog.totalMatched = matched;
     desktopSyncLog.status = "success";
-    console.log(`[Desktop Sync] Complete. Matched: ${matched}, Updated: ${updated}, Errors: ${desktopSyncLog.errors.length}`);
+    console.log(
+      `[Desktop Sync] Complete. Added: ${created}, Matched: ${matched}, Updated: ${updated}, Errors: ${desktopSyncLog.errors.length}`,
+    );
   } catch (err: any) {
     desktopSyncLog.status = "error";
     desktopSyncLog.errors.push(`Sync failed: ${err.message}`);
