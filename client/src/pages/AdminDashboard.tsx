@@ -103,6 +103,7 @@ function PriceSyncCard() {
     lastSync: string | null;
     nextSync: string | null;
     updatedCount: number;
+    createdCount?: number;
     totalMatched: number;
     fetchedCount?: number;
     errors: string[];
@@ -120,9 +121,15 @@ function PriceSyncCard() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/price-sync/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      const created = data.createdCount ?? 0;
+      const updated = data.updatedCount ?? 0;
+      const matched = data.totalMatched ?? 0;
+      const fetched = data.fetchedCount ?? 0;
       toast({
-        title: "تم مزامنة الأسعار",
-        description: `تم تحديث ${data.updatedCount} منتج من أصل ${data.totalMatched} منتج متطابق`,
+        title: "تمت مزامنة اللابتوبات",
+        description: created > 0 || updated > 0
+          ? `أُضيف ${created} لابتوب جديد، وتم تحديث ${updated} سعر (${matched} موجود مسبقاً من ${fetched} على GlobalIraq)`
+          : `جميع الأسعار محدّثة — ${matched} لابتوب متطابق من ${fetched} على GlobalIraq`,
       });
     },
     onError: () => {
@@ -155,7 +162,7 @@ function PriceSyncCard() {
             مزامنة الأسعار - GlobalIraq
           </CardTitle>
           <CardDescription>
-            مزامنة تلقائية كل 6 ساعات مع globaliraq.iq
+            استيراد لابتوبات GlobalIraq وتحديث الأسعار تلقائياً كل 6 ساعات
           </CardDescription>
         </div>
         <Button
@@ -201,12 +208,16 @@ function PriceSyncCard() {
             <p className="font-medium">{formatDate(status?.nextSync ?? null)}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">منتجات GlobalIraq</p>
+            <p className="text-muted-foreground">لابتوبات GlobalIraq</p>
             <p className="font-medium">{status?.fetchedCount ?? 0}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">المنتجات المحدثة</p>
-            <p className="font-medium">{status?.updatedCount ?? 0} / {status?.totalMatched ?? 0}</p>
+            <p className="text-muted-foreground">مضاف / محدّث</p>
+            <p className="font-medium">{status?.createdCount ?? 0} / {status?.updatedCount ?? 0}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">موجود مسبقاً</p>
+            <p className="font-medium">{status?.totalMatched ?? 0}</p>
           </div>
         </div>
         {status?.errors && status.errors.length > 0 && (
