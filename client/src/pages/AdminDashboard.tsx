@@ -41,6 +41,87 @@ import {
 } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { formatPrice } from "@/lib/formatters";
+import { getCategoryName } from "@/lib/categoryNames";
+
+interface SyncProductEntry {
+  id: string;
+  nameEn: string;
+  sku: string | null;
+  category: string;
+  price: string;
+  previousPrice?: string | null;
+}
+
+function SyncProductResults({
+  createdProducts,
+  updatedProducts,
+  createdLabel,
+  updatedLabel,
+}: {
+  createdProducts?: SyncProductEntry[];
+  updatedProducts?: SyncProductEntry[];
+  createdLabel: string;
+  updatedLabel: string;
+}) {
+  const { language } = useLanguage();
+  const created = createdProducts ?? [];
+  const updated = updatedProducts ?? [];
+
+  if (created.length === 0 && updated.length === 0) {
+    return null;
+  }
+
+  const renderList = (items: SyncProductEntry[], showPrevious = false) => (
+    <ScrollArea className="h-52 rounded-md border">
+      <div className="p-2 space-y-1">
+        {items.map((product) => (
+          <div
+            key={product.id}
+            className="flex items-start justify-between gap-3 py-2 border-b last:border-0 text-sm"
+          >
+            <div className="min-w-0 flex-1">
+              <Link href={`/product/${product.id}`} className="text-primary hover:underline line-clamp-2">
+                {product.nameEn}
+              </Link>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {getCategoryName(product.category, language)}
+                {product.sku ? ` · SKU ${product.sku}` : ""}
+              </p>
+            </div>
+            <div className="shrink-0 text-left">
+              {showPrevious && product.previousPrice ? (
+                <p className="text-xs text-muted-foreground line-through">
+                  {formatPrice(parseFloat(product.previousPrice) * 1000, language)}
+                </p>
+              ) : null}
+              <p className="font-medium whitespace-nowrap">
+                {formatPrice(parseFloat(product.price) * 1000, language)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </ScrollArea>
+  );
+
+  return (
+    <div className="mt-4 space-y-4">
+      {created.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-2">{createdLabel} ({created.length})</p>
+          {renderList(created)}
+        </div>
+      )}
+      {updated.length > 0 && (
+        <div>
+          <p className="text-sm font-medium mb-2">{updatedLabel} ({updated.length})</p>
+          {renderList(updated, true)}
+        </div>
+      )}
+    </div>
+  );
+}
 
 interface Order {
   id: string;
@@ -106,6 +187,8 @@ function PriceSyncCard() {
     createdCount?: number;
     totalMatched: number;
     fetchedCount?: number;
+    createdProducts?: SyncProductEntry[];
+    updatedProducts?: SyncProductEntry[];
     errors: string[];
     status: string;
   }>({
@@ -227,6 +310,12 @@ function PriceSyncCard() {
             ))}
           </div>
         )}
+        <SyncProductResults
+          createdProducts={status?.createdProducts}
+          updatedProducts={status?.updatedProducts}
+          createdLabel="لابتوبات مضافة من GlobalIraq"
+          updatedLabel="لابتوبات تم تحديث سعرها"
+        />
       </CardContent>
     </Card>
   );
@@ -242,6 +331,8 @@ function DesktopSyncCard() {
     createdCount?: number;
     totalMatched: number;
     fetchedCount?: number;
+    createdProducts?: SyncProductEntry[];
+    updatedProducts?: SyncProductEntry[];
     errors: string[];
     status: string;
   }>({
@@ -358,6 +449,12 @@ function DesktopSyncCard() {
             {status.errors.map((err, i) => <p key={i}>{err}</p>)}
           </div>
         )}
+        <SyncProductResults
+          createdProducts={status?.createdProducts}
+          updatedProducts={status?.updatedProducts}
+          createdLabel="أجهزة مضافة من GlobalIraq"
+          updatedLabel="أجهزة تم تحديث سعرها"
+        />
       </CardContent>
     </Card>
   );

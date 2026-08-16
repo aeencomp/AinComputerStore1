@@ -52,6 +52,15 @@ const GLOBAL_LAPTOP_TYPES = ["Gaming Laptop", "Office Laptop"];
 
 const GLOBAL_DESKTOP_TYPES = ["All in One", "all in one", "Desktop System"];
 
+export interface SyncProductEntry {
+  id: string;
+  nameEn: string;
+  sku: string | null;
+  category: string;
+  price: string;
+  previousPrice?: string | null;
+}
+
 interface SyncLog {
   lastSync: Date | null;
   nextSync: Date | null;
@@ -59,6 +68,8 @@ interface SyncLog {
   createdCount: number;
   totalMatched: number;
   fetchedCount: number;
+  createdProducts: SyncProductEntry[];
+  updatedProducts: SyncProductEntry[];
   errors: string[];
   status: "idle" | "running" | "success" | "error";
 }
@@ -70,6 +81,8 @@ let syncLog: SyncLog = {
   createdCount: 0,
   totalMatched: 0,
   fetchedCount: 0,
+  createdProducts: [],
+  updatedProducts: [],
   errors: [],
   status: "idle",
 };
@@ -206,9 +219,29 @@ function buildOurSkuIndex<T extends { sku: string | null }>(
   return index;
 }
 
+function toSyncProductEntry(
+  product: {
+    id: string;
+    nameEn: string;
+    sku: string | null;
+    category: string;
+    price: string | null;
+  },
+  previousPrice?: number | null,
+): SyncProductEntry {
+  return {
+    id: product.id,
+    nameEn: product.nameEn,
+    sku: product.sku,
+    category: product.category,
+    price: product.price?.toString() ?? "0",
+    ...(previousPrice != null && { previousPrice: previousPrice.toString() }),
+  };
+}
+
 function findOurProductForGlobal(
   globalProduct: ShopifyProduct,
-  ourProducts: { id: string; nameEn: string; sku: string | null; price?: string | null }[],
+  ourProducts: { id: string; nameEn: string; sku: string | null; category?: string; price?: string | null }[],
   ourSkuIndex: Map<string, (typeof ourProducts)[number]>,
   matcher: (ourName: string, globals: ShopifyProduct[]) => ShopifyProduct | null = matchProducts,
 ): (typeof ourProducts)[number] | null {
@@ -406,6 +439,8 @@ export async function syncPrices(): Promise<SyncLog> {
       createdCount: 0,
       totalMatched: 0,
       fetchedCount: 0,
+      createdProducts: [],
+      updatedProducts: [],
       errors: [],
       status: "running",
     })
@@ -496,6 +531,18 @@ export async function syncPrices(): Promise<SyncLog> {
               console.log(
                 `[Price Sync] Updated ${existing.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`,
               );
+              syncLog.updatedProducts.push(
+                toSyncProductEntry(
+                  {
+                    id: existing.id,
+                    nameEn: existing.nameEn,
+                    sku: sku ?? existing.sku,
+                    category: existing.category ?? globalLaptopCategory(globalProduct.product_type || ""),
+                    price: markedUpPrice.toString(),
+                  },
+                  currentPrice,
+                ),
+              );
               updated++;
             }
           }
@@ -535,6 +582,8 @@ export async function syncPrices(): Promise<SyncLog> {
 
         ourLaptops.push(inserted);
         if (sku) ourSkuIndex.set(sku.toLowerCase(), inserted);
+
+        syncLog.createdProducts.push(toSyncProductEntry(inserted));
 
         console.log(
           `[Price Sync] Added ${globalProduct.title.substring(0, 50)} @ ${markedUpPrice}`,
@@ -617,6 +666,8 @@ let desktopSyncLog: SyncLog = {
   createdCount: 0,
   totalMatched: 0,
   fetchedCount: 0,
+  createdProducts: [],
+  updatedProducts: [],
   errors: [],
   status: "idle",
 };
@@ -716,6 +767,8 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
       createdCount: 0,
       totalMatched: 0,
       fetchedCount: 0,
+      createdProducts: [],
+      updatedProducts: [],
       errors: [],
       status: "running",
     })
@@ -807,6 +860,18 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
               console.log(
                 `[Desktop Sync] Updated ${existing.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`,
               );
+              desktopSyncLog.updatedProducts.push(
+                toSyncProductEntry(
+                  {
+                    id: existing.id,
+                    nameEn: existing.nameEn,
+                    sku: sku ?? existing.sku,
+                    category: existing.category ?? globalDesktopCategory(globalProduct),
+                    price: markedUpPrice.toString(),
+                  },
+                  currentPrice,
+                ),
+              );
               updated++;
             }
           }
@@ -846,6 +911,8 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
 
         ourDesktops.push(inserted);
         if (sku) ourSkuIndex.set(sku.toLowerCase(), inserted);
+
+        desktopSyncLog.createdProducts.push(toSyncProductEntry(inserted));
 
         console.log(
           `[Desktop Sync] Added ${globalProduct.title.substring(0, 50)} @ ${markedUpPrice}`,
