@@ -11,7 +11,8 @@
     "db:push": "drizzle-kit push",
     "db:copy-remote": "powershell -ExecutionPolicy Bypass -File scripts/copy-remote-to-local.ps1",
     "images:migrate-local": "tsx scripts/migrate-images-to-local.ts",
-    "seed:windows11": "tsx scripts/seed-windows-11.ts"
+    "seed:windows11": "tsx scripts/seed-windows-11.ts",
+    "sync:prices": "tsx scripts/run-price-sync.ts"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",

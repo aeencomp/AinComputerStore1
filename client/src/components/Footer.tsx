@@ -62,11 +62,11 @@ export function Footer() {
     : t('footer.location');
 
   return (
-    <footer className="bg-gradient-to-b from-muted/50 to-muted mt-12 md:mt-16" data-testid="footer">
+    <footer className="bg-gradient-to-b from-muted/50 to-muted mt-16 md:mt-24" data-testid="footer">
       {/* Trust Badges Section */}
       <div className="bg-primary/5 border-y border-primary/10">
-        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-8">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8 py-8 md:py-10">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-12">
             <div className="flex items-center gap-3 justify-center md:justify-start">
               <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
                 <Truck className="h-6 w-6 text-primary" />

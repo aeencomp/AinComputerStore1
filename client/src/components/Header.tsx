@@ -89,7 +89,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
   return (
     <header className="sticky top-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16 gap-4">
+        <div className="flex items-center justify-between h-20 md:h-20 gap-6">
           <Link href="/" className="flex items-center gap-3 cursor-pointer" data-testid="link-logo-home">
             {(logoUrl && !logoError) ? (
               <img 
@@ -228,7 +228,7 @@ export function Header({ cartItemsCount, onCartClick, onSearch, onCategorySelect
           </div>
         </div>
 
-        <nav className="hidden md:flex items-center justify-center flex-wrap gap-1 py-3 border-t bg-muted/30 overflow-x-auto">
+        <nav className="hidden md:flex items-center justify-center flex-wrap gap-2 py-4 border-t bg-muted/30 overflow-x-auto">
           <Link href="/">
             <Button 
               variant="ghost" 

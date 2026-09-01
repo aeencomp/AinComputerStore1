@@ -47,9 +47,9 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
   const { t, language } = useLanguage();
   
   return (
-    <section className="py-16 md:py-20 bg-gradient-to-b from-background via-muted/20 to-background" data-testid="section-categories">
+    <section className="py-20 md:py-28 bg-gradient-to-b from-background via-muted/20 to-background" data-testid="section-categories">
       <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
-        <div className="text-center mb-14">
+        <div className="text-center mb-16">
           <h2 className="text-4xl md:text-6xl font-black mb-4 tracking-tight" data-testid="text-categories-title">
             <span className="bg-gradient-to-r from-foreground via-foreground/90 to-foreground/70 bg-clip-text text-transparent text-[48px]">
               {t('home.categories.title')}
@@ -66,7 +66,7 @@ export function CategorySection({ onCategoryClick }: CategorySectionProps) {
             <div className="w-12 h-1 bg-gradient-to-l from-transparent to-primary rounded-full" />
           </div>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8">
           {categories.map((category, index) => (
               <div
                 key={category.id}

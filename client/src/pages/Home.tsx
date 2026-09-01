@@ -250,7 +250,7 @@ export default function Home() {
         {!searchQuery && !selectedCategory && showCategories && <CategorySection onCategoryClick={handleCategorySelect} />}
 
         {!searchQuery && !selectedCategory && (
-          <section className="py-12 md:py-16" data-testid="section-repair-service">
+          <section className="py-16 md:py-24" data-testid="section-repair-service">
             <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
               <div className="relative flex flex-col md:flex-row items-center gap-6 md:gap-10 p-6 md:p-8 rounded-2xl border-2 border-primary/40 bg-gradient-to-br from-primary/5 via-card/80 to-primary/10 shadow-xl shadow-primary/10 overflow-hidden">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary/20 via-transparent to-transparent opacity-50 pointer-events-none" />
@@ -289,7 +289,7 @@ export default function Home() {
           </section>
         )}
 
-        <section className="py-12 md:py-20" data-testid="section-products">
+        <section className="py-16 md:py-24" data-testid="section-products">
           <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
             {/* Section Header - Enhanced */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-10">
@@ -327,7 +327,7 @@ export default function Home() {
             </div>
 
             {isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10">
                 {[...Array(8)].map((_, i) => (
                   <div key={i} className="space-y-4 bg-card rounded-2xl p-4 border border-border/50">
                     <Skeleton className="aspect-square w-full rounded-xl" />
@@ -462,7 +462,7 @@ export default function Home() {
                 )}
               </div>
             ) : searchQuery || selectedCategory ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10">
                 {filteredProducts.map((product) => (
                   <ProductCard
                     key={product.id}
@@ -507,7 +507,7 @@ export default function Home() {
                           </Button>
                         </Link>
                       </div>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5 md:gap-8">
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-10">
                         {categoryProducts.slice(0, maxPerCategory).map((product) => (
                           <ProductCard
                             key={product.id}

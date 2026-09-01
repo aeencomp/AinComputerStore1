@@ -74,7 +74,7 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
             )}
           </div>
         </CardContent>
-        <CardContent className="p-4 space-y-2 cursor-pointer">
+        <CardContent className="p-5 space-y-3 cursor-pointer">
           <h3 className="font-bold text-lg line-clamp-1" data-testid={`text-name-${product.id}`}>
             {productName}
           </h3>

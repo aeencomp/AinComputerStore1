@@ -219,6 +219,129 @@ function buildOurSkuIndex<T extends { sku: string | null }>(
   return index;
 }
 
+function buildGlobalSkuIndex(
+  globalProducts: ShopifyProduct[],
+): Map<string, ShopifyProduct> {
+  const index = new Map<string, ShopifyProduct>();
+  for (const product of globalProducts) {
+    for (const variant of product.variants || []) {
+      const sku = variant.sku?.trim().toLowerCase();
+      if (sku) index.set(sku, product);
+    }
+  }
+  return index;
+}
+
+/** Legacy rows may store full IQD (1850000) instead of thousands (1850). */
+function normalizeOurStoredPrice(rawPrice: string | null | undefined): number {
+  const price = parseFloat(rawPrice?.toString() || "0");
+  if (!Number.isFinite(price) || price <= 0) return 0;
+  if (price >= 10000) return Math.round((price / 1000) * 100) / 100;
+  return price;
+}
+
+function findGlobalProductForOur(
+  ourProduct: { nameEn: string | null; nameAr?: string | null; sku: string | null },
+  globalProducts: ShopifyProduct[],
+  globalSkuIndex: Map<string, ShopifyProduct>,
+  matcher: (ourName: string, globals: ShopifyProduct[]) => ShopifyProduct | null,
+): ShopifyProduct | null {
+  const sku = ourProduct.sku?.trim().toLowerCase();
+  if (sku) {
+    const bySku = globalSkuIndex.get(sku);
+    if (bySku) return bySku;
+  }
+
+  if (ourProduct.nameEn) {
+    const byNameEn = matcher(ourProduct.nameEn, globalProducts);
+    if (byNameEn) return byNameEn;
+  }
+
+  if (ourProduct.nameAr && ourProduct.nameAr !== ourProduct.nameEn) {
+    const byNameAr = matcher(ourProduct.nameAr, globalProducts);
+    if (byNameAr) return byNameAr;
+  }
+
+  return null;
+}
+
+function resolveOldPrice(
+  markedUpPrice: number,
+  comparePrice: number | null,
+  previousStoredPrice: number,
+): string | null {
+  if (comparePrice != null && comparePrice > markedUpPrice) {
+    return comparePrice.toString();
+  }
+  if (previousStoredPrice > markedUpPrice) {
+    return previousStoredPrice.toString();
+  }
+  return null;
+}
+
+async function applyGlobalPriceToExisting(
+  existing: {
+    id: string;
+    nameEn: string;
+    sku: string | null;
+    category: string;
+    price: string | null;
+    oldPrice?: string | null;
+  },
+  globalProduct: ShopifyProduct,
+  variant: ShopifyVariant,
+  markedUpPrice: number,
+  log: SyncLog,
+): Promise<"updated" | "matched"> {
+  const rawStoredPrice = parseFloat(existing.price?.toString() || "0");
+  const currentPrice = normalizeOurStoredPrice(existing.price);
+  const sku = variant.sku?.trim() || null;
+  const comparePrice = variant.compare_at_price
+    ? globalPriceToStorePrice(variant.compare_at_price)
+    : null;
+  const nextOldPrice = resolveOldPrice(markedUpPrice, comparePrice, currentPrice);
+  const currentOldPrice = normalizeOurStoredPrice(existing.oldPrice);
+
+  const needsPriceUpdate =
+    Math.abs(currentPrice - markedUpPrice) >= 0.01 || rawStoredPrice >= 10000;
+  const needsSku = !!sku && existing.sku !== sku;
+  const nextOldPriceNum = nextOldPrice != null ? parseFloat(nextOldPrice) : null;
+  const needsOldPriceUpdate =
+    nextOldPriceNum !== (currentOldPrice > 0 ? currentOldPrice : null);
+
+  if (needsPriceUpdate || needsSku || needsOldPriceUpdate) {
+    await db
+      .update(products)
+      .set({
+        price: markedUpPrice.toString(),
+        oldPrice: nextOldPrice,
+        ...(needsSku && { sku }),
+      })
+      .where(eq(products.id, existing.id));
+
+    if (needsPriceUpdate || needsOldPriceUpdate) {
+      log.updatedProducts.push(
+        toSyncProductEntry(
+          {
+            id: existing.id,
+            nameEn: existing.nameEn,
+            sku: sku ?? existing.sku,
+            category: existing.category,
+            price: markedUpPrice.toString(),
+          },
+          currentPrice,
+        ),
+      );
+      console.log(
+        `[Price Sync] Updated ${existing.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`,
+      );
+      return "updated";
+    }
+  }
+
+  return "matched";
+}
+
 function toSyncProductEntry(
   product: {
     id: string;
@@ -465,6 +588,8 @@ export async function syncPrices(): Promise<SyncLog> {
     const allOurProducts = await db.select().from(products);
     const ourLaptops = allOurProducts.filter((p) => isLaptopCategory(p.category));
     const ourSkuIndex = buildOurSkuIndex(allOurProducts);
+    const globalSkuIndex = buildGlobalSkuIndex(globalLaptops);
+    const matchedOurIds = new Set<string>();
 
     console.log(
       `[Price Sync] ${ourLaptops.length} laptop products in our database, syncing ${globalLaptops.length} from GlobalIraq`,
@@ -505,47 +630,23 @@ export async function syncPrices(): Promise<SyncLog> {
         );
 
         if (existing) {
+          matchedOurIds.add(existing.id);
           matched++;
-
-          const currentPrice = parseFloat(existing.price?.toString() || "0");
-          const sku = variant.sku?.trim() || null;
-          const needsPriceUpdate = Math.abs(currentPrice - markedUpPrice) >= 0.01;
-          const needsSku = sku && existing.sku !== sku;
-
-          if (needsPriceUpdate || needsSku) {
-            await db
-              .update(products)
-              .set({
-                ...(needsPriceUpdate && {
-                  price: markedUpPrice.toString(),
-                  oldPrice:
-                    currentPrice > markedUpPrice
-                      ? currentPrice.toString()
-                      : oldPrice,
-                }),
-                ...(needsSku && { sku }),
-              })
-              .where(eq(products.id, existing.id));
-
-            if (needsPriceUpdate) {
-              console.log(
-                `[Price Sync] Updated ${existing.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`,
-              );
-              syncLog.updatedProducts.push(
-                toSyncProductEntry(
-                  {
-                    id: existing.id,
-                    nameEn: existing.nameEn,
-                    sku: sku ?? existing.sku,
-                    category: existing.category ?? globalLaptopCategory(globalProduct.product_type || ""),
-                    price: markedUpPrice.toString(),
-                  },
-                  currentPrice,
-                ),
-              );
-              updated++;
-            }
-          }
+          const result = await applyGlobalPriceToExisting(
+            {
+              id: existing.id,
+              nameEn: existing.nameEn,
+              sku: existing.sku,
+              category: existing.category,
+              price: existing.price,
+              oldPrice: existing.oldPrice,
+            },
+            globalProduct,
+            variant,
+            markedUpPrice,
+            syncLog,
+          );
+          if (result === "updated") updated++;
           continue;
         }
 
@@ -592,6 +693,56 @@ export async function syncPrices(): Promise<SyncLog> {
       } catch (err: any) {
         syncLog.errors.push(
           `Error processing ${globalProduct.title}: ${err.message}`,
+        );
+      }
+    }
+
+    // Reverse pass: update existing site products that weren't matched in forward pass
+    const reverseCandidates = allOurProducts.filter(
+      (p) =>
+        !matchedOurIds.has(p.id) &&
+        (isLaptopCategory(p.category) ||
+          (!!p.sku && globalSkuIndex.has(p.sku.trim().toLowerCase()))),
+    );
+    console.log(`[Price Sync] Reverse pass for ${reverseCandidates.length} unmatched local products...`);
+    for (const ourProduct of reverseCandidates) {
+      if (matchedOurIds.has(ourProduct.id)) continue;
+
+      try {
+        const globalMatch = findGlobalProductForOur(
+          ourProduct,
+          globalLaptops,
+          globalSkuIndex,
+          matchProducts,
+        );
+        if (!globalMatch) continue;
+
+        const variant = getPrimaryVariant(globalMatch);
+        if (!variant) continue;
+
+        const markedUpPrice = globalPriceToStorePrice(variant.price || "");
+        if (markedUpPrice == null) continue;
+
+        matchedOurIds.add(ourProduct.id);
+        matched++;
+        const result = await applyGlobalPriceToExisting(
+          {
+            id: ourProduct.id,
+            nameEn: ourProduct.nameEn,
+            sku: ourProduct.sku,
+            category: ourProduct.category,
+            price: ourProduct.price,
+            oldPrice: ourProduct.oldPrice,
+          },
+          globalMatch,
+          variant,
+          markedUpPrice,
+          syncLog,
+        );
+        if (result === "updated") updated++;
+      } catch (err: any) {
+        syncLog.errors.push(
+          `Error updating existing ${ourProduct.nameEn}: ${err.message}`,
         );
       }
     }
@@ -793,6 +944,8 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
     const allOurProducts = await db.select().from(products);
     const ourDesktops = allOurProducts.filter((p) => isDesktopCategory(p.category));
     const ourSkuIndex = buildOurSkuIndex(allOurProducts);
+    const globalSkuIndex = buildGlobalSkuIndex(globalDesktops);
+    const matchedOurIds = new Set<string>();
 
     console.log(
       `[Desktop Sync] ${ourDesktops.length} desktop/AIO products in our database, syncing ${globalDesktops.length} from GlobalIraq`,
@@ -834,47 +987,23 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
         );
 
         if (existing) {
+          matchedOurIds.add(existing.id);
           matched++;
-
-          const currentPrice = parseFloat(existing.price?.toString() || "0");
-          const sku = variant.sku?.trim() || null;
-          const needsPriceUpdate = Math.abs(currentPrice - markedUpPrice) >= 0.01;
-          const needsSku = sku && existing.sku !== sku;
-
-          if (needsPriceUpdate || needsSku) {
-            await db
-              .update(products)
-              .set({
-                ...(needsPriceUpdate && {
-                  price: markedUpPrice.toString(),
-                  oldPrice:
-                    currentPrice > markedUpPrice
-                      ? currentPrice.toString()
-                      : oldPrice,
-                }),
-                ...(needsSku && { sku }),
-              })
-              .where(eq(products.id, existing.id));
-
-            if (needsPriceUpdate) {
-              console.log(
-                `[Desktop Sync] Updated ${existing.nameEn.substring(0, 50)}: ${currentPrice} → ${markedUpPrice}`,
-              );
-              desktopSyncLog.updatedProducts.push(
-                toSyncProductEntry(
-                  {
-                    id: existing.id,
-                    nameEn: existing.nameEn,
-                    sku: sku ?? existing.sku,
-                    category: existing.category ?? globalDesktopCategory(globalProduct),
-                    price: markedUpPrice.toString(),
-                  },
-                  currentPrice,
-                ),
-              );
-              updated++;
-            }
-          }
+          const result = await applyGlobalPriceToExisting(
+            {
+              id: existing.id,
+              nameEn: existing.nameEn,
+              sku: existing.sku,
+              category: existing.category,
+              price: existing.price,
+              oldPrice: existing.oldPrice,
+            },
+            globalProduct,
+            variant,
+            markedUpPrice,
+            desktopSyncLog,
+          );
+          if (result === "updated") updated++;
           continue;
         }
 
@@ -921,6 +1050,57 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
       } catch (err: any) {
         desktopSyncLog.errors.push(
           `Error processing ${globalProduct.title}: ${err.message}`,
+        );
+      }
+    }
+
+    const reverseCandidates = allOurProducts.filter(
+      (p) =>
+        !matchedOurIds.has(p.id) &&
+        (isDesktopCategory(p.category) ||
+          (!!p.sku && globalSkuIndex.has(p.sku.trim().toLowerCase()))),
+    );
+    console.log(
+      `[Desktop Sync] Reverse pass for ${reverseCandidates.length} unmatched local products...`,
+    );
+    for (const ourProduct of reverseCandidates) {
+      if (matchedOurIds.has(ourProduct.id)) continue;
+
+      try {
+        const globalMatch = findGlobalProductForOur(
+          ourProduct,
+          globalDesktops,
+          globalSkuIndex,
+          matchDesktopProducts,
+        );
+        if (!globalMatch) continue;
+
+        const variant = getPrimaryVariant(globalMatch);
+        if (!variant) continue;
+
+        const markedUpPrice = globalPriceToStorePrice(variant.price || "");
+        if (markedUpPrice == null) continue;
+
+        matchedOurIds.add(ourProduct.id);
+        matched++;
+        const result = await applyGlobalPriceToExisting(
+          {
+            id: ourProduct.id,
+            nameEn: ourProduct.nameEn,
+            sku: ourProduct.sku,
+            category: ourProduct.category,
+            price: ourProduct.price,
+            oldPrice: ourProduct.oldPrice,
+          },
+          globalMatch,
+          variant,
+          markedUpPrice,
+          desktopSyncLog,
+        );
+        if (result === "updated") updated++;
+      } catch (err: any) {
+        desktopSyncLog.errors.push(
+          `Error updating existing ${ourProduct.nameEn}: ${err.message}`,
         );
       }
     }
