@@ -677,6 +677,8 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.lookup.errorMessage': 'حدث خطأ أثناء البحث',
     
     'repair.ticket.details': 'تفاصيل التذكرة',
+    'repair.ticket.source.online': 'أونلاين',
+    'repair.ticket.source.technician': 'محل',
     'repair.ticket.ticketNumber': 'رقم التذكرة',
     'repair.ticket.status': 'الحالة',
     'repair.ticket.priority': 'الأولوية',
@@ -1548,6 +1550,8 @@ const translations: Record<Language, Record<string, string>> = {
     'repair.lookup.errorMessage': 'An error occurred while searching',
     
     'repair.ticket.details': 'Ticket Details',
+    'repair.ticket.source.online': 'Online',
+    'repair.ticket.source.technician': 'In-store',
     'repair.ticket.ticketNumber': 'Ticket Number',
     'repair.ticket.status': 'Status',
     'repair.ticket.priority': 'Priority',

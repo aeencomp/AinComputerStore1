@@ -4576,7 +4576,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post("/api/repair-tickets", async (req, res) => {
     try {
       const validatedData = insertRepairTicketSchema.parse(req.body);
-      const ticket = await storage.createRepairTicket(validatedData);
+      const requestSource = (req.session as any)?.technicianId ? "technician" : "online";
+      const ticket = await storage.createRepairTicket({ ...validatedData, requestSource });
       
       // Send WhatsApp notification (non-blocking)
       const whatsappResult = await sendTicketCreatedMessage(

@@ -483,6 +483,8 @@ export const repairTickets = pgTable("repair_tickets", {
   excludedFromSalesReport: integer("excluded_from_sales_report").notNull().default(0),
   /** sales = cashier portal; technician = repair portal payment */
   repairPaymentSource: text("repair_payment_source").notNull().default("sales"),
+  /** online = customer submitted via website; technician = created in repair portal */
+  requestSource: text("request_source").notNull().default("technician"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -492,9 +494,13 @@ export const insertRepairTicketSchema = createInsertSchema(repairTickets).omit({
   ticketNumber: true,
   createdAt: true,
   updatedAt: true,
+  requestSource: true,
 });
 
 export type InsertRepairTicket = z.infer<typeof insertRepairTicketSchema>;
+export type CreateRepairTicketInput = InsertRepairTicket & {
+  requestSource?: "online" | "technician";
+};
 export type RepairTicket = typeof repairTickets.$inferSelect;
 
 export const repairTicketStatusHistory = pgTable("repair_ticket_status_history", {

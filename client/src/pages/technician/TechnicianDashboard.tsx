@@ -12,7 +12,7 @@ import { formatPosPaymentLabel } from '@/lib/posPayment';
 import { useToast } from '@/hooks/use-toast';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing, BarChart3, TrendingDown } from 'lucide-react';
+import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle, Clock, Banknote, Truck, Archive, ArchiveRestore, UserSearch, CreditCard, MessageCircle, BellRing, BarChart3, TrendingDown, Globe } from 'lucide-react';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
@@ -808,10 +808,12 @@ export default function TechnicianDashboard() {
           </div>
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredTickets.map((ticket) => (
+            {filteredTickets.map((ticket) => {
+              const isOnlineRequest = ticket.requestSource === 'online';
+              return (
               <Card
                 key={ticket.id}
-                className="hover-elevate cursor-pointer"
+                className={`hover-elevate cursor-pointer ${isOnlineRequest ? 'border-violet-400/70 bg-violet-50/50 dark:bg-violet-950/25 ring-1 ring-violet-300/40 dark:ring-violet-700/40' : ''}`}
                 role="button"
                 tabIndex={0}
                 onClick={() => { setSelectedTicketId(ticket.id); setDialogOpen(true); }}
@@ -822,6 +824,15 @@ export default function TechnicianDashboard() {
                   <div className="flex justify-between items-start mb-2">
                     <CardTitle className="text-lg">{ticket.ticketNumber}</CardTitle>
                     <div className="flex items-center gap-1 flex-wrap justify-end">
+                      {isOnlineRequest && (
+                        <Badge
+                          className="bg-violet-600 text-white border-violet-700 gap-1 text-xs"
+                          data-testid={`badge-online-${ticket.id}`}
+                        >
+                          <Globe className="h-3 w-3" />
+                          {t('repair.ticket.source.online')}
+                        </Badge>
+                      )}
                       {ticket.repairCustomerId && customerIdMap[ticket.repairCustomerId] && (
                         <Badge
                           variant="outline"
@@ -985,7 +996,8 @@ export default function TechnicianDashboard() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <Card>

@@ -71,6 +71,9 @@ const STARTUP_MIGRATIONS: string[] = [
   `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS repair_payment_source TEXT NOT NULL DEFAULT 'sales'`,
   `UPDATE repair_tickets SET repair_payment_source = 'sales' WHERE repair_payment_source IS NULL OR trim(repair_payment_source) = ''`,
 
+  `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS request_source TEXT NOT NULL DEFAULT 'technician'`,
+  `UPDATE repair_tickets SET request_source = 'technician' WHERE request_source IS NULL OR trim(request_source) = ''`,
+
   `UPDATE repair_tickets
      SET repair_payment_source = 'technician'
      WHERE excluded_from_sales_report = 1
