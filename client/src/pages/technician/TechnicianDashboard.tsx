@@ -17,7 +17,7 @@ import { LogOut, Wrench, Search, Users, Settings, Plus, DollarSign, CheckCircle,
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
-import { computeTechnicianRevenueStats } from '@/lib/technicianRevenue';
+import { baghdadMonthStartKey, baghdadTodayKey, computeTechnicianRevenueStats } from '@/lib/technicianRevenue';
 import { isOnlineRepairTicket } from '@/lib/repairTicketSource';
 import { IntercomWidget } from '@/components/IntercomWidget';
 import {
@@ -61,9 +61,8 @@ export default function TechnicianDashboard() {
   const [showArchived, setShowArchived] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [customerLookup, setCustomerLookup] = useState('');
-  const [revenueDate, setRevenueDate] = useState(() =>
-    new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' }),
-  );
+  const [revenueFromDate, setRevenueFromDate] = useState(baghdadMonthStartKey);
+  const [revenueToDate, setRevenueToDate] = useState(baghdadTodayKey);
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -275,9 +274,13 @@ export default function TechnicianDashboard() {
   });
 
   const stats = useMemo(
-    () => computeTechnicianRevenueStats(tickets, revenueDate),
-    [tickets, revenueDate],
+    () => computeTechnicianRevenueStats(tickets, { from: revenueFromDate, to: revenueToDate }),
+    [tickets, revenueFromDate, revenueToDate],
   );
+
+  const revenueRangeLabel = revenueFromDate === revenueToDate
+    ? revenueFromDate
+    : `${revenueFromDate} → ${revenueToDate}`;
 
   const onlinePendingCount = useMemo(() => {
     if (!tickets) return 0;
@@ -513,24 +516,66 @@ export default function TechnicianDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {canViewRevenue && (
-          <div className="mb-4 flex flex-col sm:flex-row sm:items-end gap-3">
+          <div className="mb-4 flex flex-col lg:flex-row lg:items-end gap-3 flex-wrap">
             <div className="space-y-1">
-              <Label htmlFor="revenue-date">
-                {language === 'ar' ? 'تاريخ الإيرادات' : 'Revenue date'}
+              <Label htmlFor="revenue-from-date">
+                {language === 'ar' ? 'من تاريخ' : 'From'}
               </Label>
               <Input
-                id="revenue-date"
+                id="revenue-from-date"
                 type="date"
-                value={revenueDate}
-                onChange={(e) => setRevenueDate(e.target.value)}
-                className="w-full sm:w-[220px]"
-                data-testid="input-revenue-date"
+                value={revenueFromDate}
+                max={revenueToDate}
+                onChange={(e) => setRevenueFromDate(e.target.value)}
+                className="w-full sm:w-[180px]"
+                data-testid="input-revenue-from-date"
               />
             </div>
-            <p className="text-sm text-muted-foreground pb-2">
+            <div className="space-y-1">
+              <Label htmlFor="revenue-to-date">
+                {language === 'ar' ? 'إلى تاريخ' : 'To'}
+              </Label>
+              <Input
+                id="revenue-to-date"
+                type="date"
+                value={revenueToDate}
+                min={revenueFromDate}
+                onChange={(e) => setRevenueToDate(e.target.value)}
+                className="w-full sm:w-[180px]"
+                data-testid="input-revenue-to-date"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mb-0.5"
+              onClick={() => {
+                const today = baghdadTodayKey();
+                setRevenueFromDate(today);
+                setRevenueToDate(today);
+              }}
+              data-testid="button-revenue-today"
+            >
+              {language === 'ar' ? 'اليوم' : 'Today'}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="mb-0.5"
+              onClick={() => {
+                setRevenueFromDate(baghdadMonthStartKey());
+                setRevenueToDate(baghdadTodayKey());
+              }}
+              data-testid="button-revenue-this-month"
+            >
+              {language === 'ar' ? 'هذا الشهر' : 'This month'}
+            </Button>
+            <p className="text-sm text-muted-foreground pb-2 lg:pb-0">
               {language === 'ar'
-                ? `إيرادات ${revenueDate} (توقيت بغداد)`
-                : `Revenue for ${revenueDate} (Baghdad time)`}
+                ? `إيرادات الفترة: ${revenueRangeLabel} (توقيت بغداد)`
+                : `Period revenue: ${revenueRangeLabel} (Baghdad time)`}
             </p>
           </div>
         )}
@@ -558,11 +603,13 @@ export default function TechnicianDashboard() {
                     <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
-                    <p className="text-lg font-bold" data-testid="text-total-revenue">
+                    <p className="text-xs text-muted-foreground truncate">
+                      {language === 'ar' ? 'إيرادات الفترة' : 'Period Revenue'}
+                    </p>
+                    <p className="text-lg font-bold" data-testid="text-period-revenue">
                       {language === 'ar'
-                        ? `${stats.totalRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${stats.totalRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
+                        ? `${stats.periodRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${stats.periodRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
                     </p>
                   </div>
                 </div>
@@ -583,12 +630,12 @@ export default function TechnicianDashboard() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground truncate">
-                      {language === 'ar' ? 'إيراد التاريخ' : 'Date Revenue'}
+                      {language === 'ar' ? 'إجمالي الكل' : 'All-time Total'}
                     </p>
-                    <p className="text-lg font-bold" data-testid="text-daily-revenue">
+                    <p className="text-lg font-bold" data-testid="text-total-revenue">
                       {language === 'ar'
-                        ? `${stats.dailyRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${stats.dailyRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
+                        ? `${stats.totalRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${stats.totalRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
                     </p>
                   </div>
                 </div>

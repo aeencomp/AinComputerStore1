@@ -1,13 +1,20 @@
 import type { RepairTicket } from "@shared/schema";
 
 export type TechnicianRevenueStats = {
+  /** All-time completed + delivered revenue. */
   totalRevenue: number;
-  dailyRevenue: number;
+  /** Revenue for completed/delivered tickets within the selected date range. */
+  periodRevenue: number;
   completedCount: number;
   completedRevenue: number;
   pendingCount: number;
   deliveredCount: number;
   deferredCount: number;
+};
+
+export type TechnicianRevenueRange = {
+  from: string;
+  to: string;
 };
 
 function ticketCost(ticket: RepairTicket): number {
@@ -45,18 +52,35 @@ export function getTechnicianDailyActivityDay(ticket: RepairTicket): string | nu
   return null;
 }
 
-function baghdadTodayKey(): string {
+export function baghdadTodayKey(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+}
+
+export function baghdadMonthStartKey(): string {
+  const today = baghdadTodayKey();
+  return `${today.slice(0, 8)}01`;
+}
+
+function normalizeRevenueRange(range?: TechnicianRevenueRange): TechnicianRevenueRange {
+  const today = baghdadTodayKey();
+  const from = range?.from?.trim() || baghdadMonthStartKey();
+  const to = range?.to?.trim() || today;
+  return from <= to ? { from, to } : { from: to, to: from };
+}
+
+function isDayInRange(day: string | null, from: string, to: string): boolean {
+  if (!day) return false;
+  return day >= from && day <= to;
 }
 
 /** Dashboard stats — all repair tickets visible in the technician portal. */
 export function computeTechnicianRevenueStats(
   tickets: RepairTicket[] | undefined,
-  revenueDate?: string,
+  range?: TechnicianRevenueRange,
 ): TechnicianRevenueStats {
   const empty: TechnicianRevenueStats = {
     totalRevenue: 0,
-    dailyRevenue: 0,
+    periodRevenue: 0,
     completedCount: 0,
     completedRevenue: 0,
     pendingCount: 0,
@@ -65,9 +89,9 @@ export function computeTechnicianRevenueStats(
   };
   if (!tickets?.length) return empty;
 
-  const selectedDay = revenueDate?.trim() || baghdadTodayKey();
+  const { from, to } = normalizeRevenueRange(range);
   let totalRevenue = 0;
-  let dailyRevenue = 0;
+  let periodRevenue = 0;
   let completedCount = 0;
   let completedRevenue = 0;
   let pendingCount = 0;
@@ -86,7 +110,7 @@ export function computeTechnicianRevenueStats(
     if (ticket.status === "completed") {
       totalRevenue += cost;
       const completedDay = baghdadDayKey(ticket.completedAt || ticket.updatedAt);
-      if (completedDay === selectedDay) dailyRevenue += cost;
+      if (isDayInRange(completedDay, from, to)) periodRevenue += cost;
       if (!archived) {
         completedCount++;
         completedRevenue += cost;
@@ -94,14 +118,14 @@ export function computeTechnicianRevenueStats(
     } else if (ticket.status === "delivered") {
       totalRevenue += cost;
       const deliveredDay = baghdadDayKey(ticket.deliveredAt || ticket.updatedAt);
-      if (deliveredDay === selectedDay) dailyRevenue += cost;
+      if (isDayInRange(deliveredDay, from, to)) periodRevenue += cost;
       if (!archived) deliveredCount++;
     }
   }
 
   return {
     totalRevenue,
-    dailyRevenue,
+    periodRevenue,
     completedCount,
     completedRevenue,
     pendingCount,
