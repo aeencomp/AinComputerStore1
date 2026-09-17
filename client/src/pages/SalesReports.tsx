@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { repairTicketSalesAt, repairTicketEligibleForSalesReport } from "@shared/repair-sales";
 import { orderIncludedInSalesReport } from "@shared/order-sales";
@@ -36,7 +36,22 @@ import {
   FileText,
 } from "lucide-react";
 import { openA4InvoicePrint, type A4InvoiceOrder } from "@/lib/a4InvoicePrint";
-import { startOfDay, startOfWeek, startOfMonth, startOfYear, isAfter } from "date-fns";
+import {
+  addBaghdadDays,
+  baghdadDateKey,
+  baghdadMonthStartKey,
+  normalizeBaghdadDateRange,
+  previousBaghdadPeriod,
+} from "@shared/baghdadDateRange";
+
+function baghdadDayFromIso(iso: string | Date): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+}
+
+function dayInBaghdadRange(day: string | null | undefined, from: string, to: string): boolean {
+  if (!day) return false;
+  return day >= from && day <= to;
+}
 
 interface Order {
   id: string;
@@ -134,6 +149,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const { language } = useLanguage();
   const { toast } = useToast();
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
+  const [salesFromDate, setSalesFromDate] = useState(() => baghdadDateKey());
+  const [salesToDate, setSalesToDate] = useState(() => baghdadDateKey());
   const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'online' | 'walk-in' | 'in-store'>('all');
   const [activeTab, setActiveTab] = useState<'sales' | 'cashflow'>('sales');
   const [salesSearchQuery, setSalesSearchQuery] = useState("");
@@ -159,6 +176,67 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       if (!res.ok) throw new Error('Failed to load repair tickets');
       return res.json();
     },
+  });
+
+  useEffect(() => {
+    if (!user.permissions.canViewReports) return;
+    const today = baghdadDateKey();
+    switch (dateRange) {
+      case "today":
+        setSalesFromDate(today);
+        setSalesToDate(today);
+        break;
+      case "week":
+        setSalesFromDate(addBaghdadDays(today, -6));
+        setSalesToDate(today);
+        break;
+      case "month":
+        setSalesFromDate(baghdadMonthStartKey());
+        setSalesToDate(today);
+        break;
+      case "year":
+        setSalesFromDate(`${today.slice(0, 4)}-01-01`);
+        setSalesToDate(today);
+        break;
+      case "all":
+        setSalesFromDate("2020-01-01");
+        setSalesToDate(today);
+        break;
+    }
+  }, [dateRange, user.permissions.canViewReports]);
+
+  const salesRange = useMemo(
+    () => normalizeBaghdadDateRange(salesFromDate, salesToDate),
+    [salesFromDate, salesToDate],
+  );
+  const salesPreviousRange = useMemo(
+    () => previousBaghdadPeriod(salesRange.from, salesRange.to),
+    [salesRange.from, salesRange.to],
+  );
+
+  const fetchCashflowForRange = async (from: string, to: string) => {
+    const params = new URLSearchParams({ from, to, locationId: String(salesLocationId) });
+    const res = await fetch(`/api/instore/monthly-cashflow?${params.toString()}`, { credentials: "include" });
+    if (!res.ok) throw new Error("Failed to load cashflow");
+    return res.json() as Promise<MonthlyCashflowResponse>;
+  };
+
+  const { data: salesPeriodCashflow } = useQuery<MonthlyCashflowResponse>({
+    queryKey: ["/api/instore/monthly-cashflow", "sales-period", salesRange.from, salesRange.to, salesLocationId],
+    queryFn: () => fetchCashflowForRange(salesRange.from, salesRange.to),
+    enabled: user.permissions.canViewReports && activeTab === "sales",
+  });
+
+  const { data: salesPreviousCashflow } = useQuery<MonthlyCashflowResponse>({
+    queryKey: [
+      "/api/instore/monthly-cashflow",
+      "sales-prev",
+      salesPreviousRange.from,
+      salesPreviousRange.to,
+      salesLocationId,
+    ],
+    queryFn: () => fetchCashflowForRange(salesPreviousRange.from, salesPreviousRange.to),
+    enabled: user.permissions.canViewReports && activeTab === "sales",
   });
 
   const { data: monthlyCashflow, isLoading: cashflowLoading } = useQuery<MonthlyCashflowResponse>({
@@ -345,23 +423,10 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     );
   }
 
-  const getDateRangeStart = () => {
-    const now = new Date();
-    switch (dateRange) {
-      case 'today': return startOfDay(now);
-      case 'week': return startOfWeek(now, { weekStartsOn: 0 });
-      case 'month': return startOfMonth(now);
-      case 'year': return startOfYear(now);
-      default: return new Date(0);
-    }
-  };
-
   const filteredOrders = orders.filter(order => {
-    const orderDate = new Date(order.createdAt);
-    const rangeStart = getDateRangeStart();
-    
-    if (!isAfter(orderDate, rangeStart) && dateRange !== 'all') return false;
-    
+    const day = baghdadDayFromIso(order.createdAt);
+    if (!dayInBaghdadRange(day, salesRange.from, salesRange.to)) return false;
+
     if (orderTypeFilter !== 'all') {
       const orderType = order.orderType || 'online';
       if (orderTypeFilter === 'walk-in' && orderType !== 'walk-in') return false;
@@ -393,9 +458,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
     const ticketDate = repairTicketSalesAt(t as RepairTicket);
     if (!ticketDate) return false;
-    const rangeStart = getDateRangeStart();
-    if (dateRange !== 'all' && !isAfter(ticketDate, rangeStart)) return false;
-    return true;
+    const day = baghdadDayFromIso(ticketDate);
+    return dayInBaghdadRange(day, salesRange.from, salesRange.to);
   }) : [];
 
   const repairTotalCash = filteredRepairTickets
@@ -408,6 +472,32 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     .filter(t => t.paymentStatus === 'deferred')
     .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
   const repairTotal = repairTotalCash + repairTotalCard;
+  const combinedGross = totalRevenue + repairTotal;
+  const periodWithdrawals = salesPeriodCashflow?.totals.withdrawalsTotal ?? 0;
+  const netAfterWithdrawals = combinedGross - periodWithdrawals;
+
+  const prevFilteredOrders = orders.filter((order) => {
+    const day = baghdadDayFromIso(order.createdAt);
+    return dayInBaghdadRange(day, salesPreviousRange.from, salesPreviousRange.to);
+  });
+  const prevActiveOrders = prevFilteredOrders.filter((order) => orderIncludedInSalesReport(order));
+  const prevOrderRevenue = prevActiveOrders.reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
+  const prevRepairTickets =
+    salesLocationId === 1
+      ? allRepairTickets.filter((t) => {
+          if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
+          const ticketDate = repairTicketSalesAt(t as RepairTicket);
+          if (!ticketDate) return false;
+          const day = baghdadDayFromIso(ticketDate);
+          return dayInBaghdadRange(day, salesPreviousRange.from, salesPreviousRange.to);
+        })
+      : [];
+  const prevRepairGross = prevRepairTickets
+    .filter((t) => t.paymentStatus !== "deferred")
+    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
+  const prevCombinedGross = prevOrderRevenue + prevRepairGross;
+  const prevWithdrawals = salesPreviousCashflow?.totals.withdrawalsTotal ?? 0;
+  const prevNetAfterWithdrawals = prevCombinedGross - prevWithdrawals;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ar-IQ').format(price);
@@ -819,6 +909,57 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                 onChange={(e) => setSalesSearchQuery(e.target.value)}
                 data-testid="input-sales-report-search"
               />
+              <div className="flex flex-wrap items-end gap-2 w-full pt-1">
+                <div className="space-y-1">
+                  <Label htmlFor="sales-from-date">{language === 'ar' ? 'من' : 'From'}</Label>
+                  <Input
+                    id="sales-from-date"
+                    type="date"
+                    className="w-40"
+                    value={salesFromDate}
+                    max={salesToDate}
+                    onChange={(e) => setSalesFromDate(e.target.value)}
+                    data-testid="input-sales-from-date"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="sales-to-date">{language === 'ar' ? 'إلى' : 'To'}</Label>
+                  <Input
+                    id="sales-to-date"
+                    type="date"
+                    className="w-40"
+                    value={salesToDate}
+                    min={salesFromDate}
+                    onChange={(e) => setSalesToDate(e.target.value)}
+                    data-testid="input-sales-to-date"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const today = baghdadDateKey();
+                    setSalesFromDate(today);
+                    setSalesToDate(today);
+                    setDateRange('today');
+                  }}
+                >
+                  {language === 'ar' ? 'اليوم' : 'Today'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSalesFromDate(baghdadMonthStartKey());
+                    setSalesToDate(baghdadDateKey());
+                    setDateRange('month');
+                  }}
+                >
+                  {language === 'ar' ? 'هذا الشهر' : 'This month'}
+                </Button>
+              </div>
             </>
           ) : (
             <>
@@ -894,6 +1035,53 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
         </TabsList>
 
         <TabsContent value="sales" className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar' ? 'إجمالي الفترة (مبيعات + صيانة)' : 'Period gross (sales + repair)'}
+            </p>
+            <p className="text-xs text-muted-foreground font-mono mt-0.5">
+              {salesRange.from === salesRange.to ? salesRange.from : `${salesRange.from} → ${salesRange.to}`}
+            </p>
+            <p className="text-xl font-bold text-green-600" data-testid="text-sales-period-gross">
+              {formatPrice(combinedGross)} IQD
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">{language === 'ar' ? 'السحوبات' : 'Withdrawals'}</p>
+            <p className="text-xl font-bold text-orange-600" data-testid="text-sales-period-withdrawals">
+              − {formatPrice(periodWithdrawals)} IQD
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar' ? 'الصافي بعد السحب' : 'Net after withdrawals'}
+            </p>
+            <p className="text-xl font-bold" data-testid="text-sales-period-net">
+              {formatPrice(netAfterWithdrawals)} IQD
+            </p>
+          </CardContent>
+        </Card>
+        <Card className="border-dashed">
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">
+              {language === 'ar' ? 'الفترة السابقة (صافي)' : 'Previous period (net)'}
+            </p>
+            <p className="text-[10px] font-mono text-muted-foreground">
+              {salesPreviousRange.from} → {salesPreviousRange.to}
+            </p>
+            <p className="text-xl font-bold text-muted-foreground" data-testid="text-sales-previous-net">
+              {formatPrice(prevNetAfterWithdrawals)} IQD
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -903,7 +1091,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}
+                  {language === 'ar' ? 'إيراد المبيعات' : 'Sales Revenue'}
                 </p>
                 <p className="text-xl font-bold">{formatPrice(totalRevenue)} IQD</p>
               </div>

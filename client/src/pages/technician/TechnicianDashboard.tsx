@@ -69,9 +69,41 @@ export default function TechnicianDashboard() {
     retry: false,
   });
 
+  const canViewRevenue = useMemo(
+    () =>
+      !!currentTechnician &&
+      (currentTechnician.isAdmin === 1 ||
+        (currentTechnician.permissions || []).includes('view_revenue')),
+    [currentTechnician],
+  );
+
   const { data: tickets, isLoading: isTicketsLoading } = useQuery<RepairTicket[]>({
     queryKey: ['/api/repair-tickets'],
     enabled: !!currentTechnician,
+  });
+
+  const { data: periodSummary } = useQuery<{
+    periodRevenue: number;
+    totalWithdrawals: number;
+    netTotal: number;
+    previousPeriod: {
+      from: string;
+      to: string;
+      periodRevenue: number;
+      totalWithdrawals: number;
+      netTotal: number;
+    };
+  }>({
+    queryKey: ['/api/technician/period-revenue-summary', revenueFromDate, revenueToDate],
+    queryFn: async () => {
+      const params = new URLSearchParams({ from: revenueFromDate, to: revenueToDate });
+      const res = await fetch(`/api/technician/period-revenue-summary?${params.toString()}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to load period revenue');
+      return res.json();
+    },
+    enabled: canViewRevenue,
   });
 
   const { data: reminders } = useQuery<RepairReminderResponse>({
@@ -354,7 +386,6 @@ export default function TechnicianDashboard() {
   }
 
   const isAdmin = currentTechnician.isAdmin === 1;
-  const canViewRevenue = isAdmin || (currentTechnician.permissions || []).includes('view_revenue');
 
   const filteredTickets = tickets?.filter((ticket) => {
     if (!showArchived && ticket.isArchived === 1) return false;
@@ -590,13 +621,9 @@ export default function TechnicianDashboard() {
           </Alert>
         )}
 
-        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-6' : 'grid-cols-2'}`}>
+        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-4 xl:grid-cols-8' : 'grid-cols-2'}`}>
           {canViewRevenue && (
-            <Card
-              className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => setFilterStatus('all')}
-              data-testid="card-total-revenue"
-            >
+            <Card data-testid="card-period-revenue">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
@@ -604,12 +631,12 @@ export default function TechnicianDashboard() {
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground truncate">
-                      {language === 'ar' ? 'إيرادات الفترة' : 'Period Revenue'}
+                      {language === 'ar' ? 'إيراد الفترة (قبل السحب)' : 'Period (before withdrawals)'}
                     </p>
                     <p className="text-lg font-bold" data-testid="text-period-revenue">
                       {language === 'ar'
-                        ? `${stats.periodRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${stats.periodRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
+                        ? `${(periodSummary?.periodRevenue ?? stats.periodRevenue).toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${(periodSummary?.periodRevenue ?? stats.periodRevenue).toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
                     </p>
                   </div>
                 </div>
@@ -618,15 +645,75 @@ export default function TechnicianDashboard() {
           )}
 
           {canViewRevenue && (
-            <Card
-              className={`cursor-pointer hover-elevate ${filterStatus === 'all' ? 'ring-2 ring-primary' : ''}`}
-              onClick={() => setFilterStatus('all')}
-              data-testid="card-daily-revenue"
-            >
+            <Card data-testid="card-period-withdrawals">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
+                    <TrendingDown className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground truncate">
+                      {language === 'ar' ? 'السحوبات' : 'Withdrawals'}
+                    </p>
+                    <p className="text-lg font-bold text-orange-600 dark:text-orange-400" data-testid="text-period-withdrawals">
+                      − {language === 'ar'
+                        ? `${(periodSummary?.totalWithdrawals ?? 0).toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${(periodSummary?.totalWithdrawals ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {canViewRevenue && (
+            <Card data-testid="card-period-net">
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
                     <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs text-muted-foreground truncate">
+                      {language === 'ar' ? 'الصافي (بعد السحب)' : 'Net (after withdrawals)'}
+                    </p>
+                    <p className="text-lg font-bold" data-testid="text-period-net">
+                      {language === 'ar'
+                        ? `${(periodSummary?.netTotal ?? stats.periodRevenue).toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                        : `${(periodSummary?.netTotal ?? stats.periodRevenue).toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {canViewRevenue && periodSummary?.previousPeriod && (
+            <Card className="border-dashed" data-testid="card-previous-period-net">
+              <CardContent className="pt-4 pb-4">
+                <div className="min-w-0">
+                  <p className="text-xs text-muted-foreground truncate">
+                    {language === 'ar' ? 'الفترة السابقة (صافي)' : 'Previous period (net)'}
+                  </p>
+                  <p className="text-[10px] font-mono text-muted-foreground">
+                    {periodSummary.previousPeriod.from} → {periodSummary.previousPeriod.to}
+                  </p>
+                  <p className="text-lg font-bold text-muted-foreground" data-testid="text-previous-period-net">
+                    {language === 'ar'
+                      ? `${periodSummary.previousPeriod.netTotal.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+                      : `${periodSummary.previousPeriod.netTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {canViewRevenue && (
+            <Card data-testid="card-all-time-revenue">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full bg-slate-500/10 flex items-center justify-center flex-shrink-0">
+                    <Banknote className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                   </div>
                   <div className="min-w-0">
                     <p className="text-xs text-muted-foreground truncate">
