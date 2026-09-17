@@ -45,8 +45,15 @@ export function getTechnicianDailyActivityDay(ticket: RepairTicket): string | nu
   return null;
 }
 
+function baghdadTodayKey(): string {
+  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+}
+
 /** Dashboard stats — all repair tickets visible in the technician portal. */
-export function computeTechnicianRevenueStats(tickets: RepairTicket[] | undefined): TechnicianRevenueStats {
+export function computeTechnicianRevenueStats(
+  tickets: RepairTicket[] | undefined,
+  revenueDate?: string,
+): TechnicianRevenueStats {
   const empty: TechnicianRevenueStats = {
     totalRevenue: 0,
     dailyRevenue: 0,
@@ -58,7 +65,7 @@ export function computeTechnicianRevenueStats(tickets: RepairTicket[] | undefine
   };
   if (!tickets?.length) return empty;
 
-  const baghdadToday = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+  const selectedDay = revenueDate?.trim() || baghdadTodayKey();
   let totalRevenue = 0;
   let dailyRevenue = 0;
   let completedCount = 0;
@@ -79,7 +86,7 @@ export function computeTechnicianRevenueStats(tickets: RepairTicket[] | undefine
     if (ticket.status === "completed") {
       totalRevenue += cost;
       const completedDay = baghdadDayKey(ticket.completedAt || ticket.updatedAt);
-      if (completedDay === baghdadToday) dailyRevenue += cost;
+      if (completedDay === selectedDay) dailyRevenue += cost;
       if (!archived) {
         completedCount++;
         completedRevenue += cost;
@@ -87,7 +94,7 @@ export function computeTechnicianRevenueStats(tickets: RepairTicket[] | undefine
     } else if (ticket.status === "delivered") {
       totalRevenue += cost;
       const deliveredDay = baghdadDayKey(ticket.deliveredAt || ticket.updatedAt);
-      if (deliveredDay === baghdadToday) dailyRevenue += cost;
+      if (deliveredDay === selectedDay) dailyRevenue += cost;
       if (!archived) deliveredCount++;
     }
   }

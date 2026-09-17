@@ -359,8 +359,10 @@ export class DrizzleStorage implements IStorage {
       }
     }
 
+    const { requestSource, ...ticketFields } = insertTicket;
     const result = await db.insert(repairTickets).values({
-      ...insertTicket,
+      ...ticketFields,
+      requestSource: requestSource ?? "technician",
       ticketNumber,
       repairCustomerId,
       receivedAt: (insertTicket as any).receivedAt || new Date(),

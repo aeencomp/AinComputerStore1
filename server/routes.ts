@@ -4573,13 +4573,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // ==================== End QiCard Routes ====================
 
-  app.post("/api/repair-tickets", async (req, res) => {
+  async function handleCreateRepairTicket(
+    req: Request,
+    res: any,
+    forcedSource?: "online" | "technician",
+  ) {
     try {
       const validatedData = insertRepairTicketSchema.parse(req.body);
-      const requestSource = (req.session as any)?.technicianId ? "technician" : "online";
+      const headerSource = String(req.headers["x-repair-source"] || "").trim().toLowerCase();
+      const isTechnicianSession = !!(req.session as any)?.technicianId;
+      let requestSource: "online" | "technician";
+      if (forcedSource) {
+        requestSource = forcedSource;
+      } else if (isTechnicianSession) {
+        requestSource = "technician";
+      } else if (headerSource === "online") {
+        requestSource = "online";
+      } else {
+        requestSource = "online";
+      }
+
       const ticket = await storage.createRepairTicket({ ...validatedData, requestSource });
-      
-      // Send WhatsApp notification (non-blocking)
+      console.log(
+        `Repair ticket ${ticket.ticketNumber} created (source=${requestSource}, technicianSession=${isTechnicianSession})`,
+      );
+
       const whatsappResult = await sendTicketCreatedMessage(
         ticket.customerPhone,
         ticket.customerName,
@@ -4590,9 +4608,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error('WhatsApp notification failed:', err);
         return { success: false, error: err.message };
       });
-      
+
       return res.json({
         ...ticket,
+        requestSource: ticket.requestSource ?? requestSource,
         _whatsappStatus: whatsappResult.success
           ? `accepted:${whatsappResult.messageStatus || 'unknown'}${whatsappResult.deliveryMethod === 'free_text' ? ':free_text_may_not_deliver' : ''}`
           : `failed: ${whatsappResult.error || 'unknown'}`,
@@ -4613,6 +4632,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.error("Error creating repair ticket:", error);
       return res.status(500).json({ error: "Failed to create repair ticket" });
     }
+  }
+
+  /** Public website repair form — always tagged as online regardless of session cookies. */
+  app.post("/api/public/repair-requests", async (req, res) => {
+    return handleCreateRepairTicket(req, res, "online");
+  });
+
+  app.post("/api/repair-tickets", async (req, res) => {
+    const requestSource = (req.session as any)?.technicianId ? "technician" : "online";
+    return handleCreateRepairTicket(req, res, requestSource);
   });
 
   app.get("/api/repair-tickets", async (req, res) => {

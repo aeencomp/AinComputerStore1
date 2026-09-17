@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatPosPaymentLabel } from '@/lib/posPayment';
@@ -17,6 +18,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { format } from 'date-fns';
 import TicketDetailDialog from '@/components/TicketDetailDialog';
 import { computeTechnicianRevenueStats } from '@/lib/technicianRevenue';
+import { isOnlineRepairTicket } from '@/lib/repairTicketSource';
 import { IntercomWidget } from '@/components/IntercomWidget';
 import {
   AlertDialog,
@@ -59,6 +61,9 @@ export default function TechnicianDashboard() {
   const [showArchived, setShowArchived] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [customerLookup, setCustomerLookup] = useState('');
+  const [revenueDate, setRevenueDate] = useState(() =>
+    new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Baghdad' }),
+  );
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -269,7 +274,17 @@ export default function TechnicianDashboard() {
     },
   });
 
-  const stats = useMemo(() => computeTechnicianRevenueStats(tickets), [tickets]);
+  const stats = useMemo(
+    () => computeTechnicianRevenueStats(tickets, revenueDate),
+    [tickets, revenueDate],
+  );
+
+  const onlinePendingCount = useMemo(() => {
+    if (!tickets) return 0;
+    return tickets.filter(
+      (t) => t.isArchived !== 1 && t.status === 'pending' && isOnlineRepairTicket(t),
+    ).length;
+  }, [tickets]);
 
   const archivedCount = useMemo(() => {
     return tickets?.filter(t => t.isArchived === 1).length || 0;
@@ -497,6 +512,39 @@ export default function TechnicianDashboard() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
+        {canViewRevenue && (
+          <div className="mb-4 flex flex-col sm:flex-row sm:items-end gap-3">
+            <div className="space-y-1">
+              <Label htmlFor="revenue-date">
+                {language === 'ar' ? 'تاريخ الإيرادات' : 'Revenue date'}
+              </Label>
+              <Input
+                id="revenue-date"
+                type="date"
+                value={revenueDate}
+                onChange={(e) => setRevenueDate(e.target.value)}
+                className="w-full sm:w-[220px]"
+                data-testid="input-revenue-date"
+              />
+            </div>
+            <p className="text-sm text-muted-foreground pb-2">
+              {language === 'ar'
+                ? `إيرادات ${revenueDate} (توقيت بغداد)`
+                : `Revenue for ${revenueDate} (Baghdad time)`}
+            </p>
+          </div>
+        )}
+
+        {onlinePendingCount > 0 && !showArchived && (
+          <Alert className="mb-4 border-violet-300 bg-violet-50/60 dark:border-violet-800 dark:bg-violet-950/30">
+            <Globe className="h-4 w-4 text-violet-700 dark:text-violet-300" />
+            <AlertTitle>{t('repair.ticket.source.onlineAlertTitle')}</AlertTitle>
+            <AlertDescription>
+              {t('repair.ticket.source.onlineAlertDescription', { count: String(onlinePendingCount) })}
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-6' : 'grid-cols-2'}`}>
           {canViewRevenue && (
             <Card
@@ -534,7 +582,9 @@ export default function TechnicianDashboard() {
                     <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'إيراد اليوم' : 'Daily Revenue'}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {language === 'ar' ? 'إيراد التاريخ' : 'Date Revenue'}
+                    </p>
                     <p className="text-lg font-bold" data-testid="text-daily-revenue">
                       {language === 'ar'
                         ? `${stats.dailyRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
@@ -809,17 +859,30 @@ export default function TechnicianDashboard() {
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredTickets.map((ticket) => {
-              const isOnlineRequest = ticket.requestSource === 'online';
+              const isOnlineRequest = isOnlineRepairTicket(ticket);
               return (
               <Card
                 key={ticket.id}
-                className={`hover-elevate cursor-pointer ${isOnlineRequest ? 'border-violet-400/70 bg-violet-50/50 dark:bg-violet-950/25 ring-1 ring-violet-300/40 dark:ring-violet-700/40' : ''}`}
+                className={`hover-elevate cursor-pointer overflow-hidden ${
+                  isOnlineRequest
+                    ? 'border-2 border-violet-500 shadow-md shadow-violet-200/60 dark:shadow-violet-900/30 bg-violet-50/70 dark:bg-violet-950/35'
+                    : ''
+                }`}
                 role="button"
                 tabIndex={0}
                 onClick={() => { setSelectedTicketId(ticket.id); setDialogOpen(true); }}
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedTicketId(ticket.id); setDialogOpen(true); } }}
                 data-testid={`card-ticket-${ticket.id}`}
               >
+                {isOnlineRequest && (
+                  <div
+                    className="bg-violet-600 text-white text-xs font-semibold px-3 py-2 flex items-center gap-2"
+                    data-testid={`banner-online-${ticket.id}`}
+                  >
+                    <Globe className="h-3.5 w-3.5 shrink-0" />
+                    {t('repair.ticket.source.onlineBanner')}
+                  </div>
+                )}
                 <CardHeader>
                   <div className="flex justify-between items-start mb-2">
                     <CardTitle className="text-lg">{ticket.ticketNumber}</CardTitle>

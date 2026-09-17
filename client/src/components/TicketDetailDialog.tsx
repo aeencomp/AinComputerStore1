@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
+import { isOnlineRepairTicket } from '@/lib/repairTicketSource';
 import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt, MessageCircleOff, Globe } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
@@ -620,7 +621,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
             {ticket ? (
               <>
                 <span data-testid="text-dialog-ticket-number">{ticket.ticketNumber}</span>
-                {ticket.requestSource === 'online' && (
+                {isOnlineRepairTicket(ticket) && (
                   <Badge className="bg-violet-600 text-white border-violet-700 gap-1">
                     <Globe className="h-3 w-3" />
                     {t('repair.ticket.source.online')}
