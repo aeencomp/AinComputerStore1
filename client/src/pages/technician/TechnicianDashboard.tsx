@@ -61,8 +61,8 @@ export default function TechnicianDashboard() {
   const [showArchived, setShowArchived] = useState(false);
   const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
   const [customerLookup, setCustomerLookup] = useState('');
-  const [revenueFromDate, setRevenueFromDate] = useState(baghdadMonthStartKey);
-  const [revenueToDate, setRevenueToDate] = useState(baghdadTodayKey);
+  const [revenueFromDate, setRevenueFromDate] = useState(() => baghdadMonthStartKey());
+  const [revenueToDate, setRevenueToDate] = useState(() => baghdadTodayKey());
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
