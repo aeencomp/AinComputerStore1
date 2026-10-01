@@ -78,6 +78,7 @@ export interface IStorage {
   updateSalesUser(id: string, updates: Partial<InsertSalesUser>): Promise<SalesUser | undefined>;
   deleteSalesUser(id: string): Promise<void>;
   initializeDefaultSalesAdmin(): Promise<void>;
+  ensureSalesAdminLoginPassword(): Promise<void>;
   
   // Market price methods
   getMarketPrices(): Promise<MarketPrice[]>;
@@ -724,6 +725,10 @@ export class MemStorage implements IStorage {
   }
 
   async initializeDefaultSalesAdmin(): Promise<void> {
+    // MemStorage does not support sales users
+  }
+
+  async ensureSalesAdminLoginPassword(): Promise<void> {
     // MemStorage does not support sales users
   }
   

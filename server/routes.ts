@@ -805,6 +805,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await storage.initializeDefaultTechnician();
   await storage.initializeDefaultAdmin();
   await storage.initializeDefaultSalesAdmin();
+  await storage.ensureSalesAdminLoginPassword();
 
   // One-time hygiene: ensure there is at most one active shift per sales user per location.
   // This prevents duplicate actives from breaking reports/closing logic.
@@ -1329,7 +1330,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: "اسم المستخدم وكلمة المرور مطلوبان" });
       }
       
-      const salesUser = await storage.getSalesUserByUsername(username);
+      const salesUser = await storage.getSalesUserByUsername(String(username).trim());
       if (!salesUser) {
         return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
       }
@@ -1338,7 +1339,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "الحساب غير نشط" });
       }
       
-      const validPassword = await bcrypt.compare(password, salesUser.password);
+      let validPassword = await bcrypt.compare(password, salesUser.password);
+      if (!validPassword && salesUser.password === password) {
+        validPassword = true;
+        await storage.updateSalesUser(salesUser.id, { password });
+      }
       if (!validPassword) {
         return res.status(401).json({ error: "اسم المستخدم أو كلمة المرور غير صحيحة" });
       }

@@ -667,7 +667,13 @@ export class DrizzleStorage implements IStorage {
   }
 
   async getSalesUserByUsername(username: string): Promise<SalesUser | undefined> {
-    const result = await db.select().from(salesUsers).where(eq(salesUsers.username, username)).limit(1);
+    const normalized = String(username || "").trim().toLowerCase();
+    if (!normalized) return undefined;
+    const result = await db
+      .select()
+      .from(salesUsers)
+      .where(sql`lower(trim(${salesUsers.username})) = ${normalized}`)
+      .limit(1);
     return result[0];
   }
 
@@ -710,6 +716,74 @@ export class DrizzleStorage implements IStorage {
       }
     } catch (error) {
       console.error('Failed to initialize default sales admin:', error);
+    }
+  }
+
+  /** Ensures salesadmin (or primary sales_admin) can log in after deploy; idempotent via migration flag. */
+  async ensureSalesAdminLoginPassword(): Promise<void> {
+    const flagKey = "reset-salesadmin-password-2026-10-02-v2";
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS app_migration_flags (
+          key TEXT PRIMARY KEY,
+          applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )
+      `);
+
+      const envPassword = process.env.SALES_ADMIN_PASSWORD?.trim();
+      const forceEnv =
+        process.env.FORCE_RESET_SALESADMIN === "1" ||
+        process.env.FORCE_RESET_SALESADMIN === "true";
+
+      if (!forceEnv && !envPassword) {
+        const flagResult = await db.execute(sql`
+          SELECT 1 AS one FROM app_migration_flags WHERE key = ${flagKey} LIMIT 1
+        `);
+        if (flagResult.rows?.length) return;
+      }
+
+      let user = await this.getSalesUserByUsername("salesadmin");
+      if (!user) {
+        const [salesAdmin] = await db
+          .select()
+          .from(salesUsers)
+          .where(and(eq(salesUsers.role, "sales_admin"), eq(salesUsers.isActive, 1)))
+          .limit(1);
+        user = salesAdmin;
+      }
+      if (!user) {
+        await this.initializeDefaultSalesAdmin();
+        user = await this.getSalesUserByUsername("salesadmin");
+      }
+      if (!user) {
+        console.error("[sales-admin] no sales admin user found to reset password");
+        return;
+      }
+
+      const newPassword = envPassword || "sales123";
+      await this.updateSalesUser(user.id, { password: newPassword });
+
+      const refreshed = await this.getSalesUser(user.id);
+      const verified =
+        !!refreshed && (await bcrypt.compare(newPassword, refreshed.password));
+      if (!verified) {
+        console.error(`[sales-admin] password reset verification failed for "${user.username}"`);
+        return;
+      }
+
+      if (!forceEnv && !envPassword) {
+        await db.execute(sql`
+          INSERT INTO app_migration_flags (key) VALUES (${flagKey})
+          ON CONFLICT (key) DO NOTHING
+        `);
+      }
+
+      console.log(
+        `[sales-admin] login password updated for "${user.username}"` +
+          (envPassword ? " (from SALES_ADMIN_PASSWORD)" : " (default: sales123)"),
+      );
+    } catch (error) {
+      console.error("[sales-admin] ensureSalesAdminLoginPassword failed:", error);
     }
   }
 
