@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
-import { ArrowLeft, Trash2, Printer, Lock, Banknote, CreditCard, Split } from 'lucide-react';
+import { ArrowLeft, Trash2, Printer, Banknote, CreditCard, Split } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatPosPaymentLabel } from '@/lib/posPayment';
 import { repairReceiptTermsSectionHtml } from '@/lib/repairReceiptTerms';
@@ -113,10 +113,19 @@ export default function TicketDetail() {
 
   const cleanPrice = (v: string | null | undefined) => v ? String(parseFloat(v)) : '';
 
+  const resolveStatusField = (status: string, paymentStatus: string) => {
+    if (status === 'delivered') {
+      if (paymentStatus === 'deferred') return 'delivered-deferred';
+      if (paymentStatus === 'paid') return 'delivered-paid';
+      return 'delivered';
+    }
+    return status;
+  };
+
   const form = useForm<z.infer<typeof updateSchema>>({
     resolver: zodResolver(updateSchema),
     defaultValues: {
-      status: ticket?.status || 'pending',
+      status: ticket ? resolveStatusField(ticket.status, ticket.paymentStatus || 'unpaid') : 'pending',
       priority: ticket?.priority || 'normal',
       technicianNotes: ticket?.technicianNotes || '',
       estimatedCompletion: ticket?.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
@@ -133,7 +142,7 @@ export default function TicketDetail() {
     if (ticket) {
       prevStatusRef.current = ticket.priority;
       form.reset({
-        status: ticket.status,
+        status: resolveStatusField(ticket.status, ticket.paymentStatus || 'unpaid'),
         priority: ticket.priority,
         technicianNotes: ticket.technicianNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
@@ -147,14 +156,22 @@ export default function TicketDetail() {
     }
   }, [ticket, form]);
 
+  const watchedStatus = form.watch('status');
   const watchedPriority = form.watch('priority');
   const watchedPaymentStatus = form.watch('paymentStatus');
   const watchedPaymentMethod = form.watch('paymentMethod');
   const watchedFinalCost = form.watch('finalCost');
+  const watchedCostEstimate = form.watch('costEstimate');
   const watchedSplitCash = form.watch('cashPaidAmount');
   const watchedSplitCard = form.watch('cardPaidAmount');
 
-  const repairPayTotal = parseFloat(watchedFinalCost || '0') || 0;
+  const paymentMethodEnabled =
+    watchedPaymentStatus === 'paid' ||
+    watchedStatus === 'delivered-paid' ||
+    (watchedStatus === 'delivered' && watchedPaymentStatus === 'paid');
+
+  const repairPayTotal =
+    parseFloat(watchedFinalCost || watchedCostEstimate || '0') || 0;
   const splitPaidTotal =
     (parseFloat(watchedSplitCash || '0') || 0) + (parseFloat(watchedSplitCard || '0') || 0);
   const splitRemaining = repairPayTotal - splitPaidTotal;
@@ -225,10 +242,10 @@ export default function TicketDetail() {
         });
       }
     },
-    onError: () => {
+    onError: (err: Error) => {
       toast({
         title: t('common.error'),
-        description: t('repair.edit.errorMessage'),
+        description: err.message || t('repair.edit.errorMessage'),
         variant: 'destructive',
       });
     },
@@ -257,10 +274,21 @@ export default function TicketDetail() {
   });
 
   const onSubmit = (data: z.infer<typeof updateSchema>) => {
-    if (data.paymentMethod === 'split' && data.paymentStatus === 'paid') {
+    let status = data.status;
+    let paymentStatus = data.paymentStatus || 'unpaid';
+    if (data.status === 'delivered-paid') {
+      status = 'delivered';
+      paymentStatus = 'paid';
+    } else if (data.status === 'delivered-deferred') {
+      status = 'delivered';
+      paymentStatus = 'deferred';
+    }
+
+    if (data.paymentMethod === 'split' && paymentStatus === 'paid') {
       const cash = parseFloat(data.cashPaidAmount || '0') || 0;
       const card = parseFloat(data.cardPaidAmount || '0') || 0;
-      const amount = parseFloat(data.finalCost || '0') || 0;
+      const amount =
+        parseFloat(data.finalCost || data.costEstimate || '0') || 0;
       if (cash <= 0 || card <= 0) {
         toast({
           title: isRTL ? 'مبالغ الدفع' : 'Payment amounts',
@@ -288,7 +316,7 @@ export default function TicketDetail() {
         return;
       }
     }
-    updateMutation.mutate(data);
+    updateMutation.mutate({ ...data, status, paymentStatus });
   };
 
   useEffect(() => {
@@ -630,7 +658,14 @@ export default function TicketDetail() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>{t('repair.ticket.status')}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} >
+                        <Select
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            if (val === 'delivered-paid') form.setValue('paymentStatus', 'paid');
+                            else if (val === 'delivered-deferred') form.setValue('paymentStatus', 'deferred');
+                          }}
+                          value={field.value}
+                        >
                           <FormControl>
                             <SelectTrigger data-testid="select-status" >
                               <SelectValue />
@@ -642,6 +677,8 @@ export default function TicketDetail() {
                             <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                             <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                             <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
+                            <SelectItem value="delivered-paid">{isRTL ? 'مُسلَّم - مدفوع' : 'Delivered - Paid'}</SelectItem>
+                            <SelectItem value="delivered-deferred">{isRTL ? 'مُسلَّم - آجل' : 'Delivered - Deferred'}</SelectItem>
                             <SelectItem value="rejected">{t('repair.status.rejected')}</SelectItem>
                             <SelectItem value="unrepairable">{t('repair.status.unrepairable')}</SelectItem>
                           </SelectContent>
@@ -716,28 +753,30 @@ export default function TicketDetail() {
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="paymentStatus"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('repair.ticket.paymentStatus') || 'حالة الدفع'}</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} >
-                          <FormControl>
-                            <SelectTrigger data-testid="select-payment-status" >
-                              <SelectValue />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="unpaid">{t('repair.payment.unpaid') || 'غير مدفوع'}</SelectItem>
-                            <SelectItem value="paid">{t('repair.payment.paid') || 'مدفوع'}</SelectItem>
-                            <SelectItem value="deferred">{t('repair.payment.deferred') || 'أجل'}</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {!['delivered-paid', 'delivered-deferred'].includes(watchedStatus) && (
+                    <FormField
+                      control={form.control}
+                      name="paymentStatus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>{t('repair.ticket.paymentStatus') || 'حالة الدفع'}</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} >
+                            <FormControl>
+                              <SelectTrigger data-testid="select-payment-status" >
+                                <SelectValue />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="unpaid">{t('repair.payment.unpaid') || 'غير مدفوع'}</SelectItem>
+                              <SelectItem value="paid">{t('repair.payment.paid') || 'مدفوع'}</SelectItem>
+                              <SelectItem value="deferred">{t('repair.payment.deferred') || 'أجل'}</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                   <FormItem className="md:col-span-2">
                     <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
                     <div className="grid grid-cols-3 gap-2">
@@ -752,7 +791,7 @@ export default function TicketDetail() {
                           variant={watchedPaymentMethod === method.value ? 'default' : 'outline'}
                           size="sm"
                           className="h-auto py-2 flex-col gap-1"
-                          disabled={watchedPaymentStatus !== 'paid'}
+                          disabled={!paymentMethodEnabled}
                           onClick={() => selectRepairPaymentMethod(method.value)}
                           data-testid={`button-payment-${method.value}`}
                         >
@@ -761,12 +800,12 @@ export default function TicketDetail() {
                         </Button>
                       ))}
                     </div>
-                    {watchedPaymentStatus !== 'paid' && (
+                    {!paymentMethodEnabled && (
                       <p className="text-xs text-muted-foreground mt-1">
-                        {isRTL ? 'اختر "مدفوع" لتفعيل طريقة الدفع' : 'Set status to Paid to choose payment method'}
+                        {isRTL ? 'اختر "مدفوع" أو "مُسلَّم - مدفوع" لتفعيل طريقة الدفع' : 'Set Paid or Delivered - Paid to choose payment method'}
                       </p>
                     )}
-                    {watchedPaymentMethod === 'split' && watchedPaymentStatus === 'paid' && (
+                    {watchedPaymentMethod === 'split' && paymentMethodEnabled && (
                       <div className="grid grid-cols-2 gap-2 mt-2">
                         <FormField
                           control={form.control}

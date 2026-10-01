@@ -185,11 +185,16 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   const watchedStatus = form.watch('status');
   const watchedPaymentStatus = form.watch('paymentStatus');
   const watchedPaymentMethod = form.watch('paymentMethod');
-  const paymentMethodEnabled = watchedPaymentStatus === 'paid' || watchedStatus === 'delivered-paid';
+  const paymentMethodEnabled =
+    watchedPaymentStatus === 'paid' ||
+    watchedStatus === 'delivered-paid' ||
+    (watchedStatus === 'delivered' && watchedPaymentStatus === 'paid');
   const watchedFinalCost = form.watch('finalCost');
+  const watchedCostEstimate = form.watch('costEstimate');
   const watchedSplitCash = form.watch('cashPaidAmount');
   const watchedSplitCard = form.watch('cardPaidAmount');
-  const repairPayTotal = parseFloat(watchedFinalCost || '0') || 0;
+  const repairPayTotal =
+    parseFloat(watchedFinalCost || watchedCostEstimate || '0') || 0;
   const splitPaidTotal =
     (parseFloat(watchedSplitCash || '0') || 0) + (parseFloat(watchedSplitCard || '0') || 0);
   const splitRemaining = repairPayTotal - splitPaidTotal;
@@ -299,10 +304,10 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         });
       }
     },
-    onError: () => {
+    onError: (err: Error) => {
       toast({
         title: t('common.error'),
-        description: t('repair.edit.errorMessage'),
+        description: err.message || t('repair.edit.errorMessage'),
         variant: 'destructive',
       });
     },
@@ -366,7 +371,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     if (data.paymentMethod === 'split' && paymentStatus === 'paid') {
       const cash = parseFloat(data.cashPaidAmount || '0') || 0;
       const card = parseFloat(data.cardPaidAmount || '0') || 0;
-      const amount = parseFloat(data.finalCost || '0') || 0;
+      const amount =
+        parseFloat(data.finalCost || data.costEstimate || '0') || 0;
       if (cash <= 0 || card <= 0) {
         toast({
           title: isRTL ? 'مبالغ الدفع' : 'Payment amounts',
@@ -377,8 +383,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       }
       if (amount <= 0) {
         toast({
-          title: isRTL ? 'التكلفة النهائية' : 'Final cost',
-          description: isRTL ? 'أدخل التكلفة النهائية أولاً' : 'Enter final cost first',
+          title: isRTL ? 'التكلفة' : 'Cost',
+          description: isRTL ? 'أدخل التكلفة النهائية أو التقديرية' : 'Enter final or estimated cost',
           variant: 'destructive',
         });
         return;
