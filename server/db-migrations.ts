@@ -1,5 +1,24 @@
+import bcrypt from "bcrypt";
 import { pool } from "./db";
 import { seedSalesLocations, repairTransferInventoryDuplicates } from "./sales-locations";
+
+/** One-time password reset for salesadmin (runs once per flag key on deploy). */
+async function resetSalesAdminPasswordOnce(): Promise<void> {
+  const flagKey = "reset-salesadmin-password-2026-10-01";
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS app_migration_flags (
+      key TEXT PRIMARY KEY,
+      applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  const existing = await pool.query(`SELECT 1 FROM app_migration_flags WHERE key = $1 LIMIT 1`, [flagKey]);
+  if (existing.rowCount && existing.rowCount > 0) return;
+
+  const hash = await bcrypt.hash("sales123", 10);
+  await pool.query(`UPDATE sales_users SET password = $1 WHERE username = 'salesadmin'`, [hash]);
+  await pool.query(`INSERT INTO app_migration_flags (key) VALUES ($1)`, [flagKey]);
+  console.log("[db-migrations] reset salesadmin password (username: salesadmin, password: sales123)");
+}
 
 /** Idempotent SQL run on startup so deploy does not require manual ALTER TABLE. */
 const STARTUP_MIGRATIONS: string[] = [
@@ -213,6 +232,7 @@ export async function runDbMigrations(): Promise<void> {
     await pool.query(statement);
   }
   await seedSalesLocations();
+  await resetSalesAdminPasswordOnce();
   console.log(`[db-migrations] startup migrations applied in ${Date.now() - started}ms`);
 
   // Run heavy inventory repair in background so the server accepts requests immediately.

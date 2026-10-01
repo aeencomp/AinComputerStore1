@@ -10,7 +10,8 @@ import { useLanguage } from '@/contexts/LanguageContext';
 import { useToast } from '@/hooks/use-toast';
 import type { RepairTicket, RepairCustomer } from '@shared/schema';
 import { isOnlineRepairTicket } from '@/lib/repairTicketSource';
-import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt, MessageCircleOff, Globe } from 'lucide-react';
+import { Trash2, Printer, AlertTriangle, LayoutList, Pencil, X, Receipt, MessageCircleOff, Globe, Banknote, CreditCard, Split } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import JsBarcode from 'jsbarcode';
 import QRCode from 'qrcode';
 import { format } from 'date-fns';
@@ -104,6 +105,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     priority: z.string(),
     paymentStatus: z.string(),
     paymentMethod: z.string().optional(),
+    cashPaidAmount: z.string().optional(),
+    cardPaidAmount: z.string().optional(),
     technicianNotes: z.string().optional(),
     estimatedCompletion: z.string().optional(),
     costEstimate: z.string().optional(),
@@ -128,6 +131,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       priority: 'normal',
       paymentStatus: 'unpaid',
       paymentMethod: 'cash',
+      cashPaidAmount: '',
+      cardPaidAmount: '',
       technicianNotes: '',
       estimatedCompletion: '',
       costEstimate: '',
@@ -167,6 +172,8 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         priority: ticket.priority,
         paymentStatus: ticket.paymentStatus || 'unpaid',
         paymentMethod: (ticket as any).paymentMethod || 'cash',
+        cashPaidAmount: cleanPrice((ticket as any).cashPaidAmount),
+        cardPaidAmount: cleanPrice((ticket as any).cardPaidAmount),
         technicianNotes: ticket.technicianNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
         costEstimate: cleanPrice(ticket.costEstimate),
@@ -174,6 +181,33 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       });
     }
   }, [ticket, form]);
+
+  const watchedStatus = form.watch('status');
+  const watchedPaymentStatus = form.watch('paymentStatus');
+  const watchedPaymentMethod = form.watch('paymentMethod');
+  const paymentMethodEnabled = watchedPaymentStatus === 'paid' || watchedStatus === 'delivered-paid';
+  const watchedFinalCost = form.watch('finalCost');
+  const watchedSplitCash = form.watch('cashPaidAmount');
+  const watchedSplitCard = form.watch('cardPaidAmount');
+  const repairPayTotal = parseFloat(watchedFinalCost || '0') || 0;
+  const splitPaidTotal =
+    (parseFloat(watchedSplitCash || '0') || 0) + (parseFloat(watchedSplitCard || '0') || 0);
+  const splitRemaining = repairPayTotal - splitPaidTotal;
+
+  const selectRepairPaymentMethod = (value: string) => {
+    form.setValue('paymentMethod', value);
+    if (value === 'split') {
+      const cash = form.getValues('cashPaidAmount');
+      const card = form.getValues('cardPaidAmount');
+      if (!cash && !card) {
+        form.setValue('cashPaidAmount', String(Math.round(repairPayTotal)));
+        form.setValue('cardPaidAmount', '0');
+      }
+    } else {
+      form.setValue('cashPaidAmount', '');
+      form.setValue('cardPaidAmount', '');
+    }
+  };
 
   useEffect(() => {
     setBarcodeReady(false);
@@ -328,6 +362,37 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     } else if (data.status === 'delivered-deferred') {
       status = 'delivered';
       paymentStatus = 'deferred';
+    }
+    if (data.paymentMethod === 'split' && paymentStatus === 'paid') {
+      const cash = parseFloat(data.cashPaidAmount || '0') || 0;
+      const card = parseFloat(data.cardPaidAmount || '0') || 0;
+      const amount = parseFloat(data.finalCost || '0') || 0;
+      if (cash <= 0 || card <= 0) {
+        toast({
+          title: isRTL ? 'مبالغ الدفع' : 'Payment amounts',
+          description: isRTL ? 'أدخل مبلغ النقد ومبلغ البطاقة' : 'Enter both cash and card amounts',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (amount <= 0) {
+        toast({
+          title: isRTL ? 'التكلفة النهائية' : 'Final cost',
+          description: isRTL ? 'أدخل التكلفة النهائية أولاً' : 'Enter final cost first',
+          variant: 'destructive',
+        });
+        return;
+      }
+      if (Math.abs(cash + card - amount) > 0.5) {
+        toast({
+          title: isRTL ? 'مجموع غير صحيح' : 'Invalid total',
+          description: isRTL
+            ? 'مجموع النقد والبطاقة يجب أن يساوي التكلفة النهائية'
+            : 'Cash + card must equal final cost',
+          variant: 'destructive',
+        });
+        return;
+      }
     }
     updateMutation.mutate({ ...data, status, paymentStatus });
   };
@@ -1018,27 +1083,70 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                         )}
                       />
                     )}
-                    <FormField
-                      control={form.control}
-                      name="paymentMethod"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value || 'cash'}>
-                            <FormControl>
-                              <SelectTrigger data-testid="dialog-select-payment-method">
-                                <SelectValue />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="cash">{isRTL ? 'نقداً' : 'Cash'}</SelectItem>
-                              <SelectItem value="card">{isRTL ? 'بطاقة' : 'Card'}</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
+                    <FormItem className="sm:col-span-2">
+                      <FormLabel>{isRTL ? 'طريقة الدفع' : 'Payment Method'}</FormLabel>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { value: 'cash', label: isRTL ? 'نقداً' : 'Cash', icon: Banknote },
+                          { value: 'card', label: isRTL ? 'بطاقة' : 'Card', icon: CreditCard },
+                          { value: 'split', label: isRTL ? 'نقد+بطاقة' : 'Cash+Card', icon: Split },
+                        ].map((method) => (
+                          <Button
+                            key={method.value}
+                            type="button"
+                            variant={watchedPaymentMethod === method.value ? 'default' : 'outline'}
+                            size="sm"
+                            className="h-auto py-2 flex-col gap-1"
+                            disabled={!paymentMethodEnabled}
+                            onClick={() => selectRepairPaymentMethod(method.value)}
+                            data-testid={`dialog-button-payment-${method.value}`}
+                          >
+                            <method.icon className="h-4 w-4" />
+                            <span className="text-xs">{method.label}</span>
+                          </Button>
+                        ))}
+                      </div>
+                      {watchedPaymentMethod === 'split' && paymentMethodEnabled && (
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                          <FormField
+                            control={form.control}
+                            name="cashPaidAmount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">{isRTL ? 'مبلغ النقد' : 'Cash amount'}</FormLabel>
+                                <FormControl>
+                                  <Input type="number" min={0} {...field} data-testid="dialog-input-split-cash" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <FormField
+                            control={form.control}
+                            name="cardPaidAmount"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-xs">{isRTL ? 'مبلغ البطاقة' : 'Card amount'}</FormLabel>
+                                <FormControl>
+                                  <Input type="number" min={0} {...field} data-testid="dialog-input-split-card" />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+                          <p
+                            className={cn(
+                              'col-span-2 text-xs',
+                              Math.abs(splitRemaining) <= 0.5 ? 'text-green-600' : 'text-destructive',
+                            )}
+                          >
+                            {isRTL
+                              ? `المتبقي: ${Math.max(0, splitRemaining).toLocaleString('en-US')} د.ع (التكلفة ${repairPayTotal.toLocaleString('en-US')} د.ع)`
+                              : `Remaining: ${Math.max(0, splitRemaining).toLocaleString('en-US')} IQD (cost ${repairPayTotal.toLocaleString('en-US')} IQD)`}
+                          </p>
+                        </div>
                       )}
-                    />
+                    </FormItem>
                   </div>
 
                   <FormField

@@ -28,6 +28,7 @@ import {
   Clock,
 } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { baghdadMonthStartKey, baghdadTodayKey } from "@/lib/technicianRevenue";
 import { format } from "date-fns";
 
 interface Technician {
@@ -58,6 +59,8 @@ interface RepairSale {
 
 interface RepairReportResponse {
   date: string;
+  from?: string;
+  to?: string;
   repairSales: RepairSale[];
   withdrawals?: Array<{
     id: number;
@@ -75,6 +78,11 @@ interface RepairReportResponse {
     totalWithdrawals: number;
     withdrawalCount: number;
     netTotal: number;
+  };
+  previousPeriod?: {
+    from: string;
+    to: string;
+    summary: RepairReportResponse["summary"];
   };
 }
 
@@ -98,10 +106,6 @@ interface ShiftSnapshot {
     netTotal?: number;
   };
   withdrawals?: Array<{ id: number; amount: string; employeeName: string; reason: string | null }>;
-}
-
-function baghdadToday(): string {
-  return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
 function fmtNum(n: number) {
@@ -254,7 +258,8 @@ export default function TechnicianDailyReport() {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [selectedDate, setSelectedDate] = useState(baghdadToday());
+  const [reportFromDate, setReportFromDate] = useState(() => baghdadMonthStartKey());
+  const [reportToDate, setReportToDate] = useState(() => baghdadTodayKey());
   const [showShiftDialog, setShowShiftDialog] = useState(false);
   const [shiftAction, setShiftAction] = useState<"start" | "end">("start");
   const [openingCash, setOpeningCash] = useState("");
@@ -272,9 +277,10 @@ export default function TechnicianDailyReport() {
       (technician.permissions || []).includes("view_daily_report"));
 
   const { data: report, isLoading: reportLoading } = useQuery<RepairReportResponse>({
-    queryKey: ["/api/technician/repair-report", selectedDate],
+    queryKey: ["/api/technician/repair-report", reportFromDate, reportToDate],
     queryFn: async () => {
-      const res = await fetch(`/api/technician/repair-report?date=${selectedDate}`, {
+      const params = new URLSearchParams({ from: reportFromDate, to: reportToDate });
+      const res = await fetch(`/api/technician/repair-report?${params.toString()}`, {
         credentials: "include",
       });
       if (!res.ok) throw new Error("Failed to load repair report");
@@ -283,27 +289,11 @@ export default function TechnicianDailyReport() {
     enabled: canViewRepairReport,
   });
 
-  const { data: withdrawalsForDay = [] } = useQuery<NonNullable<RepairReportResponse["withdrawals"]>>({
-    queryKey: ["/api/technician/withdrawals", selectedDate],
-    queryFn: async () => {
-      const res = await fetch(`/api/technician/withdrawals?date=${selectedDate}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to load withdrawals");
-      return res.json();
-    },
-    enabled: canViewRepairReport,
-    staleTime: 0,
-  });
-
   const summary = report?.summary;
   const repairSales = report?.repairSales ?? [];
   const withdrawals = report?.withdrawals ?? [];
 
-  const effectiveWithdrawals = useMemo(() => {
-    if (withdrawals.length > 0) return withdrawals;
-    return withdrawalsForDay;
-  }, [withdrawals, withdrawalsForDay]);
+  const effectiveWithdrawals = withdrawals;
 
   const effectiveSummary = useMemo(() => {
     if (!summary) return undefined;
@@ -429,7 +419,9 @@ export default function TechnicianDailyReport() {
 
   const dateLabel = report?.date
     ? format(new Date(report.date), "dd/MM/yyyy")
-    : format(new Date(`${selectedDate}T12:00:00+03:00`), "dd/MM/yyyy");
+    : reportFromDate === reportToDate
+      ? format(new Date(`${reportFromDate}T12:00:00+03:00`), "dd/MM/yyyy")
+      : `${reportFromDate} → ${reportToDate}`;
 
   const handlePrint = () => {
     if (!effectiveSummary) return;
@@ -518,14 +510,54 @@ export default function TechnicianDailyReport() {
               {language === "ar" ? "مدفوعات التصليح فقط" : "Repair payments only"}
             </p>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="w-auto"
-              data-testid="input-repair-report-date"
-            />
+          <div className="flex flex-wrap items-end gap-2">
+            <div className="space-y-1">
+              <Label htmlFor="repair-report-from">{language === "ar" ? "من" : "From"}</Label>
+              <Input
+                id="repair-report-from"
+                type="date"
+                value={reportFromDate}
+                max={reportToDate}
+                onChange={(e) => setReportFromDate(e.target.value)}
+                className="w-auto"
+                data-testid="input-repair-report-from"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="repair-report-to">{language === "ar" ? "إلى" : "To"}</Label>
+              <Input
+                id="repair-report-to"
+                type="date"
+                value={reportToDate}
+                min={reportFromDate}
+                onChange={(e) => setReportToDate(e.target.value)}
+                className="w-auto"
+                data-testid="input-repair-report-to"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                const today = baghdadTodayKey();
+                setReportFromDate(today);
+                setReportToDate(today);
+              }}
+            >
+              {language === "ar" ? "اليوم" : "Today"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setReportFromDate(baghdadMonthStartKey());
+                setReportToDate(baghdadTodayKey());
+              }}
+            >
+              {language === "ar" ? "هذا الشهر" : "This month"}
+            </Button>
             <Button
               onClick={handlePrint}
               disabled={reportLoading || !report?.summary}
@@ -586,33 +618,50 @@ export default function TechnicianDailyReport() {
               </Card>
             </div>
 
-            {(effectiveSummary?.totalWithdrawals ?? 0) > 0 && (
-              <div className="grid grid-cols-2 gap-4">
-                <Card>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    {language === "ar"
+                      ? `السحوبات (${effectiveSummary?.withdrawalCount ?? 0})`
+                      : `Withdrawals (${effectiveSummary?.withdrawalCount ?? 0})`}
+                  </p>
+                  <p className="text-lg font-bold text-orange-600">
+                    − {fmtNum(effectiveSummary?.totalWithdrawals ?? 0)}
+                  </p>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="pt-4">
+                  <p className="text-xs text-muted-foreground">
+                    {language === "ar" ? "الصافي" : "Net"}
+                    <span className="block text-[10px]">
+                      {language === "ar" ? "بعد السحوبات" : "After withdrawals"}
+                    </span>
+                  </p>
+                  <p className="text-lg font-bold">{fmtNum(effectiveSummary?.netTotal ?? 0)}</p>
+                </CardContent>
+              </Card>
+              {report?.previousPeriod && (
+                <Card className="md:col-span-2 border-dashed">
                   <CardContent className="pt-4">
                     <p className="text-xs text-muted-foreground">
-                      {language === "ar"
-                        ? `السحوبات (${effectiveSummary?.withdrawalCount ?? 0})`
-                        : `Withdrawals (${effectiveSummary?.withdrawalCount ?? 0})`}
-                    </p>
-                    <p className="text-lg font-bold text-orange-600">
-                      − {fmtNum(effectiveSummary?.totalWithdrawals ?? 0)}
-                    </p>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground">
-                      {language === "ar" ? "الصافي" : "Net"}
-                      <span className="block text-[10px]">
-                        {language === "ar" ? "بعد السحوبات" : "After withdrawals"}
+                      {language === "ar" ? "الفترة السابقة (صافي)" : "Previous period (net)"}
+                      <span className="block text-[10px] font-mono">
+                        {report.previousPeriod.from} → {report.previousPeriod.to}
                       </span>
                     </p>
-                    <p className="text-lg font-bold">{fmtNum(effectiveSummary?.netTotal ?? 0)}</p>
+                    <p className="text-lg font-bold text-muted-foreground">
+                      {fmtNum(report.previousPeriod.summary.netTotal)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {language === "ar" ? "إجمالي قبل السحوبات:" : "Gross:"}{" "}
+                      {fmtNum(report.previousPeriod.summary.repairTotal)}
+                    </p>
                   </CardContent>
                 </Card>
-              </div>
-            )}
+              )}
+            </div>
 
             {((effectiveSummary?.totalWithdrawals ?? 0) > 0 || effectiveWithdrawals.length > 0) && (
               <Card>

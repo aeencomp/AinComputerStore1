@@ -1403,7 +1403,6 @@ body{width:50mm;height:25mm;display:flex;flex-direction:row;align-items:center;j
                     spellCheck={false}
                     placeholder={language === 'ar' ? 'في انتظار المسح...' : 'Waiting for scan...'}
                     className="text-lg font-mono h-12"
-                    autoComplete="off"
                     data-testid="input-scan-barcode"
                     disabled={unknownCodes.length > 0}
                   />

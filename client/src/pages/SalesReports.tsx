@@ -34,6 +34,7 @@ import {
   Edit3,
   Save,
   FileText,
+  UserRound,
 } from "lucide-react";
 import { openA4InvoicePrint, type A4InvoiceOrder } from "@/lib/a4InvoicePrint";
 import {
@@ -70,6 +71,13 @@ interface Order {
   createdAt: string;
   items: any[];
   notes?: string | null;
+  salespersonId?: string | null;
+}
+
+interface ReportSalesUser {
+  id: string;
+  username: string;
+  name?: string | null;
 }
 
 interface RepairTicket {
@@ -93,6 +101,7 @@ interface RepairTicket {
 interface SalesUser {
   id: string;
   name?: string;
+  username?: string;
   role?: string;
   permissions: {
     canViewReports: number;
@@ -154,6 +163,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const [orderTypeFilter, setOrderTypeFilter] = useState<'all' | 'online' | 'walk-in' | 'in-store'>('all');
   const [activeTab, setActiveTab] = useState<'sales' | 'cashflow'>('sales');
   const [salesSearchQuery, setSalesSearchQuery] = useState("");
+  const [selectedSalespersonId, setSelectedSalespersonId] = useState<string>("all");
+  const isSalesSupervisor = user.role === "sales_admin";
   const [cashflowMonth, setCashflowMonth] = useState(() => new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).slice(0, 7));
   const [cashflowFromDate, setCashflowFromDate] = useState("");
   const [cashflowToDate, setCashflowToDate] = useState("");
@@ -177,6 +188,33 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       return res.json();
     },
   });
+
+  const { data: reportSalesUsers = [] } = useQuery<ReportSalesUser[]>({
+    queryKey: ["/api/sales/report-users"],
+    queryFn: async () => {
+      const res = await fetch("/api/sales/report-users", { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load sales users");
+      return res.json();
+    },
+    enabled: !!user.permissions.canViewReports,
+  });
+
+  const salespersonFilter = isSalesSupervisor ? selectedSalespersonId : user.id;
+
+  const orderMatchesSalesperson = (order: Order) => {
+    if (!isSalesSupervisor) {
+      return order.salespersonId === user.id;
+    }
+    if (salespersonFilter === "all") return true;
+    if (salespersonFilter === "unassigned") return !order.salespersonId;
+    return order.salespersonId === salespersonFilter;
+  };
+
+  const salespersonLabel = (id: string | null | undefined) => {
+    if (!id) return language === "ar" ? "—" : "—";
+    const match = reportSalesUsers.find((u) => u.id === id);
+    return match?.name || match?.username || id.slice(0, 8);
+  };
 
   useEffect(() => {
     if (!user.permissions.canViewReports) return;
@@ -224,7 +262,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const { data: salesPeriodCashflow } = useQuery<MonthlyCashflowResponse>({
     queryKey: ["/api/instore/monthly-cashflow", "sales-period", salesRange.from, salesRange.to, salesLocationId],
     queryFn: () => fetchCashflowForRange(salesRange.from, salesRange.to),
-    enabled: user.permissions.canViewReports && activeTab === "sales",
+    enabled: !!user.permissions.canViewReports && activeTab === "sales",
   });
 
   const { data: salesPreviousCashflow } = useQuery<MonthlyCashflowResponse>({
@@ -236,7 +274,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       salesLocationId,
     ],
     queryFn: () => fetchCashflowForRange(salesPreviousRange.from, salesPreviousRange.to),
-    enabled: user.permissions.canViewReports && activeTab === "sales",
+    enabled: !!user.permissions.canViewReports && activeTab === "sales",
   });
 
   const { data: monthlyCashflow, isLoading: cashflowLoading } = useQuery<MonthlyCashflowResponse>({
@@ -441,6 +479,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       const phone = (order.customerPhone || "").toLowerCase();
       if (!orderNo.includes(q) && !customer.includes(q) && !phone.includes(q)) return false;
     }
+
+    if (!orderMatchesSalesperson(order)) return false;
     
     return true;
   });
@@ -454,7 +494,10 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const inStoreOrders = activeOrders.filter(o => o.orderType === 'in-store').length;
   const onlineOrders = activeOrders.filter(o => o.orderType === 'online').length;
 
-  const filteredRepairTickets = salesLocationId === 1 ? allRepairTickets.filter(t => {
+  const includeRepairInSalesTotals =
+    isSalesSupervisor && (salespersonFilter === "all" || salespersonFilter === "unassigned");
+
+  const filteredRepairTickets = salesLocationId === 1 && includeRepairInSalesTotals ? allRepairTickets.filter(t => {
     if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
     const ticketDate = repairTicketSalesAt(t as RepairTicket);
     if (!ticketDate) return false;
@@ -478,12 +521,13 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
 
   const prevFilteredOrders = orders.filter((order) => {
     const day = baghdadDayFromIso(order.createdAt);
-    return dayInBaghdadRange(day, salesPreviousRange.from, salesPreviousRange.to);
+    if (!dayInBaghdadRange(day, salesPreviousRange.from, salesPreviousRange.to)) return false;
+    return orderMatchesSalesperson(order);
   });
   const prevActiveOrders = prevFilteredOrders.filter((order) => orderIncludedInSalesReport(order));
   const prevOrderRevenue = prevActiveOrders.reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
   const prevRepairTickets =
-    salesLocationId === 1
+    salesLocationId === 1 && includeRepairInSalesTotals
       ? allRepairTickets.filter((t) => {
           if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
           const ticketDate = repairTicketSalesAt(t as RepairTicket);
@@ -902,6 +946,23 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                   <SelectItem value="online">{language === 'ar' ? 'أونلاين' : 'Online'}</SelectItem>
                 </SelectContent>
               </Select>
+              {isSalesSupervisor && (
+                <Select value={selectedSalespersonId} onValueChange={setSelectedSalespersonId}>
+                  <SelectTrigger className="w-52" data-testid="select-salesperson">
+                    <UserRound className="h-4 w-4 me-2" />
+                    <SelectValue placeholder={language === "ar" ? "موظف المبيعات" : "Sales employee"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">{language === "ar" ? "كل الموظفين" : "All employees"}</SelectItem>
+                    <SelectItem value="unassigned">{language === "ar" ? "بدون موظف" : "Unassigned"}</SelectItem>
+                    {reportSalesUsers.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.username}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Input
                 className="w-72"
                 placeholder={language === 'ar' ? 'ابحث بالعميل / الهاتف / رقم الوصل...' : 'Search by customer / phone / receipt #...'}
@@ -1214,6 +1275,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                   <tr className="border-b">
                     <th className="text-start p-3">{language === 'ar' ? 'رقم الطلب' : 'Order #'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'العميل' : 'Customer'}</th>
+                    {isSalesSupervisor && salespersonFilter === "all" && (
+                      <th className="text-start p-3">{language === "ar" ? "الموظف" : "Employee"}</th>
+                    )}
                     <th className="text-start p-3">{language === 'ar' ? 'النوع' : 'Type'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'الحالة' : 'Status'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'الدفع' : 'Payment'}</th>
@@ -1227,6 +1291,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                     <tr key={order.id} className="border-b hover:bg-muted/50">
                       <td className="p-3 font-mono">{order.orderNumber}</td>
                       <td className="p-3">{order.customerName}</td>
+                      {isSalesSupervisor && salespersonFilter === "all" && (
+                        <td className="p-3 text-muted-foreground">{salespersonLabel(order.salespersonId)}</td>
+                      )}
                       <td className="p-3">
                         {order.orderType === 'in-store' ? (
                           <Badge className="bg-violet-500/15 text-violet-700 border-violet-300">

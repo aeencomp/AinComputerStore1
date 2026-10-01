@@ -1087,10 +1087,6 @@ export default function TechnicianDashboard() {
                       onValueChange={(val) => {
                         statusUpdateMutation.mutate({ id: ticket.id, status: val });
                       }}
-                      disabled={
-                        ticket.status === 'delivered' &&
-                        (ticket.paymentStatus === 'paid' || ticket.paymentStatus === 'deferred')
-                      }
                     >
                       <SelectTrigger
                         className="w-full"

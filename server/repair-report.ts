@@ -17,8 +17,13 @@ import {
   sqlBaghdadRepairEndBound,
   sqlCashWithdrawalOnBaghdadDate,
 } from "./daily-revenue-report";
-import { WITHDRAWAL_SOURCE_TECHNICIAN } from "@shared/schema";
+import { WITHDRAWAL_SOURCE_TECHNICIAN, type CashWithdrawal, type RepairTicket } from "@shared/schema";
 import { technicianShiftOwnerId } from "./technician-shift";
+import {
+  enumerateBaghdadDays,
+  normalizeBaghdadDateRange,
+  previousBaghdadPeriod,
+} from "@shared/baghdadDateRange";
 
 export type RepairReportSummary = {
   repairCount: number;
@@ -142,5 +147,81 @@ export async function computeRepairReport(
       withdrawalCount: dailyWithdrawals.length,
       netTotal: repairTotal - totalWithdrawals,
     } satisfies RepairReportSummary,
+  };
+}
+
+function mergeRepairReportSummaries(summaries: RepairReportSummary[]): RepairReportSummary {
+  return summaries.reduce(
+    (acc, s) => ({
+      repairCount: acc.repairCount + s.repairCount,
+      repairTotal: acc.repairTotal + s.repairTotal,
+      repairTotalDeferred: acc.repairTotalDeferred + s.repairTotalDeferred,
+      repairTotalCash: acc.repairTotalCash + s.repairTotalCash,
+      repairTotalCard: acc.repairTotalCard + s.repairTotalCard,
+      totalWithdrawals: acc.totalWithdrawals + s.totalWithdrawals,
+      withdrawalCount: acc.withdrawalCount + s.withdrawalCount,
+      netTotal: 0,
+    }),
+    {
+      repairCount: 0,
+      repairTotal: 0,
+      repairTotalDeferred: 0,
+      repairTotalCash: 0,
+      repairTotalCard: 0,
+      totalWithdrawals: 0,
+      withdrawalCount: 0,
+      netTotal: 0,
+    },
+  );
+}
+
+/** Aggregate repair report across Baghdad calendar days (inclusive). */
+export async function computeRepairReportRange(
+  fromStr: string,
+  toStr: string,
+  options?: RepairReportOptions,
+) {
+  const { from, to } = normalizeBaghdadDateRange(fromStr, toStr);
+  const days = enumerateBaghdadDays(from, to);
+
+  const repairSalesById = new Map<string, RepairTicket>();
+  const withdrawalsById = new Map<number, CashWithdrawal>();
+
+  const summaries: RepairReportSummary[] = [];
+
+  for (const day of days) {
+    const dayReport = await computeRepairReport(day, options);
+    for (const t of dayReport.repairSales) {
+      repairSalesById.set(t.id, t);
+    }
+    for (const w of dayReport.withdrawals) {
+      withdrawalsById.set(w.id, w);
+    }
+    summaries.push(dayReport.summary);
+  }
+  const summary = mergeRepairReportSummaries(summaries);
+  summary.netTotal = summary.repairTotal - summary.totalWithdrawals;
+
+  const prev = previousBaghdadPeriod(from, to);
+  const prevDays = enumerateBaghdadDays(prev.from, prev.to);
+  const prevSummaries: RepairReportSummary[] = [];
+  for (const day of prevDays) {
+    prevSummaries.push((await computeRepairReport(day, options)).summary);
+  }
+  const previousSummary = mergeRepairReportSummaries(prevSummaries);
+  previousSummary.netTotal = previousSummary.repairTotal - previousSummary.totalWithdrawals;
+
+  return {
+    from,
+    to,
+    date: new Date(`${from}T00:00:00+03:00`).toISOString(),
+    repairSales: Array.from(repairSalesById.values()),
+    withdrawals: Array.from(withdrawalsById.values()),
+    summary,
+    previousPeriod: {
+      from: prev.from,
+      to: prev.to,
+      summary: previousSummary,
+    },
   };
 }

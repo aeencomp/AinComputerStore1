@@ -39,7 +39,8 @@ import {
   type CustomerExportFormat,
   type CustomerExportSource,
 } from "./customer-export";
-import { computeRepairReport } from "./repair-report";
+import { computeRepairReport, computeRepairReportRange } from "./repair-report";
+import { computeTechnicianPeriodRevenueSummary } from "./technician-period-revenue";
 import {
   findTechnicianRepairShift,
   startTechnicianRepairShift,
@@ -1720,6 +1721,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error resolving POS scan:", error);
       return res.status(500).json({ error: "فشل البحث عن المنتج" });
+    }
+  });
+
+  // Minimal sales user list for report filters (canViewReports or canManageUsers).
+  app.get("/api/sales/report-users", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser?.canViewReports && !currentUser?.canManageUsers) {
+        return res.status(403).json({ error: "ليس لديك صلاحية عرض التقارير" });
+      }
+
+      const isSupervisor = currentUser.role === "sales_admin";
+      if (!isSupervisor) {
+        return res.json([
+          { id: currentUser.id, username: currentUser.username, name: currentUser.name },
+        ]);
+      }
+
+      const users = await storage.getSalesUsers();
+      const active = users.filter((u) => u.isActive === 1 && !String(u.id).startsWith("tech:"));
+      return res.json(
+        active.map((u) => ({ id: u.id, username: u.username, name: u.name })),
+      );
+    } catch (error) {
+      console.error("Error fetching report users:", error);
+      return res.status(500).json({ error: "فشل جلب المستخدمين" });
     }
   });
 
@@ -5367,17 +5399,51 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
 
+      const fromParam = req.query.from as string | undefined;
+      const toParam = req.query.to as string | undefined;
       const dateParam = req.query.date as string | undefined;
       const baghdadDateStr =
         dateParam || new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 
       const technicianId = (req.session as any)?.technicianId as string | undefined;
-      const report = await computeRepairReport(baghdadDateStr, { technicianId });
+      const report =
+        fromParam && toParam
+          ? await computeRepairReportRange(fromParam, toParam, { technicianId })
+          : await computeRepairReportRange(baghdadDateStr, baghdadDateStr, { technicianId });
       res.set("Cache-Control", "no-store");
       return res.json(report);
     } catch (error) {
       console.error("Error fetching technician repair report:", error);
       return res.status(500).json({ error: "فشل جلب تقرير الصيانة" });
+    }
+  });
+
+  app.get("/api/technician/period-revenue-summary", async (req, res) => {
+    try {
+      const technicianId = (req.session as any)?.technicianId as string | undefined;
+      if (!technicianId) return res.status(401).json({ error: "غير مصرح" });
+      const technician = await storage.getTechnician(technicianId);
+      if (!technician || technician.isActive !== 1) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+      const perms = Array.isArray(technician.permissions) ? (technician.permissions as string[]) : [];
+      const canView =
+        technician.isAdmin === 1 || perms.includes("view_revenue") || perms.includes("view_daily_report");
+      if (!canView) return res.status(401).json({ error: "غير مصرح" });
+
+      const fromParam = req.query.from as string | undefined;
+      const toParam = req.query.to as string | undefined;
+      const tickets = await storage.getRepairTickets();
+      const summary = await computeTechnicianPeriodRevenueSummary(
+        tickets,
+        fromParam || "",
+        toParam || "",
+      );
+      res.set("Cache-Control", "no-store");
+      return res.json(summary);
+    } catch (error) {
+      console.error("Error fetching technician period revenue summary:", error);
+      return res.status(500).json({ error: "فشل جلب ملخص الإيرادات" });
     }
   });
 
