@@ -44,6 +44,8 @@ import {
   normalizeBaghdadDateRange,
   previousBaghdadPeriod,
 } from "@shared/baghdadDateRange";
+import { resolveOrderSalesOwner } from "@shared/salesOrderAttribution";
+import type { SalesShift } from "@shared/schema";
 
 function baghdadDayFromIso(iso: string | Date): string {
   return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
@@ -201,21 +203,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
 
   const salespersonFilter = isSalesSupervisor ? selectedSalespersonId : user.id;
 
-  const orderMatchesSalesperson = (order: Order) => {
-    if (!isSalesSupervisor) {
-      return order.salespersonId === user.id;
-    }
-    if (salespersonFilter === "all") return true;
-    if (salespersonFilter === "unassigned") return !order.salespersonId;
-    return order.salespersonId === salespersonFilter;
-  };
-
-  const salespersonLabel = (id: string | null | undefined) => {
-    if (!id) return language === "ar" ? "—" : "—";
-    const match = reportSalesUsers.find((u) => u.id === id);
-    return match?.name || match?.username || id.slice(0, 8);
-  };
-
   useEffect(() => {
     if (!user.permissions.canViewReports) return;
     const today = baghdadDateKey();
@@ -251,6 +238,70 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     () => previousBaghdadPeriod(salesRange.from, salesRange.to),
     [salesRange.from, salesRange.to],
   );
+
+  const { data: salesShifts = [] } = useQuery<SalesShift[]>({
+    queryKey: ["/api/sales/shifts", salesLocationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/sales/shifts?locationId=${salesLocationId}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to load shifts");
+      return res.json();
+    },
+    enabled: !!user.permissions.canViewReports,
+  });
+
+  const knownSalesUserIds = useMemo(
+    () => new Set(reportSalesUsers.map((u) => u.id)),
+    [reportSalesUsers],
+  );
+
+  const shiftsInPeriod = useMemo(() => {
+    const fromMs = new Date(`${salesRange.from}T00:00:00+03:00`).getTime();
+    const toMs = new Date(`${salesRange.to}T23:59:59.999+03:00`).getTime();
+    return salesShifts.filter((s) => {
+      const loc = s.salesLocationId ?? 1;
+      if (loc !== salesLocationId) return false;
+      const start = new Date(s.startTime).getTime();
+      const end = s.endTime ? new Date(s.endTime).getTime() : Date.now();
+      return end >= fromMs && start <= toMs;
+    });
+  }, [salesShifts, salesRange.from, salesRange.to, salesLocationId]);
+
+  const resolveOrderOwner = (order: Order) =>
+    resolveOrderSalesOwner(order, shiftsInPeriod, knownSalesUserIds);
+
+  const orderMatchesSalesperson = (order: Order) => {
+    const owner = resolveOrderOwner(order);
+    if (!isSalesSupervisor) {
+      return owner === user.id;
+    }
+    if (salespersonFilter === "all") return true;
+    if (salespersonFilter === "unassigned") return !owner;
+    return owner === salespersonFilter;
+  };
+
+  const salespersonLabel = (id: string | null | undefined) => {
+    if (!id) return language === "ar" ? "غير محدد" : "Unassigned";
+    const match = reportSalesUsers.find((u) => u.id === id);
+    return match?.name || match?.username || id.slice(0, 8);
+  };
+
+  const revenueByUser = useMemo(() => {
+    const totals = new Map<string, { revenue: number; count: number }>();
+    for (const order of orders) {
+      const day = baghdadDayFromIso(order.createdAt);
+      if (!dayInBaghdadRange(day, salesRange.from, salesRange.to)) continue;
+      if (!orderIncludedInSalesReport(order)) continue;
+      const orderType = order.orderType || "online";
+      if (orderType === "online") continue;
+      const owner = resolveOrderSalesOwner(order, shiftsInPeriod, knownSalesUserIds);
+      if (!owner) continue;
+      const prev = totals.get(owner) ?? { revenue: 0, count: 0 };
+      prev.revenue += parseFloat(order.total || "0");
+      prev.count += 1;
+      totals.set(owner, prev);
+    }
+    return totals;
+  }, [orders, salesRange.from, salesRange.to, shiftsInPeriod, knownSalesUserIds]);
 
   const fetchCashflowForRange = async (from: string, to: string) => {
     const params = new URLSearchParams({ from, to, locationId: String(salesLocationId) });
@@ -516,7 +567,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
   const repairTotal = repairTotalCash + repairTotalCard;
   const combinedGross = totalRevenue + repairTotal;
-  const periodWithdrawals = salesPeriodCashflow?.totals.withdrawalsTotal ?? 0;
+  const storeWideWithdrawals = salesPeriodCashflow?.totals.withdrawalsTotal ?? 0;
+  const periodWithdrawals =
+    isSalesSupervisor && salespersonFilter !== "all" ? 0 : storeWideWithdrawals;
   const netAfterWithdrawals = combinedGross - periodWithdrawals;
 
   const prevFilteredOrders = orders.filter((order) => {
@@ -540,7 +593,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     .filter((t) => t.paymentStatus !== "deferred")
     .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
   const prevCombinedGross = prevOrderRevenue + prevRepairGross;
-  const prevWithdrawals = salesPreviousCashflow?.totals.withdrawalsTotal ?? 0;
+  const prevStoreWithdrawals = salesPreviousCashflow?.totals.withdrawalsTotal ?? 0;
+  const prevWithdrawals =
+    isSalesSupervisor && salespersonFilter !== "all" ? 0 : prevStoreWithdrawals;
   const prevNetAfterWithdrawals = prevCombinedGross - prevWithdrawals;
 
   const formatPrice = (price: number) => {
@@ -1116,6 +1171,11 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
             <p className="text-xl font-bold text-orange-600" data-testid="text-sales-period-withdrawals">
               − {formatPrice(periodWithdrawals)} IQD
             </p>
+            {isSalesSupervisor && salespersonFilter !== "all" && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {language === "ar" ? "السحوبات للمتجر كاملاً — لا تُخصم عند اختيار موظف" : "Store-wide withdrawals — not split per employee"}
+              </p>
+            )}
           </CardContent>
         </Card>
         <Card>
@@ -1143,6 +1203,48 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
         </Card>
       </div>
 
+      {isSalesSupervisor && salespersonFilter === "all" && reportSalesUsers.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <UserRound className="h-4 w-4" />
+              {language === "ar" ? "إيراد كل موظف (كاونتر / متجر)" : "Revenue per employee (POS / in-store)"}
+            </CardTitle>
+            <p className="text-xs text-muted-foreground font-mono">
+              {salesRange.from === salesRange.to ? salesRange.from : `${salesRange.from} → ${salesRange.to}`}
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-muted-foreground">
+                    <th className="text-start p-2">{language === "ar" ? "الموظف" : "Employee"}</th>
+                    <th className="text-end p-2">{language === "ar" ? "عدد الفواتير" : "Invoices"}</th>
+                    <th className="text-end p-2">{language === "ar" ? "الإيراد" : "Revenue"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reportSalesUsers
+                    .map((u) => ({
+                      user: u,
+                      stats: revenueByUser.get(u.id) ?? { revenue: 0, count: 0 },
+                    }))
+                    .sort((a, b) => b.stats.revenue - a.stats.revenue)
+                    .map(({ user: u, stats }) => (
+                      <tr key={u.id} className="border-b last:border-0">
+                        <td className="p-2">{u.name || u.username}</td>
+                        <td className="p-2 text-end tabular-nums">{stats.count}</td>
+                        <td className="p-2 text-end font-semibold tabular-nums">{formatPrice(stats.revenue)} IQD</td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -1152,7 +1254,13 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
               </div>
               <div>
                 <p className="text-sm text-muted-foreground">
-                  {language === 'ar' ? 'إيراد المبيعات' : 'Sales Revenue'}
+                  {language === "ar"
+                    ? salespersonFilter === "all"
+                      ? "إيراد المبيعات"
+                      : "إيراد الموظف المحدد"
+                    : salespersonFilter === "all"
+                      ? "Sales Revenue"
+                      : "Selected employee revenue"}
                 </p>
                 <p className="text-xl font-bold">{formatPrice(totalRevenue)} IQD</p>
               </div>
@@ -1292,7 +1400,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                       <td className="p-3 font-mono">{order.orderNumber}</td>
                       <td className="p-3">{order.customerName}</td>
                       {isSalesSupervisor && salespersonFilter === "all" && (
-                        <td className="p-3 text-muted-foreground">{salespersonLabel(order.salespersonId)}</td>
+                        <td className="p-3 text-muted-foreground">{salespersonLabel(resolveOrderOwner(order))}</td>
                       )}
                       <td className="p-3">
                         {order.orderType === 'in-store' ? (

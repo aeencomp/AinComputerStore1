@@ -949,12 +949,21 @@ export default function DailyReport({ user, salesLocationId = 1 }: DailyReportPr
       ? new Date(baseData.shift.startTime).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" })
       : baghdadToday;
 
+    // Never replace a specific employee shift with store-wide daily totals.
+    if (selectedShiftId) {
+      return stripRepairsFromInStoreReport(baseData);
+    }
+
+    if (activeSnapshot) {
+      return stripRepairsFromInStoreReport(baseData);
+    }
+
     if (reportBaghdadDay !== baghdadToday) {
       return stripRepairsFromInStoreReport(baseData);
     }
 
     return mergeTodayDailyReport(baseData, dailyReportApi);
-  }, [baseData, dailyReportApi, baghdadToday]);
+  }, [baseData, dailyReportApi, baghdadToday, selectedShiftId, activeSnapshot]);
 
   const reportBaghdadDay = useMemo(() => {
     if (data?.shift?.startTime) {
