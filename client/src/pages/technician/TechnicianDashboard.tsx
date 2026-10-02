@@ -20,6 +20,8 @@ import TicketDetailDialog from '@/components/TicketDetailDialog';
 import { baghdadMonthStartKey, baghdadTodayKey, computeTechnicianRevenueStats } from '@/lib/technicianRevenue';
 import { isOnlineRepairTicket } from '@/lib/repairTicketSource';
 import { IntercomWidget } from '@/components/IntercomWidget';
+import { cn } from '@/lib/utils';
+import type { ReactNode } from 'react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,6 +48,65 @@ interface RepairReminderResponse {
   completedNotPickedDueCount: number;
   pendingDueIds: string[];
   completedNotPickedDueIds: string[];
+}
+
+function DashboardStatCard({
+  label,
+  value,
+  icon,
+  iconWrapClassName,
+  valueClassName,
+  subLabel,
+  className,
+  onClick,
+  testId,
+  valueTestId,
+}: {
+  label: string;
+  value: ReactNode;
+  icon: ReactNode;
+  iconWrapClassName?: string;
+  valueClassName?: string;
+  subLabel?: string;
+  className?: string;
+  onClick?: () => void;
+  testId?: string;
+  valueTestId?: string;
+}) {
+  return (
+    <Card
+      className={cn(
+        'border-border/70 shadow-sm overflow-hidden transition-all',
+        onClick && 'cursor-pointer hover:shadow-md hover:border-primary/35',
+        className,
+      )}
+      onClick={onClick}
+      data-testid={testId}
+    >
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <p className="text-[13px] font-medium text-muted-foreground leading-snug">{label}</p>
+          <div
+            className={cn(
+              'h-10 w-10 rounded-xl flex items-center justify-center shrink-0',
+              iconWrapClassName,
+            )}
+          >
+            {icon}
+          </div>
+        </div>
+        {subLabel ? (
+          <p className="text-[11px] font-mono text-muted-foreground mb-1.5">{subLabel}</p>
+        ) : null}
+        <p
+          className={cn('text-2xl font-semibold tabular-nums tracking-tight', valueClassName)}
+          data-testid={valueTestId}
+        >
+          {value}
+        </p>
+      </CardContent>
+    </Card>
+  );
 }
 
 export default function TechnicianDashboard() {
@@ -317,6 +378,15 @@ export default function TechnicianDashboard() {
     ? revenueFromDate
     : `${revenueFromDate} → ${revenueToDate}`;
 
+  const formatIqd = (amount: number) =>
+    language === 'ar'
+      ? `${amount.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
+      : `${amount.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`;
+
+  const periodGross = periodSummary?.periodRevenue ?? stats.periodRevenue;
+  const periodWithdrawals = periodSummary?.totalWithdrawals ?? 0;
+  const periodNet = periodSummary?.netTotal ?? stats.periodRevenue;
+
   const onlinePendingCount = useMemo(() => {
     if (!tickets) return 0;
     return tickets.filter(
@@ -550,68 +620,135 @@ export default function TechnicianDashboard() {
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {canViewRevenue && (
-          <div className="mb-4 flex flex-col lg:flex-row lg:items-end gap-3 flex-wrap">
-            <div className="space-y-1">
-              <Label htmlFor="revenue-from-date">
-                {language === 'ar' ? 'من تاريخ' : 'From'}
-              </Label>
-              <Input
-                id="revenue-from-date"
-                type="date"
-                value={revenueFromDate}
-                max={revenueToDate}
-                onChange={(e) => setRevenueFromDate(e.target.value)}
-                className="w-full sm:w-[180px]"
-                data-testid="input-revenue-from-date"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="revenue-to-date">
-                {language === 'ar' ? 'إلى تاريخ' : 'To'}
-              </Label>
-              <Input
-                id="revenue-to-date"
-                type="date"
-                value={revenueToDate}
-                min={revenueFromDate}
-                onChange={(e) => setRevenueToDate(e.target.value)}
-                className="w-full sm:w-[180px]"
-                data-testid="input-revenue-to-date"
-              />
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mb-0.5"
-              onClick={() => {
-                const today = baghdadTodayKey();
-                setRevenueFromDate(today);
-                setRevenueToDate(today);
-              }}
-              data-testid="button-revenue-today"
-            >
-              {language === 'ar' ? 'اليوم' : 'Today'}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="mb-0.5"
-              onClick={() => {
-                setRevenueFromDate(baghdadMonthStartKey());
-                setRevenueToDate(baghdadTodayKey());
-              }}
-              data-testid="button-revenue-this-month"
-            >
-              {language === 'ar' ? 'هذا الشهر' : 'This month'}
-            </Button>
-            <p className="text-sm text-muted-foreground pb-2 lg:pb-0">
-              {language === 'ar'
-                ? `إيرادات الفترة: ${revenueRangeLabel} (توقيت بغداد)`
-                : `Period revenue: ${revenueRangeLabel} (Baghdad time)`}
-            </p>
-          </div>
+          <Card className="mb-6 border-border/70 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base font-semibold flex items-center gap-2">
+                <BarChart3 className="h-4 w-4 text-primary" />
+                {language === 'ar' ? 'ملخص الإيرادات' : 'Revenue overview'}
+              </CardTitle>
+              <CardDescription>
+                {language === 'ar'
+                  ? `الفترة: ${revenueRangeLabel} — توقيت بغداد`
+                  : `Period: ${revenueRangeLabel} — Baghdad time`}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6 pt-0">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
+                <div className="space-y-1.5 flex-1 min-w-[140px]">
+                  <Label htmlFor="revenue-from-date">{language === 'ar' ? 'من تاريخ' : 'From'}</Label>
+                  <Input
+                    id="revenue-from-date"
+                    type="date"
+                    value={revenueFromDate}
+                    max={revenueToDate}
+                    onChange={(e) => setRevenueFromDate(e.target.value)}
+                    data-testid="input-revenue-from-date"
+                  />
+                </div>
+                <div className="space-y-1.5 flex-1 min-w-[140px]">
+                  <Label htmlFor="revenue-to-date">{language === 'ar' ? 'إلى تاريخ' : 'To'}</Label>
+                  <Input
+                    id="revenue-to-date"
+                    type="date"
+                    value={revenueToDate}
+                    min={revenueFromDate}
+                    onChange={(e) => setRevenueToDate(e.target.value)}
+                    data-testid="input-revenue-to-date"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      const today = baghdadTodayKey();
+                      setRevenueFromDate(today);
+                      setRevenueToDate(today);
+                    }}
+                    data-testid="button-revenue-today"
+                  >
+                    {language === 'ar' ? 'اليوم' : 'Today'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => {
+                      setRevenueFromDate(baghdadMonthStartKey());
+                      setRevenueToDate(baghdadTodayKey());
+                    }}
+                    data-testid="button-revenue-this-month"
+                  >
+                    {language === 'ar' ? 'هذا الشهر' : 'This month'}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+                <DashboardStatCard
+                  testId="card-period-revenue"
+                  valueTestId="text-period-revenue"
+                  label={language === 'ar' ? 'إيراد الفترة (قبل السحب)' : 'Period gross (before withdrawals)'}
+                  value={formatIqd(periodGross)}
+                  icon={<Banknote className="h-5 w-5 text-green-600 dark:text-green-400" />}
+                  iconWrapClassName="bg-green-500/10"
+                />
+                <DashboardStatCard
+                  testId="card-period-withdrawals"
+                  valueTestId="text-period-withdrawals"
+                  label={language === 'ar' ? 'السحوبات' : 'Withdrawals'}
+                  value={`− ${formatIqd(periodWithdrawals)}`}
+                  valueClassName="text-orange-600 dark:text-orange-400"
+                  icon={<TrendingDown className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+                  iconWrapClassName="bg-orange-500/10"
+                />
+                <DashboardStatCard
+                  testId="card-period-net"
+                  valueTestId="text-period-net"
+                  label={language === 'ar' ? 'الصافي (بعد السحب)' : 'Net (after withdrawals)'}
+                  value={formatIqd(periodNet)}
+                  valueClassName="text-emerald-700 dark:text-emerald-400"
+                  icon={<DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
+                  iconWrapClassName="bg-emerald-500/10"
+                />
+                {periodSummary?.previousPeriod ? (
+                  <DashboardStatCard
+                    testId="card-previous-period-net"
+                    valueTestId="text-previous-period-net"
+                    label={language === 'ar' ? 'الفترة السابقة (صافي)' : 'Previous period (net)'}
+                    subLabel={`${periodSummary.previousPeriod.from} → ${periodSummary.previousPeriod.to}`}
+                    value={formatIqd(periodSummary.previousPeriod.netTotal)}
+                    valueClassName="text-muted-foreground"
+                    icon={<BarChart3 className="h-5 w-5 text-muted-foreground" />}
+                    iconWrapClassName="bg-muted"
+                    className="bg-muted/20"
+                  />
+                ) : (
+                  <DashboardStatCard
+                    testId="card-all-time-revenue"
+                    valueTestId="text-total-revenue"
+                    label={language === 'ar' ? 'إجمالي الكل' : 'All-time total'}
+                    value={formatIqd(stats.totalRevenue)}
+                    icon={<Banknote className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
+                    iconWrapClassName="bg-slate-500/10"
+                  />
+                )}
+              </div>
+
+              {periodSummary?.previousPeriod ? (
+                <DashboardStatCard
+                  testId="card-all-time-revenue"
+                  valueTestId="text-total-revenue"
+                  label={language === 'ar' ? 'إجمالي الكل (كل الوقت)' : 'All-time total'}
+                  value={formatIqd(stats.totalRevenue)}
+                  icon={<Banknote className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
+                  iconWrapClassName="bg-slate-500/10"
+                  className="sm:max-w-md"
+                />
+              ) : null}
+            </CardContent>
+          </Card>
         )}
 
         {onlinePendingCount > 0 && !showArchived && (
@@ -624,193 +761,61 @@ export default function TechnicianDashboard() {
           </Alert>
         )}
 
-        <div className={`grid gap-4 mb-6 ${canViewRevenue ? 'grid-cols-2 lg:grid-cols-4 xl:grid-cols-8' : 'grid-cols-2'}`}>
-          {canViewRevenue && (
-            <Card data-testid="card-period-revenue">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-green-500/10 flex items-center justify-center flex-shrink-0">
-                    <Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">
-                      {language === 'ar' ? 'إيراد الفترة (قبل السحب)' : 'Period (before withdrawals)'}
-                    </p>
-                    <p className="text-lg font-bold" data-testid="text-period-revenue">
-                      {language === 'ar'
-                        ? `${(periodSummary?.periodRevenue ?? stats.periodRevenue).toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${(periodSummary?.periodRevenue ?? stats.periodRevenue).toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {canViewRevenue && (
-            <Card data-testid="card-period-withdrawals">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                    <TrendingDown className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">
-                      {language === 'ar' ? 'السحوبات' : 'Withdrawals'}
-                    </p>
-                    <p className="text-lg font-bold text-orange-600 dark:text-orange-400" data-testid="text-period-withdrawals">
-                      − {language === 'ar'
-                        ? `${(periodSummary?.totalWithdrawals ?? 0).toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${(periodSummary?.totalWithdrawals ?? 0).toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {canViewRevenue && (
-            <Card data-testid="card-period-net">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-emerald-500/10 flex items-center justify-center flex-shrink-0">
-                    <DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">
-                      {language === 'ar' ? 'الصافي (بعد السحب)' : 'Net (after withdrawals)'}
-                    </p>
-                    <p className="text-lg font-bold" data-testid="text-period-net">
-                      {language === 'ar'
-                        ? `${(periodSummary?.netTotal ?? stats.periodRevenue).toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${(periodSummary?.netTotal ?? stats.periodRevenue).toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {canViewRevenue && periodSummary?.previousPeriod && (
-            <Card className="border-dashed" data-testid="card-previous-period-net">
-              <CardContent className="pt-4 pb-4">
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">
-                    {language === 'ar' ? 'الفترة السابقة (صافي)' : 'Previous period (net)'}
-                  </p>
-                  <p className="text-[10px] font-mono text-muted-foreground">
-                    {periodSummary.previousPeriod.from} → {periodSummary.previousPeriod.to}
-                  </p>
-                  <p className="text-lg font-bold text-muted-foreground" data-testid="text-previous-period-net">
-                    {language === 'ar'
-                      ? `${periodSummary.previousPeriod.netTotal.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                      : `${periodSummary.previousPeriod.netTotal.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {canViewRevenue && (
-            <Card data-testid="card-all-time-revenue">
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-9 h-9 rounded-full bg-slate-500/10 flex items-center justify-center flex-shrink-0">
-                    <Banknote className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs text-muted-foreground truncate">
-                      {language === 'ar' ? 'إجمالي الكل' : 'All-time Total'}
-                    </p>
-                    <p className="text-lg font-bold" data-testid="text-total-revenue">
-                      {language === 'ar'
-                        ? `${stats.totalRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${stats.totalRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          <Card
-            className={`cursor-pointer hover-elevate ${filterStatus === 'completed' ? 'ring-2 ring-primary' : ''}`}
-            onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
-            data-testid="card-completed-count"
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'بانتظار الاستلام' : 'Awaiting Pickup'}</p>
-                  <p className="text-lg font-bold" data-testid="text-completed-count">
-                    {canViewRevenue
-                      ? (language === 'ar'
-                        ? `${stats.completedRevenue.toLocaleString('ar-IQ', { maximumFractionDigits: 0 })} د.ع`
-                        : `${stats.completedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })} IQD`)
-                      : stats.completedCount}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            className={`cursor-pointer hover-elevate ${filterStatus === 'pending' ? 'ring-2 ring-primary' : ''}`}
-            onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')}
-            data-testid="card-pending-count"
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-yellow-500/10 flex items-center justify-center flex-shrink-0">
-                  <Clock className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'قيد الانتظار' : 'Pending'}</p>
-                  <p className="text-lg font-bold" data-testid="text-pending-count">{stats.pendingCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            className={`cursor-pointer hover-elevate ${filterStatus === 'delivered' ? 'ring-2 ring-primary' : ''}`}
-            onClick={() => setFilterStatus(filterStatus === 'delivered' ? 'all' : 'delivered')}
-            data-testid="card-delivered-count"
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-orange-500/10 flex items-center justify-center flex-shrink-0">
-                  <Truck className="h-4 w-4 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'تم التسليم' : 'Delivered'}</p>
-                  <p className="text-lg font-bold" data-testid="text-delivered-count">{stats.deliveredCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card
-            className={`cursor-pointer hover-elevate ${filterPayment === 'deferred' ? 'ring-2 ring-orange-500' : ''}`}
-            onClick={() => setFilterPayment(filterPayment === 'deferred' ? 'all' : 'deferred')}
-            data-testid="card-deferred-count"
-          >
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-full bg-amber-500/10 flex items-center justify-center flex-shrink-0">
-                  <CreditCard className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-xs text-muted-foreground truncate">{language === 'ar' ? 'آجل (غير محصّل)' : 'Deferred'}</p>
-                  <p className="text-lg font-bold text-amber-600 dark:text-amber-400" data-testid="text-deferred-count">{stats.deferredCount}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <section className="mb-6 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-foreground">
+              {language === 'ar' ? 'حالة التذاكر' : 'Ticket pipeline'}
+            </h2>
+            <p className="text-xs text-muted-foreground">
+              {language === 'ar' ? 'اضغط على بطاقة للتصفية' : 'Tap a card to filter the list'}
+            </p>
+          </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <DashboardStatCard
+              testId="card-completed-count"
+              valueTestId="text-completed-count"
+              label={language === 'ar' ? 'بانتظار الاستلام' : 'Awaiting pickup'}
+              value={
+                canViewRevenue ? formatIqd(stats.completedRevenue) : stats.completedCount
+              }
+              icon={<CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />}
+              iconWrapClassName="bg-blue-500/10"
+              className={filterStatus === 'completed' ? 'ring-2 ring-primary border-primary/40' : undefined}
+              onClick={() => setFilterStatus(filterStatus === 'completed' ? 'all' : 'completed')}
+            />
+            <DashboardStatCard
+              testId="card-pending-count"
+              valueTestId="text-pending-count"
+              label={language === 'ar' ? 'قيد الانتظار' : 'Pending'}
+              value={stats.pendingCount}
+              icon={<Clock className="h-5 w-5 text-yellow-600 dark:text-yellow-400" />}
+              iconWrapClassName="bg-yellow-500/10"
+              className={filterStatus === 'pending' ? 'ring-2 ring-primary border-primary/40' : undefined}
+              onClick={() => setFilterStatus(filterStatus === 'pending' ? 'all' : 'pending')}
+            />
+            <DashboardStatCard
+              testId="card-delivered-count"
+              valueTestId="text-delivered-count"
+              label={language === 'ar' ? 'تم التسليم' : 'Delivered'}
+              value={stats.deliveredCount}
+              icon={<Truck className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+              iconWrapClassName="bg-orange-500/10"
+              className={filterStatus === 'delivered' ? 'ring-2 ring-primary border-primary/40' : undefined}
+              onClick={() => setFilterStatus(filterStatus === 'delivered' ? 'all' : 'delivered')}
+            />
+            <DashboardStatCard
+              testId="card-deferred-count"
+              valueTestId="text-deferred-count"
+              label={language === 'ar' ? 'آجل (غير محصّل)' : 'Deferred (unpaid)'}
+              value={stats.deferredCount}
+              valueClassName="text-amber-600 dark:text-amber-400"
+              icon={<CreditCard className="h-5 w-5 text-amber-600 dark:text-amber-400" />}
+              iconWrapClassName="bg-amber-500/10"
+              className={filterPayment === 'deferred' ? 'ring-2 ring-orange-500 border-orange-500/40' : undefined}
+              onClick={() => setFilterPayment(filterPayment === 'deferred' ? 'all' : 'deferred')}
+            />
+          </div>
+        </section>
 
         {!showArchived && ((reminders?.completedNotPickedDueCount || 0) > 0 || (reminders?.pendingDueCount || 0) > 0) && (
           <div className="space-y-3 mb-6">
