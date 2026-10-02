@@ -207,6 +207,9 @@ export default function TechnicianDashboard() {
     },
     onSuccess: (response: any) => {
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      if (response?.id) {
+        queryClient.setQueryData(['/api/repair-tickets', response.id], response);
+      }
       toast({
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
@@ -228,10 +231,10 @@ export default function TechnicianDashboard() {
         });
       }
     },
-    onError: () => {
+    onError: (err: Error) => {
       toast({
         title: t('common.error'),
-        description: t('repair.edit.errorMessage'),
+        description: err.message || t('repair.edit.errorMessage'),
         variant: 'destructive',
       });
     },

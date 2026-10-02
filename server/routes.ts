@@ -4923,6 +4923,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             updateData.deliveredAt = await baghdadNow();
           }
         }
+        // Allow reopening / correcting status after delivery
+        if (
+          req.body.status !== 'delivered' &&
+          existing?.status === 'delivered'
+        ) {
+          updateData.deliveredAt = null;
+        }
       }
       if (req.body.priority !== undefined) {
         updateData.priority = req.body.priority;
@@ -5018,7 +5025,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         updateData.repairPaymentSource = "sales";
       }
 
-      if (effectiveMethod === "split" && effectiveStatus === "paid") {
+      const paymentFieldsTouched =
+        req.body.paymentMethod !== undefined ||
+        req.body.paymentStatus !== undefined ||
+        req.body.cashPaidAmount !== undefined ||
+        req.body.cardPaidAmount !== undefined ||
+        req.body.finalCost !== undefined ||
+        req.body.costEstimate !== undefined;
+
+      if (effectiveMethod === "split" && effectiveStatus === "paid" && paymentFieldsTouched) {
         const amount = parseFloat(
           String(
             updateData.finalCost ??
@@ -5038,7 +5053,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
         updateData.cashPaidAmount = cashNum.toString();
         updateData.cardPaidAmount = cardNum.toString();
-      } else if (effectiveMethod !== "split") {
+      } else if (paymentFieldsTouched && effectiveMethod !== "split") {
         updateData.cashPaidAmount = null;
         updateData.cardPaidAmount = null;
       }
