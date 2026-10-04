@@ -62,6 +62,7 @@ function DashboardStatCard({
   onClick,
   testId,
   valueTestId,
+  density = 'default',
 }: {
   label: string;
   value: ReactNode;
@@ -73,38 +74,75 @@ function DashboardStatCard({
   onClick?: () => void;
   testId?: string;
   valueTestId?: string;
+  density?: 'default' | 'compact';
 }) {
+  const compact = density === 'compact';
+
   return (
     <Card
       className={cn(
-        'border-border/70 shadow-sm overflow-hidden transition-all',
+        'border-border/70 overflow-hidden transition-all',
+        compact ? 'shadow-none' : 'shadow-sm',
         onClick && 'cursor-pointer hover:shadow-md hover:border-primary/35',
         className,
       )}
       onClick={onClick}
       data-testid={testId}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3 mb-2">
-          <p className="text-[13px] font-medium text-muted-foreground leading-snug">{label}</p>
-          <div
-            className={cn(
-              'h-10 w-10 rounded-xl flex items-center justify-center shrink-0',
-              iconWrapClassName,
-            )}
-          >
-            {icon}
-          </div>
-        </div>
-        {subLabel ? (
-          <p className="text-[11px] font-mono text-muted-foreground mb-1.5">{subLabel}</p>
-        ) : null}
-        <p
-          className={cn('text-2xl font-semibold tabular-nums tracking-tight', valueClassName)}
-          data-testid={valueTestId}
-        >
-          {value}
-        </p>
+      <CardContent className={cn(compact ? 'p-3' : 'p-4')}>
+        {compact ? (
+          <>
+            <div className="flex items-start gap-2 min-w-0 mb-1.5">
+              <div
+                className={cn(
+                  'h-8 w-8 rounded-lg flex items-center justify-center shrink-0',
+                  iconWrapClassName,
+                )}
+              >
+                {icon}
+              </div>
+              <p className="text-[11px] font-medium text-muted-foreground leading-snug line-clamp-2 min-w-0 flex-1">
+                {label}
+              </p>
+            </div>
+            {subLabel ? (
+              <p className="text-[10px] font-mono text-muted-foreground truncate mb-1 ps-10">{subLabel}</p>
+            ) : null}
+            <p
+              className={cn(
+                'text-base xl:text-lg font-semibold tabular-nums tracking-tight truncate ps-10',
+                valueClassName,
+              )}
+              data-testid={valueTestId}
+              title={typeof value === 'string' ? value : undefined}
+            >
+              {value}
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="flex items-start justify-between gap-3 mb-2">
+              <p className="text-[13px] font-medium text-muted-foreground leading-snug">{label}</p>
+              <div
+                className={cn(
+                  'h-10 w-10 rounded-xl flex items-center justify-center shrink-0',
+                  iconWrapClassName,
+                )}
+              >
+                {icon}
+              </div>
+            </div>
+            {subLabel ? (
+              <p className="text-[11px] font-mono text-muted-foreground mb-1.5">{subLabel}</p>
+            ) : null}
+            <p
+              className={cn('text-2xl font-semibold tabular-nums tracking-tight', valueClassName)}
+              data-testid={valueTestId}
+            >
+              {value}
+            </p>
+          </>
+        )}
       </CardContent>
     </Card>
   );
@@ -701,46 +739,64 @@ export default function TechnicianDashboard() {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {canViewRevenue && (
           <Card className="mb-6 border-border/70 shadow-sm">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base font-semibold flex items-center gap-2">
-                <BarChart3 className="h-4 w-4 text-primary" />
-                {language === 'ar' ? 'ملخص الإيرادات' : 'Revenue overview'}
-              </CardTitle>
-              <CardDescription>
-                {language === 'ar'
-                  ? `الفترة: ${revenueRangeLabel} — توقيت بغداد`
-                  : `Period: ${revenueRangeLabel} — Baghdad time`}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6 pt-0">
-              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:items-end">
-                <div className="space-y-1.5 flex-1 min-w-[140px]">
-                  <Label htmlFor="revenue-from-date">{language === 'ar' ? 'من تاريخ' : 'From'}</Label>
-                  <Input
-                    id="revenue-from-date"
-                    type="date"
-                    value={revenueFromDate}
-                    max={revenueToDate}
-                    onChange={(e) => setRevenueFromDate(e.target.value)}
-                    data-testid="input-revenue-from-date"
-                  />
+            <CardContent className="p-4 sm:p-5 space-y-4">
+              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <BarChart3 className="h-4 w-4 text-primary" />
+                    </div>
+                    <div className="min-w-0">
+                      <h2 className="text-base font-semibold leading-tight">
+                        {language === 'ar' ? 'ملخص الإيرادات' : 'Revenue overview'}
+                      </h2>
+                      <p className="text-xs text-muted-foreground truncate">
+                        {language === 'ar'
+                          ? `${revenueRangeLabel} · توقيت بغداد`
+                          : `${revenueRangeLabel} · Baghdad time`}
+                      </p>
+                    </div>
+                  </div>
                 </div>
-                <div className="space-y-1.5 flex-1 min-w-[140px]">
-                  <Label htmlFor="revenue-to-date">{language === 'ar' ? 'إلى تاريخ' : 'To'}</Label>
-                  <Input
-                    id="revenue-to-date"
-                    type="date"
-                    value={revenueToDate}
-                    min={revenueFromDate}
-                    onChange={(e) => setRevenueToDate(e.target.value)}
-                    data-testid="input-revenue-to-date"
-                  />
-                </div>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap items-center gap-2 shrink-0">
+                  <div
+                    className="flex items-center gap-1 rounded-lg border bg-muted/25 px-2 py-0.5"
+                    role="group"
+                    aria-label={language === 'ar' ? 'نطاق التاريخ' : 'Date range'}
+                  >
+                    <Label htmlFor="revenue-from-date" className="sr-only">
+                      {language === 'ar' ? 'من تاريخ' : 'From'}
+                    </Label>
+                    <Input
+                      id="revenue-from-date"
+                      type="date"
+                      value={revenueFromDate}
+                      max={revenueToDate}
+                      onChange={(e) => setRevenueFromDate(e.target.value)}
+                      data-testid="input-revenue-from-date"
+                      className="h-8 w-[8.75rem] border-0 bg-transparent shadow-none px-1 text-sm"
+                    />
+                    <span className="text-muted-foreground text-xs select-none" aria-hidden>
+                      →
+                    </span>
+                    <Label htmlFor="revenue-to-date" className="sr-only">
+                      {language === 'ar' ? 'إلى تاريخ' : 'To'}
+                    </Label>
+                    <Input
+                      id="revenue-to-date"
+                      type="date"
+                      value={revenueToDate}
+                      min={revenueFromDate}
+                      onChange={(e) => setRevenueToDate(e.target.value)}
+                      data-testid="input-revenue-to-date"
+                      className="h-8 w-[8.75rem] border-0 bg-transparent shadow-none px-1 text-sm"
+                    />
+                  </div>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
+                    className="h-8"
                     onClick={() => {
                       const today = baghdadTodayKey();
                       setRevenueFromDate(today);
@@ -752,8 +808,9 @@ export default function TechnicianDashboard() {
                   </Button>
                   <Button
                     type="button"
-                    variant="secondary"
+                    variant="outline"
                     size="sm"
+                    className="h-8"
                     onClick={() => {
                       setRevenueFromDate(baghdadMonthStartKey());
                       setRevenueToDate(baghdadTodayKey());
@@ -765,68 +822,67 @@ export default function TechnicianDashboard() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3">
+              <div
+                className={cn(
+                  'grid gap-2 min-w-0',
+                  periodSummary?.previousPeriod
+                    ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-5'
+                    : 'grid-cols-2 md:grid-cols-4',
+                )}
+              >
                 <DashboardStatCard
+                  density="compact"
                   testId="card-period-revenue"
                   valueTestId="text-period-revenue"
-                  label={language === 'ar' ? 'إيراد الفترة (قبل السحب)' : 'Period gross (before withdrawals)'}
+                  label={language === 'ar' ? 'إيراد الفترة' : 'Period gross'}
                   value={formatIqd(periodGross)}
-                  icon={<Banknote className="h-5 w-5 text-green-600 dark:text-green-400" />}
+                  icon={<Banknote className="h-4 w-4 text-green-600 dark:text-green-400" />}
                   iconWrapClassName="bg-green-500/10"
                 />
                 <DashboardStatCard
+                  density="compact"
                   testId="card-period-withdrawals"
                   valueTestId="text-period-withdrawals"
                   label={language === 'ar' ? 'السحوبات' : 'Withdrawals'}
                   value={`− ${formatIqd(periodWithdrawals)}`}
                   valueClassName="text-orange-600 dark:text-orange-400"
-                  icon={<TrendingDown className="h-5 w-5 text-orange-600 dark:text-orange-400" />}
+                  icon={<TrendingDown className="h-4 w-4 text-orange-600 dark:text-orange-400" />}
                   iconWrapClassName="bg-orange-500/10"
                 />
                 <DashboardStatCard
+                  density="compact"
                   testId="card-period-net"
                   valueTestId="text-period-net"
-                  label={language === 'ar' ? 'الصافي (بعد السحب)' : 'Net (after withdrawals)'}
+                  label={language === 'ar' ? 'الصافي' : 'Net'}
                   value={formatIqd(periodNet)}
                   valueClassName="text-emerald-700 dark:text-emerald-400"
-                  icon={<DollarSign className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />}
+                  icon={<DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
                   iconWrapClassName="bg-emerald-500/10"
                 />
                 {periodSummary?.previousPeriod ? (
                   <DashboardStatCard
+                    density="compact"
                     testId="card-previous-period-net"
                     valueTestId="text-previous-period-net"
-                    label={language === 'ar' ? 'الفترة السابقة (صافي)' : 'Previous period (net)'}
+                    label={language === 'ar' ? 'الفترة السابقة' : 'Previous period'}
                     subLabel={`${periodSummary.previousPeriod.from} → ${periodSummary.previousPeriod.to}`}
                     value={formatIqd(periodSummary.previousPeriod.netTotal)}
                     valueClassName="text-muted-foreground"
-                    icon={<BarChart3 className="h-5 w-5 text-muted-foreground" />}
+                    icon={<BarChart3 className="h-4 w-4 text-muted-foreground" />}
                     iconWrapClassName="bg-muted"
-                    className="bg-muted/20"
+                    className="bg-muted/15"
                   />
-                ) : (
-                  <DashboardStatCard
-                    testId="card-all-time-revenue"
-                    valueTestId="text-total-revenue"
-                    label={language === 'ar' ? 'إجمالي الكل' : 'All-time total'}
-                    value={formatIqd(stats.totalRevenue)}
-                    icon={<Banknote className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
-                    iconWrapClassName="bg-slate-500/10"
-                  />
-                )}
-              </div>
-
-              {periodSummary?.previousPeriod ? (
+                ) : null}
                 <DashboardStatCard
+                  density="compact"
                   testId="card-all-time-revenue"
                   valueTestId="text-total-revenue"
-                  label={language === 'ar' ? 'إجمالي الكل (كل الوقت)' : 'All-time total'}
+                  label={language === 'ar' ? 'إجمالي الكل' : 'All-time total'}
                   value={formatIqd(stats.totalRevenue)}
-                  icon={<Banknote className="h-5 w-5 text-slate-600 dark:text-slate-400" />}
+                  icon={<Banknote className="h-4 w-4 text-slate-600 dark:text-slate-400" />}
                   iconWrapClassName="bg-slate-500/10"
-                  className="sm:max-w-md"
                 />
-              ) : null}
+              </div>
             </CardContent>
           </Card>
         )}
