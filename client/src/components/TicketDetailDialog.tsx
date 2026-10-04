@@ -64,6 +64,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   const [barcodeReady, setBarcodeReady] = useState(false);
   const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('');
   const [editingCustomerInfo, setEditingCustomerInfo] = useState(false);
+  const [whatsappCustomMessage, setWhatsappCustomMessage] = useState('');
 
   const { data: ticket, isLoading } = useQuery<RepairTicket>({
     queryKey: ['/api/repair-tickets', ticketId],
@@ -218,7 +219,12 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     setBarcodeReady(false);
     setQrCodeDataUrl('');
     setEditingCustomerInfo(false);
+    setWhatsappCustomMessage('');
   }, [ticketId]);
+
+  useEffect(() => {
+    if (!open) setWhatsappCustomMessage('');
+  }, [open]);
 
   useEffect(() => {
     if (ticket && open) {
@@ -268,15 +274,24 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
   }, [ticket, open]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof updateSchema>) => {
+    mutationFn: async (
+      payload: z.infer<typeof updateSchema> & {
+        status?: string;
+        paymentStatus?: string;
+        customMessage?: string;
+      },
+    ) => {
       if (!ticketId) throw new Error('No ticket ID');
+      const { customMessage, ...data } = payload;
       const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${ticketId}`, {
         ...data,
         estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
+        customMessage: customMessage?.trim() || undefined,
       });
       return res.json();
     },
     onSuccess: (response: any) => {
+      setWhatsappCustomMessage('');
       if (response && ticketId) {
         const { _whatsappStatus, ...freshTicket } = response;
         queryClient.setQueryData(['/api/repair-tickets', ticketId], freshTicket);
@@ -400,7 +415,12 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         return;
       }
     }
-    updateMutation.mutate({ ...data, status, paymentStatus });
+    updateMutation.mutate({
+      ...data,
+      status,
+      paymentStatus,
+      customMessage: whatsappCustomMessage,
+    });
   };
 
   const handlePrint = () => {
@@ -1178,6 +1198,31 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                       </FormItem>
                     )}
                   />
+
+                  <div className="space-y-2 rounded-lg border border-dashed p-3 bg-muted/25">
+                    <Label htmlFor="dialog-whatsapp-custom-message">
+                      {isRTL ? 'رسالة واتساب إضافية للعميل (اختياري)' : 'Extra WhatsApp message for customer (optional)'}
+                    </Label>
+                    <Textarea
+                      id="dialog-whatsapp-custom-message"
+                      rows={3}
+                      value={whatsappCustomMessage}
+                      onChange={(e) => setWhatsappCustomMessage(e.target.value)}
+                      placeholder={
+                        isRTL
+                          ? 'تُرسل مع إشعار واتساب عند الحفظ…'
+                          : 'Sent with the WhatsApp notification when you save…'
+                      }
+                      lang="ar"
+                      dir="auto"
+                      data-testid="dialog-input-whatsapp-custom-message"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {isRTL
+                        ? 'اتركها فارغة لإرسال رسالة التحديث الاعتيادية فقط.'
+                        : 'Leave empty to send the usual status update only.'}
+                    </p>
+                  </div>
 
                   <div className="flex items-center gap-4 justify-between flex-wrap">
                     <Button type="submit" disabled={updateMutation.isPending} data-testid="button-dialog-save-ticket">

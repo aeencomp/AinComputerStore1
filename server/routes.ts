@@ -4903,6 +4903,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { id } = req.params;
 
       const existing = await storage.getRepairTicket(id);
+      const whatsappCustomMessage =
+        typeof req.body.customMessage === "string" ? req.body.customMessage.trim() : "";
 
       // Build update object with all fields including prices (all technicians can edit prices)
       const updateData: Record<string, any> = {};
@@ -5081,7 +5083,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ticket.status,
         ticket.technicianNotes,
         ticket.costEstimate,
-        ticket.finalCost
+        ticket.finalCost,
+        whatsappCustomMessage ? { customMessage: whatsappCustomMessage } : undefined,
       ).catch(err => {
         console.error('WhatsApp update notification failed:', err);
         return { success: false, error: err.message };

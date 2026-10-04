@@ -60,6 +60,7 @@ export default function TicketDetail() {
   const printRef = useRef<HTMLDivElement>(null);
   const barcodeRef = useRef<SVGSVGElement>(null);
   const [barcodeReady, setBarcodeReady] = useState(false);
+  const [whatsappCustomMessage, setWhatsappCustomMessage] = useState('');
   const prevStatusRef = useRef<string>('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
@@ -205,15 +206,24 @@ export default function TicketDetail() {
   }, [watchedPriority, form]);
 
   const updateMutation = useMutation({
-    mutationFn: async (data: z.infer<typeof updateSchema>) => {
+    mutationFn: async (
+      payload: z.infer<typeof updateSchema> & {
+        status?: string;
+        paymentStatus?: string;
+        customMessage?: string;
+      },
+    ) => {
       if (!params?.id) throw new Error('No ticket ID');
+      const { customMessage, ...data } = payload;
       const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${params.id}`, {
         ...data,
         estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
+        customMessage: customMessage?.trim() || undefined,
       });
       return res.json();
     },
     onSuccess: (response: any) => {
+      setWhatsappCustomMessage('');
       // Immediately push the fresh ticket into the cache
       // right now instead of waiting for a background refetch to complete.
       if (response && params?.id) {
@@ -316,7 +326,12 @@ export default function TicketDetail() {
         return;
       }
     }
-    updateMutation.mutate({ ...data, status, paymentStatus });
+    updateMutation.mutate({
+      ...data,
+      status,
+      paymentStatus,
+      customMessage: whatsappCustomMessage,
+    });
   };
 
   useEffect(() => {
@@ -876,6 +891,29 @@ export default function TicketDetail() {
                     </FormItem>
                   )}
                 />
+
+                <div className="space-y-2 rounded-lg border border-dashed p-3 bg-muted/25">
+                  <Label htmlFor="ticket-whatsapp-custom-message">
+                    {isRTL ? 'رسالة واتساب إضافية للعميل (اختياري)' : 'Extra WhatsApp message for customer (optional)'}
+                  </Label>
+                  <Textarea
+                    id="ticket-whatsapp-custom-message"
+                    rows={3}
+                    value={whatsappCustomMessage}
+                    onChange={(e) => setWhatsappCustomMessage(e.target.value)}
+                    placeholder={
+                      isRTL
+                        ? 'تُرسل مع إشعار واتساب عند الحفظ…'
+                        : 'Sent with the WhatsApp notification when you save…'
+                    }
+                    data-testid="input-whatsapp-custom-message"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {isRTL
+                      ? 'اتركها فارغة لإرسال رسالة التحديث الاعتيادية فقط.'
+                      : 'Leave empty to send the usual status update only.'}
+                  </p>
+                </div>
 
                 <div className="flex items-center gap-4 justify-between">
                   <Button type="submit" disabled={updateMutation.isPending} data-testid="button-save-ticket">
