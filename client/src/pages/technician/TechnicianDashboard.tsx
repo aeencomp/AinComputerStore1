@@ -822,14 +822,7 @@ export default function TechnicianDashboard() {
                 </div>
               </div>
 
-              <div
-                className={cn(
-                  'grid gap-2 min-w-0',
-                  periodSummary?.previousPeriod
-                    ? 'grid-cols-2 md:grid-cols-3 xl:grid-cols-5'
-                    : 'grid-cols-2 md:grid-cols-4',
-                )}
-              >
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 min-w-0">
                 <DashboardStatCard
                   density="compact"
                   testId="card-period-revenue"
@@ -859,20 +852,6 @@ export default function TechnicianDashboard() {
                   icon={<DollarSign className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />}
                   iconWrapClassName="bg-emerald-500/10"
                 />
-                {periodSummary?.previousPeriod ? (
-                  <DashboardStatCard
-                    density="compact"
-                    testId="card-previous-period-net"
-                    valueTestId="text-previous-period-net"
-                    label={language === 'ar' ? 'الفترة السابقة' : 'Previous period'}
-                    subLabel={`${periodSummary.previousPeriod.from} → ${periodSummary.previousPeriod.to}`}
-                    value={formatIqd(periodSummary.previousPeriod.netTotal)}
-                    valueClassName="text-muted-foreground"
-                    icon={<BarChart3 className="h-4 w-4 text-muted-foreground" />}
-                    iconWrapClassName="bg-muted"
-                    className="bg-muted/15"
-                  />
-                ) : null}
                 <DashboardStatCard
                   density="compact"
                   testId="card-all-time-revenue"

@@ -642,25 +642,6 @@ export default function TechnicianDailyReport() {
                   <p className="text-lg font-bold">{fmtNum(effectiveSummary?.netTotal ?? 0)}</p>
                 </CardContent>
               </Card>
-              {report?.previousPeriod && (
-                <Card className="md:col-span-2 border-dashed">
-                  <CardContent className="pt-4">
-                    <p className="text-xs text-muted-foreground">
-                      {language === "ar" ? "الفترة السابقة (صافي)" : "Previous period (net)"}
-                      <span className="block text-[10px] font-mono">
-                        {report.previousPeriod.from} → {report.previousPeriod.to}
-                      </span>
-                    </p>
-                    <p className="text-lg font-bold text-muted-foreground">
-                      {fmtNum(report.previousPeriod.summary.netTotal)}
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      {language === "ar" ? "إجمالي قبل السحوبات:" : "Gross:"}{" "}
-                      {fmtNum(report.previousPeriod.summary.repairTotal)}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
             </div>
 
             {((effectiveSummary?.totalWithdrawals ?? 0) > 0 || effectiveWithdrawals.length > 0) && (

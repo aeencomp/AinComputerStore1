@@ -42,7 +42,6 @@ import {
   baghdadDateKey,
   baghdadMonthStartKey,
   normalizeBaghdadDateRange,
-  previousBaghdadPeriod,
 } from "@shared/baghdadDateRange";
 import { resolveOrderSalesOwner } from "@shared/salesOrderAttribution";
 import type { SalesShift } from "@shared/schema";
@@ -234,11 +233,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     () => normalizeBaghdadDateRange(salesFromDate, salesToDate),
     [salesFromDate, salesToDate],
   );
-  const salesPreviousRange = useMemo(
-    () => previousBaghdadPeriod(salesRange.from, salesRange.to),
-    [salesRange.from, salesRange.to],
-  );
-
   const { data: salesShifts = [] } = useQuery<SalesShift[]>({
     queryKey: ["/api/sales/shifts", salesLocationId],
     queryFn: async () => {
@@ -313,18 +307,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const { data: salesPeriodCashflow } = useQuery<MonthlyCashflowResponse>({
     queryKey: ["/api/instore/monthly-cashflow", "sales-period", salesRange.from, salesRange.to, salesLocationId],
     queryFn: () => fetchCashflowForRange(salesRange.from, salesRange.to),
-    enabled: !!user.permissions.canViewReports && activeTab === "sales",
-  });
-
-  const { data: salesPreviousCashflow } = useQuery<MonthlyCashflowResponse>({
-    queryKey: [
-      "/api/instore/monthly-cashflow",
-      "sales-prev",
-      salesPreviousRange.from,
-      salesPreviousRange.to,
-      salesLocationId,
-    ],
-    queryFn: () => fetchCashflowForRange(salesPreviousRange.from, salesPreviousRange.to),
     enabled: !!user.permissions.canViewReports && activeTab === "sales",
   });
 
@@ -571,32 +553,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const periodWithdrawals =
     isSalesSupervisor && salespersonFilter !== "all" ? 0 : storeWideWithdrawals;
   const netAfterWithdrawals = combinedGross - periodWithdrawals;
-
-  const prevFilteredOrders = orders.filter((order) => {
-    const day = baghdadDayFromIso(order.createdAt);
-    if (!dayInBaghdadRange(day, salesPreviousRange.from, salesPreviousRange.to)) return false;
-    return orderMatchesSalesperson(order);
-  });
-  const prevActiveOrders = prevFilteredOrders.filter((order) => orderIncludedInSalesReport(order));
-  const prevOrderRevenue = prevActiveOrders.reduce((sum, o) => sum + parseFloat(o.total || "0"), 0);
-  const prevRepairTickets =
-    salesLocationId === 1 && includeRepairInSalesTotals
-      ? allRepairTickets.filter((t) => {
-          if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
-          const ticketDate = repairTicketSalesAt(t as RepairTicket);
-          if (!ticketDate) return false;
-          const day = baghdadDayFromIso(ticketDate);
-          return dayInBaghdadRange(day, salesPreviousRange.from, salesPreviousRange.to);
-        })
-      : [];
-  const prevRepairGross = prevRepairTickets
-    .filter((t) => t.paymentStatus !== "deferred")
-    .reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || "0"), 0);
-  const prevCombinedGross = prevOrderRevenue + prevRepairGross;
-  const prevStoreWithdrawals = salesPreviousCashflow?.totals.withdrawalsTotal ?? 0;
-  const prevWithdrawals =
-    isSalesSupervisor && salespersonFilter !== "all" ? 0 : prevStoreWithdrawals;
-  const prevNetAfterWithdrawals = prevCombinedGross - prevWithdrawals;
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('ar-IQ').format(price);
@@ -1151,7 +1107,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
         </TabsList>
 
         <TabsContent value="sales" className="space-y-6">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">
@@ -1185,19 +1141,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
             </p>
             <p className="text-xl font-bold" data-testid="text-sales-period-net">
               {formatPrice(netAfterWithdrawals)} IQD
-            </p>
-          </CardContent>
-        </Card>
-        <Card className="border-dashed">
-          <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">
-              {language === 'ar' ? 'الفترة السابقة (صافي)' : 'Previous period (net)'}
-            </p>
-            <p className="text-[10px] font-mono text-muted-foreground">
-              {salesPreviousRange.from} → {salesPreviousRange.to}
-            </p>
-            <p className="text-xl font-bold text-muted-foreground" data-testid="text-sales-previous-net">
-              {formatPrice(prevNetAfterWithdrawals)} IQD
             </p>
           </CardContent>
         </Card>
