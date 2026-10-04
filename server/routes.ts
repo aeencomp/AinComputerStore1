@@ -5119,8 +5119,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/admin/repair-tickets/bulk-send-completion-whatsapp", async (_req, res) => {
+  app.post("/api/admin/repair-tickets/bulk-send-completion-whatsapp", async (req, res) => {
     try {
+      const customMessage =
+        typeof req.body?.customMessage === "string" ? req.body.customMessage.trim() : "";
       const all = await storage.getRepairTickets();
       const targets = all.filter((t) => t.status === "completed" && t.isArchived !== 1);
       const results: { id: string; ticketNumber: string; _whatsappStatus: string }[] = [];
@@ -5132,7 +5134,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           "completed",
           ticket.technicianNotes,
           ticket.costEstimate,
-          ticket.finalCost
+          ticket.finalCost,
+          customMessage ? { customMessage } : undefined,
         ).catch((err) => {
           console.error(`WhatsApp bulk completion failed for ${ticket.ticketNumber}:`, err);
           return { success: false, error: err.message };

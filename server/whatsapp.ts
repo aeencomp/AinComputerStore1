@@ -516,6 +516,8 @@ export async function sendTicketCreatedMessage(
 export type TicketUpdatedMessageOptions = {
   /** When true, do not fall back to free-text (won't deliver outside 24h window). */
   skipFreeTextFallback?: boolean;
+  /** Optional note from staff appended to the customer message (template extra param / free text). */
+  customMessage?: string | null;
 };
 
 export async function sendTicketUpdatedMessage(
@@ -551,6 +553,8 @@ export async function sendTicketUpdatedMessage(
 
   // Build the 4th parameter: extra details line
   const extras: string[] = [];
+  const staffNote = options?.customMessage?.trim();
+  if (staffNote) extras.push(staffNote);
   if (costEstimate)   extras.push(`التكلفة المقدرة: ${costEstimate} د.ع`);
   if (finalCost)      extras.push(`التكلفة النهائية: ${finalCost} د.ع`);
   if (technicianNotes) extras.push(`ملاحظات: ${technicianNotes}`);

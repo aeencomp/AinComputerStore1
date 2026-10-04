@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useLanguage } from '@/contexts/LanguageContext';
@@ -31,7 +32,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 
 interface Technician {
@@ -124,6 +124,8 @@ export default function TechnicianDashboard() {
   const [customerLookup, setCustomerLookup] = useState('');
   const [revenueFromDate, setRevenueFromDate] = useState(() => baghdadMonthStartKey());
   const [revenueToDate, setRevenueToDate] = useState(() => baghdadTodayKey());
+  const [bulkWhatsAppOpen, setBulkWhatsAppOpen] = useState(false);
+  const [bulkWhatsAppNote, setBulkWhatsAppNote] = useState('');
 
   const { data: currentTechnician, isLoading: isAuthLoading, error: authError } = useQuery<Technician>({
     queryKey: ['/api/technician/auth/me'],
@@ -349,12 +351,17 @@ export default function TechnicianDashboard() {
   });
 
   const bulkSendCompletionWhatsAppMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest('POST', '/api/admin/repair-tickets/bulk-send-completion-whatsapp', {});
+    mutationFn: async (customMessage: string) => {
+      const trimmed = customMessage.trim();
+      const res = await apiRequest('POST', '/api/admin/repair-tickets/bulk-send-completion-whatsapp', {
+        customMessage: trimmed || undefined,
+      });
       return res.json();
     },
     onSuccess: (data: { sent: number; total: number }) => {
       queryClient.invalidateQueries({ queryKey: ['/api/repair-tickets'] });
+      setBulkWhatsAppOpen(false);
+      setBulkWhatsAppNote('');
       toast({
         title: language === 'ar' ? 'انتهى إرسال واتساب' : 'WhatsApp batch finished',
         description: t('repair.whatsapp.bulkResult', { sent: String(data.sent), total: String(data.total) }),
@@ -541,44 +548,72 @@ export default function TechnicianDashboard() {
               </Button>
             </Link>
             {!showArchived && stats.completedCount > 0 && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button
-                    variant="default"
-                    size="sm"
-                    className="h-7 min-h-7 gap-1 px-2 py-0 text-[11px] leading-none bg-red-600 hover:bg-red-600/90 text-white"
-                    disabled={bulkSendCompletionWhatsAppMutation.isPending || isTicketsLoading}
-                    data-testid="button-send-whatsapp-all-completed"
-                  >
-                    <MessageCircle className="h-3 w-3 shrink-0" aria-hidden />
-                    <span className="truncate max-w-[9.5rem] sm:max-w-none">{t('repair.whatsapp.dashboardButton')}</span>
-                    <span className="opacity-90 tabular-nums">({stats.completedCount})</span>
-                  </Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent>
-                  <AlertDialogHeader>
-                    <AlertDialogTitle>{t('repair.whatsapp.confirmTitle')}</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      {t('repair.whatsapp.confirmDescription', { count: String(stats.completedCount) })}
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel data-testid="button-whatsapp-confirm-cancel">
-                      {t('repair.whatsapp.confirmCancel')}
-                    </AlertDialogCancel>
-                    <AlertDialogAction
-                      className="bg-red-600 text-white hover:bg-red-600/90"
-                      disabled={bulkSendCompletionWhatsAppMutation.isPending}
-                      onClick={() => bulkSendCompletionWhatsAppMutation.mutate()}
-                      data-testid="button-whatsapp-confirm-send"
-                    >
-                      {bulkSendCompletionWhatsAppMutation.isPending
-                        ? (language === 'ar' ? 'جاري الإرسال…' : 'Sending…')
-                        : t('repair.whatsapp.confirmSend')}
-                    </AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <>
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-7 min-h-7 gap-1 px-2 py-0 text-[11px] leading-none bg-red-600 hover:bg-red-600/90 text-white"
+                  disabled={bulkSendCompletionWhatsAppMutation.isPending || isTicketsLoading}
+                  data-testid="button-send-whatsapp-all-completed"
+                  onClick={() => setBulkWhatsAppOpen(true)}
+                >
+                  <MessageCircle className="h-3 w-3 shrink-0" aria-hidden />
+                  <span className="truncate max-w-[9.5rem] sm:max-w-none">{t('repair.whatsapp.dashboardButton')}</span>
+                  <span className="opacity-90 tabular-nums">({stats.completedCount})</span>
+                </Button>
+                <AlertDialog open={bulkWhatsAppOpen} onOpenChange={setBulkWhatsAppOpen}>
+                  <AlertDialogContent className="max-w-md">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t('repair.whatsapp.confirmTitle')}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t('repair.whatsapp.confirmDescription', { count: String(stats.completedCount) })}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <div className="space-y-2 py-1">
+                      <Label htmlFor="bulk-whatsapp-note">
+                        {language === 'ar'
+                          ? 'رسالة إضافية للعميل (اختياري)'
+                          : 'Extra message for customers (optional)'}
+                      </Label>
+                      <Textarea
+                        id="bulk-whatsapp-note"
+                        rows={4}
+                        value={bulkWhatsAppNote}
+                        onChange={(e) => setBulkWhatsAppNote(e.target.value)}
+                        placeholder={
+                          language === 'ar'
+                            ? 'مثال: يرجى استلام الجهاز خلال 3 أيام من فرع الكرادة…'
+                            : 'e.g. Please pick up within 3 days from our Karrada branch…'
+                        }
+                        data-testid="input-bulk-whatsapp-note"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {language === 'ar'
+                          ? 'تُضاف هذه الجملة إلى رسالة واتساب لكل تذكرة مكتملة (جاهزة للاستلام).'
+                          : 'This text is added to the WhatsApp for each completed (ready for pickup) ticket.'}
+                      </p>
+                    </div>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel data-testid="button-whatsapp-confirm-cancel">
+                        {t('repair.whatsapp.confirmCancel')}
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-red-600 text-white hover:bg-red-600/90"
+                        disabled={bulkSendCompletionWhatsAppMutation.isPending}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          bulkSendCompletionWhatsAppMutation.mutate(bulkWhatsAppNote);
+                        }}
+                        data-testid="button-whatsapp-confirm-send"
+                      >
+                        {bulkSendCompletionWhatsAppMutation.isPending
+                          ? (language === 'ar' ? 'جاري الإرسال…' : 'Sending…')
+                          : t('repair.whatsapp.confirmSend')}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
             {canViewDailyReport && (
               <Link href="/technician/daily-report">
