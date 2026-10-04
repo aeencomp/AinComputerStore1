@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { formatPosPaymentLabel } from '@/lib/posPayment';
 import { useToast } from '@/hooks/use-toast';
@@ -515,143 +516,187 @@ export default function TechnicianDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="border-b bg-card">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex flex-wrap justify-between items-center gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
-              <Wrench className="h-5 w-5 text-primary" />
+      <header className="sticky top-0 z-30 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/90 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex items-center justify-between gap-3 py-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="h-11 w-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
+                <Wrench className="h-5 w-5 text-primary" />
+              </div>
+              <div className="min-w-0">
+                <h1
+                  className="text-lg sm:text-xl font-semibold tracking-tight truncate"
+                  data-testid="text-technician-dashboard-title"
+                >
+                  {t('repair.technician.dashboard.title')}
+                </h1>
+                <p className="text-sm text-muted-foreground truncate">
+                  {t('technician.dashboard.welcome', { name: currentTechnician.displayName })}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold" data-testid="text-technician-dashboard-title">
-                {t('repair.technician.dashboard.title')}
-              </h1>
-              <p className="text-sm text-muted-foreground">
-                {t('technician.dashboard.welcome', { name: currentTechnician.displayName })}
-              </p>
+            <div className="flex items-center gap-1.5 shrink-0">
+              <ThemeToggle />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 px-2.5 font-medium"
+                onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
+                data-testid="button-language-toggle"
+              >
+                {language === 'ar' ? 'EN' : 'AR'}
+              </Button>
+              <Separator orientation="vertical" className="h-6 hidden sm:block" />
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-9 text-muted-foreground hover:text-foreground"
+                onClick={handleLogout}
+                disabled={logoutMutation.isPending}
+                data-testid="button-technician-logout"
+              >
+                <LogOut className="h-4 w-4 sm:me-2" />
+                <span className="hidden sm:inline">{t('technician.dashboard.logout')}</span>
+              </Button>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2 flex-wrap">
-            <ThemeToggle />
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setLanguage(language === 'ar' ? 'en' : 'ar')}
-              data-testid="button-language-toggle"
-            >
-              {language === 'ar' ? 'EN' : 'AR'}
-            </Button>
-            <Link href="/technician/new-request">
-              <Button data-testid="button-new-repair-request">
-                <Plus className="h-4 w-4 me-2" />
-                {language === 'ar' ? 'طلب صيانة جديد' : 'New Request'}
-              </Button>
-            </Link>
-            {!showArchived && stats.completedCount > 0 && (
-              <>
+
+          <Separator className="opacity-60" />
+
+          <div className="py-3 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/technician/new-request">
+                <Button size="sm" className="h-9 shadow-sm" data-testid="button-new-repair-request">
+                  <Plus className="h-4 w-4 me-2" />
+                  {language === 'ar' ? 'طلب صيانة جديد' : 'New request'}
+                </Button>
+              </Link>
+              {!showArchived && stats.completedCount > 0 && (
                 <Button
-                  variant="default"
+                  variant="outline"
                   size="sm"
-                  className="h-7 min-h-7 gap-1 px-2 py-0 text-[11px] leading-none bg-red-600 hover:bg-red-600/90 text-white"
+                  className="h-9 border-green-600/30 bg-green-600/5 text-green-800 hover:bg-green-600/10 dark:text-green-300"
                   disabled={bulkSendCompletionWhatsAppMutation.isPending || isTicketsLoading}
                   data-testid="button-send-whatsapp-all-completed"
                   onClick={() => setBulkWhatsAppOpen(true)}
                 >
-                  <MessageCircle className="h-3 w-3 shrink-0" aria-hidden />
-                  <span className="truncate max-w-[9.5rem] sm:max-w-none">{t('repair.whatsapp.dashboardButton')}</span>
-                  <span className="opacity-90 tabular-nums">({stats.completedCount})</span>
+                  <MessageCircle className="h-4 w-4 me-2 shrink-0" />
+                  <span className="hidden sm:inline">
+                    {language === 'ar' ? 'واتساب — جاهز للاستلام' : 'WhatsApp — ready for pickup'}
+                  </span>
+                  <span className="sm:hidden">{language === 'ar' ? 'واتساب' : 'WhatsApp'}</span>
+                  <Badge variant="secondary" className="ms-2 tabular-nums px-1.5 min-w-[1.5rem] justify-center">
+                    {stats.completedCount}
+                  </Badge>
                 </Button>
-                <AlertDialog open={bulkWhatsAppOpen} onOpenChange={setBulkWhatsAppOpen}>
-                  <AlertDialogContent className="max-w-md">
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>{t('repair.whatsapp.confirmTitle')}</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        {t('repair.whatsapp.confirmDescription', { count: String(stats.completedCount) })}
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <div className="space-y-2 py-1">
-                      <Label htmlFor="bulk-whatsapp-note">
-                        {language === 'ar'
-                          ? 'رسالة إضافية للعميل (اختياري)'
-                          : 'Extra message for customers (optional)'}
-                      </Label>
-                      <Textarea
-                        id="bulk-whatsapp-note"
-                        rows={4}
-                        value={bulkWhatsAppNote}
-                        onChange={(e) => setBulkWhatsAppNote(e.target.value)}
-                        placeholder={
-                          language === 'ar'
-                            ? 'مثال: يرجى استلام الجهاز خلال 3 أيام من فرع الكرادة…'
-                            : 'e.g. Please pick up within 3 days from our Karrada branch…'
-                        }
-                        data-testid="input-bulk-whatsapp-note"
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {language === 'ar'
-                          ? 'تُضاف هذه الجملة إلى رسالة واتساب لكل تذكرة مكتملة (جاهزة للاستلام).'
-                          : 'This text is added to the WhatsApp for each completed (ready for pickup) ticket.'}
-                      </p>
-                    </div>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel data-testid="button-whatsapp-confirm-cancel">
-                        {t('repair.whatsapp.confirmCancel')}
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        className="bg-red-600 text-white hover:bg-red-600/90"
-                        disabled={bulkSendCompletionWhatsAppMutation.isPending}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          bulkSendCompletionWhatsAppMutation.mutate(bulkWhatsAppNote);
-                        }}
-                        data-testid="button-whatsapp-confirm-send"
-                      >
-                        {bulkSendCompletionWhatsAppMutation.isPending
-                          ? (language === 'ar' ? 'جاري الإرسال…' : 'Sending…')
-                          : t('repair.whatsapp.confirmSend')}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </>
-            )}
-            {canViewDailyReport && (
-              <Link href="/technician/daily-report">
-                <Button variant="outline" data-testid="button-technician-daily-report">
-                  <BarChart3 className="h-4 w-4 me-2" />
-                  {language === 'ar'
-                    ? repairShift
-                      ? 'تقرير الصيانة · وردية مفتوحة'
-                      : 'تقرير الصيانة · فتح وردية'
-                    : repairShift
-                      ? 'Repair Report · Shift open'
-                      : 'Repair Report · Open shift'}
-                </Button>
-              </Link>
-            )}
-            {canViewWithdrawals && (
-              <Link href="/technician/withdrawals">
-                <Button variant="outline" data-testid="button-technician-withdrawals">
-                  <TrendingDown className="h-4 w-4 me-2" />
-                  {language === 'ar' ? 'السحوبات' : 'Withdrawals'}
-                </Button>
-              </Link>
-            )}
-            {isAdmin && (
-              <Link href="/technician/manage">
-                <Button variant="outline" data-testid="button-manage-technicians">
-                  <Users className="h-4 w-4 me-2" />
-                  {t('technician.management.title')}
-                </Button>
-              </Link>
-            )}
-            <Button variant="outline" onClick={handleLogout} disabled={logoutMutation.isPending} data-testid="button-technician-logout">
-              <LogOut className="h-4 w-4 me-2" />
-              {t('technician.dashboard.logout')}
-            </Button>
+              )}
+            </div>
+
+            <nav
+              className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2"
+              aria-label={language === 'ar' ? 'أدوات لوحة الفني' : 'Technician tools'}
+            >
+              {canViewDailyReport && (
+                <Link href="/technician/daily-report" className="contents sm:block">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-full sm:w-auto justify-start sm:justify-center"
+                    data-testid="button-technician-daily-report"
+                  >
+                    <BarChart3 className="h-4 w-4 me-2 shrink-0" />
+                    <span className="truncate">{language === 'ar' ? 'تقرير الصيانة' : 'Repair report'}</span>
+                    {repairShift ? (
+                      <Badge variant="outline" className="ms-auto sm:ms-2 text-[10px] px-1.5 py-0 border-green-500/40 text-green-700 dark:text-green-400">
+                        {language === 'ar' ? 'وردية' : 'Shift'}
+                      </Badge>
+                    ) : null}
+                  </Button>
+                </Link>
+              )}
+              {canViewWithdrawals && (
+                <Link href="/technician/withdrawals" className="contents sm:block">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-full sm:w-auto justify-start"
+                    data-testid="button-technician-withdrawals"
+                  >
+                    <TrendingDown className="h-4 w-4 me-2 shrink-0" />
+                    {language === 'ar' ? 'السحوبات' : 'Withdrawals'}
+                  </Button>
+                </Link>
+              )}
+              {isAdmin && (
+                <Link href="/technician/manage" className="contents sm:block">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-9 w-full sm:w-auto justify-start sm:col-span-2 lg:col-span-1"
+                    data-testid="button-manage-technicians"
+                  >
+                    <Users className="h-4 w-4 me-2 shrink-0" />
+                    <span className="truncate">{t('technician.management.title')}</span>
+                  </Button>
+                </Link>
+              )}
+            </nav>
           </div>
         </div>
-      </div>
+
+        <AlertDialog open={bulkWhatsAppOpen} onOpenChange={setBulkWhatsAppOpen}>
+          <AlertDialogContent className="max-w-md">
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t('repair.whatsapp.confirmTitle')}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t('repair.whatsapp.confirmDescription', { count: String(stats.completedCount) })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="space-y-2 py-1">
+              <Label htmlFor="bulk-whatsapp-note">
+                {language === 'ar'
+                  ? 'رسالة إضافية للعميل (اختياري)'
+                  : 'Extra message for customers (optional)'}
+              </Label>
+              <Textarea
+                id="bulk-whatsapp-note"
+                rows={4}
+                value={bulkWhatsAppNote}
+                onChange={(e) => setBulkWhatsAppNote(e.target.value)}
+                placeholder={
+                  language === 'ar'
+                    ? 'مثال: يرجى استلام الجهاز خلال 3 أيام من فرع الكرادة…'
+                    : 'e.g. Please pick up within 3 days from our Karrada branch…'
+                }
+                data-testid="input-bulk-whatsapp-note"
+              />
+              <p className="text-xs text-muted-foreground">
+                {language === 'ar'
+                  ? 'تُضاف هذه الجملة إلى رسالة واتساب لكل تذكرة مكتملة (جاهزة للاستلام).'
+                  : 'This text is added to the WhatsApp for each completed (ready for pickup) ticket.'}
+              </p>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel data-testid="button-whatsapp-confirm-cancel">
+                {t('repair.whatsapp.confirmCancel')}
+              </AlertDialogCancel>
+              <AlertDialogAction
+                className="bg-green-600 text-white hover:bg-green-600/90"
+                disabled={bulkSendCompletionWhatsAppMutation.isPending}
+                onClick={(e) => {
+                  e.preventDefault();
+                  bulkSendCompletionWhatsAppMutation.mutate(bulkWhatsAppNote);
+                }}
+                data-testid="button-whatsapp-confirm-send"
+              >
+                {bulkSendCompletionWhatsAppMutation.isPending
+                  ? (language === 'ar' ? 'جاري الإرسال…' : 'Sending…')
+                  : t('repair.whatsapp.confirmSend')}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </header>
 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {canViewRevenue && (
