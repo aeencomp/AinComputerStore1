@@ -258,7 +258,7 @@ export default function TechnicianDailyReport() {
   const { language } = useLanguage();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [reportFromDate, setReportFromDate] = useState(() => baghdadMonthStartKey());
+  const [reportFromDate, setReportFromDate] = useState(() => baghdadTodayKey());
   const [reportToDate, setReportToDate] = useState(() => baghdadTodayKey());
   const [showShiftDialog, setShowShiftDialog] = useState(false);
   const [shiftAction, setShiftAction] = useState<"start" | "end">("start");
