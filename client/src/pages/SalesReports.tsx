@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { repairTicketSalesAt, repairTicketEligibleForSalesReport } from "@shared/repair-sales";
 import { orderIncludedInSalesReport } from "@shared/order-sales";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { apiRequest, fetchWithTimeout, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -35,7 +35,6 @@ import {
   Save,
   FileText,
   UserRound,
-  FileSpreadsheet,
 } from "lucide-react";
 import { openA4InvoicePrint, type A4InvoiceOrder } from "@/lib/a4InvoicePrint";
 import {
@@ -172,7 +171,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const [cashflowToDate, setCashflowToDate] = useState("");
   const [receiptEditorOpen, setReceiptEditorOpen] = useState(false);
   const [receiptDraft, setReceiptDraft] = useState<any>(null);
-  const [exportingPeriodCustomers, setExportingPeriodCustomers] = useState(false);
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
     queryKey: ['/api/orders', salesLocationId],
@@ -521,82 +519,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   });
 
   const activeOrders = filteredOrders.filter(order => orderIncludedInSalesReport(order));
-
-  const periodCustomersMap = new Map<
-    string,
-    { name: string; phone: string; orderCount: number; totalSpent: number }
-  >();
-  for (const order of activeOrders) {
-    const phone = (order.customerPhone || "").trim();
-    if (!phone) continue;
-    const total = parseFloat(order.total || "0") || 0;
-    const existing = periodCustomersMap.get(phone);
-    if (existing) {
-      existing.orderCount += 1;
-      existing.totalSpent += total;
-      if (!existing.name.trim() && order.customerName?.trim()) {
-        existing.name = order.customerName.trim();
-      }
-    } else {
-      periodCustomersMap.set(phone, {
-        phone,
-        name: order.customerName?.trim() || "",
-        orderCount: 1,
-        totalSpent: total,
-      });
-    }
-  }
-  const periodCustomers = Array.from(periodCustomersMap.values()).sort(
-    (a, b) => b.orderCount - a.orderCount,
-  );
-
-  const exportPeriodCustomersXlsx = async () => {
-    setExportingPeriodCustomers(true);
-    try {
-      const params = new URLSearchParams({
-        from: salesRange.from,
-        to: salesRange.to,
-        lang: language === "ar" ? "ar" : "en",
-        locationId: String(salesLocationId),
-        reportEligible: "1",
-      });
-      if (orderTypeFilter !== "all") {
-        params.set("orderType", orderTypeFilter);
-      }
-      const res = await fetchWithTimeout(
-        `/api/sales/customers/export?${params.toString()}`,
-        { credentials: "include" },
-      );
-      if (!res.ok) throw new Error(await res.text());
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      const range =
-        salesRange.from === salesRange.to
-          ? salesRange.from
-          : `${salesRange.from}_to_${salesRange.to}`;
-      link.download = `sales-customers-${range}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-      toast({
-        title: language === "ar" ? "تم تصدير الزبائن" : "Customers exported",
-        description:
-          language === "ar"
-            ? `${periodCustomers.length} زبون في الفترة المحددة`
-            : `${periodCustomers.length} customer(s) in selected period`,
-      });
-    } catch {
-      toast({
-        title: language === "ar" ? "فشل التصدير" : "Export failed",
-        variant: "destructive",
-      });
-    } finally {
-      setExportingPeriodCustomers(false);
-    }
-  };
 
   const totalRevenue = activeOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
   const orderCount = activeOrders.length;
@@ -1385,81 +1307,13 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       </div>
 
       <Card>
-        <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2 pb-2">
-          <CardTitle className="text-base">
-            {language === "ar" ? "زبائن الفترة" : "Customers in period"}
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <Badge variant="secondary">{periodCustomers.length}</Badge>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              className="gap-1.5"
-              disabled={exportingPeriodCustomers || periodCustomers.length === 0}
-              onClick={() => void exportPeriodCustomersXlsx()}
-              data-testid="button-export-period-customers"
-            >
-              {exportingPeriodCustomers ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileSpreadsheet className="h-4 w-4" />
-              )}
-              {language === "ar" ? "Excel" : "Excel"}
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <p className="text-xs text-muted-foreground mb-3">
-            {salesRange.from === salesRange.to
-              ? salesRange.from
-              : `${salesRange.from} → ${salesRange.to}`}
-            {orderTypeFilter !== "all"
-              ? ` · ${orderTypeFilter === "walk-in" ? (language === "ar" ? "كاونتر" : "Counter") : orderTypeFilter === "in-store" ? (language === "ar" ? "متجر" : "In-store") : (language === "ar" ? "أونلاين" : "Online")}`
-              : ` · ${language === "ar" ? "كل أنواع المبيعات" : "All sale types"}`}
-            {language === "ar"
-              ? " — زبائن لديهم رقم هاتف (بدون حد)"
-              : " — customers with phone (no limit)"}
-          </p>
-          {periodCustomers.length === 0 ? (
-            <p className="text-center text-muted-foreground py-8 text-sm">
-              {language === "ar" ? "لا زبائن في هذه الفترة" : "No customers in this period"}
-            </p>
-          ) : (
-            <div className="overflow-x-auto max-h-[min(420px,50vh)] overflow-y-auto border rounded-md">
-              <table className="w-full text-sm">
-                <thead className="sticky top-0 bg-muted/95 backdrop-blur z-10">
-                  <tr className="border-b">
-                    <th className="text-start p-2">{language === "ar" ? "الاسم" : "Name"}</th>
-                    <th className="text-start p-2">{language === "ar" ? "الهاتف" : "Phone"}</th>
-                    <th className="text-end p-2">{language === "ar" ? "الطلبات" : "Orders"}</th>
-                    <th className="text-end p-2">{language === "ar" ? "الإجمالي" : "Total"}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {periodCustomers.map((c) => (
-                    <tr key={c.phone} className="border-b hover:bg-muted/40">
-                      <td className="p-2">{c.name || (language === "ar" ? "—" : "—")}</td>
-                      <td className="p-2 font-mono text-xs" dir="ltr">
-                        {c.phone}
-                      </td>
-                      <td className="p-2 text-end tabular-nums">{c.orderCount}</td>
-                      <td className="p-2 text-end tabular-nums">
-                        {formatPrice(Math.round(c.totalSpent))}{" "}
-                        {language === "ar" ? "د.ع" : "IQD"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
+        <CardHeader className="pb-2">
           <CardTitle>{language === 'ar' ? 'سجل الطلبات' : 'Order History'}</CardTitle>
+          <p className="text-xs text-muted-foreground font-normal mt-1">
+            {language === 'ar'
+              ? 'كل طلبات الفترة — اضغط «الفاتورة» أو «الوصل» لفتح/طباعة فاتورة الزبون (بدون حد على العدد).'
+              : 'All orders in the period — use Invoice or Receipt to open/print the customer bill (no row limit).'}
+          </p>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -1471,12 +1325,12 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
               {language === 'ar' ? 'لا توجد طلبات في هذه الفترة' : 'No orders in this period'}
             </div>
           ) : (
-            <div className="overflow-x-auto max-h-[min(520px,60vh)] overflow-y-auto border rounded-md">
+            <div className="overflow-x-auto max-h-[min(640px,70vh)] overflow-y-auto border rounded-md">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/95 backdrop-blur z-10">
                   <tr className="border-b">
                     <th className="text-start p-3">{language === 'ar' ? 'رقم الطلب' : 'Order #'}</th>
-                    <th className="text-start p-3">{language === 'ar' ? 'العميل' : 'Customer'}</th>
+                    <th className="text-start p-3">{language === 'ar' ? 'العميل / الهاتف' : 'Customer / phone'}</th>
                     {isSalesSupervisor && salespersonFilter === "all" && (
                       <th className="text-start p-3">{language === "ar" ? "الموظف" : "Employee"}</th>
                     )}
@@ -1485,14 +1339,30 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                     <th className="text-start p-3">{language === 'ar' ? 'الدفع' : 'Payment'}</th>
                     <th className="text-end p-3">{language === 'ar' ? 'المبلغ' : 'Amount'}</th>
                     <th className="text-start p-3">{language === 'ar' ? 'التاريخ' : 'Date'}</th>
-                    <th className="p-3"></th>
+                    <th className="text-start p-3 min-w-[8.5rem]">{language === 'ar' ? 'الفاتورة' : 'Invoice'}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredOrders.map(order => (
                     <tr key={order.id} className="border-b hover:bg-muted/50">
-                      <td className="p-3 font-mono">{order.orderNumber}</td>
-                      <td className="p-3">{order.customerName}</td>
+                      <td className="p-3 font-mono">
+                        <button
+                          type="button"
+                          className="text-primary hover:underline font-semibold text-start"
+                          onClick={() => void printA4OrderReceipt(order)}
+                          title={language === 'ar' ? 'فتح فاتورة A4' : 'Open A4 invoice'}
+                        >
+                          {order.orderNumber}
+                        </button>
+                      </td>
+                      <td className="p-3">
+                        <div className="font-medium">{order.customerName || '—'}</div>
+                        {order.customerPhone ? (
+                          <div className="text-xs text-muted-foreground font-mono" dir="ltr">
+                            {order.customerPhone}
+                          </div>
+                        ) : null}
+                      </td>
                       {isSalesSupervisor && salespersonFilter === "all" && (
                         <td className="p-3 text-muted-foreground">{salespersonLabel(resolveOrderOwner(order))}</td>
                       )}
@@ -1546,7 +1416,27 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                         {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
                       </td>
                       <td className="p-3">
-                        <div className="flex items-center gap-1">
+                        <div className="flex flex-wrap items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 gap-1 px-2"
+                            onClick={() => void printA4OrderReceipt(order)}
+                            data-testid={`button-invoice-${order.id}`}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            {language === 'ar' ? 'فاتورة' : 'Invoice'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1 px-2"
+                            onClick={() => printOrderReceipt(order)}
+                            data-testid={`button-receipt-${order.id}`}
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            {language === 'ar' ? 'وصل' : 'Receipt'}
+                          </Button>
                           {order.orderType === 'online' && order.status === 'pending' && (
                             <Button
                               size="sm"
@@ -1571,24 +1461,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                               {language === 'ar' ? 'تم التوصيل' : 'Mark Completed'}
                             </Button>
                           )}
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => printOrderReceipt(order)}
-                            data-testid={`button-print-${order.id}`}
-                            title={language === 'ar' ? 'طباعة وصل حراري' : 'Print thermal receipt'}
-                          >
-                            <Printer className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            onClick={() => printA4OrderReceipt(order)}
-                            data-testid={`button-print-a4-${order.id}`}
-                            title={language === 'ar' ? 'طباعة فاتورة A4' : 'Print A4 invoice'}
-                          >
-                            <FileText className="w-4 h-4" />
-                          </Button>
                           {user.permissions.canEditReceipt === 1 && (
                             <Button
                               size="icon"
