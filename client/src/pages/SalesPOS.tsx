@@ -1728,12 +1728,41 @@ export default function SalesPOS({
                 )}
               </div>
             </div>
+            <div className="flex flex-wrap gap-2 mt-2 pt-2 border-t border-border/60">
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="h-8 gap-1.5 flex-1 sm:flex-none min-w-[9rem]"
+                onClick={() => void exportSalesCustomersXlsx()}
+                disabled={exportingCustomers || customers.length === 0}
+                data-testid="button-export-sales-customers-header"
+              >
+                {exportingCustomers ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4" />
+                )}
+                {language === 'ar' ? 'تصدير العملاء Excel' : 'Export customers (Excel)'}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1.5 flex-1 sm:flex-none"
+                onClick={() => setShowCustomerLookup(true)}
+                data-testid="button-customer-lookup-header"
+              >
+                <UserSearch className="h-4 w-4" />
+                {language === 'ar' ? 'بحث عميل' : 'Find customer'}
+              </Button>
+            </div>
           </CardHeader>
           
           <CardContent className="flex-1 flex flex-col min-h-0 p-0 overflow-hidden">
             {cart.length === 0 ? (
               <div className="flex-1 flex items-center justify-center p-6">
-                <div className="text-center space-y-3">
+                <div className="text-center space-y-3 max-w-xs">
                   <div className="h-20 w-20 rounded-full bg-muted flex items-center justify-center mx-auto">
                     <ShoppingCart className="h-10 w-10 text-muted-foreground/30" />
                   </div>
@@ -1742,6 +1771,11 @@ export default function SalesPOS({
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {language === 'ar' ? 'اختر منتجات لإضافتها' : 'Select products to add'}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground pt-1">
+                    {language === 'ar'
+                      ? 'تصدير كل عملاء المبيعات (اسم + هاتف) من الزر أعلى السلة.'
+                      : 'Export all sales customers (name + phone) using the button at the top of the cart panel.'}
                   </p>
                 </div>
               </div>
