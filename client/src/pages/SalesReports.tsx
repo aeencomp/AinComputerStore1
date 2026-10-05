@@ -67,6 +67,7 @@ interface Order {
   orderNumber: string;
   customerName: string;
   customerPhone?: string;
+  salesLocationId?: number;
   total: string;
   subtotal?: string;
   discount?: string;
@@ -524,8 +525,13 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     );
   }
 
-  const orderMatchesReportFilters = (order: Order, includeDateRange: boolean) => {
-    if (includeDateRange) {
+  const orderMatchesSharedFilters = (
+    order: Order,
+    opts: { includeDateRange: boolean; restrictToSalesperson: boolean },
+  ) => {
+    if ((order.salesLocationId ?? 1) !== effectiveSalesLocationId) return false;
+
+    if (opts.includeDateRange) {
       const day = baghdadDayFromIso(order.createdAt);
       if (!dayInBaghdadRange(day, salesRange.from, salesRange.to)) return false;
     }
@@ -545,16 +551,18 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       if (!orderNo.includes(q) && !customer.includes(q) && !phone.includes(q)) return false;
     }
 
-    if (!orderMatchesSalesperson(order)) return false;
+    if (opts.restrictToSalesperson && !orderMatchesSalesperson(order)) return false;
 
     return true;
   };
 
-  const filteredOrders = orders.filter((order) => orderMatchesReportFilters(order, true));
+  const filteredOrders = orders.filter((order) =>
+    orderMatchesSharedFilters(order, { includeDateRange: true, restrictToSalesperson: true }),
+  );
 
-  /** All customers at this location (full history), not limited to selected date range. */
+  /** All customers at this location (any employee); not limited to the logged-in user. */
   const ordersForCustomerDirectory = orders.filter((order) =>
-    orderMatchesReportFilters(order, false),
+    orderMatchesSharedFilters(order, { includeDateRange: false, restrictToSalesperson: false }),
   );
 
   const activeOrders = filteredOrders.filter(order => orderIncludedInSalesReport(order));
@@ -1419,8 +1427,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
           </div>
           <p className="text-xs text-muted-foreground font-normal mt-1">
             {language === "ar"
-              ? "كل الزبائن لهذا الموقع (كل الوقت، بدون حد) — «فاتورة» تطبع آخر طلب مسجّل للزبون."
-              : "Every customer at this location (all time, no limit) — Invoice prints their most recent order."}
+              ? `زبائن الموقع ${effectiveSalesLocationId} فقط (كل الوقت، كل الموظفين) — لا يقتصر على مبيعاتك أنت.`
+              : `Location ${effectiveSalesLocationId} only (all time, all staff) — not limited to your own sales.`}
           </p>
         </CardHeader>
         <CardContent>
@@ -1496,8 +1504,12 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
           <CardTitle>{language === 'ar' ? 'سجل الطلبات' : 'Order History'}</CardTitle>
           <p className="text-xs text-muted-foreground font-normal mt-1">
             {language === 'ar'
-              ? 'كل طلبات الفترة — اضغط «الفاتورة» أو «الوصل» لفتح/طباعة فاتورة الزبون (بدون حد على العدد).'
-              : 'All orders in the period — use Invoice or Receipt to open/print the customer bill (no row limit).'}
+              ? isSalesSupervisor
+                ? 'كل طلبات الفترة — اضغط «الفاتورة» أو «الوصل».'
+                : 'طلباتك في الفترة (سجل الطلبات) — قائمة الزبائن أعلاه تشمل كل زبائن الموقع.'
+              : isSalesSupervisor
+                ? 'All orders in the period — Invoice or Receipt.'
+                : 'Your orders in the period below — the customer list above is the whole location.'}
           </p>
         </CardHeader>
         <CardContent>

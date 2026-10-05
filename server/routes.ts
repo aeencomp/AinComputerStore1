@@ -2168,19 +2168,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const filter = parseSalesCustomerQuery(req);
-      let baseOrders = await storage.getOrders();
-      if (
-        filter.salesLocationId != null &&
-        !Number.isNaN(filter.salesLocationId)
-      ) {
-        baseOrders = await listOrdersForSalesLocationListing(filter.salesLocationId);
-      }
+      const locationId =
+        filter.salesLocationId != null && !Number.isNaN(filter.salesLocationId)
+          ? filter.salesLocationId
+          : resolveRequestLocationId(req);
+      const baseOrders = await listOrdersForSalesLocationListing(locationId);
       const ordersForCustomers = filterOrdersForSalesCustomerList(baseOrders, {
         ...filter,
-        salesLocationId: undefined,
+        salesLocationId: locationId,
       });
       const customers = aggregateSalesPosCustomers(ordersForCustomers);
       res.setHeader("X-Customer-Count", String(customers.length));
+      res.setHeader("X-Sales-Location-Id", String(locationId));
       return res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -2201,17 +2200,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const filter = parseSalesCustomerQuery(req);
-      let baseOrders = await storage.getOrders();
-      if (
-        filter.salesLocationId != null &&
-        !Number.isNaN(filter.salesLocationId)
-      ) {
-        baseOrders = await listOrdersForSalesLocationListing(filter.salesLocationId);
-      }
+      const locationId =
+        filter.salesLocationId != null && !Number.isNaN(filter.salesLocationId)
+          ? filter.salesLocationId
+          : resolveRequestLocationId(req);
+      const baseOrders = await listOrdersForSalesLocationListing(locationId);
       const customers = aggregateSalesPosCustomers(
         filterOrdersForSalesCustomerList(baseOrders, {
           ...filter,
-          salesLocationId: undefined,
+          salesLocationId: locationId,
         }),
       );
       if (customers.length === 0) {
