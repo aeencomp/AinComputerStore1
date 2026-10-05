@@ -461,14 +461,20 @@ export default function SalesPOS({
   }
   
   const { data: customers = [] } = useQuery<CustomerData[]>({
-    queryKey: ['/api/sales/customers', salesLocationId],
+    queryKey: ['sales-pos-customers', salesLocationId],
     queryFn: async () => {
-      const res = await fetch(`/api/sales/customers?locationId=${salesLocationId}`, {
+      const params = new URLSearchParams({
+        locationId: String(salesLocationId),
+        reportEligible: '0',
+      });
+      const res = await fetchWithTimeout(`/api/sales/customers?${params.toString()}`, {
         credentials: 'include',
       });
       if (!res.ok) throw new Error('Failed to load customers');
       return res.json();
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   // Filter customers by search query
@@ -517,7 +523,7 @@ export default function SalesPOS({
     setExportingCustomers(true);
     try {
       const res = await fetchWithTimeout(
-        `/api/sales/customers/export?lang=${language === "ar" ? "ar" : "en"}&locationId=${salesLocationId}`,
+        `/api/sales/customers/export?lang=${language === "ar" ? "ar" : "en"}&locationId=${salesLocationId}&reportEligible=0`,
         { credentials: "include" },
       );
       if (!res.ok) {
@@ -2843,7 +2849,7 @@ export default function SalesPOS({
                 ? `${filteredCustomers.length} عميل — مرّر للأسفل لعرض الكل`
                 : `${filteredCustomers.length} customer(s) — scroll to see all`}
             </p>
-            <div className="space-y-2 max-h-[min(70vh,560px)] overflow-y-auto">
+            <div className="space-y-2 max-h-[min(75vh,720px)] overflow-y-auto">
               {filteredCustomers.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <UserSearch className="h-12 w-12 mx-auto mb-3 opacity-30" />

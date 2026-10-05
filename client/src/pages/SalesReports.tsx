@@ -515,9 +515,11 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     );
   }
 
-  const filteredOrders = orders.filter(order => {
-    const day = baghdadDayFromIso(order.createdAt);
-    if (!dayInBaghdadRange(day, salesRange.from, salesRange.to)) return false;
+  const orderMatchesReportFilters = (order: Order, includeDateRange: boolean) => {
+    if (includeDateRange) {
+      const day = baghdadDayFromIso(order.createdAt);
+      if (!dayInBaghdadRange(day, salesRange.from, salesRange.to)) return false;
+    }
 
     if (orderTypeFilter !== 'all') {
       const orderType = order.orderType || 'online';
@@ -535,9 +537,16 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     }
 
     if (!orderMatchesSalesperson(order)) return false;
-    
+
     return true;
-  });
+  };
+
+  const filteredOrders = orders.filter((order) => orderMatchesReportFilters(order, true));
+
+  /** All customers at this location (full history), not limited to selected date range. */
+  const ordersForCustomerDirectory = orders.filter((order) =>
+    orderMatchesReportFilters(order, false),
+  );
 
   const activeOrders = filteredOrders.filter(order => orderIncludedInSalesReport(order));
 
@@ -550,7 +559,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     latestOrder: Order;
   };
   const periodCustomerMap = new Map<string, PeriodCustomerRow>();
-  for (const order of filteredOrders) {
+  for (const order of ordersForCustomerDirectory) {
     const phone = (order.customerPhone || "").trim();
     const key = phone || `__no_phone__:${order.id}`;
     const orderTotal = parseFloat(order.total || "0") || 0;
@@ -1396,13 +1405,13 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>{language === "ar" ? "زبائن الفترة" : "Customers in period"}</CardTitle>
+            <CardTitle>{language === "ar" ? "كل زبائن الموقع" : "All customers at location"}</CardTitle>
             <Badge variant="secondary">{periodCustomers.length}</Badge>
           </div>
           <p className="text-xs text-muted-foreground font-normal mt-1">
             {language === "ar"
-              ? "كل الزبائن في الفترة (بدون حد) — «فاتورة» تطبع آخر طلب للزبون في هذه الفترة."
-              : "All customers in the period (no limit) — Invoice prints their latest order in this period."}
+              ? "كل الزبائن لهذا الموقع (كل الوقت، بدون حد) — «فاتورة» تطبع آخر طلب مسجّل للزبون."
+              : "Every customer at this location (all time, no limit) — Invoice prints their most recent order."}
           </p>
         </CardHeader>
         <CardContent>
@@ -1411,7 +1420,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
               {language === "ar" ? "لا زبائن في هذه الفترة" : "No customers in this period"}
             </p>
           ) : (
-            <div className="overflow-x-auto max-h-[min(420px,50vh)] overflow-y-auto border rounded-md">
+            <div className="overflow-x-auto max-h-[min(560px,65vh)] overflow-y-auto border rounded-md">
               <table className="w-full text-sm">
                 <thead className="sticky top-0 bg-muted/95 backdrop-blur z-10">
                   <tr className="border-b">

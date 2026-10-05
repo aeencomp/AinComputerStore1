@@ -2149,7 +2149,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       locationRaw != null && String(locationRaw).trim() !== ""
         ? parseInt(String(locationRaw), 10)
         : undefined;
-    const reportEligibleOnly = req.query.reportEligible !== "0";
+    const reportEligibleOnly = req.query.reportEligible === "1";
     return { from, to, orderType, salesLocationId, reportEligibleOnly };
   };
 
@@ -2167,8 +2167,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const filter = parseSalesCustomerQuery(req);
-      const orders = filterOrdersForSalesCustomerList(await storage.getOrders(), filter);
-      const customers = aggregateSalesPosCustomers(orders);
+      let baseOrders = await storage.getOrders();
+      if (
+        filter.salesLocationId != null &&
+        !Number.isNaN(filter.salesLocationId)
+      ) {
+        baseOrders = await db
+          .select()
+          .from(orders)
+          .where(eq(orders.salesLocationId, filter.salesLocationId))
+          .orderBy(desc(orders.createdAt));
+      }
+      const ordersForCustomers = filterOrdersForSalesCustomerList(baseOrders, filter);
+      const customers = aggregateSalesPosCustomers(ordersForCustomers);
       return res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -2189,8 +2200,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const filter = parseSalesCustomerQuery(req);
+      let baseOrders = await storage.getOrders();
+      if (
+        filter.salesLocationId != null &&
+        !Number.isNaN(filter.salesLocationId)
+      ) {
+        baseOrders = await db
+          .select()
+          .from(orders)
+          .where(eq(orders.salesLocationId, filter.salesLocationId))
+          .orderBy(desc(orders.createdAt));
+      }
       const customers = aggregateSalesPosCustomers(
-        filterOrdersForSalesCustomerList(await storage.getOrders(), filter),
+        filterOrdersForSalesCustomerList(baseOrders, filter),
       );
       if (customers.length === 0) {
         return res.status(404).json({ error: "No customers to export" });
