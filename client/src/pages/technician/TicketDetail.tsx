@@ -104,8 +104,6 @@ export default function TicketDetail() {
     priority: z.string(),
     technicianNotes: z.string().optional(),
     internalTeamNotes: z.string().optional(),
-    estimatedCompletion: z.string().optional(),
-    costEstimate: z.string().optional(),
     finalCost: z.string().optional(),
     paymentStatus: z.string().optional(),
     paymentMethod: z.string().optional(),
@@ -131,8 +129,6 @@ export default function TicketDetail() {
       priority: ticket?.priority || 'normal',
       technicianNotes: ticket?.technicianNotes || '',
       internalTeamNotes: ticket?.internalTeamNotes || '',
-      estimatedCompletion: ticket?.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
-      costEstimate: cleanPrice(ticket?.costEstimate),
       finalCost: cleanPrice(ticket?.finalCost),
       paymentStatus: ticket?.paymentStatus || 'unpaid',
       paymentMethod: (ticket as any)?.paymentMethod || 'cash',
@@ -149,8 +145,6 @@ export default function TicketDetail() {
         priority: ticket.priority,
         technicianNotes: ticket.technicianNotes || '',
         internalTeamNotes: ticket.internalTeamNotes || '',
-        estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
-        costEstimate: cleanPrice(ticket.costEstimate),
         finalCost: cleanPrice(ticket.finalCost),
         paymentStatus: ticket.paymentStatus || 'unpaid',
         paymentMethod: (ticket as any).paymentMethod || 'cash',
@@ -165,7 +159,6 @@ export default function TicketDetail() {
   const watchedPaymentStatus = form.watch('paymentStatus');
   const watchedPaymentMethod = form.watch('paymentMethod');
   const watchedFinalCost = form.watch('finalCost');
-  const watchedCostEstimate = form.watch('costEstimate');
   const watchedSplitCash = form.watch('cashPaidAmount');
   const watchedSplitCard = form.watch('cardPaidAmount');
 
@@ -174,8 +167,7 @@ export default function TicketDetail() {
     watchedStatus === 'delivered-paid' ||
     (watchedStatus === 'delivered' && watchedPaymentStatus === 'paid');
 
-  const repairPayTotal =
-    parseFloat(watchedFinalCost || watchedCostEstimate || '0') || 0;
+  const repairPayTotal = parseFloat(watchedFinalCost || '0') || 0;
   const splitPaidTotal =
     (parseFloat(watchedSplitCash || '0') || 0) + (parseFloat(watchedSplitCard || '0') || 0);
   const splitRemaining = repairPayTotal - splitPaidTotal;
@@ -220,7 +212,6 @@ export default function TicketDetail() {
       const { customMessage, ...data } = payload;
       const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${params.id}`, {
         ...data,
-        estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
         customMessage: customMessage?.trim() || undefined,
       });
       return res.json();
@@ -302,8 +293,7 @@ export default function TicketDetail() {
     if (data.paymentMethod === 'split' && paymentStatus === 'paid') {
       const cash = parseFloat(data.cashPaidAmount || '0') || 0;
       const card = parseFloat(data.cardPaidAmount || '0') || 0;
-      const amount =
-        parseFloat(data.finalCost || data.costEstimate || '0') || 0;
+      const amount = parseFloat(data.finalCost || '0') || 0;
       if (cash <= 0 || card <= 0) {
         toast({
           title: isRTL ? 'مبالغ الدفع' : 'Payment amounts',
@@ -480,7 +470,7 @@ export default function TicketDetail() {
         </div>
         <div class="date-row"><span class="lbl">${isRTL ? 'وقت الاستلام:' : 'Intake Time:'}</span><span>${intakeDate} — ${intakeTime}</span></div>
         <div class="date-row"><span class="lbl">${isRTL ? 'تاريخ التسليم:' : 'Delivery Date:'}</span><span>${deliveryDate}</span></div>
-        ${ticket.finalCost ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span><span>${Number(ticket.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ticket.costEstimate ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة التقديرية:' : 'Est. Cost:'}</span><span>${Number(ticket.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
+        ${ticket.finalCost ? `<div class="cost-row"><span class="lbl">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span><span>${Number(ticket.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
         ${ticket.technicianNotes ? `<div class="notes"><span style="font-weight:900;">${isRTL ? 'ملاحظات:' : 'Notes:'}</span> ${ticket.technicianNotes}</div>` : ''}
         ${repairReceiptTermsSectionHtml(isRTL)}
         <div class="keep-note">${isRTL ? 'احتفظ بهذا الوصل لاستلام جهازك' : 'Keep this receipt to collect your device'}</div>
@@ -734,33 +724,6 @@ export default function TicketDetail() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="estimatedCompletion"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('repair.ticket.estimatedCompletion')}</FormLabel>
-                        <FormControl>
-                          <Input type="date" {...field}  data-testid="input-estimated-completion" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="costEstimate"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
-                        <FormControl>
-                          <Input type="number" step="0.01" placeholder="0.00" {...field}  data-testid="input-cost-estimate" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
                   <FormField
                     control={form.control}
                     name="finalCost"

@@ -1191,15 +1191,6 @@ export default function TechnicianDashboard() {
                       </span>
                     </div>
                   )}
-                  {canViewRevenue && formatPrice(ticket.costEstimate) && !formatPrice(ticket.finalCost) && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">{t('repair.ticket.costEstimate')}:</span>
-                      <span className="text-sm font-semibold" data-testid={`text-price-${ticket.id}`}>
-                        {formatPrice(ticket.costEstimate)}
-                      </span>
-                    </div>
-                  )}
-
                   <div
                     className="pt-2"
                     onClick={(e) => e.stopPropagation()}

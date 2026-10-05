@@ -110,8 +110,6 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     cardPaidAmount: z.string().optional(),
     technicianNotes: z.string().optional(),
     internalTeamNotes: z.string().optional(),
-    estimatedCompletion: z.string().optional(),
-    costEstimate: z.string().optional(),
     finalCost: z.string().optional(),
   }), []);
 
@@ -137,8 +135,6 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       cardPaidAmount: '',
       technicianNotes: '',
       internalTeamNotes: '',
-      estimatedCompletion: '',
-      costEstimate: '',
       finalCost: '',
     },
   });
@@ -179,8 +175,6 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         cardPaidAmount: cleanPrice((ticket as any).cardPaidAmount),
         technicianNotes: ticket.technicianNotes || '',
         internalTeamNotes: ticket.internalTeamNotes || '',
-        estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
-        costEstimate: cleanPrice(ticket.costEstimate),
         finalCost: cleanPrice(ticket.finalCost),
       });
     }
@@ -194,11 +188,9 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     watchedStatus === 'delivered-paid' ||
     (watchedStatus === 'delivered' && watchedPaymentStatus === 'paid');
   const watchedFinalCost = form.watch('finalCost');
-  const watchedCostEstimate = form.watch('costEstimate');
   const watchedSplitCash = form.watch('cashPaidAmount');
   const watchedSplitCard = form.watch('cardPaidAmount');
-  const repairPayTotal =
-    parseFloat(watchedFinalCost || watchedCostEstimate || '0') || 0;
+  const repairPayTotal = parseFloat(watchedFinalCost || '0') || 0;
   const splitPaidTotal =
     (parseFloat(watchedSplitCash || '0') || 0) + (parseFloat(watchedSplitCard || '0') || 0);
   const splitRemaining = repairPayTotal - splitPaidTotal;
@@ -288,7 +280,6 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       const { customMessage, ...data } = payload;
       const res = await apiRequest('PATCH', `/api/admin/repair-tickets/${ticketId}`, {
         ...data,
-        estimatedCompletion: data.estimatedCompletion ? new Date(data.estimatedCompletion).toISOString() : null,
         customMessage: customMessage?.trim() || undefined,
       });
       return res.json();
@@ -391,8 +382,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     if (data.paymentMethod === 'split' && paymentStatus === 'paid') {
       const cash = parseFloat(data.cashPaidAmount || '0') || 0;
       const card = parseFloat(data.cardPaidAmount || '0') || 0;
-      const amount =
-        parseFloat(data.finalCost || data.costEstimate || '0') || 0;
+      const amount = parseFloat(data.finalCost || '0') || 0;
       if (cash <= 0 || card <= 0) {
         toast({
           title: isRTL ? 'مبالغ الدفع' : 'Payment amounts',
@@ -576,11 +566,6 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
             <span class="info-label">${isRTL ? 'الأولوية:' : 'Priority:'}</span>
             <span class="info-value">${priorityText[ticket.priority] || ticket.priority}</span>
           </div>
-          ${ticket.costEstimate ? `
-          <div class="info-row">
-            <span class="info-label">${isRTL ? 'التكلفة المتوقعة:' : 'Estimated Cost:'}</span>
-            <span class="info-value">${Number(ticket.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span>
-          </div>` : ''}
           ${ticket.finalCost ? `
           <div class="info-row">
             <span class="info-label">${isRTL ? 'التكلفة النهائية:' : 'Final Cost:'}</span>
@@ -645,7 +630,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         <div class="device-info-row"><span class="lbl">${isRTL ? 'الجهاز:' : 'Device:'}</span><span>${t.deviceBrand} ${t.deviceModel}</span></div>
         <div class="device-info-row"><span class="lbl">${isRTL ? 'النوع:' : 'Type:'}</span><span>${typeMap[t.deviceType] || t.deviceType}</span></div>
         <div class="device-info-row"><span class="lbl">${isRTL ? 'الحالة:' : 'Status:'}</span><span style="font-weight:900;">${statusMap[t.status] || t.status}</span></div>
-        ${t.costEstimate ? `<div class="device-info-row"><span class="lbl">${isRTL ? 'التكلفة:' : 'Cost:'}</span><span style="font-weight:900;">${Number(t.costEstimate).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
+        ${t.finalCost ? `<div class="device-info-row"><span class="lbl">${isRTL ? 'التكلفة:' : 'Cost:'}</span><span style="font-weight:900;">${Number(t.finalCost).toLocaleString(undefined, { maximumFractionDigits: 0 })} ${isRTL ? 'د.ع' : 'IQD'}</span></div>` : ''}
         ${t.issueDescriptionAr || t.issueDescriptionEn ? `<div class="device-issue"><span class="lbl">${isRTL ? 'المشكلة:' : 'Issue:'}</span> ${t.issueDescriptionAr || t.issueDescriptionEn}</div>` : ''}
       </div>
     `).join('<div class="divider"></div>');
@@ -1066,34 +1051,6 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
 
                     <FormField
                       control={form.control}
-                      name="estimatedCompletion"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('repair.ticket.estimatedCompletion')}</FormLabel>
-                          <FormControl>
-                            <Input type="date" {...field} data-testid="dialog-input-estimated-completion" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="costEstimate"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>{t('repair.ticket.costEstimate')}</FormLabel>
-                          <FormControl>
-                            <Input type="number" step="0.01" placeholder="0.00" {...field} data-testid="dialog-input-cost-estimate" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
                       name="finalCost"
                       render={({ field }) => (
                         <FormItem>
@@ -1233,7 +1190,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                                 ? 'مثال: انتظر قطعة من المخزن — لا تبلغ العميل بعد'
                                 : 'e.g. Waiting on part from stock — do not notify customer yet'
                             }
-                            rows={3}
+                            rows={2}
                             {...field}
                             lang="ar"
                             dir="auto"
@@ -1253,7 +1210,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                     </Label>
                     <Textarea
                       id="dialog-whatsapp-custom-message"
-                      rows={3}
+                      rows={2}
                       value={whatsappCustomMessage}
                       onChange={(e) => setWhatsappCustomMessage(e.target.value)}
                       placeholder={
@@ -1265,7 +1222,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                       dir="auto"
                       data-testid="dialog-input-whatsapp-custom-message"
                     />
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-[11px] text-muted-foreground">
                       {isRTL
                         ? 'اتركها فارغة لإرسال رسالة التحديث الاعتيادية فقط.'
                         : 'Leave empty to send the usual status update only.'}

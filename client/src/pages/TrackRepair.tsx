@@ -258,18 +258,6 @@ export default function TrackRepair() {
                     <Label className="text-muted-foreground">{t('repair.ticket.createdAt')}</Label>
                     <p className="font-medium">{formatDate(ticket.createdAt)}</p>
                   </div>
-                  {ticket.estimatedCompletion && (
-                    <div>
-                      <Label className="text-muted-foreground">{t('repair.ticket.estimatedCompletion')}</Label>
-                      <p className="font-medium">{formatDate(ticket.estimatedCompletion)}</p>
-                    </div>
-                  )}
-                  {ticket.costEstimate && (
-                    <div>
-                      <Label className="text-muted-foreground">{t('repair.ticket.costEstimate')}</Label>
-                      <p className="font-medium">{ticket.costEstimate} {t('common.currency')}</p>
-                    </div>
-                  )}
                   {ticket.finalCost && (
                     <div>
                       <Label className="text-muted-foreground">{t('repair.ticket.finalCost')}</Label>
