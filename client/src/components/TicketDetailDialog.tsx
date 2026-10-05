@@ -711,19 +711,22 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="dialog-ticket-detail">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3 flex-wrap">
+      <DialogContent
+        className="max-w-3xl max-h-[90vh] overflow-y-auto gap-3 p-4 sm:p-5"
+        data-testid="dialog-ticket-detail"
+      >
+        <DialogHeader className="space-y-1 pb-0">
+          <DialogTitle className="flex items-center gap-2 flex-wrap text-base">
             {ticket ? (
               <>
                 <span data-testid="text-dialog-ticket-number">{ticket.ticketNumber}</span>
                 {isOnlineRepairTicket(ticket) && (
-                  <Badge className="bg-violet-600 text-white border-violet-700 gap-1">
+                  <Badge className="bg-violet-600 text-white border-violet-700 gap-1 text-[10px] px-1.5 py-0">
                     <Globe className="h-3 w-3" />
                     {t('repair.ticket.source.online')}
                   </Badge>
                 )}
-                <Badge className={getStatusColor(ticket.status)}>
+                <Badge className={cn('text-[10px] px-1.5 py-0', getStatusColor(ticket.status))}>
                   {t(`repair.status.${ticket.status}`)}
                 </Badge>
               </>
@@ -731,7 +734,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
               <span>{t('common.loading')}</span>
             )}
           </DialogTitle>
-          <DialogDescription>{t('repair.ticket.details')}</DialogDescription>
+          <DialogDescription className="sr-only">{t('repair.ticket.details')}</DialogDescription>
         </DialogHeader>
 
         {isLoading ? (
@@ -739,48 +742,54 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
             {t('common.loading')}
           </div>
         ) : ticket ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">{isRTL ? 'وقت استلام الجهاز' : 'Received At'}</div>
-                <div className="text-sm font-semibold">
-                  {format(new Date((ticket as any).receivedAt || ticket.createdAt), 'dd/MM/yyyy HH:mm')}
-                </div>
+          <div className="space-y-3">
+            <div className="rounded-md border bg-muted/20 px-2.5 py-2 space-y-1.5">
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
+                <span>
+                  <span className="text-muted-foreground">{isRTL ? 'استلام:' : 'Received:'}</span>{' '}
+                  <span className="font-medium tabular-nums">
+                    {format(new Date((ticket as any).receivedAt || ticket.createdAt), 'dd/MM/yyyy HH:mm')}
+                  </span>
+                </span>
+                <span>
+                  <span className="text-muted-foreground">{isRTL ? 'تحديث:' : 'Updated:'}</span>{' '}
+                  <span className="font-medium tabular-nums">
+                    {format(new Date(ticket.updatedAt), 'dd/MM/yyyy HH:mm')}
+                  </span>
+                </span>
               </div>
-              <div className="rounded-md border p-3">
-                <div className="text-xs text-muted-foreground">{isRTL ? 'آخر تحديث' : 'Last Updated'}</div>
-                <div className="text-sm font-semibold">
-                  {format(new Date(ticket.updatedAt), 'dd/MM/yyyy HH:mm')}
+              <div className="border-t border-border/50 pt-1.5">
+                <div className="text-[11px] font-semibold text-muted-foreground mb-0.5">
+                  {isRTL ? 'سجل الحالة' : 'Status history'}
                 </div>
-              </div>
-            </div>
-
-            <div className="rounded-md border p-3">
-              <div className="text-sm font-semibold mb-2">{isRTL ? 'سجل تغيّر الحالة' : 'Status Change Timeline'}</div>
-              {statusHistory.length === 0 ? (
-                <div className="text-sm text-muted-foreground">{isRTL ? 'لا يوجد سجل بعد' : 'No history yet'}</div>
-              ) : (
-                <div className="space-y-2">
-                  {statusHistory.map((h) => (
-                    <div key={h.id} className="flex items-center justify-between gap-3 p-2 rounded border bg-muted/10">
-                      <div className="min-w-0">
-                        <div className="text-sm font-medium truncate">
+                {statusHistory.length === 0 ? (
+                  <div className="text-xs text-muted-foreground">{isRTL ? 'لا يوجد سجل' : 'No history yet'}</div>
+                ) : (
+                  <ul className="space-y-0.5 max-h-24 overflow-y-auto">
+                    {statusHistory.map((h) => (
+                      <li
+                        key={h.id}
+                        className="flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0 text-xs"
+                      >
+                        <span className="font-medium truncate">
                           {(h.fromStatus ? `${h.fromStatus} → ` : '') + h.toStatus}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(new Date(h.changedAt), 'dd/MM/yyyy HH:mm')}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                        </span>
+                        <span className="text-muted-foreground tabular-nums shrink-0">
+                          {format(new Date(h.changedAt), 'dd/MM/yy HH:mm')}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
             {/* Customer & Device Info Section */}
             <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">{isRTL ? 'بيانات العميل والجهاز' : 'Customer & Device Info'}</h3>
+              <div className="flex items-center justify-between mb-1.5">
+                <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                  {isRTL ? 'بيانات العميل والجهاز' : 'Customer & Device Info'}
+                </h3>
                 <Button
                   type="button"
                   size="sm"
@@ -885,45 +894,45 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                 </Form>
               ) : (
                 <>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerName')}</Label>
-                      <p className="font-medium" data-testid="text-dialog-customer-name">{ticket.customerName}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerPhone')}</Label>
-                      <p className="font-medium" data-testid="text-dialog-customer-phone">{ticket.customerPhone}</p>
-                    </div>
-                    {ticket.customerEmail && (
-                      <div>
-                        <Label className="text-muted-foreground text-xs">{t('repair.ticket.customerEmail')}</Label>
-                        <p className="font-medium">{ticket.customerEmail}</p>
-                      </div>
-                    )}
-                    <div>
-                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceType')}</Label>
-                      <p className="font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceBrand')}</Label>
-                      <p className="font-medium">{ticket.deviceBrand}</p>
-                    </div>
-                    <div>
-                      <Label className="text-muted-foreground text-xs">{t('repair.ticket.deviceModel')}</Label>
-                      <p className="font-medium">{ticket.deviceModel}</p>
-                    </div>
-                  </div>
-                  <div className="mt-3">
-                    <Label className="text-muted-foreground text-xs">{t('repair.ticket.issueDescription')}</Label>
-                    <p className="mt-1 text-sm">{ticket.issueDescriptionAr || ticket.issueDescriptionEn}</p>
+                  <div className="rounded-md border px-2.5 py-2 grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-1 text-sm">
+                    <p className="min-w-0 sm:col-span-2">
+                      <span className="text-[11px] text-muted-foreground">{t('repair.ticket.customerName')}: </span>
+                      <span className="font-medium" data-testid="text-dialog-customer-name">{ticket.customerName}</span>
+                    </p>
+                    <p className="min-w-0">
+                      <span className="text-[11px] text-muted-foreground">{t('repair.ticket.customerPhone')}: </span>
+                      <span className="font-medium tabular-nums" data-testid="text-dialog-customer-phone">{ticket.customerPhone}</span>
+                    </p>
+                    {ticket.customerEmail ? (
+                      <p className="min-w-0 truncate">
+                        <span className="text-[11px] text-muted-foreground">{t('repair.ticket.customerEmail')}: </span>
+                        <span className="font-medium">{ticket.customerEmail}</span>
+                      </p>
+                    ) : null}
+                    <p className="min-w-0">
+                      <span className="text-[11px] text-muted-foreground">{t('repair.ticket.deviceType')}: </span>
+                      <span className="font-medium">{t(`repair.deviceType.${ticket.deviceType}`)}</span>
+                    </p>
+                    <p className="min-w-0">
+                      <span className="text-[11px] text-muted-foreground">{t('repair.ticket.deviceBrand')}: </span>
+                      <span className="font-medium">{ticket.deviceBrand}</span>
+                    </p>
+                    <p className="min-w-0">
+                      <span className="text-[11px] text-muted-foreground">{t('repair.ticket.deviceModel')}: </span>
+                      <span className="font-medium">{ticket.deviceModel}</span>
+                    </p>
+                    <p className="min-w-0 sm:col-span-2 pt-1 border-t border-border/40 mt-0.5">
+                      <span className="text-[11px] text-muted-foreground block mb-0.5">{t('repair.ticket.issueDescription')}</span>
+                      <span className="text-xs leading-snug">{ticket.issueDescriptionAr || ticket.issueDescriptionEn}</span>
+                    </p>
                   </div>
                 </>
               )}
             </div>
 
-            <div className="border-t pt-4">
+            <div className="border-t pt-2">
               {dialogActiveTickets.length > 1 && ticketCustomer && (
-                <div className="flex gap-2 p-3 mb-3 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700" data-testid="banner-dialog-multi-device">
+                <div className="flex gap-2 p-2 mb-2 rounded-md border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 text-xs" data-testid="banner-dialog-multi-device">
                   <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
                   <div className="min-w-0 space-y-1">
                     <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">
@@ -941,8 +950,10 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                   </div>
                 </div>
               )}
-              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                <h3 className="font-semibold text-sm">{isRTL ? 'خيارات الطباعة' : 'Print Options'}</h3>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground">
+                  {isRTL ? 'خيارات الطباعة' : 'Print Options'}
+                </h3>
                 <div className="flex gap-2 flex-wrap">
                   <Button size="sm" onClick={handlePrint} className="gap-2" disabled={!barcodeReady} data-testid="button-dialog-print-label">
                     <Printer className="h-4 w-4" />
@@ -986,11 +997,13 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
               </div>
             </div>
 
-            <div className="border-t pt-4">
-              <h3 className="font-semibold text-sm mb-3">{t('repair.edit.title')}</h3>
+            <div className="border-t pt-2">
+              <h3 className="font-semibold text-xs uppercase tracking-wide text-muted-foreground mb-2">
+                {t('repair.edit.title')}
+              </h3>
               <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     <FormField
                       control={form.control}
                       name="status"
@@ -1192,7 +1205,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                         <FormControl>
                           <Textarea
                             placeholder={t('repair.edit.addNotes') || 'Add notes...'}
-                            rows={3}
+                            rows={2}
                             {...field}
                             lang="ar"
                             dir="auto"
