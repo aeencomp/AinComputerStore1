@@ -40,6 +40,10 @@ import {
   type CustomerExportSource,
 } from "./customer-export";
 import { computeRepairReport, computeRepairReportRange } from "./repair-report";
+import {
+  omitInternalRepairFields,
+  repairTicketUpdateNotifiesCustomer,
+} from "./repair-ticket-utils";
 import { computeTechnicianPeriodRevenueSummary } from "./technician-period-revenue";
 import {
   findTechnicianRepairShift,
@@ -4727,7 +4731,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Repair ticket not found" });
       }
       
-      return res.json(ticket);
+      return res.json(omitInternalRepairFields(ticket));
     } catch (error) {
       console.error("Error looking up repair ticket by phone:", error);
       return res.status(500).json({ error: "Failed to lookup repair ticket" });
@@ -4753,7 +4757,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Repair ticket not found" });
       }
 
-      return res.json(ticket);
+      return res.json(omitInternalRepairFields(ticket));
     } catch (error) {
       console.error("Error searching repair ticket:", error);
       return res.status(500).json({ error: "Failed to search repair ticket" });
@@ -4769,7 +4773,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ error: "Repair ticket not found" });
       }
       
-      return res.json(ticket);
+      return res.json(omitInternalRepairFields(ticket));
     } catch (error) {
       console.error("Error looking up repair ticket:", error);
       return res.status(500).json({ error: "Failed to lookup repair ticket" });
@@ -4939,6 +4943,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (req.body.technicianNotes !== undefined) {
         updateData.technicianNotes = req.body.technicianNotes || '';
       }
+      if (req.body.internalTeamNotes !== undefined) {
+        updateData.internalTeamNotes = req.body.internalTeamNotes || '';
+      }
       if (req.body.estimatedCompletion !== undefined) {
         updateData.estimatedCompletion = req.body.estimatedCompletion ? new Date(req.body.estimatedCompletion) : null;
       }
@@ -5075,35 +5082,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Send WhatsApp update notification (non-blocking)
-      const whatsappResult = await sendTicketUpdatedMessage(
-        ticket.customerPhone,
-        ticket.customerName,
-        ticket.ticketNumber,
-        ticket.status,
-        ticket.technicianNotes,
-        ticket.costEstimate,
-        ticket.finalCost,
-        whatsappCustomMessage ? { customMessage: whatsappCustomMessage } : undefined,
-      ).catch(err => {
-        console.error('WhatsApp update notification failed:', err);
-        return { success: false, error: err.message };
-      });
+      const notifyCustomer =
+        existing &&
+        repairTicketUpdateNotifiesCustomer(existing, updateData, whatsappCustomMessage);
 
-      if (!whatsappResult.success) {
-        console.warn(
-          `WhatsApp status update not sent for ticket ${ticket.ticketNumber}. ` +
-          `phone="${ticket.customerPhone}" status="${ticket.status}" ` +
-          `errorCode=${(whatsappResult as any).errorCode ?? 'n/a'} error="${whatsappResult.error ?? 'unknown'}"`
-        );
+      let whatsappResult: Awaited<ReturnType<typeof sendTicketUpdatedMessage>> = {
+        success: false,
+        error: "skipped",
+      };
+
+      if (notifyCustomer) {
+        whatsappResult = await sendTicketUpdatedMessage(
+          ticket.customerPhone,
+          ticket.customerName,
+          ticket.ticketNumber,
+          ticket.status,
+          ticket.technicianNotes,
+          ticket.costEstimate,
+          ticket.finalCost,
+          whatsappCustomMessage ? { customMessage: whatsappCustomMessage } : undefined,
+        ).catch(err => {
+          console.error('WhatsApp update notification failed:', err);
+          return { success: false, error: err.message };
+        });
+
+        if (!whatsappResult.success) {
+          console.warn(
+            `WhatsApp status update not sent for ticket ${ticket.ticketNumber}. ` +
+            `phone="${ticket.customerPhone}" status="${ticket.status}" ` +
+            `errorCode=${(whatsappResult as any).errorCode ?? 'n/a'} error="${whatsappResult.error ?? 'unknown'}"`
+          );
+        }
       }
       
       return res.json({
         ...ticket,
-        _whatsappStatus: whatsappResult.success
-          ? `accepted:${whatsappResult.messageStatus || 'unknown'}${whatsappResult.deliveryMethod === 'free_text' ? ':free_text_may_not_deliver' : ''}`
-          : `failed: ${whatsappResult.error || 'unknown'}`,
-        _whatsappMeta: whatsappResult.success
+        _whatsappStatus: !notifyCustomer
+          ? "skipped:no_customer_change"
+          : whatsappResult.success
+            ? `accepted:${whatsappResult.messageStatus || 'unknown'}${whatsappResult.deliveryMethod === 'free_text' ? ':free_text_may_not_deliver' : ''}`
+            : `failed: ${whatsappResult.error || 'unknown'}`,
+        _whatsappMeta: notifyCustomer && whatsappResult.success
           ? {
               messageId: whatsappResult.messageId,
               messageStatus: whatsappResult.messageStatus,
@@ -5111,7 +5130,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               deliveryMethod: whatsappResult.deliveryMethod,
               templateName: whatsappResult.templateName,
             }
-          : { errorCode: whatsappResult.errorCode },
+          : notifyCustomer
+            ? { errorCode: whatsappResult.errorCode }
+            : undefined,
       });
     } catch (error) {
       if (error instanceof z.ZodError) {

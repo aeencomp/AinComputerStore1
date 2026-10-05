@@ -109,6 +109,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
     cashPaidAmount: z.string().optional(),
     cardPaidAmount: z.string().optional(),
     technicianNotes: z.string().optional(),
+    internalTeamNotes: z.string().optional(),
     estimatedCompletion: z.string().optional(),
     costEstimate: z.string().optional(),
     finalCost: z.string().optional(),
@@ -135,6 +136,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
       cashPaidAmount: '',
       cardPaidAmount: '',
       technicianNotes: '',
+      internalTeamNotes: '',
       estimatedCompletion: '',
       costEstimate: '',
       finalCost: '',
@@ -176,6 +178,7 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         cashPaidAmount: cleanPrice((ticket as any).cashPaidAmount),
         cardPaidAmount: cleanPrice((ticket as any).cardPaidAmount),
         technicianNotes: ticket.technicianNotes || '',
+        internalTeamNotes: ticket.internalTeamNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
         costEstimate: cleanPrice(ticket.costEstimate),
         finalCost: cleanPrice(ticket.finalCost),
@@ -302,7 +305,9 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
       });
-      if (response?._whatsappStatus?.startsWith('accepted:') || response?._whatsappStatus === 'sent' || response?._whatsappStatus === 'queued') {
+      if (response?._whatsappStatus === 'skipped:no_customer_change') {
+        // Internal-only or unchanged save — no WhatsApp
+      } else if (response?._whatsappStatus?.startsWith('accepted:') || response?._whatsappStatus === 'sent' || response?._whatsappStatus === 'queued') {
         toast({
           title: isRTL ? 'تم إرسال رسالة واتساب' : 'WhatsApp Message Sent',
           description: isRTL
@@ -1194,6 +1199,33 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                             data-testid="dialog-textarea-technician-notes"
                           />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="internalTeamNotes"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>{t('repair.ticket.internalTeamNotes')}</FormLabel>
+                        <FormControl>
+                          <Textarea
+                            placeholder={
+                              isRTL
+                                ? 'مثال: انتظر قطعة من المخزن — لا تبلغ العميل بعد'
+                                : 'e.g. Waiting on part from stock — do not notify customer yet'
+                            }
+                            rows={3}
+                            {...field}
+                            lang="ar"
+                            dir="auto"
+                            className="border-amber-200/80 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20"
+                            data-testid="dialog-textarea-internal-team-notes"
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">{t('repair.ticket.internalTeamNotesHint')}</p>
                         <FormMessage />
                       </FormItem>
                     )}

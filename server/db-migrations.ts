@@ -108,6 +108,8 @@ const STARTUP_MIGRATIONS: string[] = [
 
   `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS excluded_from_sales_report INTEGER NOT NULL DEFAULT 0`,
 
+  `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS internal_team_notes TEXT DEFAULT ''`,
+
   `ALTER TABLE repair_tickets ADD COLUMN IF NOT EXISTS paid_at TIMESTAMP`,
   `UPDATE repair_tickets SET paid_at = delivered_at
      WHERE payment_status = 'paid' AND paid_at IS NULL AND status = 'delivered' AND delivered_at IS NOT NULL`,

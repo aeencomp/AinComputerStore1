@@ -460,6 +460,8 @@ export const repairTickets = pgTable("repair_tickets", {
   status: text("status").notNull().default("pending"), // pending, in-progress, waiting-parts, completed, delivered
   priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
   technicianNotes: text("technician_notes").default(""),
+  /** Visible to technicians only; never sent on WhatsApp or public track page. */
+  internalTeamNotes: text("internal_team_notes").default(""),
   estimatedCompletion: timestamp("estimated_completion"),
   costEstimate: decimal("cost_estimate", { precision: 10, scale: 2 }),
   finalCost: decimal("final_cost", { precision: 10, scale: 2 }),

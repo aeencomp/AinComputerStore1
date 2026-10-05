@@ -103,6 +103,7 @@ export default function TicketDetail() {
     status: z.string(),
     priority: z.string(),
     technicianNotes: z.string().optional(),
+    internalTeamNotes: z.string().optional(),
     estimatedCompletion: z.string().optional(),
     costEstimate: z.string().optional(),
     finalCost: z.string().optional(),
@@ -129,6 +130,7 @@ export default function TicketDetail() {
       status: ticket ? resolveStatusField(ticket.status, ticket.paymentStatus || 'unpaid') : 'pending',
       priority: ticket?.priority || 'normal',
       technicianNotes: ticket?.technicianNotes || '',
+      internalTeamNotes: ticket?.internalTeamNotes || '',
       estimatedCompletion: ticket?.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
       costEstimate: cleanPrice(ticket?.costEstimate),
       finalCost: cleanPrice(ticket?.finalCost),
@@ -146,6 +148,7 @@ export default function TicketDetail() {
         status: resolveStatusField(ticket.status, ticket.paymentStatus || 'unpaid'),
         priority: ticket.priority,
         technicianNotes: ticket.technicianNotes || '',
+        internalTeamNotes: ticket.internalTeamNotes || '',
         estimatedCompletion: ticket.estimatedCompletion ? format(new Date(ticket.estimatedCompletion), 'yyyy-MM-dd') : '',
         costEstimate: cleanPrice(ticket.costEstimate),
         finalCost: cleanPrice(ticket.finalCost),
@@ -235,7 +238,9 @@ export default function TicketDetail() {
         title: t('repair.edit.successTitle'),
         description: t('repair.edit.successMessage'),
       });
-      if (response?._whatsappStatus?.startsWith('accepted:') || response?._whatsappStatus === 'sent' || response?._whatsappStatus === 'queued') {
+      if (response?._whatsappStatus === 'skipped:no_customer_change') {
+        // No WhatsApp when only internal team note changed
+      } else if (response?._whatsappStatus?.startsWith('accepted:') || response?._whatsappStatus === 'sent' || response?._whatsappStatus === 'queued') {
         toast({
           title: isRTL ? 'تم إرسال رسالة واتساب' : 'WhatsApp Message Sent',
           description: isRTL
@@ -887,6 +892,31 @@ export default function TicketDetail() {
                           data-testid="textarea-technician-notes"
                         />
                       </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="internalTeamNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>{t('repair.ticket.internalTeamNotes')}</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder={
+                            isRTL
+                              ? 'ملاحظة للفنيين فقط — لا تُرسل للعميل'
+                              : 'Note for technicians only — not sent to customer'
+                          }
+                          rows={3}
+                          {...field}
+                          className="border-amber-200/80 bg-amber-50/40 dark:border-amber-900/50 dark:bg-amber-950/20"
+                          data-testid="textarea-internal-team-notes"
+                        />
+                      </FormControl>
+                      <p className="text-xs text-muted-foreground">{t('repair.ticket.internalTeamNotesHint')}</p>
                       <FormMessage />
                     </FormItem>
                   )}
