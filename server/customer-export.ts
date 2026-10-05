@@ -56,6 +56,9 @@ export type SalesPosCustomerRow = {
   name: string;
   orderCount: number;
   totalSpent: number;
+  lastOrderId?: string;
+  lastOrderNumber?: string;
+  lastOrderAt?: string;
 };
 
 export function aggregateSalesPosCustomers(orders: Order[]): SalesPosCustomerRow[] {
@@ -68,11 +71,22 @@ export function aggregateSalesPosCustomers(orders: Order[]): SalesPosCustomerRow
     const orderTotal = parseFloat(order.total?.toString() || "0") || 0;
     const existing = customerMap.get(rawPhone);
 
+    const orderAt = new Date(order.createdAt).getTime();
+
     if (existing) {
       existing.orderCount += 1;
       existing.totalSpent += orderTotal;
       if (!existing.name?.trim() && order.customerName?.trim()) {
         existing.name = order.customerName.trim();
+      }
+      const prevAt = existing.lastOrderAt ? new Date(existing.lastOrderAt).getTime() : 0;
+      if (orderAt >= prevAt) {
+        existing.lastOrderId = order.id;
+        existing.lastOrderNumber = order.orderNumber;
+        existing.lastOrderAt =
+          typeof order.createdAt === "string"
+            ? order.createdAt
+            : new Date(order.createdAt).toISOString();
       }
     } else {
       customerMap.set(rawPhone, {
@@ -80,6 +94,12 @@ export function aggregateSalesPosCustomers(orders: Order[]): SalesPosCustomerRow
         name: order.customerName?.trim() || "",
         orderCount: 1,
         totalSpent: orderTotal,
+        lastOrderId: order.id,
+        lastOrderNumber: order.orderNumber,
+        lastOrderAt:
+          typeof order.createdAt === "string"
+            ? order.createdAt
+            : new Date(order.createdAt).toISOString(),
       });
     }
   }

@@ -634,3 +634,58 @@ export async function openA4InvoicePrint(
     popup.document.close();
   }
 }
+
+function parseStoredOrderItems(items: unknown[] | undefined): A4InvoiceItem[] {
+  if (!items?.length) return [];
+  return items
+    .map((item) => {
+      if (typeof item === "string") {
+        try {
+          return JSON.parse(item) as Record<string, unknown>;
+        } catch {
+          return null;
+        }
+      }
+      return item as Record<string, unknown>;
+    })
+    .filter((item): item is Record<string, unknown> => item !== null && typeof item === "object")
+    .map((item) => ({
+      nameAr: (item.nameAr as string) || (item.name as string),
+      nameEn: item.nameEn as string | undefined,
+      name: item.name as string | undefined,
+      sku: item.sku as string | undefined,
+      price: (item.price ?? item.unitPrice ?? "0") as string | number,
+      quantity: parseInt(String(item.quantity || "1"), 10) || 1,
+      specs: item.specs as string[] | undefined,
+      notes: item.notes as string | undefined,
+    }));
+}
+
+/** Build A4 payload from a persisted sales order row (POS / reports). */
+export function orderRecordToA4Invoice(order: {
+  orderNumber: string;
+  createdAt: string;
+  customerName?: string | null;
+  customerPhone?: string | null;
+  customerAddress?: string | null;
+  items?: unknown[];
+  subtotal?: string | number | null;
+  discount?: string | number | null;
+  total?: string | number | null;
+  paymentMethod?: string | null;
+  notes?: string | null;
+}): A4InvoiceOrder {
+  return {
+    orderNumber: order.orderNumber,
+    createdAt: order.createdAt,
+    customerName: order.customerName ?? undefined,
+    customerPhone: order.customerPhone ?? undefined,
+    customerAddress: order.customerAddress ?? undefined,
+    items: parseStoredOrderItems(order.items),
+    subtotal: order.subtotal ?? order.total ?? "0",
+    discount: order.discount ?? undefined,
+    total: order.total ?? "0",
+    paymentMethod: order.paymentMethod ?? undefined,
+    notes: order.notes,
+  };
+}

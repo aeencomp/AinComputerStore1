@@ -20,7 +20,12 @@ import {
 } from "@/lib/inventoryScanCode";
 import { formatPosPaymentLabel } from "@/lib/posPayment";
 import { cn } from "@/lib/utils";
-import { openA4InvoicePrint, STORE_BRAND_RED, STORE_WEBSITE } from "@/lib/a4InvoicePrint";
+import {
+  openA4InvoicePrint,
+  orderRecordToA4Invoice,
+  STORE_BRAND_RED,
+  STORE_WEBSITE,
+} from "@/lib/a4InvoicePrint";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
@@ -450,6 +455,9 @@ export default function SalesPOS({
     name: string;
     orderCount: number;
     totalSpent: number;
+    lastOrderId?: string;
+    lastOrderNumber?: string;
+    lastOrderAt?: string;
   }
   
   const { data: customers = [] } = useQuery<CustomerData[]>({
@@ -476,6 +484,33 @@ export default function SalesPOS({
     setCustomerName(customer.name);
     setShowCustomerLookup(false);
     setCustomerSearchQuery("");
+  };
+
+  const printCustomerInvoice = async (customer: CustomerData) => {
+    const orderNumber = customer.lastOrderNumber?.trim();
+    if (!orderNumber) {
+      toast({
+        title: language === "ar" ? "لا يوجد طلب لهذا العميل" : "No order for this customer",
+        variant: "destructive",
+      });
+      return;
+    }
+    try {
+      const res = await fetchWithTimeout(
+        `/api/orders/by-number/${encodeURIComponent(orderNumber)}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) throw new Error("Failed to load order");
+      const order = await res.json();
+      await openA4InvoicePrint(orderRecordToA4Invoice(order), {
+        issuedBy: user.name,
+      });
+    } catch {
+      toast({
+        title: language === "ar" ? "فشل طباعة الفاتورة" : "Invoice print failed",
+        variant: "destructive",
+      });
+    }
   };
 
   const exportSalesCustomersXlsx = async () => {
@@ -2803,7 +2838,12 @@ export default function SalesPOS({
               />
             </div>
             
-            <div className="space-y-2 max-h-80 overflow-y-auto">
+            <p className="text-xs text-muted-foreground">
+              {language === "ar"
+                ? `${filteredCustomers.length} عميل — مرّر للأسفل لعرض الكل`
+                : `${filteredCustomers.length} customer(s) — scroll to see all`}
+            </p>
+            <div className="space-y-2 max-h-[min(70vh,560px)] overflow-y-auto">
               {filteredCustomers.length === 0 ? (
                 <div className="text-center py-8 text-muted-foreground">
                   <UserSearch className="h-12 w-12 mx-auto mb-3 opacity-30" />
@@ -2811,30 +2851,52 @@ export default function SalesPOS({
                 </div>
               ) : (
                 filteredCustomers.map((customer, index) => (
-                  <button
+                  <div
                     key={`${customer.phone}-${index}`}
-                    className="w-full text-start p-3 rounded-lg border bg-muted/30 hover:bg-muted transition-colors"
-                    onClick={() => selectCustomer(customer)}
+                    className="flex items-stretch gap-2 rounded-lg border bg-muted/30 overflow-hidden"
                     data-testid={`customer-${index}`}
                   >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium truncate">{customer.name || (language === 'ar' ? 'بدون اسم' : 'No Name')}</p>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Phone className="h-3 w-3" />
-                          {customer.phone}
-                        </p>
+                    <button
+                      type="button"
+                      className="flex-1 min-w-0 text-start p-3 hover:bg-muted transition-colors"
+                      onClick={() => selectCustomer(customer)}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">{customer.name || (language === 'ar' ? 'بدون اسم' : 'No Name')}</p>
+                          <p className="text-sm text-muted-foreground flex items-center gap-1">
+                            <Phone className="h-3 w-3" />
+                            {customer.phone}
+                          </p>
+                          {customer.lastOrderNumber ? (
+                            <p className="text-[10px] text-muted-foreground font-mono mt-0.5" dir="ltr">
+                              {language === "ar" ? "آخر طلب:" : "Last:"} {customer.lastOrderNumber}
+                            </p>
+                          ) : null}
+                        </div>
+                        <div className="text-end flex-shrink-0">
+                          <Badge variant="outline" className="text-xs mb-1">
+                            {customer.orderCount} {language === 'ar' ? 'طلب' : 'orders'}
+                          </Badge>
+                          <p className="text-xs text-muted-foreground">
+                            {formatPrice(customer.totalSpent)} {language === 'ar' ? 'د.ع' : 'IQD'}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-end flex-shrink-0">
-                        <Badge variant="outline" className="text-xs mb-1">
-                          {customer.orderCount} {language === 'ar' ? 'طلب' : 'orders'}
-                        </Badge>
-                        <p className="text-xs text-muted-foreground">
-                          {formatPrice(customer.totalSpent)} {language === 'ar' ? 'د.ع' : 'IQD'}
-                        </p>
-                      </div>
-                    </div>
-                  </button>
+                    </button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="shrink-0 self-center me-2 gap-1 h-9"
+                      disabled={!customer.lastOrderNumber}
+                      onClick={() => void printCustomerInvoice(customer)}
+                      data-testid={`button-customer-invoice-${index}`}
+                    >
+                      <FileText className="h-3.5 w-3.5" />
+                      {language === "ar" ? "فاتورة" : "Invoice"}
+                    </Button>
+                  </div>
                 ))
               )}
             </div>

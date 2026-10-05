@@ -541,6 +541,48 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
 
   const activeOrders = filteredOrders.filter(order => orderIncludedInSalesReport(order));
 
+  type PeriodCustomerRow = {
+    key: string;
+    name: string;
+    phone: string;
+    orderCount: number;
+    totalSpent: number;
+    latestOrder: Order;
+  };
+  const periodCustomerMap = new Map<string, PeriodCustomerRow>();
+  for (const order of filteredOrders) {
+    const phone = (order.customerPhone || "").trim();
+    const key = phone || `__no_phone__:${order.id}`;
+    const orderTotal = parseFloat(order.total || "0") || 0;
+    const existing = periodCustomerMap.get(key);
+    if (existing) {
+      existing.orderCount += 1;
+      existing.totalSpent += orderTotal;
+      if (!existing.name.trim() && order.customerName?.trim()) {
+        existing.name = order.customerName.trim();
+      }
+      if (
+        new Date(order.createdAt).getTime() >
+        new Date(existing.latestOrder.createdAt).getTime()
+      ) {
+        existing.latestOrder = order;
+      }
+    } else {
+      periodCustomerMap.set(key, {
+        key,
+        phone,
+        name: order.customerName?.trim() || "",
+        orderCount: 1,
+        totalSpent: orderTotal,
+        latestOrder: order,
+      });
+    }
+  }
+  const periodCustomers = Array.from(periodCustomerMap.values()).sort((a, b) => {
+    if (b.orderCount !== a.orderCount) return b.orderCount - a.orderCount;
+    return (a.name || a.phone).localeCompare(b.name || b.phone, language === "ar" ? "ar" : "en");
+  });
+
   const totalRevenue = activeOrders.reduce((sum, o) => sum + parseFloat(o.total || '0'), 0);
   const orderCount = activeOrders.length;
   const avgOrderValue = orderCount > 0 ? totalRevenue / orderCount : 0;
@@ -1350,6 +1392,86 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
           </CardContent>
         </Card>
       </div>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <CardTitle>{language === "ar" ? "زبائن الفترة" : "Customers in period"}</CardTitle>
+            <Badge variant="secondary">{periodCustomers.length}</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground font-normal mt-1">
+            {language === "ar"
+              ? "كل الزبائن في الفترة (بدون حد) — «فاتورة» تطبع آخر طلب للزبون في هذه الفترة."
+              : "All customers in the period (no limit) — Invoice prints their latest order in this period."}
+          </p>
+        </CardHeader>
+        <CardContent>
+          {periodCustomers.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8 text-sm">
+              {language === "ar" ? "لا زبائن في هذه الفترة" : "No customers in this period"}
+            </p>
+          ) : (
+            <div className="overflow-x-auto max-h-[min(420px,50vh)] overflow-y-auto border rounded-md">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 bg-muted/95 backdrop-blur z-10">
+                  <tr className="border-b">
+                    <th className="text-start p-2">{language === "ar" ? "الاسم" : "Name"}</th>
+                    <th className="text-start p-2">{language === "ar" ? "الهاتف" : "Phone"}</th>
+                    <th className="text-end p-2">{language === "ar" ? "الطلبات" : "Orders"}</th>
+                    <th className="text-end p-2">{language === "ar" ? "الإجمالي" : "Total"}</th>
+                    <th className="text-start p-2 min-w-[9rem]">{language === "ar" ? "طباعة" : "Print"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {periodCustomers.map((row) => (
+                    <tr key={row.key} className="border-b hover:bg-muted/40">
+                      <td className="p-2 font-medium">{row.name || "—"}</td>
+                      <td className="p-2 font-mono text-xs" dir="ltr">
+                        {row.phone || "—"}
+                      </td>
+                      <td className="p-2 text-end tabular-nums">{row.orderCount}</td>
+                      <td className="p-2 text-end tabular-nums">
+                        {formatPrice(Math.round(row.totalSpent))} IQD
+                      </td>
+                      <td className="p-2">
+                        <div className="flex flex-wrap gap-1">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            className="h-8 gap-1 px-2"
+                            onClick={() => void printA4OrderReceipt(row.latestOrder)}
+                            data-testid={`button-customer-invoice-${row.key}`}
+                          >
+                            <FileText className="w-3.5 h-3.5" />
+                            {language === "ar" ? "فاتورة" : "Invoice"}
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-8 gap-1 px-2"
+                            onClick={() => printOrderReceipt(row.latestOrder)}
+                            data-testid={`button-customer-receipt-${row.key}`}
+                          >
+                            <Printer className="w-3.5 h-3.5" />
+                            {language === "ar" ? "وصل" : "Receipt"}
+                          </Button>
+                        </div>
+                        {row.orderCount > 1 ? (
+                          <p className="text-[10px] text-muted-foreground mt-1 font-mono" dir="ltr">
+                            {language === "ar" ? "آخر:" : "Latest:"} {row.latestOrder.orderNumber}
+                          </p>
+                        ) : null}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader className="pb-2">
