@@ -61,6 +61,13 @@ export type SalesPosCustomerRow = {
   lastOrderAt?: string;
 };
 
+/** Merge Iraqi phone variants (+9647…, 07…, spaces). */
+export function salesCustomerPhoneKey(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits || raw.trim();
+}
+
 export function aggregateSalesPosCustomers(orders: Order[]): SalesPosCustomerRow[] {
   const customerMap = new Map<string, SalesPosCustomerRow>();
 
@@ -68,8 +75,11 @@ export function aggregateSalesPosCustomers(orders: Order[]): SalesPosCustomerRow
     const rawPhone = order.customerPhone?.trim();
     if (!rawPhone) continue;
 
+    const phoneKey = salesCustomerPhoneKey(rawPhone);
+    if (!phoneKey) continue;
+
     const orderTotal = parseFloat(order.total?.toString() || "0") || 0;
-    const existing = customerMap.get(rawPhone);
+    const existing = customerMap.get(phoneKey);
 
     const orderAt = new Date(order.createdAt).getTime();
 
@@ -89,7 +99,7 @@ export function aggregateSalesPosCustomers(orders: Order[]): SalesPosCustomerRow
             : new Date(order.createdAt).toISOString();
       }
     } else {
-      customerMap.set(rawPhone, {
+      customerMap.set(phoneKey, {
         phone: rawPhone,
         name: order.customerName?.trim() || "",
         orderCount: 1,

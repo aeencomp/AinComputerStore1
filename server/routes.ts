@@ -30,6 +30,7 @@ import {
   sqlCashWithdrawalOnBaghdadDate,
 } from "./daily-revenue-report";
 import { listAdminCustomers } from "./admin-customers";
+import { listOrdersForSalesLocationListing } from "./sales-location-orders";
 import {
   buildContactsCsv,
   buildContactsVcf,
@@ -2172,14 +2173,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filter.salesLocationId != null &&
         !Number.isNaN(filter.salesLocationId)
       ) {
-        baseOrders = await db
-          .select()
-          .from(orders)
-          .where(eq(orders.salesLocationId, filter.salesLocationId))
-          .orderBy(desc(orders.createdAt));
+        baseOrders = await listOrdersForSalesLocationListing(filter.salesLocationId);
       }
-      const ordersForCustomers = filterOrdersForSalesCustomerList(baseOrders, filter);
+      const ordersForCustomers = filterOrdersForSalesCustomerList(baseOrders, {
+        ...filter,
+        salesLocationId: undefined,
+      });
       const customers = aggregateSalesPosCustomers(ordersForCustomers);
+      res.setHeader("X-Customer-Count", String(customers.length));
       return res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -2205,14 +2206,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         filter.salesLocationId != null &&
         !Number.isNaN(filter.salesLocationId)
       ) {
-        baseOrders = await db
-          .select()
-          .from(orders)
-          .where(eq(orders.salesLocationId, filter.salesLocationId))
-          .orderBy(desc(orders.createdAt));
+        baseOrders = await listOrdersForSalesLocationListing(filter.salesLocationId);
       }
       const customers = aggregateSalesPosCustomers(
-        filterOrdersForSalesCustomerList(baseOrders, filter),
+        filterOrdersForSalesCustomerList(baseOrders, {
+          ...filter,
+          salesLocationId: undefined,
+        }),
       );
       if (customers.length === 0) {
         return res.status(404).json({ error: "No customers to export" });
@@ -3987,11 +3987,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (locationParam != null && locationParam !== "") {
         const locationId = parseInt(String(locationParam), 10);
         if (!Number.isNaN(locationId)) {
-          const rows = await db
-            .select()
-            .from(orders)
-            .where(eq(orders.salesLocationId, locationId))
-            .orderBy(desc(orders.createdAt));
+          const rows = await listOrdersForSalesLocationListing(locationId);
           return res.json(rows);
         }
       }

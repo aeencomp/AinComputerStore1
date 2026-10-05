@@ -51,6 +51,12 @@ function baghdadDayFromIso(iso: string | Date): string {
   return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
 }
 
+function salesCustomerPhoneKey(raw: string): string {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length >= 10) return digits.slice(-10);
+  return digits || raw.trim();
+}
+
 function dayInBaghdadRange(day: string | null | undefined, from: string, to: string): boolean {
   if (!day) return false;
   return day >= from && day <= to;
@@ -194,12 +200,14 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const [receiptDraft, setReceiptDraft] = useState<any>(null);
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
-    queryKey: ['/api/orders', effectiveSalesLocationId],
+    queryKey: ['sales-location-orders', effectiveSalesLocationId],
     queryFn: async () => {
       const res = await fetch(`/api/orders?locationId=${effectiveSalesLocationId}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to load orders");
       return res.json();
     },
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const { data: allRepairTickets = [] } = useQuery<RepairTicket[]>({
@@ -351,7 +359,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
 
   const invalidateOrderQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/orders', effectiveSalesLocationId] });
+    queryClient.invalidateQueries({ queryKey: ['sales-location-orders', effectiveSalesLocationId] });
+    queryClient.invalidateQueries({ queryKey: ['sales-pos-customers', effectiveSalesLocationId] });
     queryClient.invalidateQueries({ queryKey: ['/api/daily-report'] });
     queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts'] });
     queryClient.invalidateQueries({ queryKey: ['/api/sales/repair-tickets'] });
@@ -561,7 +570,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const periodCustomerMap = new Map<string, PeriodCustomerRow>();
   for (const order of ordersForCustomerDirectory) {
     const phone = (order.customerPhone || "").trim();
-    const key = phone || `__no_phone__:${order.id}`;
+    const key = phone ? salesCustomerPhoneKey(phone) : `__no_phone__:${order.id}`;
     const orderTotal = parseFloat(order.total || "0") || 0;
     const existing = periodCustomerMap.get(key);
     if (existing) {
