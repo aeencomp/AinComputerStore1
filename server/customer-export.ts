@@ -1,4 +1,5 @@
 import type { Order } from "@shared/schema";
+import { orderIncludedInSalesReport } from "@shared/order-sales";
 import {
   type AdminCustomerRow,
   formatCustomerExportDate,
@@ -6,6 +7,49 @@ import {
   normalizeContactPhone,
   prepareContactsList,
 } from "./admin-customers";
+
+function baghdadDayFromOrder(iso: string | Date): string {
+  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+}
+
+export type SalesCustomerOrderFilter = {
+  from?: string;
+  to?: string;
+  /** all | walk-in | in-store | online | pos (walk-in + in-store) */
+  orderType?: string;
+  salesLocationId?: number;
+  reportEligibleOnly?: boolean;
+};
+
+export function filterOrdersForSalesCustomerList(
+  orders: Order[],
+  filter: SalesCustomerOrderFilter,
+): Order[] {
+  return orders.filter((order) => {
+    if (
+      filter.salesLocationId != null &&
+      (order.salesLocationId ?? 1) !== filter.salesLocationId
+    ) {
+      return false;
+    }
+    if (filter.reportEligibleOnly && !orderIncludedInSalesReport(order)) {
+      return false;
+    }
+    const orderType = order.orderType || "online";
+    if (filter.orderType && filter.orderType !== "all") {
+      if (filter.orderType === "pos") {
+        if (orderType !== "walk-in" && orderType !== "in-store") return false;
+      } else if (orderType !== filter.orderType) {
+        return false;
+      }
+    }
+    if (filter.from && filter.to) {
+      const day = baghdadDayFromOrder(order.createdAt);
+      if (day < filter.from || day > filter.to) return false;
+    }
+    return true;
+  });
+}
 
 export type SalesPosCustomerRow = {
   phone: string;
@@ -66,8 +110,12 @@ export async function buildSalesPosCustomersExcelBuffer(
   return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
 }
 
-export function salesPosCustomersExportFilename(): string {
+export function salesPosCustomersExportFilename(from?: string, to?: string): string {
   const dateStamp = new Date().toISOString().slice(0, 10);
+  if (from && to) {
+    const range = from === to ? from : `${from}_to_${to}`;
+    return `sales-customers-${range}.xlsx`;
+  }
   return `sales-customers-${dateStamp}.xlsx`;
 }
 

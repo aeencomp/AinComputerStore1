@@ -37,6 +37,7 @@ import {
   buildCustomersExcelBuffer,
   buildSalesPosCustomersExcelBuffer,
   exportFilename,
+  filterOrdersForSalesCustomerList,
   getCustomersForExport,
   salesPosCustomersExportFilename,
   type CustomerExportFormat,
@@ -2138,6 +2139,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  const parseSalesCustomerQuery = (req: Request) => {
+    const from = typeof req.query.from === "string" ? req.query.from : undefined;
+    const to = typeof req.query.to === "string" ? req.query.to : undefined;
+    const orderType =
+      typeof req.query.orderType === "string" ? req.query.orderType : undefined;
+    const locationRaw = req.query.locationId;
+    const salesLocationId =
+      locationRaw != null && String(locationRaw).trim() !== ""
+        ? parseInt(String(locationRaw), 10)
+        : undefined;
+    const reportEligibleOnly = req.query.reportEligible !== "0";
+    return { from, to, orderType, salesLocationId, reportEligibleOnly };
+  };
+
   // Sales customer lookup endpoint
   app.get("/api/sales/customers", async (req, res) => {
     try {
@@ -2145,9 +2160,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!salesUserId) {
         return res.status(401).json({ error: "غير مصرح" });
       }
-      
-      const allOrders = await storage.getOrders();
-      const customers = aggregateSalesPosCustomers(allOrders);
+
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser?.canPos && !currentUser?.canViewReports) {
+        return res.status(403).json({ error: "ليس لديك صلاحية" });
+      }
+
+      const filter = parseSalesCustomerQuery(req);
+      const orders = filterOrdersForSalesCustomerList(await storage.getOrders(), filter);
+      const customers = aggregateSalesPosCustomers(orders);
       return res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
@@ -2163,18 +2184,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const currentUser = await storage.getSalesUser(salesUserId);
-      if (!currentUser?.canPos) {
+      if (!currentUser?.canPos && !currentUser?.canViewReports) {
         return res.status(403).json({ error: "ليس لديك صلاحية" });
       }
 
-      const customers = aggregateSalesPosCustomers(await storage.getOrders());
+      const filter = parseSalesCustomerQuery(req);
+      const customers = aggregateSalesPosCustomers(
+        filterOrdersForSalesCustomerList(await storage.getOrders(), filter),
+      );
       if (customers.length === 0) {
         return res.status(404).json({ error: "No customers to export" });
       }
 
       const language = req.query.lang === "ar" ? "ar" : "en";
       const buffer = await buildSalesPosCustomersExcelBuffer(customers, language);
-      const filename = salesPosCustomersExportFilename();
+      const filename = salesPosCustomersExportFilename(filter.from, filter.to);
 
       res.setHeader(
         "Content-Type",

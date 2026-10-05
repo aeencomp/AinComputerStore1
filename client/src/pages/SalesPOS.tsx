@@ -457,12 +457,12 @@ export default function SalesPOS({
   });
 
   // Filter customers by search query
-  const filteredCustomers = customerSearchQuery
-    ? customers.filter(c => 
-        c.phone.includes(customerSearchQuery) || 
-        c.name.toLowerCase().includes(customerSearchQuery.toLowerCase())
+  const filteredCustomers = customerSearchQuery.trim()
+    ? customers.filter(c =>
+        c.phone.includes(customerSearchQuery) ||
+        c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()),
       )
-    : customers.slice(0, 10); // Show top 10 customers by default
+    : customers;
 
   const selectCustomer = (customer: { phone: string; name: string }) => {
     setCustomerPhone(customer.phone);
