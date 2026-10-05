@@ -637,29 +637,30 @@ export default function TicketDetail() {
               </Button>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="border-2 border-dashed border-muted-foreground/30 rounded-lg p-4 bg-white">
-              <div ref={printRef} data-testid="print-label">
-                <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', letterSpacing: '0.3px' }}>
-                  العين لتجارة الحاسبات
+          <div
+            className="fixed left-[-10000px] top-0 w-[50mm] overflow-hidden opacity-0 pointer-events-none"
+            aria-hidden
+          >
+            <div ref={printRef} data-testid="print-label">
+              <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', letterSpacing: '0.3px' }}>
+                العين لتجارة الحاسبات
+              </div>
+              <div className="barcode-container" style={{ textAlign: 'center', margin: '4px 0' }}>
+                <svg ref={barcodeRef} />
+              </div>
+              <div className="serial" style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', letterSpacing: '0.5px' }}>
+                {ticket.ticketNumber}
+              </div>
+              {ticketCustomer && (
+                <div className="customer-info" style={{ textAlign: 'center', fontWeight: 700, fontSize: '8px', letterSpacing: '0.2px', marginTop: '1px', wordBreak: 'break-all' }}>
+                  {ticketCustomer.customerId} — {ticket.customerName}
                 </div>
-                <div className="barcode-container" style={{ textAlign: 'center', margin: '4px 0' }}>
-                  <svg ref={barcodeRef} />
-                </div>
-                <div className="serial" style={{ textAlign: 'center', fontWeight: 800, fontSize: '12px', letterSpacing: '0.5px' }}>
-                  {ticket.ticketNumber}
-                </div>
-                {ticketCustomer && (
-                  <div className="customer-info" style={{ textAlign: 'center', fontWeight: 700, fontSize: '8px', letterSpacing: '0.2px', marginTop: '1px', wordBreak: 'break-all' }}>
-                    {ticketCustomer.customerId} — {ticket.customerName}
-                  </div>
-                )}
-                <div className="phone-info" style={{ textAlign: 'center', fontWeight: 800, fontSize: '8px', direction: 'ltr', marginTop: '1px', letterSpacing: '0.3px' }}>
-                  {ticket.customerPhone}
-                </div>
+              )}
+              <div className="phone-info" style={{ textAlign: 'center', fontWeight: 800, fontSize: '8px', direction: 'ltr', marginTop: '1px', letterSpacing: '0.3px' }}>
+                {ticket.customerPhone}
               </div>
             </div>
-          </CardContent>
+          </div>
         </Card>
 
         <Card>

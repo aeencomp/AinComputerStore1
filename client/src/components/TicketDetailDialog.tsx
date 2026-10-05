@@ -960,7 +960,10 @@ export default function TicketDetailDialog({ ticketId, open, onOpenChange }: Tic
                   )}
                 </div>
               </div>
-              <div className="border-2 border-dashed border-muted-foreground/30 rounded-md p-3 bg-white">
+              <div
+                className="fixed left-[-10000px] top-0 w-[50mm] overflow-hidden opacity-0 pointer-events-none"
+                aria-hidden
+              >
                 <div ref={printRef} data-testid="dialog-print-label">
                   <div className="store-name" style={{ textAlign: 'center', fontWeight: 900, fontSize: '9px', letterSpacing: '0.2px', lineHeight: 1.1, whiteSpace: 'nowrap', overflow: 'hidden' }}>
                     العين لتجارة الحاسبات
