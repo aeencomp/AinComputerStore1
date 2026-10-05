@@ -1,3 +1,4 @@
+import type { Order } from "@shared/schema";
 import {
   type AdminCustomerRow,
   formatCustomerExportDate,
@@ -5,6 +6,70 @@ import {
   normalizeContactPhone,
   prepareContactsList,
 } from "./admin-customers";
+
+export type SalesPosCustomerRow = {
+  phone: string;
+  name: string;
+  orderCount: number;
+  totalSpent: number;
+};
+
+export function aggregateSalesPosCustomers(orders: Order[]): SalesPosCustomerRow[] {
+  const customerMap = new Map<string, SalesPosCustomerRow>();
+
+  for (const order of orders) {
+    const rawPhone = order.customerPhone?.trim();
+    if (!rawPhone) continue;
+
+    const orderTotal = parseFloat(order.total?.toString() || "0") || 0;
+    const existing = customerMap.get(rawPhone);
+
+    if (existing) {
+      existing.orderCount += 1;
+      existing.totalSpent += orderTotal;
+      if (!existing.name?.trim() && order.customerName?.trim()) {
+        existing.name = order.customerName.trim();
+      }
+    } else {
+      customerMap.set(rawPhone, {
+        phone: rawPhone,
+        name: order.customerName?.trim() || "",
+        orderCount: 1,
+        totalSpent: orderTotal,
+      });
+    }
+  }
+
+  return Array.from(customerMap.values()).sort((a, b) => b.orderCount - a.orderCount);
+}
+
+export async function buildSalesPosCustomersExcelBuffer(
+  customers: SalesPosCustomerRow[],
+  language: "ar" | "en",
+): Promise<Buffer> {
+  const XLSX = await import("xlsx");
+  const isAr = language === "ar";
+  const rows = customers.map((customer) => ({
+    [isAr ? "الاسم" : "Name"]: customer.name || (isAr ? "بدون اسم" : "No name"),
+    [isAr ? "رقم الهاتف" : "Phone"]: normalizeContactPhone(customer.phone),
+    [isAr ? "عدد الطلبات" : "Orders"]: customer.orderCount,
+    [isAr ? "إجمالي المشتريات (د.ع)" : "Total spent (IQD)"]: Math.round(customer.totalSpent),
+  }));
+
+  const worksheet = XLSX.utils.json_to_sheet(rows);
+  worksheet["!cols"] = [{ wch: 28 }, { wch: 16 }, { wch: 12 }, { wch: 18 }];
+
+  const workbook = XLSX.utils.book_new();
+  const sheetName = isAr ? "عملاء المبيعات" : "Sales Customers";
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName.slice(0, 31));
+
+  return XLSX.write(workbook, { type: "buffer", bookType: "xlsx" }) as Buffer;
+}
+
+export function salesPosCustomersExportFilename(): string {
+  const dateStamp = new Date().toISOString().slice(0, 10);
+  return `sales-customers-${dateStamp}.xlsx`;
+}
 
 export type CustomerExportSource = "repair" | "order" | "all";
 export type CustomerExportFormat = "xlsx" | "contacts" | "vcf";

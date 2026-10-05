@@ -33,9 +33,12 @@ import { listAdminCustomers } from "./admin-customers";
 import {
   buildContactsCsv,
   buildContactsVcf,
+  aggregateSalesPosCustomers,
   buildCustomersExcelBuffer,
+  buildSalesPosCustomersExcelBuffer,
   exportFilename,
   getCustomersForExport,
+  salesPosCustomersExportFilename,
   type CustomerExportFormat,
   type CustomerExportSource,
 } from "./customer-export";
@@ -2143,38 +2146,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ error: "غير مصرح" });
       }
       
-      // Get all orders and aggregate customer data
       const allOrders = await storage.getOrders();
-      
-      const customerMap = new Map<string, { phone: string; name: string; orderCount: number; totalSpent: number }>();
-      
-      for (const order of allOrders) {
-        if (order.customerPhone && order.customerPhone.trim() !== '') {
-          const existing = customerMap.get(order.customerPhone);
-          const orderTotal = parseFloat(order.total?.toString() || '0');
-          
-          if (existing) {
-            existing.orderCount++;
-            existing.totalSpent += orderTotal;
-          } else {
-            customerMap.set(order.customerPhone, {
-              phone: order.customerPhone,
-              name: order.customerName || '',
-              orderCount: 1,
-              totalSpent: orderTotal,
-            });
-          }
-        }
-      }
-      
-      // Convert to array and sort by order count
-      const customers = Array.from(customerMap.values())
-        .sort((a, b) => b.orderCount - a.orderCount);
-      
+      const customers = aggregateSalesPosCustomers(allOrders);
       return res.json(customers);
     } catch (error) {
       console.error("Error fetching customers:", error);
       return res.status(500).json({ error: "فشل جلب العملاء" });
+    }
+  });
+
+  app.get("/api/sales/customers/export", async (req, res) => {
+    try {
+      const salesUserId = (req.session as any).salesUserId;
+      if (!salesUserId) {
+        return res.status(401).json({ error: "غير مصرح" });
+      }
+
+      const currentUser = await storage.getSalesUser(salesUserId);
+      if (!currentUser?.canPos) {
+        return res.status(403).json({ error: "ليس لديك صلاحية" });
+      }
+
+      const customers = aggregateSalesPosCustomers(await storage.getOrders());
+      if (customers.length === 0) {
+        return res.status(404).json({ error: "No customers to export" });
+      }
+
+      const language = req.query.lang === "ar" ? "ar" : "en";
+      const buffer = await buildSalesPosCustomersExcelBuffer(customers, language);
+      const filename = salesPosCustomersExportFilename();
+
+      res.setHeader(
+        "Content-Type",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      );
+      res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+      return res.send(buffer);
+    } catch (error) {
+      console.error("Error exporting sales customers:", error);
+      return res.status(500).json({ error: "فشل تصدير العملاء" });
     }
   });
 

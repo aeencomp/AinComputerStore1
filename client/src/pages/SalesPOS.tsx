@@ -75,6 +75,7 @@ import {
   Save,
   Split,
   AlertTriangle,
+  FileSpreadsheet,
 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import type { InStoreProduct } from "@shared/schema";
@@ -276,6 +277,7 @@ export default function SalesPOS({
   const [holdNote, setHoldNote] = useState("");
   const [showCustomerLookup, setShowCustomerLookup] = useState(false);
   const [customerSearchQuery, setCustomerSearchQuery] = useState("");
+  const [exportingCustomers, setExportingCustomers] = useState(false);
   const [receiptNote, setReceiptNote] = useState("");
   const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [showReceiptEditor, setShowReceiptEditor] = useState(false);
@@ -467,6 +469,44 @@ export default function SalesPOS({
     setCustomerName(customer.name);
     setShowCustomerLookup(false);
     setCustomerSearchQuery("");
+  };
+
+  const exportSalesCustomersXlsx = async () => {
+    setExportingCustomers(true);
+    try {
+      const res = await fetchWithTimeout(
+        `/api/sales/customers/export?lang=${language === "ar" ? "ar" : "en"}`,
+        { credentials: "include" },
+      );
+      if (!res.ok) {
+        const message = await res.text();
+        throw new Error(message || "Export failed");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `sales-customers-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      toast({
+        title: language === "ar" ? "تم تصدير العملاء" : "Customers exported",
+        description:
+          language === "ar"
+            ? `ملف Excel يحتوي ${customers.length} عميل`
+            : `Excel file with ${customers.length} customer(s)`,
+      });
+    } catch (error) {
+      console.error("Sales customer export failed:", error);
+      toast({
+        title: language === "ar" ? "فشل التصدير" : "Export failed",
+        variant: "destructive",
+      });
+    } finally {
+      setExportingCustomers(false);
+    }
   };
 
   const holdOrderMutation = useMutation({
@@ -1851,16 +1891,33 @@ export default function SalesPOS({
                         <User className="h-3 w-3" />
                         {language === 'ar' ? 'معلومات العميل' : 'Customer Info'}
                       </Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-6 text-xs gap-1"
-                        onClick={() => setShowCustomerLookup(true)}
-                        data-testid="button-customer-lookup"
-                      >
-                        <UserSearch className="h-3 w-3" />
-                        {language === 'ar' ? 'بحث' : 'Lookup'}
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs gap-1"
+                          onClick={() => setShowCustomerLookup(true)}
+                          data-testid="button-customer-lookup"
+                        >
+                          <UserSearch className="h-3 w-3" />
+                          {language === 'ar' ? 'بحث' : 'Lookup'}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-6 text-xs gap-1"
+                          onClick={() => void exportSalesCustomersXlsx()}
+                          disabled={exportingCustomers || customers.length === 0}
+                          data-testid="button-export-sales-customers"
+                        >
+                          {exportingCustomers ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <FileSpreadsheet className="h-3 w-3" />
+                          )}
+                          {language === 'ar' ? 'Excel' : 'Excel'}
+                        </Button>
+                      </div>
                     </div>
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="space-y-1.5">
@@ -2669,10 +2726,28 @@ export default function SalesPOS({
       <Dialog open={showCustomerLookup} onOpenChange={setShowCustomerLookup}>
         <DialogContent className="sm:max-w-lg" dir={language === 'ar' ? 'rtl' : 'ltr'}>
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <UserSearch className="h-5 w-5" />
-              {language === 'ar' ? 'بحث عن عميل' : 'Customer Lookup'}
-            </DialogTitle>
+            <div className="flex items-start justify-between gap-3">
+              <DialogTitle className="flex items-center gap-2">
+                <UserSearch className="h-5 w-5" />
+                {language === 'ar' ? 'بحث عن عميل' : 'Customer Lookup'}
+              </DialogTitle>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="gap-1.5 shrink-0"
+                onClick={() => void exportSalesCustomersXlsx()}
+                disabled={exportingCustomers || customers.length === 0}
+                data-testid="button-dialog-export-sales-customers"
+              >
+                {exportingCustomers ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4" />
+                )}
+                {language === 'ar' ? 'تصدير الكل Excel' : 'Export all (Excel)'}
+              </Button>
+            </div>
           </DialogHeader>
           
           <div className="space-y-4">
