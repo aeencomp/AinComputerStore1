@@ -210,6 +210,46 @@ export default function SalesPortal() {
     }
   }, [currentUser, isLoading, location, setLocation]);
 
+  useEffect(() => {
+    if (!currentUser || isLoading) return;
+
+    const activeLoc = currentUser.activeSalesLocationId ?? 1;
+    const allowedLocationIds = currentUser.allowedLocations?.map((loc) => loc.id) ?? [activeLoc];
+    const canUseLoc1 = allowedLocationIds.includes(1) || currentUser.role === "sales_admin";
+    const canUseLoc2 =
+      allowedLocationIds.includes(2) ||
+      currentUser.permissions.canInventoryLocation2 === 1 ||
+      currentUser.role === "sales_admin";
+
+    const loc2Routes = [
+      "/sales/pos-loc2",
+      "/sales/inventory-loc2",
+      "/sales/transfer-to-loc1",
+      "/sales/reports-loc2",
+    ];
+    const loc1Routes = ["/sales/pos", "/sales/instore-pos", "/sales/inventory-loc1", "/sales/transfer-stock"];
+    let desired: number | undefined;
+    if (loc2Routes.some((p) => location === p || location.startsWith(`${p}/`))) desired = 2;
+    else if (loc1Routes.some((p) => location === p || location.startsWith(`${p}/`))) desired = 1;
+    if (desired == null) return;
+    if (activeLoc === desired) return;
+
+    const canAccess =
+      currentUser.role === "sales_admin" ||
+      (desired === 2 && canUseLoc2) ||
+      (desired === 1 && canUseLoc1);
+    if (!canAccess) return;
+
+    void (async () => {
+      try {
+        await apiRequest("POST", "/api/sales/locations/select", { locationId: desired });
+        queryClient.invalidateQueries({ queryKey: ["/api/sales/auth/me"] });
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, [location, currentUser, isLoading, queryClient]);
+
   if (location === "/sales/pick-location") {
     return <SalesLocationPick />;
   }
@@ -343,6 +383,13 @@ export default function SalesPortal() {
       permission: currentUser.permissions.canViewReports,
       color: 'text-purple-500',
     },
+    ...(canUseLoc2 ? [{
+      path: "/sales/reports-loc2",
+      label: language === 'ar' ? 'تقارير الموقع 2' : 'Reports (Location 2)',
+      icon: BarChart3,
+      permission: currentUser.permissions.canViewReports,
+      color: 'text-purple-500',
+    }] : []),
     { 
       path: "/sales/users", 
       label: language === 'ar' ? 'المستخدمين' : 'Users', 
@@ -392,6 +439,7 @@ export default function SalesPortal() {
       items: navItems.filter(item => [
         "/sales/daily-report",
         "/sales/reports",
+        "/sales/reports-loc2",
       ].includes(item.path)),
     },
     {
@@ -734,8 +782,11 @@ export default function SalesPortal() {
         {location === "/sales/daily-report" && (
           <DailyReport user={currentUser} salesLocationId={activeLoc} />
         )}
-        {location === "/sales/reports" && (
-          <SalesReports user={currentUser} salesLocationId={activeLoc} />
+        {(location === "/sales/reports" || location === "/sales/reports-loc2") && (
+          <SalesReports
+            user={currentUser}
+            salesLocationId={location === "/sales/reports-loc2" ? 2 : activeLoc}
+          />
         )}
         {location === "/sales/users" && <SalesUsers user={currentUser} />}
       </main>

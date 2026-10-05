@@ -453,7 +453,14 @@ export default function SalesPOS({
   }
   
   const { data: customers = [] } = useQuery<CustomerData[]>({
-    queryKey: ['/api/sales/customers'],
+    queryKey: ['/api/sales/customers', salesLocationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/sales/customers?locationId=${salesLocationId}`, {
+        credentials: 'include',
+      });
+      if (!res.ok) throw new Error('Failed to load customers');
+      return res.json();
+    },
   });
 
   // Filter customers by search query
@@ -475,7 +482,7 @@ export default function SalesPOS({
     setExportingCustomers(true);
     try {
       const res = await fetchWithTimeout(
-        `/api/sales/customers/export?lang=${language === "ar" ? "ar" : "en"}`,
+        `/api/sales/customers/export?lang=${language === "ar" ? "ar" : "en"}&locationId=${salesLocationId}`,
         { credentials: "include" },
       );
       if (!res.ok) {

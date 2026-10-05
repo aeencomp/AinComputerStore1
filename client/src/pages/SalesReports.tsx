@@ -35,6 +35,7 @@ import {
   Save,
   FileText,
   UserRound,
+  Store,
 } from "lucide-react";
 import { openA4InvoicePrint, type A4InvoiceOrder } from "@/lib/a4InvoicePrint";
 import {
@@ -104,6 +105,7 @@ interface SalesUser {
   name?: string;
   username?: string;
   role?: string;
+  allowedLocations?: { id: number; nameAr: string; nameEn?: string | null }[];
   permissions: {
     canViewReports: number;
     canEditReceipt?: number;
@@ -158,6 +160,25 @@ interface SalesReportsProps {
 export default function SalesReports({ user, salesLocationId = 1 }: SalesReportsProps) {
   const { language } = useLanguage();
   const { toast } = useToast();
+
+  const reportLocationOptions = useMemo(() => {
+    if (user.allowedLocations?.length) return user.allowedLocations;
+    return [
+      {
+        id: salesLocationId,
+        nameAr: salesLocationId === 2 ? "الموقع 2" : "الموقع 1",
+        nameEn: salesLocationId === 2 ? "Location 2" : "Location 1",
+      },
+    ];
+  }, [user.allowedLocations, salesLocationId]);
+
+  const [reportLocationId, setReportLocationId] = useState(salesLocationId);
+  useEffect(() => {
+    setReportLocationId(salesLocationId);
+  }, [salesLocationId]);
+
+  const effectiveSalesLocationId = reportLocationId;
+  const showReportLocationPicker = reportLocationOptions.length > 1;
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('today');
   const [salesFromDate, setSalesFromDate] = useState(() => baghdadDateKey());
   const [salesToDate, setSalesToDate] = useState(() => baghdadDateKey());
@@ -173,9 +194,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const [receiptDraft, setReceiptDraft] = useState<any>(null);
 
   const { data: orders = [], isLoading } = useQuery<Order[]>({
-    queryKey: ['/api/orders', salesLocationId],
+    queryKey: ['/api/orders', effectiveSalesLocationId],
     queryFn: async () => {
-      const res = await fetch(`/api/orders?locationId=${salesLocationId}`, { credentials: 'include' });
+      const res = await fetch(`/api/orders?locationId=${effectiveSalesLocationId}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to load orders");
       return res.json();
     },
@@ -234,9 +255,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     [salesFromDate, salesToDate],
   );
   const { data: salesShifts = [] } = useQuery<SalesShift[]>({
-    queryKey: ["/api/sales/shifts", salesLocationId],
+    queryKey: ["/api/sales/shifts", effectiveSalesLocationId],
     queryFn: async () => {
-      const res = await fetch(`/api/sales/shifts?locationId=${salesLocationId}`, { credentials: "include" });
+      const res = await fetch(`/api/sales/shifts?locationId=${effectiveSalesLocationId}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to load shifts");
       return res.json();
     },
@@ -253,12 +274,12 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     const toMs = new Date(`${salesRange.to}T23:59:59.999+03:00`).getTime();
     return salesShifts.filter((s) => {
       const loc = s.salesLocationId ?? 1;
-      if (loc !== salesLocationId) return false;
+      if (loc !== effectiveSalesLocationId) return false;
       const start = new Date(s.startTime).getTime();
       const end = s.endTime ? new Date(s.endTime).getTime() : Date.now();
       return end >= fromMs && start <= toMs;
     });
-  }, [salesShifts, salesRange.from, salesRange.to, salesLocationId]);
+  }, [salesShifts, salesRange.from, salesRange.to, effectiveSalesLocationId]);
 
   const resolveOrderOwner = (order: Order) =>
     resolveOrderSalesOwner(order, shiftsInPeriod, knownSalesUserIds);
@@ -298,20 +319,20 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   }, [orders, salesRange.from, salesRange.to, shiftsInPeriod, knownSalesUserIds]);
 
   const fetchCashflowForRange = async (from: string, to: string) => {
-    const params = new URLSearchParams({ from, to, locationId: String(salesLocationId) });
+    const params = new URLSearchParams({ from, to, locationId: String(effectiveSalesLocationId) });
     const res = await fetch(`/api/instore/monthly-cashflow?${params.toString()}`, { credentials: "include" });
     if (!res.ok) throw new Error("Failed to load cashflow");
     return res.json() as Promise<MonthlyCashflowResponse>;
   };
 
   const { data: salesPeriodCashflow } = useQuery<MonthlyCashflowResponse>({
-    queryKey: ["/api/instore/monthly-cashflow", "sales-period", salesRange.from, salesRange.to, salesLocationId],
+    queryKey: ["/api/instore/monthly-cashflow", "sales-period", salesRange.from, salesRange.to, effectiveSalesLocationId],
     queryFn: () => fetchCashflowForRange(salesRange.from, salesRange.to),
     enabled: !!user.permissions.canViewReports && activeTab === "sales",
   });
 
   const { data: monthlyCashflow, isLoading: cashflowLoading } = useQuery<MonthlyCashflowResponse>({
-    queryKey: ['/api/instore/monthly-cashflow', cashflowMonth, cashflowFromDate, cashflowToDate, salesLocationId],
+    queryKey: ['/api/instore/monthly-cashflow', cashflowMonth, cashflowFromDate, cashflowToDate, effectiveSalesLocationId],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (cashflowFromDate && cashflowToDate) {
@@ -320,7 +341,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       } else {
         params.set("month", cashflowMonth);
       }
-      params.set("locationId", String(salesLocationId));
+      params.set("locationId", String(effectiveSalesLocationId));
       const res = await fetch(`/api/instore/monthly-cashflow?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error("Failed to load monthly cashflow");
       return res.json();
@@ -330,7 +351,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
 
   const invalidateOrderQueries = () => {
     queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
-    queryClient.invalidateQueries({ queryKey: ['/api/orders', salesLocationId] });
+    queryClient.invalidateQueries({ queryKey: ['/api/orders', effectiveSalesLocationId] });
     queryClient.invalidateQueries({ queryKey: ['/api/daily-report'] });
     queryClient.invalidateQueries({ queryKey: ['/api/sales/shifts'] });
     queryClient.invalidateQueries({ queryKey: ['/api/sales/repair-tickets'] });
@@ -530,7 +551,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const includeRepairInSalesTotals =
     isSalesSupervisor && (salespersonFilter === "all" || salespersonFilter === "unassigned");
 
-  const filteredRepairTickets = salesLocationId === 1 && includeRepairInSalesTotals ? allRepairTickets.filter(t => {
+  const filteredRepairTickets = effectiveSalesLocationId === 1 && includeRepairInSalesTotals ? allRepairTickets.filter(t => {
     if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
     const ticketDate = repairTicketSalesAt(t as RepairTicket);
     if (!ticketDate) return false;
@@ -957,6 +978,30 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                   <SelectItem value="online">{language === 'ar' ? 'أونلاين' : 'Online'}</SelectItem>
                 </SelectContent>
               </Select>
+              {showReportLocationPicker && (
+                <Select
+                  value={String(reportLocationId)}
+                  onValueChange={(v) => setReportLocationId(parseInt(v, 10))}
+                >
+                  <SelectTrigger className="w-44" data-testid="select-report-location">
+                    <Store className="h-4 w-4 me-2" />
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reportLocationOptions.map((loc) => (
+                      <SelectItem key={loc.id} value={String(loc.id)}>
+                        {language === "ar" ? loc.nameAr : (loc.nameEn || loc.nameAr)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {!showReportLocationPicker && effectiveSalesLocationId === 2 && (
+                <Badge variant="outline" className="h-9 px-3 gap-1.5">
+                  <Store className="h-3.5 w-3.5" />
+                  {language === "ar" ? "الموقع 2" : "Location 2"}
+                </Badge>
+              )}
               {isSalesSupervisor && (
                 <Select value={selectedSalespersonId} onValueChange={setSelectedSalespersonId}>
                   <SelectTrigger className="w-52" data-testid="select-salesperson">
