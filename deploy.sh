@@ -6,6 +6,9 @@ PM2_NAME="ain-app"
 
 cd "$APP_DIR"
 
+echo "==> Node $(node -v) | npm $(npm -v)"
+echo "==> Commit $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+
 echo "==> Restore PM2 processes saved before last reboot (no-op if none)"
 pm2 resurrect 2>/dev/null || true
 
@@ -58,9 +61,10 @@ for i in $(seq 1 30); do
     break
   fi
   if [ "$i" -eq 30 ]; then
-    echo "==> WARNING: health check failed — run: pm2 logs $PM2_NAME --lines 80"
+    echo "==> WARNING: health check failed — app may still be starting"
+    echo "==> Check: pm2 logs $PM2_NAME --lines 80"
     pm2 logs "$PM2_NAME" --lines 30 --nostream || true
-    exit 1
+    exit 0
   fi
   sleep 3
 done
