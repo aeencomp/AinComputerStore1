@@ -1195,6 +1195,13 @@ export function startPriceSync() {
   if (schedulerStarted) {
     return;
   }
+  // Off by default — enable in VPS .env: PRICE_SYNC_SCHEDULER=1 (manual sync via admin always works)
+  if (process.env.PRICE_SYNC_SCHEDULER !== "1") {
+    console.log(
+      "[Price Sync] Automatic scheduler disabled (set PRICE_SYNC_SCHEDULER=1 in .env to enable)",
+    );
+    return;
+  }
   schedulerStarted = true;
 
   console.log("[Price Sync] Scheduling price sync every 6 hours");

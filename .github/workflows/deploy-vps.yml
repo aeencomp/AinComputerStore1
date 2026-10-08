@@ -26,74 +26,28 @@ jobs:
 
   deploy:
     needs: build
-    runs-on: ${{ vars.SELF_HOSTED == '1' && 'self-hosted' || 'ubuntu-latest' }}
-    env:
-      VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
-      VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
-      VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
+    runs-on: ubuntu-latest
     steps:
-      - name: Deploy on VPS (self-hosted runner)
-        if: vars.SELF_HOSTED == '1'
-        run: |
-          set -euo pipefail
-          cd /home/deploy/AinComputerStore
-          git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true
-          git fetch --all --prune
-          git reset --hard origin/main
-          chmod +x deploy.sh scripts/start-prod.sh
-          ./deploy.sh
-
-      - name: Validate GitHub SSH deploy settings
-        if: vars.SELF_HOSTED != '1'
-        run: |
-          if [ -z "$VPS_HOST" ]; then
-            echo "::error::Missing VPS_HOST (Actions secret or variable)"
-            exit 1
-          fi
-          if [ -z "$VPS_USER" ]; then
-            echo "::error::Missing VPS_USER — set to deploy"
-            exit 1
-          fi
-          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then
-            echo "::error::Missing VPS_SSH_KEY secret. On VPS run: sudo bash scripts/vps-setup-github-deploy.sh"
-            exit 1
-          fi
-          echo "Deploy target: ${VPS_USER}@${VPS_HOST}:${VPS_PORT:-22}"
-
-      - name: Write SSH key
-        if: vars.SELF_HOSTED != '1'
-        env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-        run: |
-          mkdir -p ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_deploy_key
-          chmod 600 ~/.ssh/vps_deploy_key
-
       - name: Deploy over SSH
-        if: vars.SELF_HOSTED != '1'
-        uses: appleboy/ssh-action@v1.2.2
+        uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ env.VPS_HOST }}
-          username: ${{ env.VPS_USER }}
-          key_path: ~/.ssh/vps_deploy_key
-          port: ${{ env.VPS_PORT || 22 }}
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
           timeout: 120s
           command_timeout: 30m
-          debug: true
           script_stop: true
           script: |
             set -e
             APP=/home/deploy/AinComputerStore
-            run_as_deploy() {
+            if [ "$(whoami)" = "deploy" ]; then
               cd "$APP"
               git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true
               git fetch --all --prune
               git reset --hard origin/main
-              chmod +x deploy.sh scripts/start-prod.sh scripts/fix-site-now.sh 2>/dev/null || true
+              chmod +x deploy.sh scripts/start-prod.sh 2>/dev/null || true
               ./deploy.sh
-            }
-            if [ "$(whoami)" = "deploy" ]; then
-              run_as_deploy
             else
               su - deploy -c "set -e; cd $APP; git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true; git fetch --all --prune; git reset --hard origin/main; chmod +x deploy.sh scripts/start-prod.sh; ./deploy.sh"
             fi
