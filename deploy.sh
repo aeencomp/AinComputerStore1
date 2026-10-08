@@ -13,6 +13,7 @@ echo "==> Restore PM2 processes saved before last reboot (no-op if none)"
 pm2 resurrect 2>/dev/null || true
 
 echo "==> Pull latest code"
+git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git 2>/dev/null || true
 git fetch --all --prune
 git reset --hard origin/main
 
