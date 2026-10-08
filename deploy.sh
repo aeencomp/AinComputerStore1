@@ -45,6 +45,8 @@ fi
 mkdir -p uploads
 chmod 755 uploads
 
+chmod +x scripts/start-prod.sh 2>/dev/null || true
+
 echo "==> Restart PM2"
 pm2 delete "$PM2_NAME" 2>/dev/null || true
 pm2 start ecosystem.config.cjs

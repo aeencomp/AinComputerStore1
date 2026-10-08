@@ -24,50 +24,59 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=2048
 
-  deploy:
+  # SSH from GitHub cloud often fails (firewall/fail2ban). VPS cron pull is the reliable path — see scripts/vps-pull-deploy-cron.sh
+  deploy-ssh:
     needs: build
-    runs-on: ${{ vars.SELF_HOSTED == '1' && 'self-hosted' || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
+    continue-on-error: true
     env:
       VPS_HOST: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
       VPS_USER: ${{ secrets.VPS_USER || vars.VPS_USER }}
       VPS_PORT: ${{ secrets.VPS_PORT || vars.VPS_PORT }}
     steps:
-      - name: Deploy on VPS (self-hosted runner)
+      - name: Skip if self-hosted runner enabled
         if: vars.SELF_HOSTED == '1'
+        run: echo "SELF_HOSTED=1 — deploy runs on VPS runner, skipping SSH."
+
+      - name: Deploy over SSH (optional)
+        if: vars.SELF_HOSTED != '1'
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_SSH_PASSWORD: ${{ secrets.VPS_SSH_PASSWORD }}
+        run: |
+          set -euo pipefail
+          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
+            echo "::warning::No VPS_HOST/VPS_USER — enable cron on VPS (scripts/vps-pull-deploy-cron.sh) or set SSH secrets."
+            exit 0
+          fi
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq openssh-client sshpass
+          REMOTE='set -e; cd /home/deploy/AinComputerStore; git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true; git fetch --all --prune; git reset --hard origin/main; chmod +x deploy.sh scripts/start-prod.sh scripts/fix-site-now.sh; ./deploy.sh'
+          PORT="${VPS_PORT:-22}"
+          SSH_OPTS="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=90 -o ServerAliveInterval=30"
+          if [ -n "$VPS_SSH_KEY" ]; then
+            mkdir -p ~/.ssh
+            printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_deploy_key
+            chmod 600 ~/.ssh/vps_deploy_key
+            ssh -i ~/.ssh/vps_deploy_key -p "$PORT" $SSH_OPTS "${VPS_USER}@${VPS_HOST}" "$REMOTE"
+          elif [ -n "$VPS_SSH_PASSWORD" ]; then
+            sshpass -p "$VPS_SSH_PASSWORD" ssh -p "$PORT" $SSH_OPTS "${VPS_USER}@${VPS_HOST}" "$REMOTE"
+          else
+            echo "::warning::Set VPS_SSH_KEY or VPS_SSH_PASSWORD secret, or use VPS cron deploy."
+            exit 0
+          fi
+
+  deploy-self-hosted:
+    needs: build
+    if: vars.SELF_HOSTED == '1'
+    runs-on: self-hosted
+    steps:
+      - name: Deploy on VPS runner
         run: |
           set -euo pipefail
           cd /home/deploy/AinComputerStore
           git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true
           git fetch --all --prune
           git reset --hard origin/main
-          chmod +x ./deploy.sh
+          chmod +x deploy.sh scripts/start-prod.sh
           ./deploy.sh
-
-      - name: Validate SSH deploy settings
-        if: vars.SELF_HOSTED != '1'
-        run: |
-          if [ -z "$VPS_HOST" ] || [ -z "$VPS_USER" ]; then
-            echo "::error::Set VPS_HOST and VPS_USER (secrets or variables). VPS_USER should be deploy."
-            exit 1
-          fi
-          if [ -z "${{ secrets.VPS_SSH_KEY }}" ]; then
-            echo "::error::Set VPS_SSH_KEY as a repository Secret (full private key)."
-            exit 1
-          fi
-
-      - name: Deploy over OpenSSH
-        if: vars.SELF_HOSTED != '1'
-        env:
-          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
-        run: |
-          set -euo pipefail
-          mkdir -p ~/.ssh
-          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/vps_deploy_key
-          chmod 600 ~/.ssh/vps_deploy_key
-          PORT="${VPS_PORT:-22}"
-          ssh -i ~/.ssh/vps_deploy_key -p "$PORT" \
-            -o StrictHostKeyChecking=accept-new \
-            -o ConnectTimeout=60 \
-            -o ServerAliveInterval=30 \
-            "${VPS_USER}@${VPS_HOST}" \
-            "set -e; cd /home/deploy/AinComputerStore; git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true; git fetch --all --prune; git reset --hard origin/main; chmod +x ./deploy.sh; ./deploy.sh"

@@ -4,18 +4,17 @@ module.exports = {
     {
       name: "ain-app",
       cwd: "/home/deploy/AinComputerStore",
-      script: "dist/index.js",
-      interpreter: "node",
+      script: "scripts/start-prod.sh",
+      interpreter: "bash",
       env: {
         NODE_ENV: "production",
         TZ: "Asia/Baghdad",
       },
-      env_file: "/home/deploy/AinComputerStore/.env",
       max_restarts: 30,
       min_uptime: "15s",
       restart_delay: 5000,
       autorestart: true,
-      max_memory_restart: "800M",
+      max_memory_restart: "900M",
     },
   ],
 };
