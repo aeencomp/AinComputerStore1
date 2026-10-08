@@ -95,7 +95,7 @@ import Papa from "papaparse";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { startPriceSync, syncPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
+import { startPriceSync, syncAllCatalogPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
 import { normalizeCustomerEmail } from "./auth-email";
 import { runDbMigrations } from "./db-migrations";
 import { canonicalAdpSerial } from "@shared/inventoryScanCode";
@@ -10004,7 +10004,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Unauthorized" });
     }
     try {
-      const result = await syncPrices();
+      const result = await syncAllCatalogPrices();
       return res.json(result);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });

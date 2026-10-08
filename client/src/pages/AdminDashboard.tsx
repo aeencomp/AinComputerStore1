@@ -209,10 +209,10 @@ function PriceSyncCard() {
       const matched = data.totalMatched ?? 0;
       const fetched = data.fetchedCount ?? 0;
       toast({
-        title: "تمت مزامنة اللابتوبات",
+        title: "تمت مزامنة المنتجات",
         description: created > 0 || updated > 0
-          ? `أُضيف ${created} لابتوب جديد، وتم تحديث ${updated} سعر (${matched} موجود مسبقاً من ${fetched} على GlobalIraq)`
-          : `جميع الأسعار محدّثة — ${matched} لابتوب متطابق من ${fetched} على GlobalIraq`,
+          ? `أُضيف ${created} منتج جديد، وتم تحديث ${updated} سعر (${matched} متطابق من ${fetched} على GlobalIraq)`
+          : `جميع الأسعار محدّثة — ${matched} منتج متطابق من ${fetched} على GlobalIraq`,
       });
     },
     onError: () => {
@@ -245,7 +245,7 @@ function PriceSyncCard() {
             مزامنة الأسعار - GlobalIraq
           </CardTitle>
           <CardDescription>
-            استيراد لابتوبات GlobalIraq وتحديث الأسعار تلقائياً كل 6 ساعات
+            مزامنة جميع منتجات GlobalIraq (تحديث الأسعار وإضافة الجديد) كل 6 ساعات
           </CardDescription>
         </div>
         <Button

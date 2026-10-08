@@ -113,7 +113,12 @@ async function fetchJSON(url: string, retries = 3): Promise<any> {
         throw new Error(`HTTP ${res.status} for ${url}`);
       }
 
-      return await res.json();
+      const text = await res.text();
+      if (text.includes("local_rate_limited") || text.includes("rate_limit")) {
+        throw new Error("Rate limited by globaliraq.iq");
+      }
+
+      return JSON.parse(text);
     } catch (err: any) {
       lastError = err instanceof Error ? err : new Error(String(err));
       if (attempt < retries) {
@@ -139,6 +144,7 @@ async function fetchAllGlobalIraqProducts(): Promise<ShopifyProduct[]> {
     page++;
 
     if (pageProducts.length < 250) break;
+    await new Promise((resolve) => setTimeout(resolve, 1200));
   }
 
   return allProducts;
@@ -161,6 +167,130 @@ function isGlobalIraqDesktop(product: ShopifyProduct): boolean {
 
 function globalLaptopCategory(productType: string): string {
   return productType === "Gaming Laptop" ? "gaming-laptops" : "business-laptops";
+}
+
+type ProductMatcher = (
+  ourName: string,
+  globalProducts: ShopifyProduct[],
+) => ShopifyProduct | null;
+
+function mapGlobalProductToCategory(product: ShopifyProduct): string {
+  const type = (product.product_type || "").trim();
+  const titleL = product.title.toLowerCase();
+  const typeL = type.toLowerCase();
+
+  if (isGlobalIraqLaptop(product)) {
+    return globalLaptopCategory(type);
+  }
+  if (isGlobalIraqDesktop(product)) {
+    return globalDesktopCategory(product);
+  }
+
+  if (/monitor|display|شاش/i.test(typeL)) return "monitors";
+  if (/printer|طاب/i.test(typeL)) return "printers";
+  if (/toner|cartridge|drum|ink/i.test(`${typeL} ${titleL}`)) {
+    return "printer-accessories";
+  }
+  if (/cable|hub|موزع|كابل/i.test(typeL)) return "cables";
+  if (/keyboard/i.test(typeL)) return "keyboards";
+  if (/mouse|mice/i.test(typeL)) return "mice";
+  if (/headset|headphone|earphone|سماع/i.test(typeL)) return "headphones";
+  if (/webcam|camera/i.test(typeL)) return "webcams";
+  if (/bag|backpack|حقيب/i.test(typeL)) return "bags";
+  if (/charger|adapter|شاحن/i.test(typeL)) return "chargers";
+
+  if (
+    /^\d{4}$/.test(type) ||
+    /geforce|rtx|radeon|graphics|gpu/i.test(typeL) ||
+    /geforce rtx|radeon rx|graphics card/i.test(titleL)
+  ) {
+    return "gpu";
+  }
+  if (/ram|memory|ddr/i.test(typeL) && !/laptop|thinkpad|ideapad|macbook/i.test(titleL)) {
+    return "ram";
+  }
+  if (/ssd|nvme|solid state/i.test(typeL)) return "ssd";
+  if (/hdd|hard disk|hard drive/i.test(typeL)) return "hdd";
+  if (/motherboard|mainboard/i.test(typeL)) return "motherboards";
+  if (/psu|power supply/i.test(typeL)) return "psu";
+  if (/processor|cpu/i.test(typeL)) return "processors";
+  if (/case|chassis|cooling|fan/i.test(typeL)) return "pc-components";
+  if (/software|windows|office|antivirus|program/i.test(`${typeL} ${titleL}`)) {
+    return "programs";
+  }
+
+  if (/monitor/i.test(titleL) && /\d{2}[\s-]*inch/i.test(titleL)) return "monitors";
+  if (/toner|cartridge|drum/i.test(titleL)) return "printer-accessories";
+
+  return "miscellaneous";
+}
+
+function resolveMatcherForCategory(category: string): ProductMatcher {
+  if (isLaptopCategory(category)) return matchProducts;
+  if (isDesktopCategory(category)) return matchDesktopProducts;
+  return matchGenericProducts;
+}
+
+function compositeMatcherForOurProduct(
+  ourName: string,
+  globalProducts: ShopifyProduct[],
+  category: string,
+): ShopifyProduct | null {
+  const primary = resolveMatcherForCategory(category)(ourName, globalProducts);
+  if (primary) return primary;
+  if (!isLaptopCategory(category) && !isDesktopCategory(category)) {
+    return matchProducts(ourName, globalProducts) || matchDesktopProducts(ourName, globalProducts);
+  }
+  return matchGenericProducts(ourName, globalProducts);
+}
+
+function normalizeGenericTitle(s: string): string {
+  return s
+    .toLowerCase()
+    .replace(/[–—]/g, "-")
+    .replace(/[^\w\s\-\.]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function matchGenericProducts(
+  ourName: string,
+  globalProducts: ShopifyProduct[],
+): ShopifyProduct | null {
+  const ourNorm = normalizeGenericTitle(ourName);
+  if (ourNorm.length < 4) return null;
+
+  for (const gp of globalProducts) {
+    if (normalizeGenericTitle(gp.title) === ourNorm) return gp;
+  }
+
+  const ourWords = ourNorm.split(/\s+/).filter((w) => w.length > 2);
+  let bestMatch: ShopifyProduct | null = null;
+  let bestScore = 0;
+
+  for (const gp of globalProducts) {
+    const gpNorm = normalizeGenericTitle(gp.title);
+    if (gpNorm.includes(ourNorm) || ourNorm.includes(gpNorm)) {
+      const score = Math.min(gpNorm.length, ourNorm.length);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMatch = gp;
+      }
+      continue;
+    }
+
+    const gpWords = gpNorm.split(/\s+/).filter((w) => w.length > 2);
+    const matchingWords = ourWords.filter((w) => gpWords.includes(w));
+    const matchRatio =
+      matchingWords.length / Math.max(ourWords.length, gpWords.length, 1);
+
+    if (matchRatio >= 0.55 && matchingWords.length >= 3 && matchingWords.length > bestScore) {
+      bestScore = matchingWords.length;
+      bestMatch = gp;
+    }
+  }
+
+  return bestMatch;
 }
 
 function globalDesktopCategory(product: ShopifyProduct): string {
@@ -765,6 +895,216 @@ export async function syncPrices(): Promise<SyncLog> {
   return syncLog;
 }
 
+/** Full GlobalIraq catalog: update prices for all matched items and add missing products. */
+export async function syncAllCatalogPrices(): Promise<SyncLog> {
+  if (
+    !beginSync({
+      lastSync: new Date(),
+      nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
+      updatedCount: 0,
+      createdCount: 0,
+      totalMatched: 0,
+      fetchedCount: 0,
+      createdProducts: [],
+      updatedProducts: [],
+      errors: [],
+      status: "running",
+    })
+  ) {
+    return syncLog;
+  }
+
+  try {
+    console.log("[Catalog Sync] Starting full catalog sync from globaliraq.iq...");
+
+    const allGlobalProducts = await fetchAllGlobalIraqProducts();
+    const syncableGlobal = allGlobalProducts.filter((product) => {
+      const variant = getPrimaryVariant(product);
+      if (!variant) return false;
+      return globalPriceToStorePrice(variant.price || "") != null;
+    });
+
+    syncLog.fetchedCount = syncableGlobal.length;
+    console.log(
+      `[Catalog Sync] Fetched ${allGlobalProducts.length} products (${syncableGlobal.length} with valid prices)`,
+    );
+
+    if (syncableGlobal.length === 0) {
+      throw new Error("No products with valid prices returned from globaliraq.iq");
+    }
+
+    const allOurProducts = await db.select().from(products);
+    const ourSkuIndex = buildOurSkuIndex(allOurProducts);
+    const ourPool = [...allOurProducts];
+    const globalSkuIndex = buildGlobalSkuIndex(syncableGlobal);
+    const matchedOurIds = new Set<string>();
+
+    let updated = 0;
+    let matched = 0;
+    let created = 0;
+
+    for (const globalProduct of syncableGlobal) {
+      try {
+        const variant = getPrimaryVariant(globalProduct);
+        if (!variant) {
+          syncLog.errors.push(`No variant for ${globalProduct.title}`);
+          continue;
+        }
+
+        const markedUpPrice = globalPriceToStorePrice(variant.price || "");
+        if (markedUpPrice == null) continue;
+
+        const comparePrice = variant.compare_at_price
+          ? globalPriceToStorePrice(variant.compare_at_price)
+          : null;
+        const oldPrice =
+          comparePrice != null && comparePrice > markedUpPrice
+            ? comparePrice.toString()
+            : null;
+
+        const categoryForNew = mapGlobalProductToCategory(globalProduct);
+        const matcher = resolveMatcherForCategory(categoryForNew);
+        const existing = findOurProductForGlobal(
+          globalProduct,
+          ourPool,
+          ourSkuIndex,
+          matcher,
+        );
+
+        if (existing) {
+          if (matchedOurIds.has(existing.id)) {
+            continue;
+          }
+          matchedOurIds.add(existing.id);
+          matched++;
+          const result = await applyGlobalPriceToExisting(
+            {
+              id: existing.id,
+              nameEn: existing.nameEn,
+              sku: existing.sku,
+              category: existing.category,
+              price: existing.price,
+              oldPrice: existing.oldPrice,
+            },
+            globalProduct,
+            variant,
+            markedUpPrice,
+            syncLog,
+          );
+          if (result === "updated") updated++;
+          continue;
+        }
+
+        const imageUrls =
+          globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
+        const primaryImage = imageUrls[0];
+        if (!primaryImage) {
+          syncLog.errors.push(`No image for ${globalProduct.title}`);
+          continue;
+        }
+
+        const description =
+          stripHtml(globalProduct.body_html || "") || globalProduct.title;
+        const sku = variant.sku?.trim() || null;
+
+        const [inserted] = await db
+          .insert(products)
+          .values({
+            nameEn: globalProduct.title,
+            nameAr: globalProduct.title,
+            descriptionEn: description.slice(0, 2000),
+            descriptionAr: description.slice(0, 2000),
+            price: markedUpPrice.toString(),
+            oldPrice,
+            category: categoryForNew,
+            image: primaryImage,
+            images: imageUrls.slice(1),
+            specs: specsFromTitle(globalProduct.title),
+            badge: "جديد",
+            sku,
+            inStock: variant.available !== false ? 1 : 0,
+          })
+          .returning();
+
+        ourPool.push(inserted);
+        if (sku) ourSkuIndex.set(sku.toLowerCase(), inserted);
+
+        syncLog.createdProducts.push(toSyncProductEntry(inserted));
+        console.log(
+          `[Catalog Sync] Added ${globalProduct.title.substring(0, 50)} @ ${markedUpPrice}`,
+        );
+        created++;
+      } catch (err: any) {
+        syncLog.errors.push(
+          `Error processing ${globalProduct.title}: ${err.message}`,
+        );
+      }
+    }
+
+    const reverseCandidates = allOurProducts.filter((p) => !matchedOurIds.has(p.id));
+    console.log(
+      `[Catalog Sync] Reverse pass for ${reverseCandidates.length} local products...`,
+    );
+
+    for (const ourProduct of reverseCandidates) {
+      try {
+        const globalMatch = findGlobalProductForOur(
+          ourProduct,
+          syncableGlobal,
+          globalSkuIndex,
+          (name, globals) =>
+            compositeMatcherForOurProduct(name, globals, ourProduct.category),
+        );
+        if (!globalMatch) continue;
+
+        const variant = getPrimaryVariant(globalMatch);
+        if (!variant) continue;
+
+        const markedUpPrice = globalPriceToStorePrice(variant.price || "");
+        if (markedUpPrice == null) continue;
+
+        matchedOurIds.add(ourProduct.id);
+        matched++;
+        const result = await applyGlobalPriceToExisting(
+          {
+            id: ourProduct.id,
+            nameEn: ourProduct.nameEn,
+            sku: ourProduct.sku,
+            category: ourProduct.category,
+            price: ourProduct.price,
+            oldPrice: ourProduct.oldPrice,
+          },
+          globalMatch,
+          variant,
+          markedUpPrice,
+          syncLog,
+        );
+        if (result === "updated") updated++;
+      } catch (err: any) {
+        syncLog.errors.push(
+          `Error updating existing ${ourProduct.nameEn}: ${err.message}`,
+        );
+      }
+    }
+
+    syncLog.updatedCount = updated;
+    syncLog.createdCount = created;
+    syncLog.totalMatched = matched;
+    syncLog.status = "success";
+    console.log(
+      `[Catalog Sync] Complete. Added: ${created}, Matched: ${matched}, Updated: ${updated}, Errors: ${syncLog.errors.length}`,
+    );
+  } catch (err: any) {
+    syncLog.status = "error";
+    syncLog.errors.push(`Sync failed: ${err.message}`);
+    console.error("[Catalog Sync] Failed:", err.message);
+  } finally {
+    endSync();
+  }
+
+  return syncLog;
+}
+
 export function getSyncStatus(): SyncLog {
   return syncLog;
 }
@@ -781,7 +1121,7 @@ export function startPriceSync() {
 
   syncInterval = setInterval(async () => {
     try {
-      await syncPrices();
+      await syncAllCatalogPrices();
     } catch (err) {
       console.error("[Price Sync] Scheduled sync error:", err);
     }
@@ -789,7 +1129,7 @@ export function startPriceSync() {
 
   initialTimeout = setTimeout(async () => {
     try {
-      await syncPrices();
+      await syncAllCatalogPrices();
     } catch (err) {
       console.error("[Price Sync] Initial sync error:", err);
     }
@@ -1130,25 +1470,9 @@ export function getDesktopSyncStatus(): SyncLog {
 export function startDesktopPriceSync() {
   if (desktopSchedulerStarted) return;
   desktopSchedulerStarted = true;
-
-  console.log("[Desktop Sync] Scheduling desktop/AIO price sync every 6 hours");
-  desktopSyncLog.nextSync = new Date(Date.now() + SYNC_INTERVAL_MS);
-
-  desktopSyncInterval = setInterval(async () => {
-    try {
-      await syncDesktopPrices();
-    } catch (err) {
-      console.error("[Desktop Sync] Scheduled sync error:", err);
-    }
-  }, SYNC_INTERVAL_MS);
-
-  desktopInitialTimeout = setTimeout(async () => {
-    try {
-      await syncDesktopPrices();
-    } catch (err) {
-      console.error("[Desktop Sync] Initial sync error:", err);
-    }
-  }, 60000);
+  console.log(
+    "[Desktop Sync] Desktops/AIOs are included in the full catalog sync (no separate scheduler)",
+  );
 }
 
 export function stopDesktopPriceSync() {
