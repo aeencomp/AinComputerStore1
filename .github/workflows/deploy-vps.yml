@@ -23,12 +23,22 @@ jobs:
       - run: npm run build
         env:
           NODE_OPTIONS: --max-old-space-size=2048
+      - uses: actions/upload-artifact@v4
+        with:
+          name: production-dist
+          path: dist/
+          retention-days: 3
 
   deploy:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy over SSH
+      - uses: actions/download-artifact@v4
+        with:
+          name: production-dist
+          path: dist-artifact
+
+      - name: Update repo on VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
@@ -36,11 +46,62 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
           timeout: 120s
-          command_timeout: 30m
+          command_timeout: 10m
           script_stop: true
           script: |
-            cd /home/deploy/AinComputerStore
-            git fetch --all --prune
-            git reset --hard origin/main
-            chmod +x ./deploy.sh scripts/start-prod.sh
-            ./deploy.sh
+            set -e
+            APP=/home/deploy/AinComputerStore
+            if [ "$(id -u)" = "0" ]; then
+              chown -R deploy:deploy "$APP"
+            fi
+            run_git() {
+              cd "$APP"
+              git fetch --all --prune
+              git reset --hard origin/main
+              mkdir -p dist
+              chmod +x deploy.sh scripts/start-prod.sh 2>/dev/null || true
+            }
+            if [ "$(id -un)" = "deploy" ]; then
+              run_git
+            else
+              su - deploy -c "bash -lc 'cd \"$APP\" && git fetch --all --prune && git reset --hard origin/main && mkdir -p dist && chmod +x deploy.sh scripts/start-prod.sh'"
+            fi
+
+      - name: Upload dist to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          source: "dist-artifact/*"
+          target: /home/deploy/AinComputerStore/dist
+          strip_components: 1
+          overwrite: true
+
+      - name: Restart app on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          timeout: 120s
+          command_timeout: 10m
+          script_stop: true
+          script: |
+            set -e
+            APP=/home/deploy/AinComputerStore
+            if [ "$(id -u)" = "0" ]; then
+              chown -R deploy:deploy "$APP"
+            fi
+            run_deploy() {
+              cd "$APP"
+              export SKIP_VPS_BUILD=1
+              ./deploy.sh
+            }
+            if [ "$(id -un)" = "deploy" ]; then
+              run_deploy
+            else
+              su - deploy -c "bash -lc 'cd \"$APP\" && export SKIP_VPS_BUILD=1 && ./deploy.sh'"
+            fi

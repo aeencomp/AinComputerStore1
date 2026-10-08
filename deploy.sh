@@ -46,6 +46,34 @@ git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git 2>/d
 git fetch --all --prune
 git reset --hard origin/main
 
+if [ "${SKIP_VPS_BUILD:-}" = "1" ]; then
+  echo "==> SKIP_VPS_BUILD=1 — using dist from GitHub Actions (no npm ci/build on VPS)"
+  if [ ! -f dist/index.js ] || [ ! -f dist/public/index.html ]; then
+    echo "ERROR: dist/index.js or dist/public/index.html missing on VPS"
+    exit 1
+  fi
+  mkdir -p uploads
+  chmod 755 uploads
+  chmod +x scripts/start-prod.sh 2>/dev/null || true
+  echo "==> Restart PM2"
+  pm2 delete "$PM2_NAME" 2>/dev/null || true
+  pm2 start ecosystem.config.cjs
+  pm2 save
+  pm2 status
+  echo "==> Wait for app health (up to 90s) on port ${PORT:-5000}"
+  for i in $(seq 1 30); do
+    if curl -sf "http://127.0.0.1:${PORT:-5000}/api/health" >/dev/null 2>&1; then
+      echo "==> App is responding"
+      echo "==> Done"
+      exit 0
+    fi
+    sleep 3
+  done
+  echo "WARNING: health check failed — check: pm2 logs $PM2_NAME --lines 80"
+  pm2 logs "$PM2_NAME" --lines 40 --nostream || true
+  exit 0
+fi
+
 if [ -d node_modules ] && ! touch node_modules/.write-test 2>/dev/null; then
   echo "==> node_modules not writable — attempting chown (deploy sudo or ask root once)"
   sudo -n chown -R deploy:deploy "$APP_DIR" 2>/dev/null || true
