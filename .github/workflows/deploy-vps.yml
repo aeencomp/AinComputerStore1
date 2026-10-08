@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build
@@ -28,17 +28,37 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Verify VPS deploy settings exist
+        run: |
+          HOST="${{ secrets.VPS_HOST || vars.VPS_HOST }}"
+          USER="${{ secrets.VPS_USER || vars.VPS_USER }}"
+          if [ -z "$HOST" ]; then
+            echo "::error::Missing VPS_HOST (set Repository secret or variable VPS_HOST)"
+            exit 1
+          fi
+          if [ -z "$USER" ]; then
+            echo "::error::Missing VPS_USER (set Repository secret or variable VPS_USER)"
+            exit 1
+          fi
+          if [ -z "${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}" ]; then
+            echo "::error::Missing VPS_SSH_KEY (set Repository secret or variable VPS_SSH_KEY)"
+            exit 1
+          fi
+          echo "VPS deploy config present (host set, user=$USER)"
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          port: ${{ secrets.VPS_PORT || 22 }}
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          timeout: 60s
           command_timeout: 30m
+          debug: true
           script_stop: true
           script: |
-            set -euo pipefail
+            set -e
             cd /home/deploy/AinComputerStore
             echo "==> Deploy user: $(whoami)"
             echo "==> Node: $(node -v 2>/dev/null || echo missing) npm: $(npm -v 2>/dev/null || echo missing)"
