@@ -15,8 +15,12 @@ if [ -s "$HOME/.nvm/nvm.sh" ]; then
 fi
 
 if [ "$(id -un)" != "deploy" ]; then
+  if [ "$(id -u)" = "0" ]; then
+    echo "==> Running as root — fixing ownership and re-running as deploy"
+    chown -R deploy:deploy "$APP_DIR"
+    exec su - deploy -c "bash -lc 'cd \"$APP_DIR\" && ./deploy.sh'"
+  fi
   echo "ERROR: deploy.sh must run as user deploy (current: $(whoami))"
-  echo "       GitHub Actions should use: su - deploy -c './deploy.sh'"
   exit 1
 fi
 
@@ -25,10 +29,13 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+# .env may reference optional vars; do not use nounset while sourcing
+set +u
 set -a
 # shellcheck disable=SC1091
 source .env
 set +a
+set -u
 
 echo "==> Node $(node -v) | npm $(npm -v)"
 echo "==> Commit $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
@@ -39,6 +46,10 @@ git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git 2>/d
 git fetch --all --prune
 git reset --hard origin/main
 
+if [ -d node_modules ] && ! touch node_modules/.write-test 2>/dev/null; then
+  echo "==> node_modules not writable — attempting chown (deploy sudo or ask root once)"
+  sudo -n chown -R deploy:deploy "$APP_DIR" 2>/dev/null || true
+fi
 if [ -d node_modules ] && ! touch node_modules/.write-test 2>/dev/null; then
   echo "ERROR: node_modules is not writable (often caused by running npm as root)."
   echo "       As root run: chown -R deploy:deploy $APP_DIR"
