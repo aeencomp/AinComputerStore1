@@ -10023,7 +10023,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const adminId = (req.session as any).adminId;
     if (!adminId) return res.status(401).json({ error: "Unauthorized" });
     try {
-      const result = await syncDesktopPrices();
+      const result = await syncAllCatalogPrices();
       return res.json(result);
     } catch (error: any) {
       return res.status(500).json({ error: error.message });

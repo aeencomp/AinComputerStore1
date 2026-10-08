@@ -7,6 +7,14 @@ const SYNC_STALE_MS = 15 * 60 * 1000;
 const MARKUP_PERCENTAGE = 0;
 const GLOBALIRAQ_API = "https://globaliraq.iq/products.json?limit=250";
 const MAX_PAGES = 50;
+const PAGE_DELAY_MS = 2800;
+const GLOBAL_PRODUCTS_CACHE_MS = 15 * 60 * 1000;
+const FETCH_MAX_RETRIES = 10;
+
+let cachedGlobalProducts: { fetchedAt: number; products: ShopifyProduct[] } | null =
+  null;
+let globalProductsFetchPromise: Promise<ShopifyProduct[]> | null = null;
+let lastGlobalIraqRateLimitAt = 0;
 
 const LAPTOP_CATEGORIES = [
   "laptops",
@@ -93,21 +101,52 @@ let syncInterval: NodeJS.Timeout | null = null;
 let initialTimeout: NodeJS.Timeout | null = null;
 let schedulerStarted = false;
 
-async function fetchJSON(url: string, retries = 3): Promise<any> {
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function rateLimitBackoffMs(attempt: number, retryAfterHeader: string | null): number {
+  const retryAfterSec = parseInt(retryAfterHeader || "", 10);
+  if (Number.isFinite(retryAfterSec) && retryAfterSec > 0) {
+    return retryAfterSec * 1000;
+  }
+  return Math.min(180_000, 8_000 * Math.pow(2, attempt - 1));
+}
+
+async function fetchJSON(url: string, retries = FETCH_MAX_RETRIES): Promise<any> {
   let lastError: Error | null = null;
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      const sinceLimit = Date.now() - lastGlobalIraqRateLimitAt;
+      if (sinceLimit < 45_000) {
+        await sleep(45_000 - sinceLimit);
+      }
+
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 60000);
       const res = await fetch(url, {
         signal: controller.signal,
         headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; AinComputerStore/1.0)",
+          "User-Agent":
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
           Accept: "application/json",
         },
       });
       clearTimeout(timeout);
+
+      if (res.status === 429) {
+        lastGlobalIraqRateLimitAt = Date.now();
+        const waitMs = rateLimitBackoffMs(attempt, res.headers.get("retry-after"));
+        console.warn(
+          `[Price Sync] GlobalIraq rate limit (429), waiting ${Math.round(waitMs / 1000)}s (attempt ${attempt}/${retries})`,
+        );
+        if (attempt < retries) {
+          await sleep(waitMs);
+          continue;
+        }
+        throw new Error(`HTTP 429 for ${url}`);
+      }
 
       if (!res.ok) {
         throw new Error(`HTTP ${res.status} for ${url}`);
@@ -115,14 +154,29 @@ async function fetchJSON(url: string, retries = 3): Promise<any> {
 
       const text = await res.text();
       if (text.includes("local_rate_limited") || text.includes("rate_limit")) {
+        lastGlobalIraqRateLimitAt = Date.now();
+        const waitMs = rateLimitBackoffMs(attempt, null);
+        console.warn(
+          `[Price Sync] GlobalIraq rate limit body, waiting ${Math.round(waitMs / 1000)}s (attempt ${attempt}/${retries})`,
+        );
+        if (attempt < retries) {
+          await sleep(waitMs);
+          continue;
+        }
         throw new Error("Rate limited by globaliraq.iq");
       }
 
       return JSON.parse(text);
     } catch (err: any) {
       lastError = err instanceof Error ? err : new Error(String(err));
+      const is429 =
+        lastError.message.includes("429") ||
+        lastError.message.includes("Rate limit");
       if (attempt < retries) {
-        await new Promise((resolve) => setTimeout(resolve, 1000 * attempt));
+        const waitMs = is429
+          ? rateLimitBackoffMs(attempt, null)
+          : 2000 * attempt;
+        await sleep(waitMs);
       }
     }
   }
@@ -130,7 +184,7 @@ async function fetchJSON(url: string, retries = 3): Promise<any> {
   throw lastError ?? new Error(`Failed to fetch ${url}`);
 }
 
-async function fetchAllGlobalIraqProducts(): Promise<ShopifyProduct[]> {
+async function fetchAllGlobalIraqProductsFromApi(): Promise<ShopifyProduct[]> {
   const allProducts: ShopifyProduct[] = [];
   let page = 1;
 
@@ -144,10 +198,38 @@ async function fetchAllGlobalIraqProducts(): Promise<ShopifyProduct[]> {
     page++;
 
     if (pageProducts.length < 250) break;
-    await new Promise((resolve) => setTimeout(resolve, 1200));
+    const jitter = Math.floor(Math.random() * 800);
+    await sleep(PAGE_DELAY_MS + jitter);
   }
 
+  cachedGlobalProducts = { fetchedAt: Date.now(), products: allProducts };
   return allProducts;
+}
+
+/** One fetch at a time; reuse cache for 15 minutes (avoids 429 when laptop + desktop + catalog sync overlap). */
+async function fetchAllGlobalIraqProducts(
+  forceRefresh = false,
+): Promise<ShopifyProduct[]> {
+  if (
+    !forceRefresh &&
+    cachedGlobalProducts &&
+    Date.now() - cachedGlobalProducts.fetchedAt < GLOBAL_PRODUCTS_CACHE_MS
+  ) {
+    console.log(
+      `[Price Sync] Using cached GlobalIraq catalog (${cachedGlobalProducts.products.length} products)`,
+    );
+    return cachedGlobalProducts.products;
+  }
+
+  if (globalProductsFetchPromise) {
+    return globalProductsFetchPromise;
+  }
+
+  globalProductsFetchPromise = fetchAllGlobalIraqProductsFromApi().finally(() => {
+    globalProductsFetchPromise = null;
+  });
+
+  return globalProductsFetchPromise;
 }
 
 function globalPriceToStorePrice(rawPrice: string): number | null {

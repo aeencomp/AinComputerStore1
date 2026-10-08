@@ -386,7 +386,7 @@ function DesktopSyncCard() {
             مزامنة أسعار الأجهزة المكتبية والكل في واحد
           </CardTitle>
           <CardDescription>
-            استيراد أجهزة GlobalIraq المكتبية والكل في واحد وتحديث الأسعار كل 6 ساعات
+            نفس مزامنة المنتجات الكاملة (مكتبية + كل في واحد) — لا تشغّل الزرّين معاً
           </CardDescription>
         </div>
         <Button
