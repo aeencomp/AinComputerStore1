@@ -85,11 +85,16 @@ if [ -d node_modules ] && ! touch node_modules/.write-test 2>/dev/null; then
 fi
 rm -f node_modules/.write-test 2>/dev/null || true
 
+# .env often sets NODE_ENV=production; npm then skips devDependencies (vite, esbuild) and build fails
+_runtime_node_env="${NODE_ENV:-production}"
+unset NODE_ENV
+export NPM_CONFIG_PRODUCTION=false
+
 echo "==> Install dependencies (keeping app running until build succeeds)"
-if ! npm ci --no-audit --no-fund; then
+if ! npm ci --no-audit --no-fund --include=dev; then
   echo "==> npm ci failed; clean retry if we can remove node_modules"
   if rm -rf node_modules 2>/dev/null; then
-    npm ci --no-audit --no-fund
+    npm ci --no-audit --no-fund --include=dev
   else
     echo "ERROR: cannot fix node_modules — run as root: chown -R deploy:deploy $APP_DIR"
     exit 1
@@ -99,6 +104,7 @@ fi
 echo "==> Build"
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
 npm run build
+export NODE_ENV="$_runtime_node_env"
 
 if [ ! -f dist/index.js ] || [ ! -f dist/public/index.html ]; then
   echo "ERROR: build failed — dist/index.js or dist/public/index.html missing"
