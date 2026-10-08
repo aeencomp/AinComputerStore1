@@ -25,6 +25,14 @@ git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git 2>/d
 git fetch --all --prune
 git reset --hard origin/main
 
+if [ -d node_modules ] && ! touch node_modules/.write-test 2>/dev/null; then
+  echo "ERROR: node_modules is not writable by $(whoami) (often caused by running npm as root)."
+  echo "       As root run: chown -R deploy:deploy $APP_DIR"
+  echo "       Or: sudo bash $APP_DIR/scripts/fix-npm-permissions.sh"
+  exit 1
+fi
+rm -f node_modules/.write-test 2>/dev/null || true
+
 echo "==> Install dependencies (keeping app running until build succeeds)"
 if ! npm ci --no-audit --no-fund; then
   echo "==> npm ci failed; removing node_modules and retrying"

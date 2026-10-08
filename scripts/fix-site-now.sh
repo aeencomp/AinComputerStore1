@@ -30,6 +30,12 @@ git reset --hard origin/main
 
 chmod +x deploy.sh scripts/start-prod.sh 2>/dev/null || true
 
+if [ -d node_modules ] && ! touch node_modules/.write-test 2>/dev/null; then
+  echo "ERROR: node_modules not writable. As root: chown -R deploy:deploy $APP_DIR"
+  exit 1
+fi
+rm -f node_modules/.write-test 2>/dev/null || true
+
 if [ ! -d node_modules ] || [ ! -f node_modules/.package-lock.json ]; then
   echo "==> npm ci"
   npm ci --no-audit --no-fund
