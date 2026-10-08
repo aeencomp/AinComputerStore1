@@ -1215,7 +1215,7 @@ export function startPriceSync() {
     } catch (err) {
       console.error("[Price Sync] Initial sync error:", err);
     }
-  }, 30000);
+  }, 10 * 60 * 1000);
 }
 
 export function stopPriceSync() {

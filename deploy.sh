@@ -6,23 +6,26 @@ PM2_NAME="ain-app"
 
 cd "$APP_DIR"
 
+if [ ! -f .env ]; then
+  echo "ERROR: missing $APP_DIR/.env (DATABASE_URL, SESSION_SECRET, PORT, ...)"
+  exit 1
+fi
+
+set -a
+# shellcheck disable=SC1091
+source .env
+set +a
+
 echo "==> Node $(node -v) | npm $(npm -v)"
 echo "==> Commit $(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
-
-echo "==> Restore PM2 processes saved before last reboot (no-op if none)"
-pm2 resurrect 2>/dev/null || true
+echo "==> PORT=${PORT:-5000}"
 
 echo "==> Pull latest code"
 git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git 2>/dev/null || true
 git fetch --all --prune
 git reset --hard origin/main
 
-echo "==> Stop PM2 (avoid node_modules locks)"
-if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
-  pm2 stop "$PM2_NAME" || true
-fi
-
-echo "==> Install dependencies"
+echo "==> Install dependencies (keeping app running until build succeeds)"
 if ! npm ci --no-audit --no-fund; then
   echo "==> npm ci failed; removing node_modules and retrying"
   rm -rf node_modules
@@ -33,42 +36,31 @@ echo "==> Build"
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=2048}"
 npm run build
 
+if [ ! -f dist/index.js ] || [ ! -f dist/public/index.html ]; then
+  echo "ERROR: build failed — dist/index.js or dist/public/index.html missing"
+  echo "       PM2 was NOT stopped; previous app version may still be running."
+  exit 1
+fi
+
 mkdir -p uploads
 chmod 755 uploads
 
-echo "==> DB migrations run automatically on app startup (server/db-migrations.ts)"
-
 echo "==> Restart PM2"
-if pm2 describe "$PM2_NAME" >/dev/null 2>&1; then
-  pm2 delete "$PM2_NAME" || true
-fi
+pm2 delete "$PM2_NAME" 2>/dev/null || true
 pm2 start ecosystem.config.cjs
-
 pm2 save
-echo "==> PM2 status"
 pm2 status
 
-if [ -f .env ]; then
-  set -a
-  # shellcheck disable=SC1091
-  source .env
-  set +a
-fi
-
-echo "==> Wait for app health (up to 90s)"
+echo "==> Wait for app health (up to 90s) on port ${PORT:-5000}"
 for i in $(seq 1 30); do
   if curl -sf "http://127.0.0.1:${PORT:-5000}/api/health" >/dev/null 2>&1; then
-    echo "==> App is responding on port ${PORT:-5000}"
-    break
-  fi
-  if [ "$i" -eq 30 ]; then
-    echo "==> WARNING: health check failed — app may still be starting"
-    echo "==> Check: pm2 logs $PM2_NAME --lines 80"
-    pm2 logs "$PM2_NAME" --lines 30 --nostream || true
+    echo "==> App is responding"
+    echo "==> Done"
     exit 0
   fi
   sleep 3
 done
 
-echo "==> Done"
-
+echo "ERROR: health check failed — nginx may show 502"
+pm2 logs "$PM2_NAME" --lines 40 --nostream || true
+exit 1
