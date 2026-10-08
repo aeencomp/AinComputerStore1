@@ -41,13 +41,15 @@ jobs:
           script: |
             set -e
             APP=/home/deploy/AinComputerStore
-            if [ "$(whoami)" = "deploy" ]; then
-              cd "$APP"
+            # If GitHub SSH user is root, fix ownership then always deploy as deploy (avoids root npm / EACCES)
+            if [ "$(id -u)" = "0" ]; then
+              chown -R deploy:deploy "$APP"
+            fi
+            su - deploy -c "set -e
+              cd $APP
+              git config --global --add safe.directory $APP 2>/dev/null || true
               git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true
               git fetch --all --prune
               git reset --hard origin/main
               chmod +x deploy.sh scripts/start-prod.sh 2>/dev/null || true
-              ./deploy.sh
-            else
-              su - deploy -c "set -e; cd $APP; git remote set-url origin https://github.com/aeencomp/AinComputerStore1.git || true; git fetch --all --prune; git reset --hard origin/main; chmod +x deploy.sh scripts/start-prod.sh; ./deploy.sh"
-            fi
+              ./deploy.sh"

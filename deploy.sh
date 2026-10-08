@@ -6,6 +6,20 @@ PM2_NAME="ain-app"
 
 cd "$APP_DIR"
 
+git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
+
+export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:$PATH"
+if [ -s "$HOME/.nvm/nvm.sh" ]; then
+  # shellcheck disable=SC1091
+  . "$HOME/.nvm/nvm.sh"
+fi
+
+if [ "$(id -un)" != "deploy" ]; then
+  echo "ERROR: deploy.sh must run as user deploy (current: $(whoami))"
+  echo "       GitHub Actions should use: su - deploy -c './deploy.sh'"
+  exit 1
+fi
+
 if [ ! -f .env ]; then
   echo "ERROR: missing $APP_DIR/.env (DATABASE_URL, SESSION_SECRET, PORT, ...)"
   exit 1
@@ -26,18 +40,21 @@ git fetch --all --prune
 git reset --hard origin/main
 
 if [ -d node_modules ] && ! touch node_modules/.write-test 2>/dev/null; then
-  echo "ERROR: node_modules is not writable by $(whoami) (often caused by running npm as root)."
+  echo "ERROR: node_modules is not writable (often caused by running npm as root)."
   echo "       As root run: chown -R deploy:deploy $APP_DIR"
-  echo "       Or: sudo bash $APP_DIR/scripts/fix-npm-permissions.sh"
   exit 1
 fi
 rm -f node_modules/.write-test 2>/dev/null || true
 
 echo "==> Install dependencies (keeping app running until build succeeds)"
 if ! npm ci --no-audit --no-fund; then
-  echo "==> npm ci failed; removing node_modules and retrying"
-  rm -rf node_modules
-  npm ci --no-audit --no-fund
+  echo "==> npm ci failed; clean retry if we can remove node_modules"
+  if rm -rf node_modules 2>/dev/null; then
+    npm ci --no-audit --no-fund
+  else
+    echo "ERROR: cannot fix node_modules — run as root: chown -R deploy:deploy $APP_DIR"
+    exit 1
+  fi
 fi
 
 echo "==> Build"
