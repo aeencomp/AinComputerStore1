@@ -448,10 +448,25 @@ function onlineStockInfoFromMatches(product: any, matches: Awaited<ReturnType<ty
   };
 }
 
+function isDigitalOnlineProduct(product: any): boolean {
+  return product?.category === "programs";
+}
+
 function attachOnlineStock(
   product: any,
   matches: Awaited<ReturnType<typeof getOnlineInventoryMatches>>,
 ) {
+  if (isDigitalOnlineProduct(product)) {
+    const inStock = product.inStock === 1 || product.inStock === true ? 1 : 0;
+    return {
+      ...product,
+      stockQuantity: inStock ? 999 : 0,
+      inStock,
+      onlineStockByLocation: [],
+      onlineStockSource: "digital",
+    };
+  }
+
   const stock = onlineStockInfoFromMatches(product, matches);
   return {
     ...product,

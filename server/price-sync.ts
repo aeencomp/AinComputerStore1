@@ -492,9 +492,37 @@ function findOurProductForSoftwareGlobal(
   ourProducts: { id: string; nameEn: string; sku: string | null; category?: string }[],
   ourSkuIndex: Map<string, (typeof ourProducts)[number]>,
 ): (typeof ourProducts)[number] | null {
+  const handle = globalProduct.handle?.trim().toLowerCase();
+  if (handle) {
+    const byHandleSku = ourSkuIndex.get(handle);
+    if (byHandleSku && byHandleSku.category === "programs") {
+      return byHandleSku;
+    }
+    const programPool = ourProducts.filter((p) => p.category === "programs");
+    const byHandle = programPool.find(
+      (p) => p.sku?.trim().toLowerCase() === handle,
+    );
+    if (byHandle) return byHandle;
+  }
+
+  const variant = getPrimaryVariant(globalProduct);
+  const variantSku = variant?.sku?.trim().toLowerCase();
+  if (variantSku) {
+    const byVariantSku = ourSkuIndex.get(variantSku);
+    if (byVariantSku?.category === "programs") return byVariantSku;
+  }
+
+  const titleKey = globalProduct.title.trim().toLowerCase().slice(0, 80);
+  const byTitle = ourProducts.find(
+    (p) =>
+      p.category === "programs" &&
+      p.nameEn.trim().toLowerCase().slice(0, 80) === titleKey,
+  );
+  if (byTitle) return byTitle;
+
   const existing = findOurProductForGlobal(
     globalProduct,
-    ourProducts,
+    ourProducts.filter((p) => p.category === "programs"),
     ourSkuIndex,
     matchGenericProducts,
   );
@@ -1365,7 +1393,10 @@ async function syncSoftwareCollectionPrograms(
 
       const description =
         stripHtml(globalProduct.body_html || "") || globalProduct.title;
-      const sku = variant.sku?.trim() || null;
+      const sku =
+        variant.sku?.trim() ||
+        globalProduct.handle?.trim() ||
+        null;
       const inStock = globalVariantInStock(variant, globalProduct) ? 1 : 0;
 
       const existing = findOurProductForSoftwareGlobal(
@@ -1390,6 +1421,7 @@ async function syncSoftwareCollectionPrograms(
             images: imageUrls.slice(1),
             sku: sku ?? existing.sku,
             inStock,
+            stockQuantity: inStock ? 999 : 0,
           })
           .where(eq(products.id, existing.id));
 
@@ -1425,11 +1457,15 @@ async function syncSoftwareCollectionPrograms(
           badge: "جديد",
           sku,
           inStock,
+          stockQuantity: inStock ? 999 : 0,
         })
         .returning();
 
       ourPool.push(inserted);
       if (sku) ourSkuIndex.set(sku.toLowerCase(), inserted);
+      if (globalProduct.handle) {
+        ourSkuIndex.set(globalProduct.handle.toLowerCase(), inserted);
+      }
       syncLog.createdProducts.push(toSyncProductEntry(inserted));
       created++;
       console.log(
@@ -1509,6 +1545,12 @@ export async function syncAllCatalogPrices(options?: {
       ? mergeGlobalProductLists(catalogProducts, softwareProducts)
       : catalogProducts;
     const syncableGlobal = allGlobalProducts.filter((product) => {
+      if (
+        product.handle &&
+        softwareCollectionHandles.has(product.handle)
+      ) {
+        return false;
+      }
       const variant = getPrimaryVariant(product);
       if (!variant) return false;
       return globalPriceToStorePrice(variant.price || "") != null;
@@ -1703,8 +1745,14 @@ export async function syncAllCatalogPrices(options?: {
     }
 
     setSyncProgress("Syncing software / programs collection…");
+    const softwareFromCache =
+      softwareProducts.length > 0
+        ? softwareProducts
+        : (cachedGlobalCatalogProducts() ?? []).filter(
+            (p) => p.handle && softwareCollectionHandles.has(p.handle),
+          );
     const softwareStats = await syncSoftwareCollectionPrograms(
-      softwareProducts,
+      softwareFromCache,
       syncLog,
     );
     created += softwareStats.created;
