@@ -29,14 +29,41 @@ jobs:
           path: dist/
           retention-days: 3
 
+  fetch-global-catalog:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Download Global Iraq catalog (GitHub IP — not VPS)
+        run: npm run build:global-cache
+        continue-on-error: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: global-catalog-cache
+          path: data/globaliraq-catalog-cache.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   deploy:
-    needs: build
+    needs: [build, fetch-global-catalog]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
         with:
           name: production-dist
           path: dist-artifact
+
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: global-catalog-cache
+          path: catalog-cache-artifact
 
       - name: Update repo on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -58,13 +85,13 @@ jobs:
               cd "$APP"
               git fetch --all --prune
               git reset --hard origin/main
-              mkdir -p dist
+              mkdir -p dist data
               chmod +x deploy.sh scripts/start-prod.sh 2>/dev/null || true
             }
             if [ "$(id -un)" = "deploy" ]; then
               run_git
             else
-              su - deploy -c "bash -lc 'cd \"$APP\" && git fetch --all --prune && git reset --hard origin/main && mkdir -p dist && chmod +x deploy.sh scripts/start-prod.sh'"
+              su - deploy -c "bash -lc 'cd \"$APP\" && git fetch --all --prune && git reset --hard origin/main && mkdir -p dist data && chmod +x deploy.sh scripts/start-prod.sh'"
             fi
 
       - name: Upload dist to VPS
@@ -79,6 +106,18 @@ jobs:
           strip_components: 1
           overwrite: true
 
+      - name: Upload Global Iraq catalog cache to VPS
+        uses: appleboy/scp-action@v0.1.7
+        continue-on-error: true
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          source: "catalog-cache-artifact/globaliraq-catalog-cache.json"
+          target: /home/deploy/AinComputerStore/data
+          overwrite: true
+
       - name: Restart app on VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
@@ -87,13 +126,16 @@ jobs:
           key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
           timeout: 120s
-          command_timeout: 10m
+          command_timeout: 15m
           script_stop: true
           script: |
             set -e
             APP=/home/deploy/AinComputerStore
             if [ "$(id -u)" = "0" ]; then
               chown -R deploy:deploy "$APP"
+            fi
+            if [ -f "$APP/data/globaliraq-catalog-cache.json" ]; then
+              chown deploy:deploy "$APP/data/globaliraq-catalog-cache.json" 2>/dev/null || true
             fi
             run_deploy() {
               cd "$APP"

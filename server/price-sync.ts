@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 
 const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 /** No progress heartbeat for this long → treat sync as stuck (UI can reset). */
-const SYNC_PROGRESS_STALE_MS = 12 * 60 * 1000;
+const SYNC_PROGRESS_STALE_MS = 4 * 60 * 1000;
 /** Absolute max wall time for one catalog sync run. */
 const SYNC_WALL_CLOCK_MS = 50 * 60 * 1000;
 const MARKUP_PERCENTAGE = 0;
@@ -138,14 +138,23 @@ function rateLimitBackoffMs(attempt: number, retryAfterHeader: string | null): n
   return Math.min(300_000, 15_000 * Math.pow(2, attempt - 1));
 }
 
+/** VPS is rate-limited by Global Iraq — catalog is fetched on GitHub Actions and copied to `data/`. */
+function shouldUseLiveGlobalIraqFetch(): boolean {
+  return process.env.GLOBALIRAQ_LIVE_FETCH === "1";
+}
+
 export function loadGlobalCatalogCacheFromDisk(): void {
   try {
     if (!fs.existsSync(CATALOG_CACHE_FILE)) return;
     const raw = JSON.parse(fs.readFileSync(CATALOG_CACHE_FILE, "utf8")) as {
       fetchedAt?: number;
       products?: ShopifyProduct[];
+      softwareHandles?: string[];
     };
     if (!raw.products?.length) return;
+    if (raw.softwareHandles?.length) {
+      softwareCollectionHandles = new Set(raw.softwareHandles);
+    }
     cachedGlobalProducts = {
       fetchedAt: raw.fetchedAt ?? 0,
       products: raw.products,
@@ -315,6 +324,16 @@ async function fetchAllGlobalIraqProducts(
     loadGlobalCatalogCacheFromDisk();
   }
 
+  if (!shouldUseLiveGlobalIraqFetch()) {
+    const cached = cachedGlobalCatalogProducts();
+    if (cached) {
+      return cached;
+    }
+    throw new Error(
+      "ملف كتalog المنتجات غير موجود على الخادم. ادفع التحديث إلى GitHub وانتظر Deploy (التحميل من Global Iraq يتم عبر GitHub وليس VPS).",
+    );
+  }
+
   if (
     !forceRefresh &&
     cachedGlobalProducts &&
@@ -378,6 +397,13 @@ async function fetchAllGlobalIraqProducts(
 }
 
 async function fetchSoftwareCollectionProducts(): Promise<ShopifyProduct[]> {
+  if (!shouldUseLiveGlobalIraqFetch()) {
+    const cached = cachedGlobalCatalogProducts();
+    if (!cached) return [];
+    return cached.filter(
+      (p) => p.handle && softwareCollectionHandles.has(p.handle),
+    );
+  }
   const collectionProducts: ShopifyProduct[] = [];
   try {
     for (let page = 1; page <= 10; page++) {
@@ -1463,16 +1489,15 @@ export async function syncAllCatalogPrices(options?: {
   }
 
   try {
-    console.log("[Catalog Sync] Starting full catalog sync from globaliraq.iq...");
+    console.log("[Catalog Sync] Starting catalog sync…");
 
     const catalogProducts = await fetchAllGlobalIraqProducts(
       options?.forceRefresh === true,
     );
     const softwareProducts = await fetchSoftwareCollectionProducts();
-    const allGlobalProducts = mergeGlobalProductLists(
-      catalogProducts,
-      softwareProducts,
-    );
+    const allGlobalProducts = shouldUseLiveGlobalIraqFetch()
+      ? mergeGlobalProductLists(catalogProducts, softwareProducts)
+      : catalogProducts;
     const syncableGlobal = allGlobalProducts.filter((product) => {
       const variant = getPrimaryVariant(product);
       if (!variant) return false;
@@ -1720,8 +1745,15 @@ export function startPriceSync() {
   }
   schedulerStarted = true;
   loadGlobalCatalogCacheFromDisk();
+  resetCatalogSyncState();
 
-  console.log("[Price Sync] Scheduling full catalog sync every 24 hours");
+  setInterval(() => {
+    reconcileStaleSync();
+  }, 30_000);
+
+  console.log(
+    `[Price Sync] Scheduling full catalog sync every 24 hours (live Global Iraq fetch: ${shouldUseLiveGlobalIraqFetch() ? "on" : "off — using deploy cache"})`,
+  );
 
   syncLog.nextSync = new Date(Date.now() + SYNC_INTERVAL_MS);
 

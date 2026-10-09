@@ -1,5 +1,6 @@
 import { Link } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useEffect, useRef } from "react";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -34,44 +35,6 @@ export interface AdminPriceSyncStatus {
   progress?: string;
   startedAt?: string;
   processedCount?: number;
-}
-
-async function pollAdminPriceSyncStatus(
-  statusUrl: string,
-): Promise<AdminPriceSyncStatus> {
-  const deadline = Date.now() + 10 * 60 * 1000;
-  while (Date.now() < deadline) {
-    await new Promise((r) => setTimeout(r, 2500));
-    const res = await fetchWithTimeout(statusUrl, { credentials: "include" }, 30_000);
-    if (!res.ok) continue;
-    const data = (await res.json()) as AdminPriceSyncStatus;
-    if (data.status !== "running") {
-      if (data.status === "error" && data.errors?.length) {
-        throw new Error(data.errors[data.errors.length - 1] ?? "فشلت المزامنة");
-      }
-      return data;
-    }
-  }
-  throw new Error("انتهت مهلة انتظار المزامنة — تحقق من الخادم أو حاول لاحقاً");
-}
-
-async function requestCatalogSyncStart(runUrl: string): Promise<AdminPriceSyncStatus> {
-  const res = await fetchWithTimeout(
-    runUrl,
-    { method: "POST", credentials: "include" },
-    60_000,
-  );
-  const body = (await res.json()) as AdminPriceSyncStatus & { error?: string };
-  if (res.status === 409) {
-    throw new Error(body.error ?? "المزامنة قيد التشغيل بالفعل");
-  }
-  if (!res.ok) {
-    throw new Error(body.error ?? `HTTP ${res.status}`);
-  }
-  if (body.status === "running") {
-    return pollAdminPriceSyncStatus("/api/admin/price-sync/status");
-  }
-  return body;
 }
 
 function SyncProductResults({
@@ -147,56 +110,95 @@ function SyncProductResults({
 export function GlobalIraqSyncPanel({ className }: { className?: string }) {
   const { toast } = useToast();
   const { language } = useLanguage();
+  const prevStatusRef = useRef<string | undefined>(undefined);
 
   const syncStatusQuery = useQuery<AdminPriceSyncStatus>({
     queryKey: ["/api/admin/price-sync/status"],
     refetchInterval: (query) =>
-      query.state.data?.status === "running" ? 3000 : 30000,
+      query.state.data?.status === "running" ? 2000 : 30000,
   });
+
+  const status = syncStatusQuery.data;
+  const isRunning = status?.status === "running";
+
+  useEffect(() => {
+    const prev = prevStatusRef.current;
+    const cur = status?.status;
+    if (prev === "running" && cur === "success") {
+      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
+      const created = status?.createdCount ?? 0;
+      const updated = status?.updatedCount ?? 0;
+      const matched = status?.totalMatched ?? 0;
+      const fetched = status?.fetchedCount ?? 0;
+      toast({
+        title: language === "ar" ? "تمت مزامنة Global Iraq" : "Global Iraq sync complete",
+        description:
+          language === "ar"
+            ? `${created} مضاف، ${updated} محدّث (${matched}/${fetched})`
+            : `${created} added, ${updated} updated (${matched}/${fetched})`,
+      });
+    }
+    if (prev === "running" && cur === "error" && status?.errors?.length) {
+      toast({
+        title: language === "ar" ? "فشلت المزامنة" : "Sync failed",
+        description: status.errors[status.errors.length - 1],
+        variant: "destructive",
+      });
+    }
+    if (prev === "running" && cur === "idle") {
+      toast({
+        title: language === "ar" ? "توقفت المزامنة" : "Sync stopped",
+        description:
+          language === "ar"
+            ? "تم إعادة التعيين — اضغط مزامنة الآن."
+            : "State was reset — press Sync now.",
+      });
+    }
+    prevStatusRef.current = cur;
+  }, [status?.status, status, language, toast]);
 
   const resetMutation = useMutation({
     mutationFn: () => apiRequest("POST", "/api/admin/price-sync/reset"),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/price-sync/status"] });
-      toast({
-        title: language === "ar" ? "تم إعادة التعيين" : "Sync state reset",
-        description:
-          language === "ar"
-            ? "يمكنك الضغط على «مزامنة الآن» مرة أخرى."
-            : "You can press Sync now again.",
-      });
     },
   });
 
   const syncMutation = useMutation({
-    mutationFn: () => requestCatalogSyncStart("/api/admin/price-sync/run"),
-    onSuccess: (data) => {
+    mutationFn: async () => {
+      const res = await fetchWithTimeout(
+        "/api/admin/price-sync/run",
+        { method: "POST", credentials: "include" },
+        30_000,
+      );
+      const body = (await res.json()) as AdminPriceSyncStatus & { error?: string };
+      if (res.status === 409) {
+        throw new Error(body.error ?? "المزامنة قيد التشغيل بالفعل");
+      }
+      if (!res.ok) {
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
+      return body;
+    },
+    onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/price-sync/status"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/products"] });
-      const created = data.createdCount ?? 0;
-      const updated = data.updatedCount ?? 0;
-      const matched = data.totalMatched ?? 0;
-      const fetched = data.fetchedCount ?? 0;
       toast({
-        title: language === "ar" ? "تمت مزامنة Global Iraq" : "Global Iraq sync complete",
+        title: language === "ar" ? "بدأت المزامنة" : "Sync started",
         description:
           language === "ar"
-            ? created > 0 || updated > 0
-              ? `أُضيف ${created}، وتم تحديث ${updated} (${matched} من ${fetched})`
-              : `محدّث — ${matched} منتج من ${fetched} على GlobalIraq`
-            : `${created} added, ${updated} updated (${matched}/${fetched} matched)`,
+            ? "يتم التحديث في الخلفية — راقب «الحالة» أدناه."
+            : "Running in background — watch Status below.",
       });
     },
     onError: (err: Error) => {
       toast({
-        title: language === "ar" ? "فشلت المزامنة" : "Sync failed",
+        title: language === "ar" ? "لم تبدأ المزامنة" : "Could not start sync",
         description: err.message,
         variant: "destructive",
       });
     },
   });
 
-  const status = syncStatusQuery.data;
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "—";
     return new Date(dateStr).toLocaleString(language === "ar" ? "ar-IQ" : "en-IQ", {
@@ -218,12 +220,12 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
           </CardTitle>
           <CardDescription>
             {language === "ar"
-              ? "أسعار ومنتجات (لابتوبات، برامج، إكسسوارات…) — تلقائياً كل 24 ساعة وبعد كل نشر من GitHub"
-              : "Prices & catalog incl. software — auto every 24h and after GitHub deploy"}
+              ? "GitHub يحمّل الكatalog تلقائياً — «مزامنة الآن» تطبّق الأسعار على متجرك (بدون طلبات من VPS إلى Global Iraq)"
+              : "GitHub downloads the catalog on deploy — Sync now applies prices to your store"}
           </CardDescription>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
-          {(status?.status === "running" || syncMutation.isPending) && (
+          {isRunning && (
             <Button
               type="button"
               variant="outline"
@@ -232,23 +234,24 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
               onClick={() => resetMutation.mutate()}
               data-testid="button-reset-price-sync"
             >
-              {language === "ar" ? "إعادة تعيين" : "Reset stuck sync"}
+              {language === "ar" ? "إيقاف / إعادة تعيين" : "Stop / reset"}
             </Button>
           )}
           <Button
             onClick={() => syncMutation.mutate()}
-            disabled={
-              syncMutation.isPending ||
-              resetMutation.isPending ||
-              status?.status === "running"
-            }
+            disabled={syncMutation.isPending || resetMutation.isPending || isRunning}
             data-testid="button-sync-prices"
             size="lg"
           >
-            {syncMutation.isPending || status?.status === "running" ? (
+            {isRunning ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                {language === "ar" ? "جاري المزامنة…" : "Syncing…"}
+                {language === "ar" ? "جاري التطبيق…" : "Applying…"}
+              </>
+            ) : syncMutation.isPending ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {language === "ar" ? "جاري البدء…" : "Starting…"}
               </>
             ) : (
               <>
@@ -260,7 +263,7 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
         </div>
       </CardHeader>
       <CardContent>
-        {status?.status === "running" && status.progress ? (
+        {isRunning && status?.progress ? (
           <p className="text-sm text-muted-foreground mb-4">{status.progress}</p>
         ) : null}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -303,7 +306,7 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
             <p className="font-medium">{formatDate(status?.nextSync ?? null)}</p>
           </div>
           <div>
-            <p className="text-muted-foreground">{language === "ar" ? "من Global Iraq" : "Fetched"}</p>
+            <p className="text-muted-foreground">{language === "ar" ? "من الكatalog" : "In catalog"}</p>
             <p className="font-medium">{status?.fetchedCount ?? 0}</p>
           </div>
           <div>
@@ -328,14 +331,6 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
             {status.errors.map((err, i) => (
               <p key={i}>{err}</p>
             ))}
-            {status.status === "error" &&
-            status.errors.some((e) => e.includes("429") || e.includes("Rate limit")) ? (
-              <p className="mt-2 text-xs opacity-90">
-                {language === "ar"
-                  ? "Global Iraq يحدّ الطلبات. انتظر 10–15 دقيقة ثم «مزامنة الآن» — أو «إعادة تعيين» إن بقيت عالقة."
-                  : "Global Iraq is rate-limiting. Wait 10–15 minutes, then Sync now."}
-              </p>
-            ) : null}
           </div>
         )}
         <SyncProductResults
