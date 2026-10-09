@@ -44,6 +44,8 @@ interface ShopifyVariant {
   compare_at_price: string | null;
   sku?: string | null;
   available?: boolean;
+  inventory_quantity?: number | null;
+  inventory_policy?: string | null;
 }
 
 interface ShopifyImage {
@@ -283,6 +285,51 @@ function isGlobalSoftwareProduct(product: ShopifyProduct): boolean {
   }
   const type = (product.product_type || "").trim();
   return type === "Software" || type === "Operating Systems";
+}
+
+/** Digital licenses on Global Iraq are sellable; Shopify often marks `available: false` with no inventory tracking. */
+function globalVariantInStock(
+  variant: ShopifyVariant,
+  product?: ShopifyProduct,
+): boolean {
+  if (product && isGlobalSoftwareProduct(product)) {
+    if (
+      variant.available === false &&
+      variant.inventory_policy === "deny" &&
+      (variant.inventory_quantity ?? 0) <= 0
+    ) {
+      return false;
+    }
+    return true;
+  }
+  if (variant.available === true) return true;
+  if (variant.available === false) {
+    if (variant.inventory_policy === "continue") return true;
+    if ((variant.inventory_quantity ?? 0) > 0) return true;
+    return false;
+  }
+  return true;
+}
+
+function findOurProductForSoftwareGlobal(
+  globalProduct: ShopifyProduct,
+  ourProducts: { id: string; nameEn: string; sku: string | null; category?: string }[],
+  ourSkuIndex: Map<string, (typeof ourProducts)[number]>,
+): (typeof ourProducts)[number] | null {
+  const existing = findOurProductForGlobal(
+    globalProduct,
+    ourProducts,
+    ourSkuIndex,
+    matchGenericProducts,
+  );
+  if (!existing) return null;
+  if (
+    isLaptopCategory(existing.category || "") ||
+    isDesktopCategory(existing.category || "")
+  ) {
+    return null;
+  }
+  return existing;
 }
 
 function globalPriceToStorePrice(rawPrice: string): number | null {
@@ -562,6 +609,7 @@ async function applyGlobalPriceToExisting(
     category: string;
     price: string | null;
     oldPrice?: string | null;
+    inStock?: number | null;
   },
   globalProduct: ShopifyProduct,
   variant: ShopifyVariant,
@@ -583,18 +631,22 @@ async function applyGlobalPriceToExisting(
   const nextOldPriceNum = nextOldPrice != null ? parseFloat(nextOldPrice) : null;
   const needsOldPriceUpdate =
     nextOldPriceNum !== (currentOldPrice > 0 ? currentOldPrice : null);
+  const nextInStock = globalVariantInStock(variant, globalProduct) ? 1 : 0;
+  const currentInStock = existing.inStock === 0 ? 0 : 1;
+  const needsStockUpdate = currentInStock !== nextInStock;
 
-  if (needsPriceUpdate || needsSku || needsOldPriceUpdate) {
+  if (needsPriceUpdate || needsSku || needsOldPriceUpdate || needsStockUpdate) {
     await db
       .update(products)
       .set({
         price: markedUpPrice.toString(),
         oldPrice: nextOldPrice,
+        inStock: nextInStock,
         ...(needsSku && { sku }),
       })
       .where(eq(products.id, existing.id));
 
-    if (needsPriceUpdate || needsOldPriceUpdate) {
+    if (needsPriceUpdate || needsOldPriceUpdate || needsStockUpdate) {
       log.updatedProducts.push(
         toSyncProductEntry(
           {
@@ -952,7 +1004,7 @@ export async function syncPrices(): Promise<SyncLog> {
             specs: specsFromTitle(globalProduct.title),
             badge: "جديد",
             sku,
-            inStock: variant.available !== false ? 1 : 0,
+            inStock: globalVariantInStock(variant, globalProduct) ? 1 : 0,
           })
           .returning();
 
@@ -1038,6 +1090,131 @@ export async function syncPrices(): Promise<SyncLog> {
   }
 
   return syncLog;
+}
+
+/** Ensure every item from Global Iraq /collections/software exists under `programs` and is in stock. */
+async function syncSoftwareCollectionPrograms(
+  softwareProducts: ShopifyProduct[],
+  syncLog: SyncLog,
+): Promise<{ created: number; updated: number; matched: number }> {
+  let created = 0;
+  let updated = 0;
+  let matched = 0;
+  if (softwareProducts.length === 0) {
+    return { created, updated, matched };
+  }
+
+  const allOurProducts = await db.select().from(products);
+  const ourPool = [...allOurProducts];
+  const ourSkuIndex = buildOurSkuIndex(ourPool);
+
+  for (const globalProduct of softwareProducts) {
+    try {
+      const variant = getPrimaryVariant(globalProduct);
+      if (!variant) continue;
+
+      const markedUpPrice = globalPriceToStorePrice(variant.price || "");
+      if (markedUpPrice == null) continue;
+
+      const comparePrice = variant.compare_at_price
+        ? globalPriceToStorePrice(variant.compare_at_price)
+        : null;
+      const oldPrice =
+        comparePrice != null && comparePrice > markedUpPrice
+          ? comparePrice.toString()
+          : null;
+
+      const imageUrls =
+        globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
+      const primaryImage = imageUrls[0];
+      if (!primaryImage) {
+        syncLog.errors.push(`Software: no image for ${globalProduct.title}`);
+        continue;
+      }
+
+      const description =
+        stripHtml(globalProduct.body_html || "") || globalProduct.title;
+      const sku = variant.sku?.trim() || null;
+      const inStock = globalVariantInStock(variant, globalProduct) ? 1 : 0;
+
+      const existing = findOurProductForSoftwareGlobal(
+        globalProduct,
+        ourPool,
+        ourSkuIndex,
+      );
+
+      if (existing) {
+        matched++;
+        await db
+          .update(products)
+          .set({
+            nameEn: globalProduct.title,
+            nameAr: globalProduct.title,
+            descriptionEn: description.slice(0, 2000),
+            descriptionAr: description.slice(0, 2000),
+            price: markedUpPrice.toString(),
+            oldPrice,
+            category: "programs",
+            image: primaryImage,
+            images: imageUrls.slice(1),
+            sku: sku ?? existing.sku,
+            inStock,
+          })
+          .where(eq(products.id, existing.id));
+
+        syncLog.updatedProducts.push(
+          toSyncProductEntry(
+            {
+              id: existing.id,
+              nameEn: globalProduct.title,
+              sku: sku ?? existing.sku,
+              category: "programs",
+              price: markedUpPrice.toString(),
+            },
+            normalizeOurStoredPrice(existing.price),
+          ),
+        );
+        updated++;
+        continue;
+      }
+
+      const [inserted] = await db
+        .insert(products)
+        .values({
+          nameEn: globalProduct.title,
+          nameAr: globalProduct.title,
+          descriptionEn: description.slice(0, 2000),
+          descriptionAr: description.slice(0, 2000),
+          price: markedUpPrice.toString(),
+          oldPrice,
+          category: "programs",
+          image: primaryImage,
+          images: imageUrls.slice(1),
+          specs: specsFromTitle(globalProduct.title),
+          badge: "جديد",
+          sku,
+          inStock,
+        })
+        .returning();
+
+      ourPool.push(inserted);
+      if (sku) ourSkuIndex.set(sku.toLowerCase(), inserted);
+      syncLog.createdProducts.push(toSyncProductEntry(inserted));
+      created++;
+      console.log(
+        `[Catalog Sync] Software added: ${globalProduct.title.substring(0, 50)}`,
+      );
+    } catch (err: any) {
+      syncLog.errors.push(
+        `Software ${globalProduct.title}: ${err.message}`,
+      );
+    }
+  }
+
+  console.log(
+    `[Catalog Sync] Software collection: ${matched} matched, ${created} added, ${updated} refreshed`,
+  );
+  return { created, updated, matched };
 }
 
 export function isCatalogSyncRunning(): boolean {
@@ -1165,6 +1342,7 @@ export async function syncAllCatalogPrices(options?: {
               category: existing.category,
               price: existing.price,
               oldPrice: existing.oldPrice,
+              inStock: existing.inStock,
             },
             globalProduct,
             variant,
@@ -1202,7 +1380,7 @@ export async function syncAllCatalogPrices(options?: {
             specs: specsFromTitle(globalProduct.title),
             badge: "جديد",
             sku,
-            inStock: variant.available !== false ? 1 : 0,
+            inStock: globalVariantInStock(variant, globalProduct) ? 1 : 0,
           })
           .returning();
 
@@ -1266,6 +1444,14 @@ export async function syncAllCatalogPrices(options?: {
         );
       }
     }
+
+    const softwareStats = await syncSoftwareCollectionPrograms(
+      softwareProducts,
+      syncLog,
+    );
+    created += softwareStats.created;
+    updated += softwareStats.updated;
+    matched += softwareStats.matched;
 
     syncLog.updatedCount = updated;
     syncLog.createdCount = created;
@@ -1560,7 +1746,7 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
             specs: specsFromTitle(globalProduct.title),
             badge: "جديد",
             sku,
-            inStock: variant.available !== false ? 1 : 0,
+            inStock: globalVariantInStock(variant, globalProduct) ? 1 : 0,
           })
           .returning();
 
