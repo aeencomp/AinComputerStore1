@@ -9996,6 +9996,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/internal/catalog-sync", async (req, res) => {
+    const remote = req.socket.remoteAddress ?? "";
+    const local =
+      remote === "127.0.0.1" ||
+      remote === "::1" ||
+      remote === "::ffff:127.0.0.1";
+    const secret = process.env.DEPLOY_SYNC_SECRET;
+    const key = req.get("x-deploy-sync-key");
+    const secretOk = secret && key === secret;
+    if (!local && !secretOk) {
+      return res.status(403).json({ error: "Forbidden" });
+    }
+    try {
+      if (!startCatalogSyncBackground({ forceRefresh: true })) {
+        return res.status(409).json({
+          ...getSyncStatus(),
+          error: "Sync already running",
+        });
+      }
+      return res.status(202).json(getSyncStatus());
+    } catch (error: any) {
+      return res.status(500).json({ error: error.message });
+    }
+  });
+
   app.get("/api/admin/price-sync/status", async (req, res) => {
     const adminId = (req.session as any).adminId;
     if (!adminId) {

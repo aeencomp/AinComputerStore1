@@ -58,6 +58,7 @@ function Router() {
         <Route path="/admin/dashboard" component={Lazy.AdminDashboard} />
         <Route path="/admin/products" component={Lazy.AdminProducts} />
         <Route path="/admin/programs" component={Lazy.AdminPrograms} />
+        <Route path="/admin/sync" component={Lazy.AdminSync} />
         <Route path="/admin/customers" component={Lazy.AdminCustomers} />
         <Route path="/admin/attendance" component={Lazy.AdminAttendance} />
         <Route path="/admin/settings" component={Lazy.AdminSettings} />

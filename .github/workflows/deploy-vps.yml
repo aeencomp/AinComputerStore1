@@ -98,10 +98,11 @@ jobs:
             run_deploy() {
               cd "$APP"
               export SKIP_VPS_BUILD=1
+              export DEPLOY_RUN_SYNC=1
               ./deploy.sh
             }
             if [ "$(id -un)" = "deploy" ]; then
               run_deploy
             else
-              su - deploy -c "bash -lc 'cd \"$APP\" && export SKIP_VPS_BUILD=1 && ./deploy.sh'"
+              su - deploy -c "bash -lc 'cd \"$APP\" && export SKIP_VPS_BUILD=1 && export DEPLOY_RUN_SYNC=1 && ./deploy.sh'"
             fi

@@ -37,6 +37,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Plus, Pencil, Trash2, AppWindow, Loader2 } from "lucide-react";
 import { AdminNav } from "@/components/AdminNav";
+import { GlobalIraqSyncPanel } from "@/components/GlobalIraqSyncPanel";
 import { ImageUpload } from "@/components/ImageUpload";
 import type { Product, InsertProduct } from "@shared/schema";
 
@@ -256,6 +257,8 @@ export default function AdminPrograms() {
               {t('admin.programs.addNew')}
             </Button>
           </div>
+
+          <GlobalIraqSyncPanel className="mb-6" />
 
         {programs.length === 0 ? (
           <Card>

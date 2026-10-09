@@ -29,6 +29,7 @@ import {
   MessageCircle,
   UserCog,
   Share2,
+  RefreshCw,
 } from "lucide-react";
 import {
   Popover,
@@ -107,6 +108,7 @@ export function AdminNav({ currentAdmin }: AdminNavProps) {
     { href: "/admin/attendance", icon: Clock, labelAr: "الحضور", labelEn: "Attendance", permission: "settings" },
     { href: "/admin/market-prices", icon: TrendingUp, labelAr: "أسعار السوق", labelEn: "Market Prices", permission: "products" },
     { href: "/admin/programs", icon: GraduationCap, labelAr: "البرامج", labelEn: "Programs", permission: "products" },
+    { href: "/admin/sync", icon: RefreshCw, labelAr: "مزامنة Global Iraq", labelEn: "Global Iraq sync", permission: "products" },
     { href: "/admin/discount-codes", icon: Tag, labelAr: "أكواد الخصم", labelEn: "Discount Codes", permission: "discounts" },
     { href: "/admin/reviews", icon: MessageSquare, labelAr: "التقييمات", labelEn: "Reviews", permission: "products" },
     { href: "/admin/analytics", icon: Activity, labelAr: "تحليلات الزوار", labelEn: "Analytics", permission: "reports" },

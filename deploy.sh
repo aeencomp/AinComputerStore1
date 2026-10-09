@@ -4,6 +4,24 @@ set -euo pipefail
 APP_DIR="/home/deploy/AinComputerStore"
 PM2_NAME="ain-app"
 
+run_post_deploy_sync() {
+  if [ "${DEPLOY_RUN_SYNC:-}" != "1" ]; then
+    return 0
+  fi
+  echo "==> Post-deploy catalog sync"
+  local port="${PORT:-5000}"
+  if curl -sf -X POST "http://127.0.0.1:${port}/api/internal/catalog-sync" >/dev/null 2>&1; then
+    echo "==> Catalog sync started (in-app)"
+    return 0
+  fi
+  if [ -x node_modules/.bin/tsx ]; then
+    nohup npm run sync:prices >> "${HOME}/catalog-sync.log" 2>&1 &
+    echo "==> Catalog sync started (CLI fallback)"
+  else
+    echo "WARNING: could not start catalog sync"
+  fi
+}
+
 cd "$APP_DIR"
 
 git config --global --add safe.directory "$APP_DIR" 2>/dev/null || true
@@ -64,6 +82,7 @@ if [ "${SKIP_VPS_BUILD:-}" = "1" ]; then
   for i in $(seq 1 30); do
     if curl -sf "http://127.0.0.1:${PORT:-5000}/api/health" >/dev/null 2>&1; then
       echo "==> App is responding"
+      run_post_deploy_sync
       echo "==> Done"
       exit 0
     fi
@@ -71,6 +90,7 @@ if [ "${SKIP_VPS_BUILD:-}" = "1" ]; then
   done
   echo "WARNING: health check failed — check: pm2 logs $PM2_NAME --lines 80"
   pm2 logs "$PM2_NAME" --lines 40 --nostream || true
+  run_post_deploy_sync || true
   exit 0
 fi
 
@@ -127,6 +147,7 @@ echo "==> Wait for app health (up to 90s) on port ${PORT:-5000}"
 for i in $(seq 1 30); do
   if curl -sf "http://127.0.0.1:${PORT:-5000}/api/health" >/dev/null 2>&1; then
     echo "==> App is responding"
+    run_post_deploy_sync
     echo "==> Done"
     exit 0
   fi
@@ -135,4 +156,5 @@ done
 
 echo "WARNING: health check failed — check: pm2 logs $PM2_NAME --lines 80"
 pm2 logs "$PM2_NAME" --lines 40 --nostream || true
+run_post_deploy_sync || true
 exit 0

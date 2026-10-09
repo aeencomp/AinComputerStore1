@@ -5,6 +5,7 @@ export const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
 export const AdminDashboard = lazy(() => import("@/pages/AdminDashboard"));
 export const AdminProducts = lazy(() => import("@/pages/AdminProducts"));
 export const AdminPrograms = lazy(() => import("@/pages/AdminPrograms"));
+export const AdminSync = lazy(() => import("@/pages/AdminSync"));
 export const AdminCustomers = lazy(() => import("@/pages/AdminCustomers"));
 export const AdminAttendance = lazy(() => import("@/pages/AdminAttendance"));
 export const AdminSettings = lazy(() => import("@/pages/AdminSettings"));
