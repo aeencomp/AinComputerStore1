@@ -36,6 +36,13 @@ export function ProductCard({ product, onAddToCart }: ProductCardProps) {
   // Check if image is a URL, uploaded file, or mapped asset
   const getImageSrc = () => {
     if (!product.image) return laptopImage;
+    const imgLower = product.image.toLowerCase();
+    if (
+      imgLower.includes("global-iraq-build") ||
+      imgLower.includes("globaliraqpcbuildbundle")
+    ) {
+      return desktopImage;
+    }
     if (product.image.startsWith('/uploads/') || product.image.startsWith('/objects/') || product.image.startsWith('http')) {
       return resolveAssetUrl(product.image);
     }

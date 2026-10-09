@@ -114,6 +114,13 @@ export function CartSidebar({
                   // Check if image is a URL, uploaded file, or mapped asset
                   const getImageSrc = () => {
                     if (!item.product.image) return laptopImage;
+                    const imgLower = item.product.image.toLowerCase();
+                    if (
+                      imgLower.includes("global-iraq-build") ||
+                      imgLower.includes("globaliraqpcbuildbundle")
+                    ) {
+                      return desktopImage;
+                    }
                     if (item.product.image.startsWith('/uploads/') || item.product.image.startsWith('/objects/') || item.product.image.startsWith('http')) {
                       return resolveAssetUrl(item.product.image);
                     }

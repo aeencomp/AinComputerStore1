@@ -869,6 +869,68 @@ function resolveOldPrice(
   return null;
 }
 
+/** Global Iraq PC build spec-sheet collages — not product photos. */
+export function isGlobalIraqBuildCollageUrl(url: string): boolean {
+  const u = url.toLowerCase();
+  return (
+    u.includes("global-iraq-build") || u.includes("globaliraqpcbuildbundle")
+  );
+}
+
+function filterGlobalIraqProductImages(urls: string[]): string[] {
+  return urls.filter((u) => u && !isGlobalIraqBuildCollageUrl(u));
+}
+
+const PC_BUILD_PLACEHOLDER_IMAGE = "desktop_pc_tower_photo.png";
+
+function resolveGlobalIraqProductImages(globalProduct: ShopifyProduct): {
+  primary: string | null;
+  rest: string[];
+} {
+  const raw =
+    globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
+  const filtered = filterGlobalIraqProductImages(raw);
+  if (filtered.length > 0) {
+    return { primary: filtered[0], rest: filtered.slice(1) };
+  }
+  if (/pc build/i.test(globalProduct.title || "")) {
+    return { primary: PC_BUILD_PLACEHOLDER_IMAGE, rest: [] };
+  }
+  return { primary: raw[0] ?? null, rest: raw.slice(1) };
+}
+
+/** Strip build collages from stored products (one-time / each sync). */
+export async function cleanupStoredBuildCollageImages(): Promise<number> {
+  const all = await db.select().from(products);
+  let fixed = 0;
+  for (const p of all) {
+    const imgs = Array.isArray(p.images) ? p.images.filter(Boolean) : [];
+    const primaryBad = !!p.image && isGlobalIraqBuildCollageUrl(p.image);
+    const extraBad = imgs.some(isGlobalIraqBuildCollageUrl);
+    if (!primaryBad && !extraBad) continue;
+
+    const filtered = filterGlobalIraqProductImages(imgs);
+    let nextPrimary = p.image ?? "";
+    if (primaryBad) {
+      nextPrimary =
+        filtered[0] ??
+        (/pc build/i.test(p.nameEn || p.nameAr || "")
+          ? PC_BUILD_PLACEHOLDER_IMAGE
+          : nextPrimary);
+    }
+    const nextExtras = filterGlobalIraqProductImages(
+      filtered.filter((u) => u !== nextPrimary),
+    );
+
+    await db
+      .update(products)
+      .set({ image: nextPrimary, images: nextExtras })
+      .where(eq(products.id, p.id));
+    fixed++;
+  }
+  return fixed;
+}
+
 async function applyGlobalPriceToExisting(
   existing: {
     id: string;
@@ -1371,9 +1433,8 @@ export async function syncPrices(): Promise<SyncLog> {
           continue;
         }
 
-        const imageUrls =
-          globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
-        const primaryImage = imageUrls[0];
+        const { primary: primaryImage, rest: extraImages } =
+          resolveGlobalIraqProductImages(globalProduct);
         if (!primaryImage) {
           syncLog.errors.push(`No image for ${globalProduct.title}`);
           continue;
@@ -1394,7 +1455,7 @@ export async function syncPrices(): Promise<SyncLog> {
             oldPrice,
             category: globalLaptopCategory(globalProduct.product_type || ""),
             image: primaryImage,
-            images: imageUrls.slice(1),
+            images: extraImages,
             specs: specsFromTitle(globalProduct.title),
             badge: "جديد",
             sku,
@@ -1518,9 +1579,8 @@ async function syncSoftwareCollectionPrograms(
           ? comparePrice.toString()
           : null;
 
-      const imageUrls =
-        globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
-      const primaryImage = imageUrls[0];
+      const { primary: primaryImage, rest: extraImages } =
+        resolveGlobalIraqProductImages(globalProduct);
       if (!primaryImage) {
         syncLog.errors.push(`Software: no image for ${globalProduct.title}`);
         continue;
@@ -1553,7 +1613,7 @@ async function syncSoftwareCollectionPrograms(
             oldPrice,
             category: "programs",
             image: primaryImage,
-            images: imageUrls.slice(1),
+            images: extraImages,
             sku: sku ?? existing.sku,
             inStock,
             stockQuantity: inStock ? 999 : 0,
@@ -1587,7 +1647,7 @@ async function syncSoftwareCollectionPrograms(
           oldPrice,
           category: "programs",
           image: primaryImage,
-          images: imageUrls.slice(1),
+          images: extraImages,
           specs: specsFromTitle(globalProduct.title),
           badge: "جديد",
           sku,
@@ -1671,6 +1731,12 @@ export async function syncAllCatalogPrices(options?: {
 
   try {
     console.log("[Catalog Sync] Starting catalog sync…");
+    const collageRemoved = await cleanupStoredBuildCollageImages();
+    if (collageRemoved > 0) {
+      console.log(
+        `[Catalog Sync] Removed Global Iraq build collage images from ${collageRemoved} products`,
+      );
+    }
     reloadGlobalCatalogCacheFromDisk();
 
     const catalogProducts = await fetchAllGlobalIraqProducts(
@@ -1788,9 +1854,8 @@ export async function syncAllCatalogPrices(options?: {
           continue;
         }
 
-        const imageUrls =
-          globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
-        const primaryImage = imageUrls[0];
+        const { primary: primaryImage, rest: extraImages } =
+          resolveGlobalIraqProductImages(globalProduct);
         if (!primaryImage) {
           syncLog.errors.push(`No image for ${globalProduct.title}`);
           continue;
@@ -1811,7 +1876,7 @@ export async function syncAllCatalogPrices(options?: {
             oldPrice,
             category: categoryForNew,
             image: primaryImage,
-            images: imageUrls.slice(1),
+            images: extraImages,
             specs: specsFromTitle(globalProduct.title),
             badge: "جديد",
             sku: stableSku,
@@ -1958,6 +2023,14 @@ export function startPriceSync() {
   console.log(
     `[Price Sync] Automatic sync every 24h — all Global Iraq items, prices + in-stock (cache refreshed daily via GitHub Actions)`,
   );
+
+  void cleanupStoredBuildCollageImages().then((n) => {
+    if (n > 0) {
+      console.log(
+        `[Price Sync] Removed Global Iraq build collage images from ${n} products`,
+      );
+    }
+  });
 
   syncLog.nextSync = new Date(Date.now() + SYNC_INTERVAL_MS);
 
@@ -2192,9 +2265,8 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
           continue;
         }
 
-        const imageUrls =
-          globalProduct.images?.map((img) => img.src).filter(Boolean) ?? [];
-        const primaryImage = imageUrls[0];
+        const { primary: primaryImage, rest: extraImages } =
+          resolveGlobalIraqProductImages(globalProduct);
         if (!primaryImage) {
           desktopSyncLog.errors.push(`No image for ${globalProduct.title}`);
           continue;
@@ -2215,7 +2287,7 @@ export async function syncDesktopPrices(): Promise<SyncLog> {
             oldPrice,
             category: globalDesktopCategory(globalProduct),
             image: primaryImage,
-            images: imageUrls.slice(1),
+            images: extraImages,
             specs: specsFromTitle(globalProduct.title),
             badge: "جديد",
             sku,

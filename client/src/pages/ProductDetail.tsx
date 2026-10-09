@@ -148,6 +148,13 @@ export default function ProductDetail() {
   // Resolve image path - maps asset keys to actual URLs
   const resolveImagePath = (img: string): string => {
     if (!img) return laptopImage;
+    const lower = img.toLowerCase();
+    if (
+      lower.includes("global-iraq-build") ||
+      lower.includes("globaliraqpcbuildbundle")
+    ) {
+      return desktopImage;
+    }
     if (img.startsWith('/uploads/') || img.startsWith('/objects/') || img.startsWith('http')) {
       return resolveAssetUrl(img);
     }
