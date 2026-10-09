@@ -54,6 +54,8 @@ jobs:
     needs: [build, fetch-global-catalog]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
       - uses: actions/download-artifact@v4
         with:
           name: production-dist
@@ -64,6 +66,23 @@ jobs:
         with:
           name: global-catalog-cache
           path: catalog-cache-artifact
+
+      - name: Prepare catalog cache for VPS upload
+        run: |
+          mkdir -p data upload-catalog
+          DEST="upload-catalog/globaliraq-catalog-cache.json"
+          for SRC in \
+            "catalog-cache-artifact/data/globaliraq-catalog-cache.json" \
+            "catalog-cache-artifact/globaliraq-catalog-cache.json" \
+            "data/globaliraq-catalog-cache.json"; do
+            if [ -f "$SRC" ]; then
+              cp "$SRC" "$DEST"
+              echo "Catalog source: $SRC ($(wc -c < "$SRC") bytes)"
+              exit 0
+            fi
+          done
+          echo "::error::No catalog cache file found for deploy"
+          exit 1
 
       - name: Update repo on VPS
         uses: appleboy/ssh-action@v1.2.0
@@ -108,13 +127,12 @@ jobs:
 
       - name: Upload Global Iraq catalog cache to VPS
         uses: appleboy/scp-action@v0.1.7
-        continue-on-error: true
         with:
           host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
           username: ${{ secrets.VPS_USER || vars.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
-          source: "catalog-cache-artifact/globaliraq-catalog-cache.json"
+          source: "upload-catalog/globaliraq-catalog-cache.json"
           target: /home/deploy/AinComputerStore/data
           overwrite: true
 
@@ -134,9 +152,13 @@ jobs:
             if [ "$(id -u)" = "0" ]; then
               chown -R deploy:deploy "$APP"
             fi
-            if [ -f "$APP/data/globaliraq-catalog-cache.json" ]; then
-              chown deploy:deploy "$APP/data/globaliraq-catalog-cache.json" 2>/dev/null || true
+            if [ ! -f "$APP/data/globaliraq-catalog-cache.json" ]; then
+              echo "ERROR: missing $APP/data/globaliraq-catalog-cache.json"
+              ls -la "$APP/data" 2>/dev/null || true
+              exit 1
             fi
+            chown deploy:deploy "$APP/data/globaliraq-catalog-cache.json" 2>/dev/null || true
+            echo "Catalog on VPS: $(wc -c < "$APP/data/globaliraq-catalog-cache.json") bytes"
             run_deploy() {
               cd "$APP"
               export SKIP_VPS_BUILD=1

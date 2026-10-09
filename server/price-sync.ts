@@ -20,11 +20,19 @@ const GLOBAL_PRODUCTS_CACHE_MS = 15 * 60 * 1000;
 const FORCE_REFRESH_MIN_AGE_MS = 8 * 60 * 1000;
 const GLOBALIRAQ_COOLDOWN_MS = 60_000;
 const FETCH_MAX_RETRIES = 10;
-const CATALOG_CACHE_FILE = path.join(
-  process.cwd(),
-  "data",
-  "globaliraq-catalog-cache.json",
-);
+const CATALOG_CACHE_REL = path.join("data", "globaliraq-catalog-cache.json");
+
+function resolveCatalogCacheFilePath(): string {
+  const candidates = [
+    path.join(process.cwd(), CATALOG_CACHE_REL),
+    path.join(process.cwd(), "globaliraq-catalog-cache.json"),
+    "/home/deploy/AinComputerStore/data/globaliraq-catalog-cache.json",
+  ];
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p;
+  }
+  return candidates[0];
+}
 
 let cachedGlobalProducts: { fetchedAt: number; products: ShopifyProduct[] } | null =
   null;
@@ -145,8 +153,9 @@ function shouldUseLiveGlobalIraqFetch(): boolean {
 
 export function loadGlobalCatalogCacheFromDisk(): void {
   try {
-    if (!fs.existsSync(CATALOG_CACHE_FILE)) return;
-    const raw = JSON.parse(fs.readFileSync(CATALOG_CACHE_FILE, "utf8")) as {
+    const cachePath = resolveCatalogCacheFilePath();
+    if (!fs.existsSync(cachePath)) return;
+    const raw = JSON.parse(fs.readFileSync(cachePath, "utf8")) as {
       fetchedAt?: number;
       products?: ShopifyProduct[];
       softwareHandles?: string[];
@@ -170,9 +179,10 @@ export function loadGlobalCatalogCacheFromDisk(): void {
 function saveGlobalCatalogCacheToDisk(): void {
   if (!cachedGlobalProducts?.products.length) return;
   try {
-    fs.mkdirSync(path.dirname(CATALOG_CACHE_FILE), { recursive: true });
+    const cachePath = resolveCatalogCacheFilePath();
+    fs.mkdirSync(path.dirname(cachePath), { recursive: true });
     fs.writeFileSync(
-      CATALOG_CACHE_FILE,
+      cachePath,
       JSON.stringify({
         fetchedAt: cachedGlobalProducts.fetchedAt,
         products: cachedGlobalProducts.products,

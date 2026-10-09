@@ -66,6 +66,10 @@ git reset --hard origin/main
 
 if [ "${SKIP_VPS_BUILD:-}" = "1" ]; then
   echo "==> SKIP_VPS_BUILD=1 — using dist from GitHub Actions (no npm ci/build on VPS)"
+  mkdir -p data
+  if [ ! -f data/globaliraq-catalog-cache.json ]; then
+    echo "WARNING: data/globaliraq-catalog-cache.json missing — sync will fail until next deploy"
+  fi
   if [ ! -f dist/index.js ] || [ ! -f dist/public/index.html ]; then
     echo "ERROR: dist/index.js or dist/public/index.html missing on VPS"
     exit 1
