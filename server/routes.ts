@@ -4738,6 +4738,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
               formattedTo: whatsappResult.formattedTo,
               deliveryMethod: whatsappResult.deliveryMethod,
               templateName: whatsappResult.templateName,
+              policyVoice: whatsappResult.policyVoice
+                ? {
+                    success: whatsappResult.policyVoice.success,
+                    messageId: whatsappResult.policyVoice.messageId,
+                    error: whatsappResult.policyVoice.error,
+                  }
+                : undefined,
             }
           : { errorCode: whatsappResult.errorCode },
       });

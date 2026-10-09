@@ -1,5 +1,11 @@
 import axios from 'axios';
+import fs from 'fs';
+import path from 'path';
 import { storage } from './storage';
+import {
+  isRepairPolicyVoiceEnabled,
+  resolveRepairPolicyVoiceFilePath,
+} from './repair-policy-voice';
 
 const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
 
@@ -13,7 +19,12 @@ interface WhatsAppMessageResult {
   errorCode?: number | string;
   errorData?: any;
   /** How the message was sent (for diagnostics). */
-  deliveryMethod?: 'daily_template' | 'repair_status_template' | 'template' | 'free_text';
+  deliveryMethod?:
+    | 'daily_template'
+    | 'repair_status_template'
+    | 'template'
+    | 'free_text'
+    | 'repair_policy_voice';
   /** Shown when delivery may fail (e.g. free-text outside 24h window). */
   deliveryWarning?: string;
   formattedTo?: string;
@@ -276,6 +287,13 @@ export async function getWhatsAppDiagnostics() {
       'No APPROVED repair_status_update template found on this WABA. Repair WhatsApp cannot deliver until Meta approves the template.';
   }
 
+  const voicePath = resolveRepairPolicyVoiceFilePath();
+  result.repairPolicyVoice = {
+    enabled: isRepairPolicyVoiceEnabled(),
+    fileFound: !!voicePath,
+    filePath: voicePath ? `…${voicePath.slice(-48)}` : null,
+  };
+
   return result;
 }
 
@@ -317,6 +335,135 @@ export async function sendWhatsAppMessage(
     console.error('WhatsApp text send error:', JSON.stringify(errData || error.message));
     return { success: false, error: errorMessage, errorCode: errData?.code, errorData: errData };
   }
+}
+
+function mimeForAudioFile(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  if (ext === '.ogg') return 'audio/ogg';
+  if (ext === '.opus') return 'audio/opus';
+  if (ext === '.aac' || ext === '.m4a') return 'audio/aac';
+  return 'audio/mpeg';
+}
+
+async function uploadWhatsAppMedia(
+  filePath: string,
+): Promise<{ mediaId?: string; error?: string; errorCode?: number | string }> {
+  const { phoneNumberId, accessToken } = await getCredentials();
+  if (!phoneNumberId || !accessToken) {
+    return { error: 'WhatsApp not configured' };
+  }
+
+  const mime = mimeForAudioFile(filePath);
+  const buffer = fs.readFileSync(filePath);
+  const form = new FormData();
+  form.append('messaging_product', 'whatsapp');
+  form.append('type', mime);
+  form.append(
+    'file',
+    new Blob([buffer], { type: mime }),
+    path.basename(filePath),
+  );
+
+  try {
+    const response = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/media`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}` },
+      body: form,
+    });
+    const data = (await response.json()) as { id?: string; error?: { message?: string; code?: number } };
+    if (!response.ok) {
+      return {
+        error: data.error?.message || `Media upload HTTP ${response.status}`,
+        errorCode: data.error?.code,
+      };
+    }
+    return { mediaId: data.id };
+  } catch (error: any) {
+    return { error: error.message || 'Media upload failed' };
+  }
+}
+
+/** Voice note (session message — send after approved template opens the CS window). */
+export async function sendWhatsAppAudioVoiceNote(
+  to: string,
+  mediaId: string,
+): Promise<WhatsAppMessageResult> {
+  const { phoneNumberId, accessToken } = await getCredentials();
+  if (!phoneNumberId || !accessToken) {
+    return { success: false, error: 'WhatsApp not configured' };
+  }
+
+  const formattedPhone = formatPhoneNumber(to);
+
+  try {
+    const response = await axios({
+      method: 'POST',
+      url: `${WHATSAPP_API_URL}/${phoneNumberId}/messages`,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      data: {
+        messaging_product: 'whatsapp',
+        to: formattedPhone,
+        type: 'audio',
+        audio: { id: mediaId, voice: true },
+      },
+    });
+
+    console.log('WhatsApp policy voice note sent:', response.data);
+    return {
+      success: true,
+      ...parseMetaSendResponse(response.data),
+      deliveryMethod: 'repair_policy_voice',
+      formattedTo: formattedPhone,
+    };
+  } catch (error: any) {
+    const errData = error.response?.data?.error;
+    const errorMessage = errData?.message || error.message;
+    console.error('WhatsApp voice note error:', JSON.stringify(errData || error.message));
+    return {
+      success: false,
+      error: errorMessage,
+      errorCode: errData?.code,
+      errorData: errData,
+      formattedTo: formattedPhone,
+    };
+  }
+}
+
+export async function sendRepairPolicyVoiceNote(
+  customerPhone: string,
+): Promise<WhatsAppMessageResult> {
+  if (!isRepairPolicyVoiceEnabled()) {
+    return { success: false, error: 'Repair policy voice disabled' };
+  }
+
+  const phoneCheck = validateWhatsAppPhone(customerPhone);
+  if (!phoneCheck.ok) {
+    return { success: false, error: phoneCheck.error, formattedTo: phoneCheck.formatted };
+  }
+
+  const filePath = resolveRepairPolicyVoiceFilePath();
+  if (!filePath) {
+    return {
+      success: false,
+      error: 'Repair policy voice file missing (data/whatsapp/repair-policy-ar.mp3)',
+    };
+  }
+
+  const upload = await uploadWhatsAppMedia(filePath);
+  if (!upload.mediaId) {
+    return {
+      success: false,
+      error: upload.error || 'Failed to upload voice file to WhatsApp',
+      errorCode: upload.errorCode,
+    };
+  }
+
+  await new Promise((r) => setTimeout(r, 900));
+
+  return sendWhatsAppAudioVoiceNote(customerPhone, upload.mediaId);
 }
 
 // Send a pre-approved template message (works for any phone number, no 24h restriction)
@@ -465,13 +612,17 @@ async function sendWhatsAppTemplateWithLanguageFallbacks(
   return lastError;
 }
 
+export type TicketCreatedWhatsAppResult = WhatsAppMessageResult & {
+  policyVoice?: WhatsAppMessageResult;
+};
+
 export async function sendTicketCreatedMessage(
   customerPhone: string,
   customerName: string,
   ticketNumber: string,
   deviceType: string,
   deviceBrand: string
-): Promise<WhatsAppMessageResult> {
+): Promise<TicketCreatedWhatsAppResult> {
   const phoneCheck = validateWhatsAppPhone(customerPhone);
   if (!phoneCheck.ok) {
     return { success: false, error: phoneCheck.error, formattedTo: phoneCheck.formatted };
@@ -499,7 +650,18 @@ export async function sendTicketCreatedMessage(
         'ar',
         params
       );
-      if (templateResult.success) return templateResult;
+      if (templateResult.success) {
+        const policyVoice = await sendRepairPolicyVoiceNote(customerPhone).catch((err) => ({
+          success: false as const,
+          error: err?.message || 'Policy voice failed',
+        }));
+        if (!policyVoice.success) {
+          console.warn(
+            `Repair policy voice note not sent for ${ticketNumber}: ${policyVoice.error}`,
+          );
+        }
+        return { ...templateResult, policyVoice };
+      }
       const errText = `${templateResult.error || ''}`.toLowerCase();
       // Keep trying param variants only when error hints parameter mismatch.
       if (!errText.includes('parameter') || !errText.includes('match')) break;
@@ -510,7 +672,21 @@ export async function sendTicketCreatedMessage(
   const message =
     `مرحباً ${customerName}!\n\nتم استلام طلب إصلاح جهازك بنجاح.\n\nرقم التذكرة: ${ticketNumber}\nالجهاز: ${deviceBrand} - ${deviceType}\n\nسيتم التواصل معك قريباً.\n\nالعين لتجارة الحاسبات - 07850006977`;
 
-  return sendWhatsAppMessage(customerPhone, message);
+  const textResult = await sendWhatsAppMessage(customerPhone, message);
+  if (!textResult.success) {
+    return textResult;
+  }
+
+  const policyVoice = await sendRepairPolicyVoiceNote(customerPhone).catch((err) => ({
+    success: false as const,
+    error: err?.message || 'Policy voice failed',
+  }));
+  if (!policyVoice.success) {
+    console.warn(
+      `Repair policy voice note not sent for ${ticketNumber}: ${policyVoice.error}`,
+    );
+  }
+  return { ...textResult, policyVoice };
 }
 
 export type TicketUpdatedMessageOptions = {

@@ -13,7 +13,8 @@
     "images:migrate-local": "tsx scripts/migrate-images-to-local.ts",
     "seed:windows11": "tsx scripts/seed-windows-11.ts",
     "sync:prices": "tsx scripts/run-price-sync.ts",
-    "build:global-cache": "tsx scripts/build-global-catalog-cache.ts"
+    "build:global-cache": "tsx scripts/build-global-catalog-cache.ts",
+    "generate:repair-policy-voice": "tsx scripts/generate-repair-policy-voice.ts"
   },
   "dependencies": {
     "@capacitor/android": "^7.4.4",
@@ -131,6 +132,7 @@
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.4",
     "esbuild": "^0.25.0",
+    "msedge-tts": "^2.0.9",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.17",
     "tsx": "^4.20.5",
