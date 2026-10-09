@@ -1,10 +1,15 @@
 import axios from 'axios';
+import FormData from 'form-data';
 import fs from 'fs';
+import { createReadStream } from 'fs';
 import path from 'path';
 import { storage } from './storage';
 import {
   isRepairPolicyVoiceEnabled,
+  REPAIR_POLICY_VOICE_SCRIPT_AR,
   resolveRepairPolicyVoiceFilePath,
+  resolveRepairPolicyVoiceMp3Path,
+  resolveRepairPolicyVoiceOggPath,
 } from './repair-policy-voice';
 
 const WHATSAPP_API_URL = 'https://graph.facebook.com/v21.0';
@@ -287,11 +292,15 @@ export async function getWhatsAppDiagnostics() {
       'No APPROVED repair_status_update template found on this WABA. Repair WhatsApp cannot deliver until Meta approves the template.';
   }
 
-  const voicePath = resolveRepairPolicyVoiceFilePath();
+  const oggPath = resolveRepairPolicyVoiceOggPath();
+  const mp3Path = resolveRepairPolicyVoiceMp3Path();
+  const primaryVoicePath = oggPath ?? mp3Path;
   result.repairPolicyVoice = {
     enabled: isRepairPolicyVoiceEnabled(),
-    fileFound: !!voicePath,
-    filePath: voicePath ? `…${voicePath.slice(-48)}` : null,
+    oggFound: !!oggPath,
+    mp3Found: !!mp3Path,
+    filePath: primaryVoicePath ? `…${primaryVoicePath.slice(-48)}` : null,
+    hint: 'Voice notes require OGG/Opus (repair-policy-ar.ogg). MP3 sends as regular audio if OGG fails.',
   };
 
   return result;
@@ -337,11 +346,11 @@ export async function sendWhatsAppMessage(
   }
 }
 
-function mimeForAudioFile(filePath: string): string {
+function whatsAppUploadTypeForAudio(filePath: string): string {
   const ext = path.extname(filePath).toLowerCase();
   if (ext === '.ogg') return 'audio/ogg';
-  if (ext === '.opus') return 'audio/opus';
   if (ext === '.aac' || ext === '.m4a') return 'audio/aac';
+  if (ext === '.amr') return 'audio/amr';
   return 'audio/mpeg';
 }
 
@@ -353,40 +362,42 @@ async function uploadWhatsAppMedia(
     return { error: 'WhatsApp not configured' };
   }
 
-  const mime = mimeForAudioFile(filePath);
-  const buffer = fs.readFileSync(filePath);
+  const uploadType = whatsAppUploadTypeForAudio(filePath);
   const form = new FormData();
   form.append('messaging_product', 'whatsapp');
-  form.append('type', mime);
-  form.append(
-    'file',
-    new Blob([buffer], { type: mime }),
-    path.basename(filePath),
-  );
+  form.append('type', uploadType);
+  form.append('file', createReadStream(filePath), {
+    filename: path.basename(filePath),
+    contentType: uploadType,
+  });
 
   try {
-    const response = await fetch(`${WHATSAPP_API_URL}/${phoneNumberId}/media`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${accessToken}` },
-      body: form,
+    const response = await axios.post(`${WHATSAPP_API_URL}/${phoneNumberId}/media`, form, {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...form.getHeaders(),
+      },
+      maxBodyLength: Infinity,
+      maxContentLength: Infinity,
     });
-    const data = (await response.json()) as { id?: string; error?: { message?: string; code?: number } };
-    if (!response.ok) {
-      return {
-        error: data.error?.message || `Media upload HTTP ${response.status}`,
-        errorCode: data.error?.code,
-      };
+    const mediaId = response.data?.id as string | undefined;
+    if (!mediaId) {
+      return { error: 'Media upload returned no id' };
     }
-    return { mediaId: data.id };
+    return { mediaId };
   } catch (error: any) {
-    return { error: error.message || 'Media upload failed' };
+    const errData = error.response?.data?.error;
+    return {
+      error: errData?.message || error.message || 'Media upload failed',
+      errorCode: errData?.code,
+    };
   }
 }
 
-/** Voice note (session message — send after approved template opens the CS window). */
-export async function sendWhatsAppAudioVoiceNote(
+async function sendWhatsAppAudioByMediaId(
   to: string,
   mediaId: string,
+  asVoiceNote: boolean,
 ): Promise<WhatsAppMessageResult> {
   const { phoneNumberId, accessToken } = await getCredentials();
   if (!phoneNumberId || !accessToken) {
@@ -394,6 +405,10 @@ export async function sendWhatsAppAudioVoiceNote(
   }
 
   const formattedPhone = formatPhoneNumber(to);
+  const audioPayload: { id: string; voice?: boolean } = { id: mediaId };
+  if (asVoiceNote) {
+    audioPayload.voice = true;
+  }
 
   try {
     const response = await axios({
@@ -407,11 +422,14 @@ export async function sendWhatsAppAudioVoiceNote(
         messaging_product: 'whatsapp',
         to: formattedPhone,
         type: 'audio',
-        audio: { id: mediaId, voice: true },
+        audio: audioPayload,
       },
     });
 
-    console.log('WhatsApp policy voice note sent:', response.data);
+    console.log(
+      `WhatsApp repair policy audio sent (voice=${asVoiceNote}):`,
+      response.data,
+    );
     return {
       success: true,
       ...parseMetaSendResponse(response.data),
@@ -421,7 +439,10 @@ export async function sendWhatsAppAudioVoiceNote(
   } catch (error: any) {
     const errData = error.response?.data?.error;
     const errorMessage = errData?.message || error.message;
-    console.error('WhatsApp voice note error:', JSON.stringify(errData || error.message));
+    console.error(
+      `WhatsApp audio send failed (voice=${asVoiceNote}):`,
+      JSON.stringify(errData || error.message),
+    );
     return {
       success: false,
       error: errorMessage,
@@ -432,6 +453,23 @@ export async function sendWhatsAppAudioVoiceNote(
   }
 }
 
+async function sendUploadedRepairPolicyAudio(
+  customerPhone: string,
+  filePath: string,
+  asVoiceNote: boolean,
+): Promise<WhatsAppMessageResult> {
+  const upload = await uploadWhatsAppMedia(filePath);
+  if (!upload.mediaId) {
+    return {
+      success: false,
+      error: upload.error || 'Failed to upload voice file to WhatsApp',
+      errorCode: upload.errorCode,
+    };
+  }
+  return sendWhatsAppAudioByMediaId(customerPhone, upload.mediaId, asVoiceNote);
+}
+
+/** Voice note after ticket template (OGG/Opus preferred; MP3 as regular audio fallback). */
 export async function sendRepairPolicyVoiceNote(
   customerPhone: string,
 ): Promise<WhatsAppMessageResult> {
@@ -444,26 +482,76 @@ export async function sendRepairPolicyVoiceNote(
     return { success: false, error: phoneCheck.error, formattedTo: phoneCheck.formatted };
   }
 
-  const filePath = resolveRepairPolicyVoiceFilePath();
-  if (!filePath) {
+  const oggPath = resolveRepairPolicyVoiceOggPath();
+  const mp3Path = resolveRepairPolicyVoiceMp3Path();
+  if (!oggPath && !mp3Path) {
     return {
       success: false,
-      error: 'Repair policy voice file missing (data/whatsapp/repair-policy-ar.mp3)',
+      error:
+        'Repair policy voice files missing (data/whatsapp/repair-policy-ar.ogg or .mp3)',
     };
   }
 
-  const upload = await uploadWhatsAppMedia(filePath);
-  if (!upload.mediaId) {
+  const delayMs = Math.max(
+    500,
+    parseInt(process.env.WHATSAPP_REPAIR_POLICY_VOICE_DELAY_MS || '2800', 10) || 2800,
+  );
+  await new Promise((r) => setTimeout(r, delayMs));
+
+  let lastResult: WhatsAppMessageResult = {
+    success: false,
+    error: 'No repair policy audio file available',
+  };
+
+  if (oggPath) {
+    lastResult = await sendUploadedRepairPolicyAudio(customerPhone, oggPath, true);
+    if (lastResult.success) {
+      return lastResult;
+    }
+    console.warn(
+      `Repair policy OGG voice note failed (code=${lastResult.errorCode ?? 'n/a'}): ${lastResult.error}. Trying MP3 audio fallback.`,
+    );
+  }
+
+  if (mp3Path) {
+    lastResult = await sendUploadedRepairPolicyAudio(customerPhone, mp3Path, false);
+    if (lastResult.success) {
+      return lastResult;
+    }
+  }
+
+  const errCode = `${lastResult.errorCode ?? ''}`;
+  const errText = `${lastResult.error ?? ''}`.toLowerCase();
+  const outsideSession =
+    errCode === '131047' ||
+    errCode === '131026' ||
+    errText.includes('re-engagement') ||
+    errText.includes('24 hour');
+
+  if (outsideSession) {
+    console.warn(
+      'Repair policy audio blocked (session window). Customer still has ticket template; policy text fallback skipped.',
+    );
     return {
-      success: false,
-      error: upload.error || 'Failed to upload voice file to WhatsApp',
-      errorCode: upload.errorCode,
+      ...lastResult,
+      deliveryWarning:
+        'Audio needs an open WhatsApp session after the ticket template. Ensure the first template was delivered.',
     };
   }
 
-  await new Promise((r) => setTimeout(r, 900));
+  const textFallback = await sendWhatsAppMessage(
+    customerPhone,
+    REPAIR_POLICY_VOICE_SCRIPT_AR,
+  );
+  if (textFallback.success) {
+    return {
+      ...textFallback,
+      deliveryMethod: 'free_text',
+      deliveryWarning: 'Policy sent as text because audio delivery failed.',
+    };
+  }
 
-  return sendWhatsAppAudioVoiceNote(customerPhone, upload.mediaId);
+  return lastResult;
 }
 
 // Send a pre-approved template message (works for any phone number, no 24h restriction)

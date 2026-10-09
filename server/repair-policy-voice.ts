@@ -11,21 +11,35 @@ export const REPAIR_POLICY_VOICE_SCRIPT_AR =
   "الأجهزة غير المستلمة خلال ثلاثين يوماً لا نتحمل مسؤوليتها. " +
   "شكراً لزيارتكم.";
 
-const DEFAULT_REL = path.join("data", "whatsapp", "repair-policy-ar.mp3");
+const VOICE_OGG_REL = path.join("data", "whatsapp", "repair-policy-ar.ogg");
+const VOICE_MP3_REL = path.join("data", "whatsapp", "repair-policy-ar.mp3");
 
-export function resolveRepairPolicyVoiceFilePath(): string | null {
-  const fromEnv = process.env.WHATSAPP_REPAIR_POLICY_VOICE_PATH?.trim();
-  const candidates = [
-    fromEnv,
-    path.join(process.cwd(), DEFAULT_REL),
-    path.join(process.cwd(), "data", "whatsapp", "repair-policy-ar.ogg"),
-    "/home/deploy/AinComputerStore/data/whatsapp/repair-policy-ar.mp3",
-  ].filter(Boolean) as string[];
+function voiceFileCandidates(relative: string): string[] {
+  return [
+    path.join(process.cwd(), relative),
+    path.join("/home/deploy/AinComputerStore", relative),
+  ];
+}
 
-  for (const p of candidates) {
+export function resolveRepairPolicyVoiceOggPath(): string | null {
+  for (const p of voiceFileCandidates(VOICE_OGG_REL)) {
     if (fs.existsSync(p)) return p;
   }
   return null;
+}
+
+export function resolveRepairPolicyVoiceMp3Path(): string | null {
+  const fromEnv = process.env.WHATSAPP_REPAIR_POLICY_VOICE_PATH?.trim();
+  if (fromEnv && fs.existsSync(fromEnv)) return fromEnv;
+  for (const p of voiceFileCandidates(VOICE_MP3_REL)) {
+    if (fs.existsSync(p)) return p;
+  }
+  return null;
+}
+
+/** Prefer OGG/Opus (required for native voice notes); MP3 is fallback audio. */
+export function resolveRepairPolicyVoiceFilePath(): string | null {
+  return resolveRepairPolicyVoiceOggPath() ?? resolveRepairPolicyVoiceMp3Path();
 }
 
 export function isRepairPolicyVoiceEnabled(): boolean {

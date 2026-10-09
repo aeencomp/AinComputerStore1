@@ -4742,7 +4742,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 ? {
                     success: whatsappResult.policyVoice.success,
                     messageId: whatsappResult.policyVoice.messageId,
+                    messageStatus: whatsappResult.policyVoice.messageStatus,
+                    deliveryMethod: whatsappResult.policyVoice.deliveryMethod,
                     error: whatsappResult.policyVoice.error,
+                    errorCode: whatsappResult.policyVoice.errorCode,
+                    deliveryWarning: whatsappResult.policyVoice.deliveryWarning,
                   }
                 : undefined,
             }
@@ -10549,6 +10553,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get('/api/admin/whatsapp/delivery-events', async (req: any, res: any) => {
     if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
     return res.json({ events: whatsappDeliveryEvents.slice(0, 50) });
+  });
+
+  app.post('/api/admin/whatsapp/test-repair-policy-voice', async (req: any, res: any) => {
+    if (!req.session.adminId) return res.status(401).json({ error: 'Unauthorized' });
+    const { to } = req.body;
+    if (!to) return res.status(400).json({ error: 'Phone number required' });
+
+    try {
+      const templateResult = await sendTicketCreatedMessage(
+        to,
+        'عميل اختبار',
+        'TEST-VOICE',
+        'Laptop',
+        'Test',
+      );
+      return res.json({
+        ok: templateResult.success,
+        ticketCreatedPipeline: true,
+        template: {
+          success: templateResult.success,
+          messageId: templateResult.messageId,
+          deliveryMethod: templateResult.deliveryMethod,
+          error: templateResult.error,
+          errorCode: templateResult.errorCode,
+        },
+        policyVoice: templateResult.policyVoice ?? null,
+        recentDeliveryEvents: whatsappDeliveryEvents.slice(0, 10),
+        hint: 'Check customer WhatsApp for template then voice/audio. In Admin «تشخيص واتساب» confirm oggFound: true.',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message });
+    }
   });
 
   app.post('/api/admin/whatsapp/test', async (req: any, res: any) => {
