@@ -99,6 +99,7 @@ import {
   startPriceSync,
   syncAllCatalogPrices,
   getSyncStatus,
+  loadGlobalCatalogCacheFromDisk,
   resetCatalogSyncState,
   startCatalogSyncBackground,
   startDesktopPriceSync,
@@ -10010,7 +10011,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(403).json({ error: "Forbidden" });
     }
     try {
-      if (!startCatalogSyncBackground({ forceRefresh: true })) {
+      if (!startCatalogSyncBackground({ forceRefresh: false })) {
         return res.status(409).json({
           ...getSyncStatus(),
           error: "Sync already running",
@@ -10036,7 +10037,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Unauthorized" });
     }
     try {
-      if (!startCatalogSyncBackground({ forceRefresh: true })) {
+      const forceRefresh = req.body?.fullRefresh === true;
+      if (!startCatalogSyncBackground({ forceRefresh })) {
         return res.status(409).json({
           ...getSyncStatus(),
           error: "المزامنة قيد التشغيل بالفعل",
@@ -10059,6 +10061,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     return res.json(resetCatalogSyncState());
   });
 
+  loadGlobalCatalogCacheFromDisk();
   startPriceSync();
 
   app.get("/api/admin/desktop-sync/status", async (req, res) => {
@@ -10071,7 +10074,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const adminId = (req.session as any).adminId;
     if (!adminId) return res.status(401).json({ error: "Unauthorized" });
     try {
-      if (!startCatalogSyncBackground({ forceRefresh: true })) {
+      if (!startCatalogSyncBackground({ forceRefresh: false })) {
         return res.status(409).json({
           ...getSyncStatus(),
           error: "المزامنة قيد التشغيل بالفعل",

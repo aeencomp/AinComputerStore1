@@ -1,3 +1,5 @@
+import fs from "fs";
+import path from "path";
 import { db } from "./db";
 import { products } from "@shared/schema";
 import { eq } from "drizzle-orm";
@@ -12,9 +14,17 @@ const GLOBALIRAQ_API = "https://globaliraq.iq/products.json?limit=250";
 const GLOBALIRAQ_SOFTWARE_COLLECTION =
   "https://globaliraq.iq/collections/software/products.json?limit=250";
 const MAX_PAGES = 50;
-const PAGE_DELAY_MS = 2800;
+const PAGE_DELAY_MS = 4500;
 const GLOBAL_PRODUCTS_CACHE_MS = 15 * 60 * 1000;
-const FETCH_MAX_RETRIES = 6;
+/** Do not hit the live API again if cache is newer than this (force refresh). */
+const FORCE_REFRESH_MIN_AGE_MS = 8 * 60 * 1000;
+const GLOBALIRAQ_COOLDOWN_MS = 60_000;
+const FETCH_MAX_RETRIES = 10;
+const CATALOG_CACHE_FILE = path.join(
+  process.cwd(),
+  "data",
+  "globaliraq-catalog-cache.json",
+);
 
 let cachedGlobalProducts: { fetchedAt: number; products: ShopifyProduct[] } | null =
   null;
@@ -123,9 +133,50 @@ function sleep(ms: number): Promise<void> {
 function rateLimitBackoffMs(attempt: number, retryAfterHeader: string | null): number {
   const retryAfterSec = parseInt(retryAfterHeader || "", 10);
   if (Number.isFinite(retryAfterSec) && retryAfterSec > 0) {
-    return retryAfterSec * 1000;
+    return Math.max(retryAfterSec * 1000, GLOBALIRAQ_COOLDOWN_MS);
   }
-  return Math.min(180_000, 8_000 * Math.pow(2, attempt - 1));
+  return Math.min(300_000, 15_000 * Math.pow(2, attempt - 1));
+}
+
+export function loadGlobalCatalogCacheFromDisk(): void {
+  try {
+    if (!fs.existsSync(CATALOG_CACHE_FILE)) return;
+    const raw = JSON.parse(fs.readFileSync(CATALOG_CACHE_FILE, "utf8")) as {
+      fetchedAt?: number;
+      products?: ShopifyProduct[];
+    };
+    if (!raw.products?.length) return;
+    cachedGlobalProducts = {
+      fetchedAt: raw.fetchedAt ?? 0,
+      products: raw.products,
+    };
+    console.log(
+      `[Price Sync] Loaded ${raw.products.length} Global Iraq products from disk cache`,
+    );
+  } catch (err: any) {
+    console.warn("[Price Sync] Could not load disk catalog cache:", err.message);
+  }
+}
+
+function saveGlobalCatalogCacheToDisk(): void {
+  if (!cachedGlobalProducts?.products.length) return;
+  try {
+    fs.mkdirSync(path.dirname(CATALOG_CACHE_FILE), { recursive: true });
+    fs.writeFileSync(
+      CATALOG_CACHE_FILE,
+      JSON.stringify({
+        fetchedAt: cachedGlobalProducts.fetchedAt,
+        products: cachedGlobalProducts.products,
+      }),
+    );
+  } catch (err: any) {
+    console.warn("[Price Sync] Could not save disk catalog cache:", err.message);
+  }
+}
+
+function cachedGlobalCatalogProducts(): ShopifyProduct[] | null {
+  const n = cachedGlobalProducts?.products.length ?? 0;
+  return n > 0 ? cachedGlobalProducts!.products : null;
 }
 
 async function fetchJSON(url: string, retries = FETCH_MAX_RETRIES): Promise<any> {
@@ -134,12 +185,12 @@ async function fetchJSON(url: string, retries = FETCH_MAX_RETRIES): Promise<any>
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
       const sinceLimit = Date.now() - lastGlobalIraqRateLimitAt;
-      if (sinceLimit < 45_000) {
-        const waitSec = Math.ceil((45_000 - sinceLimit) / 1000);
+      if (sinceLimit < GLOBALIRAQ_COOLDOWN_MS) {
+        const waitSec = Math.ceil((GLOBALIRAQ_COOLDOWN_MS - sinceLimit) / 1000);
         setSyncProgress(
           `Global Iraq rate limit — waiting ${waitSec}s before next request…`,
         );
-        await sleep(45_000 - sinceLimit);
+        await sleep(GLOBALIRAQ_COOLDOWN_MS - sinceLimit);
       }
 
       const controller = new AbortController();
@@ -157,6 +208,9 @@ async function fetchJSON(url: string, retries = FETCH_MAX_RETRIES): Promise<any>
       if (res.status === 429) {
         lastGlobalIraqRateLimitAt = Date.now();
         const waitMs = rateLimitBackoffMs(attempt, res.headers.get("retry-after"));
+        setSyncProgress(
+          `Global Iraq 429 — retry in ${Math.round(waitMs / 1000)}s (${attempt}/${retries})…`,
+        );
         console.warn(
           `[Price Sync] GlobalIraq rate limit (429), waiting ${Math.round(waitMs / 1000)}s (attempt ${attempt}/${retries})`,
         );
@@ -207,32 +261,60 @@ async function fetchAllGlobalIraqProductsFromApi(): Promise<ShopifyProduct[]> {
   const allProducts: ShopifyProduct[] = [];
   let page = 1;
 
-  while (page <= MAX_PAGES) {
-    setSyncProgress(`Fetching Global Iraq catalog (page ${page})…`);
-    const url = `${GLOBALIRAQ_API}&page=${page}`;
-    const data = await fetchJSON(url);
-    const pageProducts: ShopifyProduct[] = data.products || [];
+  try {
+    if (!cachedGlobalCatalogProducts()) {
+      const warmSec = 10 + Math.floor(Math.random() * 10);
+      setSyncProgress(
+        `No local catalog cache — waiting ${warmSec}s before Global Iraq (reduces 429)…`,
+      );
+      await sleep(warmSec * 1000);
+    }
+    while (page <= MAX_PAGES) {
+      setSyncProgress(`Fetching Global Iraq catalog (page ${page})…`);
+      const url = `${GLOBALIRAQ_API}&page=${page}`;
+      const data = await fetchJSON(url);
+      const pageProducts: ShopifyProduct[] = data.products || [];
 
-    if (pageProducts.length === 0) break;
-    allProducts.push(...pageProducts);
-    setSyncProgress(
-      `Fetched ${allProducts.length} products from Global Iraq (page ${page})…`,
-    );
-    page++;
+      if (pageProducts.length === 0) break;
+      allProducts.push(...pageProducts);
+      setSyncProgress(
+        `Fetched ${allProducts.length} products from Global Iraq (page ${page})…`,
+      );
+      page++;
 
-    if (pageProducts.length < 250) break;
-    const jitter = Math.floor(Math.random() * 800);
-    await sleep(PAGE_DELAY_MS + jitter);
+      if (pageProducts.length < 250) break;
+      const jitter = Math.floor(Math.random() * 1200);
+      await sleep(PAGE_DELAY_MS + jitter);
+    }
+
+    if (allProducts.length === 0) {
+      throw new Error("Global Iraq returned an empty catalog");
+    }
+
+    cachedGlobalProducts = { fetchedAt: Date.now(), products: allProducts };
+    saveGlobalCatalogCacheToDisk();
+    return allProducts;
+  } catch (err: any) {
+    if (allProducts.length > 0) {
+      cachedGlobalProducts = { fetchedAt: Date.now(), products: allProducts };
+      saveGlobalCatalogCacheToDisk();
+      syncLog.errors.push(
+        `Partial catalog saved (${allProducts.length} products): ${err.message}`,
+      );
+      return allProducts;
+    }
+    throw err;
   }
-
-  cachedGlobalProducts = { fetchedAt: Date.now(), products: allProducts };
-  return allProducts;
 }
 
 /** One fetch at a time; reuse cache for 15 minutes (avoids 429 when laptop + desktop + catalog sync overlap). */
 async function fetchAllGlobalIraqProducts(
   forceRefresh = false,
 ): Promise<ShopifyProduct[]> {
+  if (!cachedGlobalProducts) {
+    loadGlobalCatalogCacheFromDisk();
+  }
+
   if (
     !forceRefresh &&
     cachedGlobalProducts &&
@@ -244,22 +326,51 @@ async function fetchAllGlobalIraqProducts(
     return cachedGlobalProducts.products;
   }
 
-  if (forceRefresh) {
-    cachedGlobalProducts = null;
+  if (
+    forceRefresh &&
+    cachedGlobalProducts &&
+    Date.now() - cachedGlobalProducts.fetchedAt < FORCE_REFRESH_MIN_AGE_MS
+  ) {
+    console.log(
+      `[Price Sync] Force refresh skipped — cache is only ${Math.round((Date.now() - cachedGlobalProducts.fetchedAt) / 1000)}s old`,
+    );
+    return cachedGlobalProducts.products;
   }
 
   if (globalProductsFetchPromise) {
     await globalProductsFetchPromise.catch(() => undefined);
     if (
-      !forceRefresh &&
       cachedGlobalProducts &&
-      Date.now() - cachedGlobalProducts.fetchedAt < GLOBAL_PRODUCTS_CACHE_MS
+      (!forceRefresh ||
+        Date.now() - cachedGlobalProducts.fetchedAt < FORCE_REFRESH_MIN_AGE_MS)
     ) {
-      return cachedGlobalProducts.products;
+      const cached = cachedGlobalCatalogProducts();
+      if (cached) return cached;
     }
   }
 
-  globalProductsFetchPromise = fetchAllGlobalIraqProductsFromApi().finally(() => {
+  const runFetch = async (): Promise<ShopifyProduct[]> => {
+    try {
+      return await fetchAllGlobalIraqProductsFromApi();
+    } catch (err: any) {
+      const stale = cachedGlobalCatalogProducts();
+      if (stale) {
+        const ageMin = cachedGlobalProducts
+          ? Math.round((Date.now() - cachedGlobalProducts.fetchedAt) / 60_000)
+          : 0;
+        syncLog.errors.push(
+          `Global Iraq blocked (${err.message}) — using cached catalog (${stale.length} products, ~${ageMin} min old). Prices updated from cache; retry later for live fetch.`,
+        );
+        console.warn(
+          `[Price Sync] Live fetch failed; using ${stale.length} cached products`,
+        );
+        return stale;
+      }
+      throw err;
+    }
+  };
+
+  globalProductsFetchPromise = runFetch().finally(() => {
     globalProductsFetchPromise = null;
   });
 
@@ -1608,6 +1719,7 @@ export function startPriceSync() {
     return;
   }
   schedulerStarted = true;
+  loadGlobalCatalogCacheFromDisk();
 
   console.log("[Price Sync] Scheduling full catalog sync every 24 hours");
 
@@ -1623,11 +1735,11 @@ export function startPriceSync() {
 
   initialTimeout = setTimeout(async () => {
     try {
-      await syncAllCatalogPrices();
+      await syncAllCatalogPrices({ forceRefresh: false });
     } catch (err) {
       console.error("[Price Sync] Initial sync error:", err);
     }
-  }, 10 * 60 * 1000);
+  }, 25 * 60 * 1000);
 }
 
 export function stopPriceSync() {

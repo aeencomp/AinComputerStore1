@@ -6,4 +6,5 @@ vite.config.ts.*
 *.tar.gz
 .env
 uploads
+data/globaliraq-catalog-cache.json
 .aider*

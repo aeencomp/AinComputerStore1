@@ -318,10 +318,24 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
           </div>
         </div>
         {status?.errors && status.errors.length > 0 && (
-          <div className="mt-3 p-2 bg-destructive/10 rounded text-sm text-destructive">
+          <div
+            className={`mt-3 p-2 rounded text-sm ${
+              status.status === "success"
+                ? "bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                : "bg-destructive/10 text-destructive"
+            }`}
+          >
             {status.errors.map((err, i) => (
               <p key={i}>{err}</p>
             ))}
+            {status.status === "error" &&
+            status.errors.some((e) => e.includes("429") || e.includes("Rate limit")) ? (
+              <p className="mt-2 text-xs opacity-90">
+                {language === "ar"
+                  ? "Global Iraq يحدّ الطلبات. انتظر 10–15 دقيقة ثم «مزامنة الآن» — أو «إعادة تعيين» إن بقيت عالقة."
+                  : "Global Iraq is rate-limiting. Wait 10–15 minutes, then Sync now."}
+              </p>
+            ) : null}
           </div>
         )}
         <SyncProductResults
