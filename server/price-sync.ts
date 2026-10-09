@@ -455,6 +455,18 @@ function mergeGlobalProductLists(
   return [...byHandle.values()];
 }
 
+/** All licensable programs on Global Iraq (collection + product_type Software / Operating Systems). */
+function collectGlobalProgramsCatalogProducts(
+  catalogProducts: ShopifyProduct[],
+  softwareCollectionProducts: ShopifyProduct[],
+): ShopifyProduct[] {
+  const programTypes = new Set(["Software", "Operating Systems"]);
+  const fromCatalog = catalogProducts.filter((p) =>
+    programTypes.has((p.product_type || "").trim()),
+  );
+  return mergeGlobalProductLists(fromCatalog, softwareCollectionProducts);
+}
+
 function isGlobalSoftwareProduct(product: ShopifyProduct): boolean {
   if (product.handle && softwareCollectionHandles.has(product.handle)) {
     return true;
@@ -1745,14 +1757,15 @@ export async function syncAllCatalogPrices(options?: {
     }
 
     setSyncProgress("Syncing software / programs collection…");
-    const softwareFromCache =
-      softwareProducts.length > 0
-        ? softwareProducts
-        : (cachedGlobalCatalogProducts() ?? []).filter(
-            (p) => p.handle && softwareCollectionHandles.has(p.handle),
-          );
+    const programsToSync = collectGlobalProgramsCatalogProducts(
+      catalogProducts,
+      softwareProducts,
+    );
+    console.log(
+      `[Catalog Sync] Global Iraq programs to sync: ${programsToSync.length} (software collection on globaliraq.iq is 8 items)`,
+    );
     const softwareStats = await syncSoftwareCollectionPrograms(
-      softwareFromCache,
+      programsToSync,
       syncLog,
     );
     created += softwareStats.created;
