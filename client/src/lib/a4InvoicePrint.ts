@@ -287,18 +287,23 @@ export function buildA4InvoiceHtml(
 <title>فاتورة ${invoiceNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet"/>
 <style>
-  @page { size: A4; margin: 10mm 12mm 14mm; }
+  @page { size: A4 portrait; margin: 7mm 9mm 8mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  body {
+  html, body {
     font-family: 'Cairo', 'Noto Naskh Arabic', Arial, sans-serif;
     margin: 0; padding: 0; color: #1a1a1a; direction: rtl;
     background: #fff;
+    height: auto;
   }
-  .page { position: relative; min-height: 277mm; padding: 4mm 2mm 14mm; }
+  .page {
+    position: relative;
+    padding: 0 1mm 2mm;
+    max-width: 100%;
+  }
   .watermark {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    font-size: 120px; font-weight: 900; color: rgba(200, 50, 51, 0.05);
-    pointer-events: none; user-select: none; letter-spacing: 8px;
+    font-size: 80px; font-weight: 900; color: rgba(200, 50, 51, 0.04);
+    pointer-events: none; user-select: none; letter-spacing: 6px;
   }
   .top-accent {
     height: 4px; border-radius: 2px;
@@ -309,20 +314,20 @@ export function buildA4InvoiceHtml(
     display: grid;
     grid-template-columns: 1fr auto 1fr;
     align-items: center;
-    column-gap: 10px;
-    padding: 12px 8px 10px;
+    column-gap: 8px;
+    padding: 6px 4px 6px;
     border-bottom: 2px solid #1a1a1a;
     background: linear-gradient(180deg, #fafbfd 0%, #fff 100%);
   }
   .banner-store { justify-self: start; text-align: start; min-width: 0; max-width: 100%; }
   .banner-store .store-name {
-    margin: 0; font-size: 17px; font-weight: 800; color: #111; line-height: 1.3;
+    margin: 0; font-size: 14px; font-weight: 800; color: #111; line-height: 1.25;
   }
   .banner-store .store-address {
-    margin: 4px 0 0; font-size: 11px; font-weight: 700; color: #444; line-height: 1.45;
+    margin: 2px 0 0; font-size: 9.5px; font-weight: 700; color: #444; line-height: 1.35;
   }
   .banner-store .store-website {
-    margin: 4px 0 0; font-size: 11px; font-weight: 800; color: ${STORE.brandRed};
+    margin: 2px 0 0; font-size: 9.5px; font-weight: 800; color: ${STORE.brandRed};
     direction: ltr; unicode-bidi: embed; letter-spacing: 0.2px;
   }
   .banner-center {
@@ -334,27 +339,26 @@ export function buildA4InvoiceHtml(
     justify-content: center;
   }
   .store-logo-img {
-    width: 240px; height: auto; max-height: 140px;
-    display: block; margin: 0 auto 6px;
+    width: 168px; height: auto; max-height: 88px;
+    display: block; margin: 0 auto 3px;
     object-fit: contain;
   }
   .banner-motto {
-    margin: 0; font-size: 15px; font-weight: 900; color: #111; white-space: nowrap;
+    margin: 0; font-size: 12px; font-weight: 900; color: #111; white-space: nowrap;
   }
   .banner-qr { justify-self: end; text-align: center; direction: ltr; }
   .banner-qr img {
-    width: 92px; height: 92px; display: block; margin: 0 auto;
-    border: 2px solid #222; border-radius: 6px; padding: 4px; background: #fff;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+    width: 72px; height: 72px; display: block; margin: 0 auto;
+    border: 1px solid #222; border-radius: 4px; padding: 2px; background: #fff;
   }
   .banner-invoice-no {
-    margin-top: 6px; font-size: 14px; font-weight: 800; color: ${STORE.brandRed};
+    margin-top: 3px; font-size: 11px; font-weight: 800; color: ${STORE.brandRed};
     font-family: 'Cairo', Arial, sans-serif; letter-spacing: 0.3px;
   }
   .banner-invoice-no span { color: #444; font-weight: 700; }
   .contacts-strip {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px 10px;
-    padding: 8px 10px; font-size: 10.5px; font-weight: 700;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px 8px;
+    padding: 4px 6px; font-size: 9px; font-weight: 700;
     background: #f4f6f9; border-bottom: 1px solid #dde3ea;
   }
   .contacts-strip .dept { color: #555; font-weight: 600; display: block; }
@@ -363,12 +367,12 @@ export function buildA4InvoiceHtml(
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 24px;
-    padding: 12px 4px;
-    font-size: 13px;
+    gap: 16px;
+    padding: 5px 2px;
+    font-size: 11px;
     font-weight: 700;
   }
-  .meta-row .field { margin-bottom: 6px; }
+  .meta-row .field { margin-bottom: 3px; }
   .meta-row .field:last-child { margin-bottom: 0; }
   .meta-row .label { color: #333; }
   .meta-row .value { border-bottom: 1px dotted #999; min-height: 18px; padding: 0 4px; }
@@ -389,74 +393,83 @@ export function buildA4InvoiceHtml(
   }
   .meta-invoice-info > div { white-space: nowrap; }
   table.items {
-    width: 100%; border-collapse: collapse; margin: 8px 0 14px;
-    font-size: 12px;
+    width: 100%; border-collapse: collapse; margin: 4px 0 6px;
+    font-size: 10.5px;
   }
   table.items thead th {
     background: linear-gradient(180deg, ${STORE.brandRed} 0%, #9b1c1c 100%);
-    color: #fff; font-weight: 800; padding: 8px 6px;
+    color: #fff; font-weight: 800; padding: 4px 3px;
     border: 1px solid #8f1528; text-align: center;
+    font-size: 10px;
   }
   table.items tbody td {
-    border: 1px solid #ccc; padding: 7px 6px; text-align: center; vertical-align: middle;
+    border: 1px solid #ccc; padding: 3px 3px; text-align: center; vertical-align: top;
   }
   table.items tbody tr:nth-child(even) { background: #fafafa; }
   table.items td.name { text-align: right; font-weight: 700; min-width: 180px; vertical-align: top; }
-  table.items td.name .name-main { font-weight: 800; font-size: 12px; line-height: 1.35; }
+  table.items td.name .name-main { font-weight: 800; font-size: 10.5px; line-height: 1.25; }
   table.items td.name .item-specs {
-    margin-top: 5px; font-size: 9.5px; font-weight: 600; color: #333;
-    line-height: 1.5; border-top: 1px dashed #ddd; padding-top: 4px;
+    margin-top: 2px; font-size: 8px; font-weight: 600; color: #333;
+    line-height: 1.3; border-top: 1px dashed #ddd; padding-top: 2px;
   }
+  table.items td.name .item-specs div { margin: 0; }
   table.items td.sku { font-family: monospace; font-weight: 700; direction: ltr; vertical-align: top; }
   table.items td.notes { font-size: 10px; color: #444; text-align: right; max-width: 100px; vertical-align: top; }
   .summary {
-    display: grid; grid-template-columns: 1.1fr 0.9fr 1fr; gap: 12px;
-    align-items: start; margin-bottom: 16px;
+    display: grid; grid-template-columns: 1.1fr 0.9fr 1fr; gap: 8px;
+    align-items: start; margin-bottom: 6px;
   }
-  .balance-box { font-size: 12px; font-weight: 700; line-height: 1.9; }
+  .balance-box { font-size: 10.5px; font-weight: 700; line-height: 1.55; }
   .balance-box .row { display: flex; justify-content: space-between; gap: 8px; }
   .balance-box .received { margin: 6px 0; padding: 6px 0; border-top: 1px dashed #bbb; border-bottom: 1px dashed #bbb; }
   .amount-words {
-    font-size: 13px; font-weight: 800; text-align: center; padding: 16px 8px;
-    border-top: 2px solid #222; margin-top: 8px; color: #111; line-height: 1.6;
+    font-size: 10.5px; font-weight: 800; text-align: center; padding: 6px 4px;
+    border-top: 1px solid #222; margin-top: 2px; color: #111; line-height: 1.45;
   }
-  .totals-stack { display: flex; flex-direction: column; gap: 6px; }
+  .totals-stack { display: flex; flex-direction: column; gap: 3px; }
   .total-row {
     display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 8px;
     font-size: 12px; font-weight: 800;
   }
   .total-row .val {
-    min-width: 72px; text-align: center; padding: 6px 10px;
-    border-radius: 4px; border: 1px solid #ddd;
+    min-width: 64px; text-align: center; padding: 3px 6px;
+    border-radius: 3px; border: 1px solid #ddd;
     background: linear-gradient(180deg, #f5f5f5 0%, #e8e8e8 100%);
-    font-size: 14px;
+    font-size: 11px;
   }
-  .total-row.net .val { color: ${STORE.brandRed}; background: #fff; border-color: ${STORE.brandRed}; font-size: 16px; }
+  .total-row.net .val { color: ${STORE.brandRed}; background: #fff; border-color: ${STORE.brandRed}; font-size: 12px; }
+  .footer-block {
+    border-top: 1px solid #222;
+    padding-top: 5px;
+    page-break-inside: avoid;
+  }
   .footer {
-    border-top: 2px solid #222; padding-top: 12px;
-    display: grid; grid-template-columns: 1fr auto 140px; gap: 16px; align-items: start;
+    display: grid; grid-template-columns: 1fr 110px; gap: 10px; align-items: start;
   }
-  .terms { font-size: 9.5px; line-height: 1.55; color: #222; list-style: none; padding: 0; margin: 0; }
-  .terms li { margin-bottom: 3px; }
+  .terms {
+    font-size: 7.5px; line-height: 1.35; color: #222; list-style: none; padding: 0; margin: 0;
+    columns: 2; column-gap: 12px;
+  }
+  .terms li { margin-bottom: 1px; break-inside: avoid; }
   .terms .term-num { color: ${STORE.brandRed}; font-weight: 800; margin-left: 4px; }
   .footer-mid { min-height: 0; }
   .barcode-wrap { text-align: center; }
-  .barcode-wrap svg { max-width: 120px; height: auto; transform: rotate(90deg); margin: 8px auto; display: block; }
-  .barcode-id { font-family: monospace; font-weight: 900; font-size: 13px; direction: ltr; color: ${STORE.brandRed}; }
-  .disclaimer { font-size: 10px; color: #555; margin-top: 8px; font-weight: 600; }
+  .barcode-wrap svg { max-width: 88px; height: auto; transform: rotate(90deg); margin: 2px auto; display: block; }
+  .barcode-id { font-family: monospace; font-weight: 900; font-size: 10px; direction: ltr; color: ${STORE.brandRed}; }
+  .disclaimer { font-size: 8px; color: #555; margin-top: 3px; font-weight: 600; }
   .footer-website {
-    font-size: 11px; font-weight: 800; color: ${STORE.brandRed};
-    margin-top: 6px; direction: ltr; unicode-bidi: embed;
+    font-size: 9px; font-weight: 800; color: ${STORE.brandRed};
+    margin-top: 2px; direction: ltr; unicode-bidi: embed;
   }
   .footer-sign-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    gap: 12px;
-    margin-top: 10px;
-    padding: 8px 6px 6px;
+    gap: 8px;
+    margin-top: 4px;
+    padding: 4px 2px 0;
     border-top: 1px dashed #bbb;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: 800;
     color: #111;
   }
@@ -467,14 +480,21 @@ export function buildA4InvoiceHtml(
     white-space: nowrap;
   }
   .page-meta {
-    position: fixed; bottom: 0; left: 0; right: 0;
-    display: flex; justify-content: space-between; align-items: center;
-    font-size: 10px; color: #666; padding: 4px 12mm; border-top: 1px solid #eee;
-    background: #fff;
+    display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px;
+    font-size: 8px; color: #666; padding: 3px 0 0; margin-top: 3px;
+    border-top: 1px solid #eee;
   }
   @media print {
-    .page { min-height: auto; }
-    .page-meta { position: fixed; }
+    .page {
+      page-break-after: avoid;
+      page-break-inside: avoid;
+      zoom: 0.94;
+    }
+    .footer-block, .summary {
+      page-break-inside: avoid;
+    }
+    thead { display: table-header-group; }
+    tbody tr { page-break-inside: avoid; }
   }
 </style>
 </head>
@@ -558,26 +578,27 @@ export function buildA4InvoiceHtml(
     </div>
   </section>
 
-  <footer class="footer">
-    <ol class="terms">${termsHtml}</ol>
-    <div class="footer-mid"></div>
-    <div class="barcode-wrap">
-      ${barcodeSvg}
-      <div class="barcode-id">${invoiceNo}</div>
-      <p class="disclaimer">الخطأ والسهو مرجوع للطرفين</p>
-      <p class="footer-website">${STORE.website}</p>
+  <div class="footer-block">
+    <footer class="footer">
+      <ol class="terms">${termsHtml}</ol>
+      <div class="barcode-wrap">
+        ${barcodeSvg}
+        <div class="barcode-id">${invoiceNo}</div>
+        <p class="disclaimer">الخطأ والسهو مرجوع للطرفين</p>
+        <p class="footer-website">${STORE.website}</p>
+      </div>
+    </footer>
+    <div class="footer-sign-row" dir="ltr">
+      <span class="product-count" dir="rtl">عدد المنتجات : ${productCount}</span>
+      <span class="receipt-organizer" dir="rtl">منظم الوصل : ${organizer}</span>
     </div>
-  </footer>
-  <div class="footer-sign-row" dir="ltr">
-    <span class="product-count" dir="rtl">عدد المنتجات : ${productCount}</span>
-    <span class="receipt-organizer" dir="rtl">منظم الوصل : ${organizer}</span>
+    <div class="page-meta">
+      <span>صفحة 1 من 1</span>
+      <span dir="ltr">${STORE.website}</span>
+      <span>${footerDate}</span>
+      <span dir="ltr">${footerShort}</span>
+    </div>
   </div>
-</div>
-<div class="page-meta">
-  <span>صفحة 1 من 1</span>
-  <span dir="ltr">${STORE.website}</span>
-  <span>${footerDate}</span>
-  <span dir="ltr">${footerShort}</span>
 </div>
 <script>
   window.onload = function() {
@@ -596,10 +617,10 @@ export async function renderInvoiceBarcodeSvg(value: string): Promise<string> {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
   JsBarcode(svg, value, {
     format: "CODE128",
-    width: 1.4,
-    height: 48,
+    width: 1.2,
+    height: 36,
     displayValue: false,
-    margin: 2,
+    margin: 1,
   });
   return new XMLSerializer().serializeToString(svg);
 }
