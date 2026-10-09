@@ -977,8 +977,27 @@ export async function syncPrices(): Promise<SyncLog> {
   return syncLog;
 }
 
+export function isCatalogSyncRunning(): boolean {
+  if (!isRunning) return false;
+  if (!syncStartedAt) return true;
+  return Date.now() - syncStartedAt <= SYNC_STALE_MS;
+}
+
+/** Start catalog sync without blocking HTTP (admin UI polls /status). */
+export function startCatalogSyncBackground(options?: {
+  forceRefresh?: boolean;
+}): boolean {
+  if (isCatalogSyncRunning()) {
+    return false;
+  }
+  void syncAllCatalogPrices(options);
+  return true;
+}
+
 /** Full GlobalIraq catalog: update prices for all matched items and add missing products. */
-export async function syncAllCatalogPrices(): Promise<SyncLog> {
+export async function syncAllCatalogPrices(options?: {
+  forceRefresh?: boolean;
+}): Promise<SyncLog> {
   if (
     !beginSync({
       lastSync: new Date(),
@@ -999,7 +1018,9 @@ export async function syncAllCatalogPrices(): Promise<SyncLog> {
   try {
     console.log("[Catalog Sync] Starting full catalog sync from globaliraq.iq...");
 
-    const allGlobalProducts = await fetchAllGlobalIraqProducts();
+    const allGlobalProducts = await fetchAllGlobalIraqProducts(
+      options?.forceRefresh === true,
+    );
     const syncableGlobal = allGlobalProducts.filter((product) => {
       const variant = getPrimaryVariant(product);
       if (!variant) return false;

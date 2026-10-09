@@ -95,7 +95,13 @@ import Papa from "papaparse";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
-import { startPriceSync, syncAllCatalogPrices, getSyncStatus, startDesktopPriceSync, syncDesktopPrices, getDesktopSyncStatus } from "./price-sync";
+import {
+  startPriceSync,
+  syncAllCatalogPrices,
+  getSyncStatus,
+  startCatalogSyncBackground,
+  startDesktopPriceSync,
+} from "./price-sync";
 import { normalizeCustomerEmail } from "./auth-email";
 import { runDbMigrations } from "./db-migrations";
 import { canonicalAdpSerial } from "@shared/inventoryScanCode";
@@ -10004,8 +10010,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(401).json({ error: "Unauthorized" });
     }
     try {
-      const result = await syncAllCatalogPrices();
-      return res.json(result);
+      if (!startCatalogSyncBackground({ forceRefresh: true })) {
+        return res.status(409).json({
+          ...getSyncStatus(),
+          error: "المزامنة قيد التشغيل بالفعل",
+        });
+      }
+      return res.status(202).json({
+        ...getSyncStatus(),
+        message: "Sync started — poll /api/admin/price-sync/status",
+      });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
@@ -10016,15 +10030,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/admin/desktop-sync/status", async (req, res) => {
     const adminId = (req.session as any).adminId;
     if (!adminId) return res.status(401).json({ error: "Unauthorized" });
-    return res.json(getDesktopSyncStatus());
+    return res.json(getSyncStatus());
   });
 
   app.post("/api/admin/desktop-sync/run", async (req, res) => {
     const adminId = (req.session as any).adminId;
     if (!adminId) return res.status(401).json({ error: "Unauthorized" });
     try {
-      const result = await syncAllCatalogPrices();
-      return res.json(result);
+      if (!startCatalogSyncBackground({ forceRefresh: true })) {
+        return res.status(409).json({
+          ...getSyncStatus(),
+          error: "المزامنة قيد التشغيل بالفعل",
+        });
+      }
+      return res.status(202).json({
+        ...getSyncStatus(),
+        message: "Sync started — poll /api/admin/price-sync/status",
+      });
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }

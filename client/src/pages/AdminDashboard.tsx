@@ -28,7 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, fetchWithTimeout, queryClient } from "@/lib/queryClient";
 import { LogOut, Package, Settings, AppWindow, Users, Trash2, UserPlus, Edit, Key, ShieldCheck, Loader2, Bell, Check, CheckCheck, TrendingUp, Warehouse, Battery, Printer, LayoutDashboard, RefreshCw, Monitor } from "lucide-react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { AdminNav } from "@/components/AdminNav";
@@ -51,6 +51,57 @@ interface SyncProductEntry {
   category: string;
   price: string;
   previousPrice?: string | null;
+}
+
+interface AdminPriceSyncStatus {
+  lastSync: string | null;
+  nextSync: string | null;
+  updatedCount: number;
+  createdCount?: number;
+  totalMatched: number;
+  fetchedCount?: number;
+  createdProducts?: SyncProductEntry[];
+  updatedProducts?: SyncProductEntry[];
+  errors: string[];
+  status: string;
+}
+
+async function pollAdminPriceSyncStatus(
+  statusUrl: string,
+): Promise<AdminPriceSyncStatus> {
+  const deadline = Date.now() + 10 * 60 * 1000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2500));
+    const res = await fetchWithTimeout(statusUrl, { credentials: "include" }, 30_000);
+    if (!res.ok) continue;
+    const data = (await res.json()) as AdminPriceSyncStatus;
+    if (data.status !== "running") {
+      if (data.status === "error" && data.errors?.length) {
+        throw new Error(data.errors[data.errors.length - 1] ?? "فشلت المزامنة");
+      }
+      return data;
+    }
+  }
+  throw new Error("انتهت مهلة انتظار المزامنة — تحقق من الخادم أو حاول لاحقاً");
+}
+
+async function requestCatalogSyncStart(runUrl: string): Promise<AdminPriceSyncStatus> {
+  const res = await fetchWithTimeout(
+    runUrl,
+    { method: "POST", credentials: "include" },
+    60_000,
+  );
+  const body = (await res.json()) as AdminPriceSyncStatus & { error?: string };
+  if (res.status === 409) {
+    throw new Error(body.error ?? "المزامنة قيد التشغيل بالفعل");
+  }
+  if (!res.ok) {
+    throw new Error(body.error ?? `HTTP ${res.status}`);
+  }
+  if (body.status === "running") {
+    return pollAdminPriceSyncStatus("/api/admin/price-sync/status");
+  }
+  return body;
 }
 
 function SyncProductResults({
@@ -180,29 +231,17 @@ interface BatterySale {
 function PriceSyncCard() {
   const { toast } = useToast();
   
-  const syncStatusQuery = useQuery<{
-    lastSync: string | null;
-    nextSync: string | null;
-    updatedCount: number;
-    createdCount?: number;
-    totalMatched: number;
-    fetchedCount?: number;
-    createdProducts?: SyncProductEntry[];
-    updatedProducts?: SyncProductEntry[];
-    errors: string[];
-    status: string;
-  }>({
+  const syncStatusQuery = useQuery<AdminPriceSyncStatus>({
     queryKey: ["/api/admin/price-sync/status"],
-    refetchInterval: 30000,
+    refetchInterval: (query) =>
+      query.state.data?.status === "running" ? 3000 : 30000,
   });
 
   const syncMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/admin/price-sync/run");
-      return res.json();
-    },
+    mutationFn: () => requestCatalogSyncStart("/api/admin/price-sync/run"),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/price-sync/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/desktop-sync/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       const created = data.createdCount ?? 0;
       const updated = data.updatedCount ?? 0;
@@ -215,10 +254,10 @@ function PriceSyncCard() {
           : `جميع الأسعار محدّثة — ${matched} منتج متطابق من ${fetched} على GlobalIraq`,
       });
     },
-    onError: () => {
+    onError: (err: Error) => {
       toast({
         title: "فشلت المزامنة",
-        description: "حدث خطأ أثناء مزامنة الأسعار",
+        description: err.message || "حدث خطأ أثناء مزامنة الأسعار",
         variant: "destructive",
       });
     },
@@ -324,29 +363,17 @@ function PriceSyncCard() {
 function DesktopSyncCard() {
   const { toast } = useToast();
 
-  const syncStatusQuery = useQuery<{
-    lastSync: string | null;
-    nextSync: string | null;
-    updatedCount: number;
-    createdCount?: number;
-    totalMatched: number;
-    fetchedCount?: number;
-    createdProducts?: SyncProductEntry[];
-    updatedProducts?: SyncProductEntry[];
-    errors: string[];
-    status: string;
-  }>({
+  const syncStatusQuery = useQuery<AdminPriceSyncStatus>({
     queryKey: ["/api/admin/desktop-sync/status"],
-    refetchInterval: 30000,
+    refetchInterval: (query) =>
+      query.state.data?.status === "running" ? 3000 : 30000,
   });
 
   const syncMutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/admin/desktop-sync/run");
-      return res.json();
-    },
+    mutationFn: () => requestCatalogSyncStart("/api/admin/desktop-sync/run"),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/desktop-sync/status"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/price-sync/status"] });
       queryClient.invalidateQueries({ queryKey: ["/api/products"] });
       const created = data.createdCount ?? 0;
       const updated = data.updatedCount ?? 0;
@@ -359,10 +386,10 @@ function DesktopSyncCard() {
           : `جميع الأسعار محدّثة — ${matched} جهاز متطابق من ${fetched} على GlobalIraq`,
       });
     },
-    onError: () => {
+    onError: (err: Error) => {
       toast({
         title: "فشلت المزامنة",
-        description: "حدث خطأ أثناء مزامنة أسعار الأجهزة المكتبية",
+        description: err.message || "حدث خطأ أثناء مزامنة أسعار الأجهزة المكتبية",
         variant: "destructive",
       });
     },
