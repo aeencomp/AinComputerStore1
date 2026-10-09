@@ -3,7 +3,10 @@ import { products } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
 const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
-const SYNC_STALE_MS = 15 * 60 * 1000;
+/** No progress heartbeat for this long → treat sync as stuck (UI can reset). */
+const SYNC_PROGRESS_STALE_MS = 12 * 60 * 1000;
+/** Absolute max wall time for one catalog sync run. */
+const SYNC_WALL_CLOCK_MS = 50 * 60 * 1000;
 const MARKUP_PERCENTAGE = 0;
 const GLOBALIRAQ_API = "https://globaliraq.iq/products.json?limit=250";
 const GLOBALIRAQ_SOFTWARE_COLLECTION =
@@ -11,7 +14,7 @@ const GLOBALIRAQ_SOFTWARE_COLLECTION =
 const MAX_PAGES = 50;
 const PAGE_DELAY_MS = 2800;
 const GLOBAL_PRODUCTS_CACHE_MS = 15 * 60 * 1000;
-const FETCH_MAX_RETRIES = 10;
+const FETCH_MAX_RETRIES = 6;
 
 let cachedGlobalProducts: { fetchedAt: number; products: ShopifyProduct[] } | null =
   null;
@@ -86,6 +89,10 @@ interface SyncLog {
   updatedProducts: SyncProductEntry[];
   errors: string[];
   status: "idle" | "running" | "success" | "error";
+  /** Human-readable step while status is running */
+  progress?: string;
+  startedAt?: string;
+  processedCount?: number;
 }
 
 let syncLog: SyncLog = {
@@ -103,6 +110,8 @@ let syncLog: SyncLog = {
 
 let isRunning = false;
 let syncStartedAt: number | null = null;
+let lastProgressAt: number | null = null;
+let syncRunId = 0;
 let syncInterval: NodeJS.Timeout | null = null;
 let initialTimeout: NodeJS.Timeout | null = null;
 let schedulerStarted = false;
@@ -126,6 +135,10 @@ async function fetchJSON(url: string, retries = FETCH_MAX_RETRIES): Promise<any>
     try {
       const sinceLimit = Date.now() - lastGlobalIraqRateLimitAt;
       if (sinceLimit < 45_000) {
+        const waitSec = Math.ceil((45_000 - sinceLimit) / 1000);
+        setSyncProgress(
+          `Global Iraq rate limit — waiting ${waitSec}s before next request…`,
+        );
         await sleep(45_000 - sinceLimit);
       }
 
@@ -195,12 +208,16 @@ async function fetchAllGlobalIraqProductsFromApi(): Promise<ShopifyProduct[]> {
   let page = 1;
 
   while (page <= MAX_PAGES) {
+    setSyncProgress(`Fetching Global Iraq catalog (page ${page})…`);
     const url = `${GLOBALIRAQ_API}&page=${page}`;
     const data = await fetchJSON(url);
     const pageProducts: ShopifyProduct[] = data.products || [];
 
     if (pageProducts.length === 0) break;
     allProducts.push(...pageProducts);
+    setSyncProgress(
+      `Fetched ${allProducts.length} products from Global Iraq (page ${page})…`,
+    );
     page++;
 
     if (pageProducts.length < 250) break;
@@ -227,8 +244,19 @@ async function fetchAllGlobalIraqProducts(
     return cachedGlobalProducts.products;
   }
 
+  if (forceRefresh) {
+    cachedGlobalProducts = null;
+  }
+
   if (globalProductsFetchPromise) {
-    return globalProductsFetchPromise;
+    await globalProductsFetchPromise.catch(() => undefined);
+    if (
+      !forceRefresh &&
+      cachedGlobalProducts &&
+      Date.now() - cachedGlobalProducts.fetchedAt < GLOBAL_PRODUCTS_CACHE_MS
+    ) {
+      return cachedGlobalProducts.products;
+    }
   }
 
   globalProductsFetchPromise = fetchAllGlobalIraqProductsFromApi().finally(() => {
@@ -242,6 +270,7 @@ async function fetchSoftwareCollectionProducts(): Promise<ShopifyProduct[]> {
   const collectionProducts: ShopifyProduct[] = [];
   try {
     for (let page = 1; page <= 10; page++) {
+      setSyncProgress(`Fetching software collection (page ${page})…`);
       const url = `${GLOBALIRAQ_SOFTWARE_COLLECTION}&page=${page}`;
       const data = await fetchJSON(url);
       const pageProducts: ShopifyProduct[] = data.products || [];
@@ -862,39 +891,94 @@ function matchProducts(
   return bestMatch;
 }
 
-function beginSync(log: SyncLog): boolean {
-  if (isRunning) {
-    const stale = !syncStartedAt || Date.now() - syncStartedAt > SYNC_STALE_MS;
-    if (!stale) return false;
-    console.warn("[Price Sync] Previous sync looked stale — restarting");
+function setSyncProgress(message: string) {
+  if (syncLog.status === "running") {
+    syncLog.progress = message;
   }
-
-  isRunning = true;
-  syncStartedAt = Date.now();
-  syncLog = log;
-  return true;
+  lastProgressAt = Date.now();
 }
 
-function endSync() {
+function isSyncProgressStale(): boolean {
+  if (!isRunning) return false;
+  const t = lastProgressAt ?? syncStartedAt;
+  if (!t) return false;
+  if (Date.now() - t > SYNC_PROGRESS_STALE_MS) return true;
+  if (syncStartedAt && Date.now() - syncStartedAt > SYNC_WALL_CLOCK_MS) {
+    return true;
+  }
+  return false;
+}
+
+function reconcileStaleSync() {
+  const orphanedRunning = syncLog.status === "running" && !isRunning;
+  if (isRunning && isSyncProgressStale()) {
+    console.warn("[Catalog Sync] Sync stalled — clearing lock so a new run can start");
+    syncLog.status = "error";
+    syncLog.errors = [
+      ...syncLog.errors,
+      "توقفت المزامنة (مهلة أو بطء Global Iraq). اضغط «إعادة تعيين» ثم «مزامنة الآن».",
+    ];
+    syncLog.progress = undefined;
+    isRunning = false;
+    syncStartedAt = null;
+    lastProgressAt = null;
+    syncRunId += 1;
+    return;
+  }
+  if (orphanedRunning) {
+    syncLog.status = "error";
+    syncLog.errors = [
+      ...syncLog.errors,
+      "انقطعت المزامنة السابقة. يمكنك المزامنة مرة أخرى.",
+    ];
+    syncLog.progress = undefined;
+  }
+}
+
+function beginSync(log: SyncLog): number | null {
+  reconcileStaleSync();
+  if (isRunning) {
+    return null;
+  }
+
+  syncRunId += 1;
+  const runId = syncRunId;
+  isRunning = true;
+  syncStartedAt = Date.now();
+  lastProgressAt = Date.now();
+  syncLog = {
+    ...log,
+    startedAt: new Date().toISOString(),
+    progress: "Starting catalog sync…",
+    processedCount: 0,
+  };
+  return runId;
+}
+
+function finishSyncRun(runId: number) {
+  if (runId !== syncRunId) return;
   isRunning = false;
   syncStartedAt = null;
+  lastProgressAt = null;
+  if (syncLog.status === "running") {
+    syncLog.progress = undefined;
+  }
 }
 
 export async function syncPrices(): Promise<SyncLog> {
-  if (
-    !beginSync({
-      lastSync: new Date(),
-      nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
-      updatedCount: 0,
-      createdCount: 0,
-      totalMatched: 0,
-      fetchedCount: 0,
-      createdProducts: [],
-      updatedProducts: [],
-      errors: [],
-      status: "running",
-    })
-  ) {
+  const runId = beginSync({
+    lastSync: new Date(),
+    nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
+    updatedCount: 0,
+    createdCount: 0,
+    totalMatched: 0,
+    fetchedCount: 0,
+    createdProducts: [],
+    updatedProducts: [],
+    errors: [],
+    status: "running",
+  });
+  if (!runId) {
     return syncLog;
   }
 
@@ -1086,7 +1170,7 @@ export async function syncPrices(): Promise<SyncLog> {
     syncLog.errors.push(`Sync failed: ${err.message}`);
     console.error("[Price Sync] Failed:", err.message);
   } finally {
-    endSync();
+    finishSyncRun(runId);
   }
 
   return syncLog;
@@ -1218,16 +1302,29 @@ async function syncSoftwareCollectionPrograms(
 }
 
 export function isCatalogSyncRunning(): boolean {
-  if (!isRunning) return false;
-  if (!syncStartedAt) return true;
-  return Date.now() - syncStartedAt <= SYNC_STALE_MS;
+  reconcileStaleSync();
+  return isRunning;
+}
+
+/** Clear a stuck "running" state so the admin can start sync again. */
+export function resetCatalogSyncState(): SyncLog {
+  syncRunId += 1;
+  isRunning = false;
+  syncStartedAt = null;
+  lastProgressAt = null;
+  syncLog.progress = undefined;
+  if (syncLog.status === "running") {
+    syncLog.status = "idle";
+  }
+  return getSyncStatus();
 }
 
 /** Start catalog sync without blocking HTTP (admin UI polls /status). */
 export function startCatalogSyncBackground(options?: {
   forceRefresh?: boolean;
 }): boolean {
-  if (isCatalogSyncRunning()) {
+  reconcileStaleSync();
+  if (isRunning) {
     return false;
   }
   void syncAllCatalogPrices(options);
@@ -1238,20 +1335,19 @@ export function startCatalogSyncBackground(options?: {
 export async function syncAllCatalogPrices(options?: {
   forceRefresh?: boolean;
 }): Promise<SyncLog> {
-  if (
-    !beginSync({
-      lastSync: new Date(),
-      nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
-      updatedCount: 0,
-      createdCount: 0,
-      totalMatched: 0,
-      fetchedCount: 0,
-      createdProducts: [],
-      updatedProducts: [],
-      errors: [],
-      status: "running",
-    })
-  ) {
+  const runId = beginSync({
+    lastSync: new Date(),
+    nextSync: new Date(Date.now() + SYNC_INTERVAL_MS),
+    updatedCount: 0,
+    createdCount: 0,
+    totalMatched: 0,
+    fetchedCount: 0,
+    createdProducts: [],
+    updatedProducts: [],
+    errors: [],
+    status: "running",
+  });
+  if (!runId) {
     return syncLog;
   }
 
@@ -1291,7 +1387,19 @@ export async function syncAllCatalogPrices(options?: {
     let matched = 0;
     let created = 0;
 
-    for (const globalProduct of syncableGlobal) {
+    setSyncProgress(`Updating database (0/${syncableGlobal.length} Global Iraq items)…`);
+
+    for (let gi = 0; gi < syncableGlobal.length; gi++) {
+      const globalProduct = syncableGlobal[gi];
+      if (gi % 20 === 0) {
+        syncLog.processedCount = gi;
+        syncLog.updatedCount = updated;
+        syncLog.createdCount = created;
+        syncLog.totalMatched = matched;
+        setSyncProgress(
+          `Updating database (${gi + 1}/${syncableGlobal.length}) — ${matched} matched, ${updated} price updates…`,
+        );
+      }
       try {
         const variant = getPrimaryVariant(globalProduct);
         if (!variant) {
@@ -1403,6 +1511,9 @@ export async function syncAllCatalogPrices(options?: {
     console.log(
       `[Catalog Sync] Reverse pass for ${reverseCandidates.length} local products...`,
     );
+    setSyncProgress(
+      `Second pass: matching ${reverseCandidates.length} local products…`,
+    );
 
     for (const ourProduct of reverseCandidates) {
       try {
@@ -1445,6 +1556,7 @@ export async function syncAllCatalogPrices(options?: {
       }
     }
 
+    setSyncProgress("Syncing software / programs collection…");
     const softwareStats = await syncSoftwareCollectionPrograms(
       softwareProducts,
       syncLog,
@@ -1453,25 +1565,35 @@ export async function syncAllCatalogPrices(options?: {
     updated += softwareStats.updated;
     matched += softwareStats.matched;
 
-    syncLog.updatedCount = updated;
-    syncLog.createdCount = created;
-    syncLog.totalMatched = matched;
-    syncLog.status = "success";
-    console.log(
-      `[Catalog Sync] Complete. Added: ${created}, Matched: ${matched}, Updated: ${updated}, Errors: ${syncLog.errors.length}`,
-    );
+    if (runId === syncRunId) {
+      syncLog.updatedCount = updated;
+      syncLog.createdCount = created;
+      syncLog.totalMatched = matched;
+      syncLog.status = "success";
+      syncLog.progress = undefined;
+      syncLog.processedCount = syncableGlobal.length;
+      console.log(
+        `[Catalog Sync] Complete. Added: ${created}, Matched: ${matched}, Updated: ${updated}, Errors: ${syncLog.errors.length}`,
+      );
+    } else {
+      console.log("[Catalog Sync] Run superseded — discarding result");
+    }
   } catch (err: any) {
-    syncLog.status = "error";
-    syncLog.errors.push(`Sync failed: ${err.message}`);
-    console.error("[Catalog Sync] Failed:", err.message);
+    if (runId === syncRunId) {
+      syncLog.status = "error";
+      syncLog.errors.push(`Sync failed: ${err.message}`);
+      syncLog.progress = undefined;
+      console.error("[Catalog Sync] Failed:", err.message);
+    }
   } finally {
-    endSync();
+    finishSyncRun(runId);
   }
 
   return syncLog;
 }
 
 export function getSyncStatus(): SyncLog {
+  reconcileStaleSync();
   return syncLog;
 }
 
@@ -1605,7 +1727,9 @@ function matchDesktopProducts(
 
 function beginDesktopSync(log: SyncLog): boolean {
   if (isDesktopRunning) {
-    const stale = !desktopSyncStartedAt || Date.now() - desktopSyncStartedAt > SYNC_STALE_MS;
+    const stale =
+      !desktopSyncStartedAt ||
+      Date.now() - desktopSyncStartedAt > SYNC_PROGRESS_STALE_MS;
     if (!stale) return false;
     console.warn("[Desktop Sync] Previous sync looked stale — restarting");
   }

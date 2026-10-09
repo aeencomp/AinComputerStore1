@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { formatPrice } from "@/lib/formatters";
 import { getCategoryName } from "@/lib/categoryNames";
-import { fetchWithTimeout, queryClient } from "@/lib/queryClient";
+import { apiRequest, fetchWithTimeout, queryClient } from "@/lib/queryClient";
 
 export interface SyncProductEntry {
   id: string;
@@ -31,6 +31,9 @@ export interface AdminPriceSyncStatus {
   updatedProducts?: SyncProductEntry[];
   errors: string[];
   status: string;
+  progress?: string;
+  startedAt?: string;
+  processedCount?: number;
 }
 
 async function pollAdminPriceSyncStatus(
@@ -151,6 +154,20 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
       query.state.data?.status === "running" ? 3000 : 30000,
   });
 
+  const resetMutation = useMutation({
+    mutationFn: () => apiRequest("POST", "/api/admin/price-sync/reset"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/price-sync/status"] });
+      toast({
+        title: language === "ar" ? "تم إعادة التعيين" : "Sync state reset",
+        description:
+          language === "ar"
+            ? "يمكنك الضغط على «مزامنة الآن» مرة أخرى."
+            : "You can press Sync now again.",
+      });
+    },
+  });
+
   const syncMutation = useMutation({
     mutationFn: () => requestCatalogSyncStart("/api/admin/price-sync/run"),
     onSuccess: (data) => {
@@ -205,27 +222,47 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
               : "Prices & catalog incl. software — auto every 24h and after GitHub deploy"}
           </CardDescription>
         </div>
-        <Button
-          onClick={() => syncMutation.mutate()}
-          disabled={syncMutation.isPending || status?.status === "running"}
-          data-testid="button-sync-prices"
-          size="lg"
-          className="shrink-0"
-        >
-          {syncMutation.isPending || status?.status === "running" ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              {language === "ar" ? "جاري المزامنة…" : "Syncing…"}
-            </>
-          ) : (
-            <>
-              <RefreshCw className="w-4 h-4" />
-              {language === "ar" ? "مزامنة الآن" : "Sync now"}
-            </>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          {(status?.status === "running" || syncMutation.isPending) && (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              disabled={resetMutation.isPending}
+              onClick={() => resetMutation.mutate()}
+              data-testid="button-reset-price-sync"
+            >
+              {language === "ar" ? "إعادة تعيين" : "Reset stuck sync"}
+            </Button>
           )}
-        </Button>
+          <Button
+            onClick={() => syncMutation.mutate()}
+            disabled={
+              syncMutation.isPending ||
+              resetMutation.isPending ||
+              status?.status === "running"
+            }
+            data-testid="button-sync-prices"
+            size="lg"
+          >
+            {syncMutation.isPending || status?.status === "running" ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                {language === "ar" ? "جاري المزامنة…" : "Syncing…"}
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                {language === "ar" ? "مزامنة الآن" : "Sync now"}
+              </>
+            )}
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
+        {status?.status === "running" && status.progress ? (
+          <p className="text-sm text-muted-foreground mb-4">{status.progress}</p>
+        ) : null}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="text-muted-foreground">{language === "ar" ? "الحالة" : "Status"}</p>

@@ -99,6 +99,7 @@ import {
   startPriceSync,
   syncAllCatalogPrices,
   getSyncStatus,
+  resetCatalogSyncState,
   startCatalogSyncBackground,
   startDesktopPriceSync,
 } from "./price-sync";
@@ -10048,6 +10049,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       return res.status(500).json({ error: error.message });
     }
+  });
+
+  app.post("/api/admin/price-sync/reset", async (req, res) => {
+    const adminId = (req.session as any).adminId;
+    if (!adminId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+    return res.json(resetCatalogSyncState());
   });
 
   startPriceSync();
