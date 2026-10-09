@@ -247,7 +247,7 @@ export function buildA4InvoiceHtml(
       const sku = escapeHtml(item.sku || "-");
       const specLines = normalizeItemSpecs(item);
       const specsHtml = specLines.length
-        ? `<div class="item-specs">${specLines.map((line) => `<div>${escapeHtml(line)}</div>`).join("")}</div>`
+        ? `<div class="item-specs">${escapeHtml(specLines.join(" · "))}</div>`
         : "";
       const nameCell = `<div class="name-main">${name}</div>${specsHtml}`;
       const notes = escapeHtml(item.notes || "");
@@ -287,7 +287,7 @@ export function buildA4InvoiceHtml(
 <title>فاتورة ${invoiceNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet"/>
 <style>
-  @page { size: A4 portrait; margin: 7mm 9mm 8mm; }
+  @page { size: A4 portrait; margin: 5mm 7mm 6mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body {
     font-family: 'Cairo', 'Noto Naskh Arabic', Arial, sans-serif;
@@ -295,10 +295,17 @@ export function buildA4InvoiceHtml(
     background: #fff;
     height: auto;
   }
+  body { width: 210mm; margin: 0 auto; overflow-x: hidden; }
+  .page-scale-host {
+    width: 210mm;
+    margin: 0 auto;
+    overflow: hidden;
+  }
   .page {
     position: relative;
-    padding: 0 1mm 2mm;
-    max-width: 100%;
+    padding: 0 1mm 1mm;
+    width: 210mm;
+    max-width: 210mm;
   }
   .watermark {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -421,7 +428,7 @@ export function buildA4InvoiceHtml(
   }
   .balance-box { font-size: 10.5px; font-weight: 700; line-height: 1.55; }
   .balance-box .row { display: flex; justify-content: space-between; gap: 8px; }
-  .balance-box .received { margin: 6px 0; padding: 6px 0; border-top: 1px dashed #bbb; border-bottom: 1px dashed #bbb; }
+  .balance-box .received { margin: 2px 0; padding: 2px 0; border-top: 1px dashed #bbb; border-bottom: 1px dashed #bbb; }
   .amount-words {
     font-size: 10.5px; font-weight: 800; text-align: center; padding: 6px 4px;
     border-top: 1px solid #222; margin-top: 2px; color: #111; line-height: 1.45;
@@ -440,8 +447,7 @@ export function buildA4InvoiceHtml(
   .total-row.net .val { color: ${STORE.brandRed}; background: #fff; border-color: ${STORE.brandRed}; font-size: 12px; }
   .footer-block {
     border-top: 1px solid #222;
-    padding-top: 5px;
-    page-break-inside: avoid;
+    padding-top: 4px;
   }
   .footer {
     display: grid; grid-template-columns: 1fr 110px; gap: 10px; align-items: start;
@@ -485,21 +491,23 @@ export function buildA4InvoiceHtml(
     border-top: 1px solid #eee;
   }
   @media print {
+    html, body {
+      width: 210mm;
+      height: auto;
+      margin: 0;
+      overflow: hidden;
+    }
+    .page-scale-host { overflow: visible; }
     .page {
       page-break-after: avoid;
-      page-break-inside: avoid;
-      zoom: 0.94;
+      break-after: avoid-page;
     }
-    .footer-block, .summary {
-      page-break-inside: avoid;
-    }
-    thead { display: table-header-group; }
-    tbody tr { page-break-inside: avoid; }
   }
 </style>
 </head>
 <body>
-<div class="page">
+<div class="page-scale-host" id="invoice-scale-host">
+<div class="page" id="invoice-page">
   <div class="watermark">العين</div>
   <div class="top-accent"></div>
   <header class="banner-header" dir="rtl">
@@ -600,12 +608,34 @@ export function buildA4InvoiceHtml(
     </div>
   </div>
 </div>
+</div>
 <script>
+  /** Shrink entire invoice to fit A4 printable height (works for old + new orders). */
+  function fitInvoiceToSinglePage() {
+    var page = document.getElementById('invoice-page');
+    var host = document.getElementById('invoice-scale-host');
+    if (!page || !host) return;
+    page.style.transform = 'none';
+    page.style.marginBottom = '0';
+    host.style.height = 'auto';
+    var maxPx = 1045;
+    var h = page.scrollHeight || page.getBoundingClientRect().height;
+    if (h <= maxPx) return;
+    var scale = maxPx / h;
+    if (scale < 0.72) scale = 0.72;
+    page.style.transform = 'scale(' + scale + ')';
+    page.style.transformOrigin = 'top center';
+    host.style.height = Math.ceil(h * scale) + 'px';
+    page.style.marginBottom = Math.ceil(h * (scale - 1)) + 'px';
+  }
   window.onload = function() {
     setTimeout(function() {
-      window.print();
-      window.onafterprint = function() { window.close(); };
-    }, 400);
+      fitInvoiceToSinglePage();
+      setTimeout(function() {
+        window.print();
+        window.onafterprint = function() { window.close(); };
+      }, 120);
+    }, 350);
   };
 </script>
 </body>
