@@ -287,25 +287,27 @@ export function buildA4InvoiceHtml(
 <title>فاتورة ${invoiceNo}</title>
 <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&family=Noto+Naskh+Arabic:wght@400;600;700&display=swap" rel="stylesheet"/>
 <style>
-  @page { size: A4 portrait; margin: 5mm 7mm 6mm; }
+  @page { size: A4 portrait; margin: 8mm; }
   * { box-sizing: border-box; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body {
     font-family: 'Cairo', 'Noto Naskh Arabic', Arial, sans-serif;
     margin: 0; padding: 0; color: #1a1a1a; direction: rtl;
     background: #fff;
     height: auto;
+    width: 100%;
+    overflow: visible;
   }
-  body { width: 210mm; margin: 0 auto; overflow-x: hidden; }
   .page-scale-host {
-    width: 210mm;
+    width: 100%;
+    max-width: 194mm;
     margin: 0 auto;
-    overflow: hidden;
+    overflow: visible;
   }
   .page {
     position: relative;
-    padding: 0 1mm 1mm;
-    width: 210mm;
-    max-width: 210mm;
+    padding: 0 2mm 2mm 3mm;
+    width: 100%;
+    max-width: 100%;
   }
   .watermark {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
@@ -395,12 +397,14 @@ export function buildA4InvoiceHtml(
     flex-shrink: 0;
     text-align: left;
     align-self: flex-start;
-    line-height: 1.65;
-    padding-left: 2px;
+    line-height: 1.55;
+    padding-left: 4px;
+    padding-right: 2px;
+    max-width: 42%;
   }
   .meta-invoice-info > div { white-space: nowrap; }
   table.items {
-    width: 100%; border-collapse: collapse; margin: 4px 0 6px;
+    width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; margin: 4px 0 6px;
     font-size: 10.5px;
   }
   table.items thead th {
@@ -413,7 +417,15 @@ export function buildA4InvoiceHtml(
     border: 1px solid #ccc; padding: 3px 3px; text-align: center; vertical-align: top;
   }
   table.items tbody tr:nth-child(even) { background: #fafafa; }
-  table.items td.name { text-align: right; font-weight: 700; min-width: 180px; vertical-align: top; }
+  table.items td.name { text-align: right; font-weight: 700; vertical-align: top; word-wrap: break-word; overflow-wrap: anywhere; }
+  table.items th:nth-child(1), table.items td:nth-child(1) { width: 4%; }
+  table.items th:nth-child(2), table.items td:nth-child(2) { width: 11%; }
+  table.items th:nth-child(3), table.items td:nth-child(3) { width: 28%; }
+  table.items th:nth-child(4), table.items td:nth-child(4) { width: 6%; }
+  table.items th:nth-child(5), table.items td:nth-child(5) { width: 7%; }
+  table.items th:nth-child(6), table.items td:nth-child(6) { width: 12%; }
+  table.items th:nth-child(7), table.items td:nth-child(7) { width: 12%; }
+  table.items th:nth-child(8), table.items td:nth-child(8) { width: 12%; }
   table.items td.name .name-main { font-weight: 800; font-size: 10.5px; line-height: 1.25; }
   table.items td.name .item-specs {
     margin-top: 2px; font-size: 8px; font-weight: 600; color: #333;
@@ -421,10 +433,10 @@ export function buildA4InvoiceHtml(
   }
   table.items td.name .item-specs div { margin: 0; }
   table.items td.sku { font-family: monospace; font-weight: 700; direction: ltr; vertical-align: top; }
-  table.items td.notes { font-size: 10px; color: #444; text-align: right; max-width: 100px; vertical-align: top; }
+  table.items td.notes { font-size: 9px; color: #444; text-align: right; vertical-align: top; word-wrap: break-word; }
   .summary {
-    display: grid; grid-template-columns: 1.1fr 0.9fr 1fr; gap: 8px;
-    align-items: start; margin-bottom: 6px;
+    display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px;
+    align-items: start; margin-bottom: 6px; max-width: 100%;
   }
   .balance-box { font-size: 10.5px; font-weight: 700; line-height: 1.55; }
   .balance-box .row { display: flex; justify-content: space-between; gap: 8px; }
@@ -459,8 +471,8 @@ export function buildA4InvoiceHtml(
   .terms li { margin-bottom: 1px; break-inside: avoid; }
   .terms .term-num { color: ${STORE.brandRed}; font-weight: 800; margin-left: 4px; }
   .footer-mid { min-height: 0; }
-  .barcode-wrap { text-align: center; }
-  .barcode-wrap svg { max-width: 88px; height: auto; transform: rotate(90deg); margin: 2px auto; display: block; }
+  .barcode-wrap { text-align: center; max-width: 100%; overflow: hidden; }
+  .barcode-wrap svg { max-width: 72px; height: auto; transform: rotate(90deg); margin: 2px auto; display: block; }
   .barcode-id { font-family: monospace; font-weight: 900; font-size: 10px; direction: ltr; color: ${STORE.brandRed}; }
   .disclaimer { font-size: 8px; color: #555; margin-top: 3px; font-weight: 600; }
   .footer-website {
@@ -492,15 +504,16 @@ export function buildA4InvoiceHtml(
   }
   @media print {
     html, body {
-      width: 210mm;
+      width: 100%;
       height: auto;
       margin: 0;
-      overflow: hidden;
+      overflow: visible;
     }
-    .page-scale-host { overflow: visible; }
+    .page-scale-host { max-width: 100%; overflow: visible; }
     .page {
       page-break-after: avoid;
       break-after: avoid-page;
+      padding: 0 1mm 1mm 2mm;
     }
   }
 </style>
@@ -521,7 +534,7 @@ export function buildA4InvoiceHtml(
       <p class="banner-motto">${STORE.motto}</p>
     </div>
     <div class="banner-qr">
-      ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR" width="92" height="92"/>` : ""}
+      ${qrDataUrl ? `<img src="${qrDataUrl}" alt="QR" width="72" height="72"/>` : ""}
       <div class="banner-invoice-no"><span>Invoice :</span> #${invoiceNo}</div>
     </div>
   </header>
@@ -610,23 +623,27 @@ export function buildA4InvoiceHtml(
 </div>
 </div>
 <script>
-  /** Shrink entire invoice to fit A4 printable height (works for old + new orders). */
+  /** Fit invoice inside printable A4 — scale host (not clip edges). */
   function fitInvoiceToSinglePage() {
     var page = document.getElementById('invoice-page');
     var host = document.getElementById('invoice-scale-host');
-    if (!page || !host) return;
-    page.style.transform = 'none';
-    page.style.marginBottom = '0';
+    if (!page || !host) return 1;
+    host.style.transform = 'none';
+    host.style.width = '100%';
     host.style.height = 'auto';
-    var maxPx = 1045;
-    var h = page.scrollHeight || page.getBoundingClientRect().height;
-    if (h <= maxPx) return;
-    var scale = maxPx / h;
-    if (scale < 0.72) scale = 0.72;
-    page.style.transform = 'scale(' + scale + ')';
-    page.style.transformOrigin = 'top center';
-    host.style.height = Math.ceil(h * scale) + 'px';
-    page.style.marginBottom = Math.ceil(h * (scale - 1)) + 'px';
+    document.body.style.height = 'auto';
+
+    var maxH = 980;
+    var h = page.getBoundingClientRect().height || page.scrollHeight;
+    var scale = h > maxH ? maxH / h : 1;
+    if (scale < 0.75) scale = 0.75;
+    if (scale >= 0.999) return 1;
+
+    host.style.transform = 'scale(' + scale + ')';
+    host.style.transformOrigin = 'top center';
+    host.style.width = (100 / scale) + '%';
+    document.body.style.height = Math.ceil(h * scale + 8) + 'px';
+    return scale;
   }
   window.onload = function() {
     setTimeout(function() {
