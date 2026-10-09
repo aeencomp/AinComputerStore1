@@ -1,0 +1,67 @@
+# Daily: download fresh prices/stock from Global Iraq (GitHub IP), push cache to VPS, run sync.
+name: Daily Global Iraq catalog sync
+
+on:
+  schedule:
+    # 03:00 UTC ≈ 06:00 Baghdad — once per day
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: daily-global-catalog
+  cancel-in-progress: false
+
+jobs:
+  refresh-and-sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - run: npm ci --no-audit --no-fund
+
+      - name: Fetch latest Global Iraq catalog
+        run: npm run build:global-cache
+
+      - name: Prepare cache upload
+        run: |
+          mkdir -p upload-catalog
+          cp data/globaliraq-catalog-cache.json upload-catalog/
+          echo "Bytes: $(wc -c < upload-catalog/globaliraq-catalog-cache.json)"
+
+      - name: Upload catalog cache to VPS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          source: "upload-catalog/globaliraq-catalog-cache.json"
+          target: /home/deploy/AinComputerStore/data
+          overwrite: true
+
+      - name: Run price and stock sync on VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST || vars.VPS_HOST }}
+          username: ${{ secrets.VPS_USER || vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY || vars.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || vars.VPS_PORT || '22' }}
+          timeout: 120s
+          command_timeout: 20m
+          script: |
+            set -e
+            APP=/home/deploy/AinComputerStore
+            chown deploy:deploy "$APP/data/globaliraq-catalog-cache.json" 2>/dev/null || true
+            PORT=$(grep -E '^PORT=' "$APP/.env" 2>/dev/null | cut -d= -f2 | tr -d '\r' || echo 5000)
+            echo "Triggering catalog sync on port ${PORT}..."
+            curl -sf -X POST "http://127.0.0.1:${PORT}/api/internal/catalog-sync" || {
+              echo "API trigger failed — sync will run on next 24h scheduler tick"
+              exit 0
+            }
+            echo "Sync started."

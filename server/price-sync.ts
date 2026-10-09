@@ -157,6 +157,12 @@ function shouldUseLiveGlobalIraqFetch(): boolean {
   return process.env.GLOBALIRAQ_LIVE_FETCH === "1";
 }
 
+/** Drop in-memory cache so the next sync reads the latest file from disk (daily GitHub upload). */
+export function reloadGlobalCatalogCacheFromDisk(): void {
+  cachedGlobalProducts = null;
+  loadGlobalCatalogCacheFromDisk();
+}
+
 export function loadGlobalCatalogCacheFromDisk(): void {
   try {
     const cachePath = resolveCatalogCacheFilePath();
@@ -872,6 +878,7 @@ async function applyGlobalPriceToExisting(
     price: string | null;
     oldPrice?: string | null;
     inStock?: number | null;
+    stockQuantity?: number | null;
   },
   globalProduct: ShopifyProduct,
   variant: ShopifyVariant,
@@ -897,6 +904,10 @@ async function applyGlobalPriceToExisting(
   const nextInStock = globalVariantInStock(variant, globalProduct) ? 1 : 0;
   const currentInStock = existing.inStock === 0 ? 0 : 1;
   const needsStockUpdate = currentInStock !== nextInStock;
+  const currentQty = existing.stockQuantity ?? 0;
+  const nextQty = nextInStock ? Math.max(1, currentQty) : 0;
+  const needsStockQtyUpdate =
+    nextInStock === 1 ? currentQty < 1 : currentQty !== 0;
   const nextCategory = options?.category;
   const needsCategoryUpdate =
     !!nextCategory && nextCategory !== existing.category;
@@ -910,6 +921,7 @@ async function applyGlobalPriceToExisting(
     needsSku ||
     needsOldPriceUpdate ||
     needsStockUpdate ||
+    needsStockQtyUpdate ||
     needsCategoryUpdate ||
     needsStableSku
   ) {
@@ -919,7 +931,7 @@ async function applyGlobalPriceToExisting(
         price: markedUpPrice.toString(),
         oldPrice: nextOldPrice,
         inStock: nextInStock,
-        stockQuantity: nextInStock ? 1 : 0,
+        stockQuantity: nextQty,
         ...(needsCategoryUpdate && { category: nextCategory }),
         ...((needsStableSku || needsSku) &&
           stableSku && { sku: stableSku }),
@@ -930,6 +942,7 @@ async function applyGlobalPriceToExisting(
       needsPriceUpdate ||
       needsOldPriceUpdate ||
       needsStockUpdate ||
+      needsStockQtyUpdate ||
       needsCategoryUpdate ||
       needsStableSku
     ) {
@@ -1658,6 +1671,7 @@ export async function syncAllCatalogPrices(options?: {
 
   try {
     console.log("[Catalog Sync] Starting catalog sync…");
+    reloadGlobalCatalogCacheFromDisk();
 
     const catalogProducts = await fetchAllGlobalIraqProducts(
       options?.forceRefresh === true,
@@ -1762,6 +1776,7 @@ export async function syncAllCatalogPrices(options?: {
               price: existing.price,
               oldPrice: existing.oldPrice,
               inStock: existing.inStock,
+              stockQuantity: existing.stockQuantity,
             },
             globalProduct,
             variant,
@@ -1895,6 +1910,8 @@ export async function syncAllCatalogPrices(options?: {
       syncLog.status = "success";
       syncLog.progress = undefined;
       syncLog.processedCount = syncableGlobal.length;
+      syncLog.lastSync = new Date();
+      syncLog.nextSync = new Date(Date.now() + SYNC_INTERVAL_MS);
       console.log(
         `[Catalog Sync] Complete. Added: ${created}, Matched: ${matched}, Updated: ${updated}, Errors: ${syncLog.errors.length}`,
       );
@@ -1939,26 +1956,27 @@ export function startPriceSync() {
   }, 30_000);
 
   console.log(
-    `[Price Sync] Scheduling full catalog sync every 24 hours (live Global Iraq fetch: ${shouldUseLiveGlobalIraqFetch() ? "on" : "off — using deploy cache"})`,
+    `[Price Sync] Automatic sync every 24h — all Global Iraq items, prices + in-stock (cache refreshed daily via GitHub Actions)`,
   );
 
   syncLog.nextSync = new Date(Date.now() + SYNC_INTERVAL_MS);
 
-  syncInterval = setInterval(async () => {
-    try {
-      await syncAllCatalogPrices();
-    } catch (err) {
-      console.error("[Price Sync] Scheduled sync error:", err);
-    }
-  }, SYNC_INTERVAL_MS);
-
-  initialTimeout = setTimeout(async () => {
+  const runScheduledSync = async (label: string) => {
+    console.log(`[Price Sync] ${label} — full catalog (prices + availability)`);
     try {
       await syncAllCatalogPrices({ forceRefresh: false });
     } catch (err) {
-      console.error("[Price Sync] Initial sync error:", err);
+      console.error(`[Price Sync] ${label} error:`, err);
     }
-  }, 25 * 60 * 1000);
+  };
+
+  syncInterval = setInterval(() => {
+    void runScheduledSync("Scheduled 24h sync");
+  }, SYNC_INTERVAL_MS);
+
+  initialTimeout = setTimeout(() => {
+    void runScheduledSync("Initial sync (~30 min after server start)");
+  }, 30 * 60 * 1000);
 }
 
 export function stopPriceSync() {

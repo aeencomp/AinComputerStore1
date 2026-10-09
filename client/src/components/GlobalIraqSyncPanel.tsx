@@ -220,8 +220,8 @@ export function GlobalIraqSyncPanel({ className }: { className?: string }) {
           </CardTitle>
           <CardDescription>
             {language === "ar"
-              ? "GitHub يحمّل الكatalog تلقائياً — «مزامنة الآن» تطبّق الأسعار على متجرك (بدون طلبات من VPS إلى Global Iraq)"
-              : "GitHub downloads the catalog on deploy — Sync now applies prices to your store"}
+              ? "تحديث تلقائي كل 24 ساعة (أسعار + توفر) — GitHub يحمّل كatalog Global Iraq يومياً، والخادم يطبّقه على المتجر"
+              : "Auto sync every 24h (price + stock) — GitHub refreshes the catalog daily, server applies to your store"}
           </CardDescription>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">
