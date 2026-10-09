@@ -284,7 +284,7 @@ function PriceSyncCard() {
             مزامنة الأسعار - GlobalIraq
           </CardTitle>
           <CardDescription>
-            مزامنة جميع منتجات GlobalIraq (تحديث الأسعار وإضافة الجديد) كل 6 ساعات
+            مزامنة جميع منتجات GlobalIraq (يشمل برامج /software) — تلقائياً كل 24 ساعة
           </CardDescription>
         </div>
         <Button

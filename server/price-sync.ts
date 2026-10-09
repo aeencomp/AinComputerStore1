@@ -2,10 +2,12 @@ import { db } from "./db";
 import { products } from "@shared/schema";
 import { eq } from "drizzle-orm";
 
-const SYNC_INTERVAL_MS = 6 * 60 * 60 * 1000;
+const SYNC_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const SYNC_STALE_MS = 15 * 60 * 1000;
 const MARKUP_PERCENTAGE = 0;
 const GLOBALIRAQ_API = "https://globaliraq.iq/products.json?limit=250";
+const GLOBALIRAQ_SOFTWARE_COLLECTION =
+  "https://globaliraq.iq/collections/software/products.json?limit=250";
 const MAX_PAGES = 50;
 const PAGE_DELAY_MS = 2800;
 const GLOBAL_PRODUCTS_CACHE_MS = 15 * 60 * 1000;
@@ -15,6 +17,8 @@ let cachedGlobalProducts: { fetchedAt: number; products: ShopifyProduct[] } | nu
   null;
 let globalProductsFetchPromise: Promise<ShopifyProduct[]> | null = null;
 let lastGlobalIraqRateLimitAt = 0;
+/** Handles from globaliraq.iq/collections/software — always mapped to `programs`. */
+let softwareCollectionHandles = new Set<string>();
 
 const LAPTOP_CATEGORIES = [
   "laptops",
@@ -232,6 +236,55 @@ async function fetchAllGlobalIraqProducts(
   return globalProductsFetchPromise;
 }
 
+async function fetchSoftwareCollectionProducts(): Promise<ShopifyProduct[]> {
+  const collectionProducts: ShopifyProduct[] = [];
+  try {
+    for (let page = 1; page <= 10; page++) {
+      const url = `${GLOBALIRAQ_SOFTWARE_COLLECTION}&page=${page}`;
+      const data = await fetchJSON(url);
+      const pageProducts: ShopifyProduct[] = data.products || [];
+      if (pageProducts.length === 0) break;
+      collectionProducts.push(...pageProducts);
+      if (pageProducts.length < 250) break;
+      const jitter = Math.floor(Math.random() * 800);
+      await sleep(PAGE_DELAY_MS + jitter);
+    }
+    softwareCollectionHandles = new Set(
+      collectionProducts.map((p) => p.handle).filter(Boolean),
+    );
+    console.log(
+      `[Catalog Sync] Software collection: ${collectionProducts.length} products (${softwareCollectionHandles.size} handles)`,
+    );
+  } catch (err: any) {
+    console.warn(
+      `[Catalog Sync] Software collection fetch failed: ${err.message}`,
+    );
+  }
+  return collectionProducts;
+}
+
+function mergeGlobalProductLists(
+  catalog: ShopifyProduct[],
+  softwareCollection: ShopifyProduct[],
+): ShopifyProduct[] {
+  const byHandle = new Map<string, ShopifyProduct>();
+  for (const p of catalog) {
+    if (p.handle) byHandle.set(p.handle, p);
+  }
+  for (const p of softwareCollection) {
+    if (p.handle) byHandle.set(p.handle, p);
+  }
+  return [...byHandle.values()];
+}
+
+function isGlobalSoftwareProduct(product: ShopifyProduct): boolean {
+  if (product.handle && softwareCollectionHandles.has(product.handle)) {
+    return true;
+  }
+  const type = (product.product_type || "").trim();
+  return type === "Software" || type === "Operating Systems";
+}
+
 function globalPriceToStorePrice(rawPrice: string): number | null {
   const globalPrice = parseFloat(rawPrice);
   if (isNaN(globalPrice) || globalPrice <= 0) return null;
@@ -297,7 +350,17 @@ function mapGlobalProductToCategory(product: ShopifyProduct): string {
   if (/psu|power supply/i.test(typeL)) return "psu";
   if (/processor|cpu/i.test(typeL)) return "processors";
   if (/case|chassis|cooling|fan/i.test(typeL)) return "pc-components";
-  if (/software|windows|office|antivirus|program/i.test(`${typeL} ${titleL}`)) {
+
+  if (isGlobalSoftwareProduct(product)) {
+    return "programs";
+  }
+  if (
+    /^(software|operating systems)$/i.test(type) ||
+    (/license key|activation code|antivirus|microsoft office|adobe |autodesk|windows 11|windows 10|macos/i.test(
+      titleL,
+    ) &&
+      !/laptop|keyboard|mouse|monitor|printer|headset/i.test(titleL))
+  ) {
     return "programs";
   }
 
@@ -1018,8 +1081,13 @@ export async function syncAllCatalogPrices(options?: {
   try {
     console.log("[Catalog Sync] Starting full catalog sync from globaliraq.iq...");
 
-    const allGlobalProducts = await fetchAllGlobalIraqProducts(
+    const catalogProducts = await fetchAllGlobalIraqProducts(
       options?.forceRefresh === true,
+    );
+    const softwareProducts = await fetchSoftwareCollectionProducts();
+    const allGlobalProducts = mergeGlobalProductLists(
+      catalogProducts,
+      softwareProducts,
     );
     const syncableGlobal = allGlobalProducts.filter((product) => {
       const variant = getPrimaryVariant(product);
@@ -1080,6 +1148,15 @@ export async function syncAllCatalogPrices(options?: {
           }
           matchedOurIds.add(existing.id);
           matched++;
+          if (
+            categoryForNew === "programs" &&
+            existing.category !== "programs"
+          ) {
+            await db
+              .update(products)
+              .set({ category: "programs" })
+              .where(eq(products.id, existing.id));
+          }
           const result = await applyGlobalPriceToExisting(
             {
               id: existing.id,
@@ -1216,16 +1293,15 @@ export function startPriceSync() {
   if (schedulerStarted) {
     return;
   }
-  // Off by default — enable in VPS .env: PRICE_SYNC_SCHEDULER=1 (manual sync via admin always works)
-  if (process.env.PRICE_SYNC_SCHEDULER !== "1") {
+  if (process.env.PRICE_SYNC_SCHEDULER === "0") {
     console.log(
-      "[Price Sync] Automatic scheduler disabled (set PRICE_SYNC_SCHEDULER=1 in .env to enable)",
+      "[Price Sync] Automatic scheduler disabled (PRICE_SYNC_SCHEDULER=0)",
     );
     return;
   }
   schedulerStarted = true;
 
-  console.log("[Price Sync] Scheduling price sync every 6 hours");
+  console.log("[Price Sync] Scheduling full catalog sync every 24 hours");
 
   syncLog.nextSync = new Date(Date.now() + SYNC_INTERVAL_MS);
 
