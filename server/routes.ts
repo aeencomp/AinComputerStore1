@@ -9,6 +9,7 @@ import { sendOrderConfirmationEmail } from "./utils/email";
 import {
   sendTicketCreatedMessage,
   sendTicketUpdatedMessage,
+  deliverQueuedRepairPolicyVoice,
   sendWhatsAppMessage,
   sendWhatsAppTemplate,
   sendDailyRevenueWhatsApp,
@@ -18,6 +19,10 @@ import {
   recordWhatsAppDeliveryEvent,
   whatsappDeliveryEvents,
 } from "./whatsapp";
+import {
+  resolveRepairPolicyVoiceMp3Path,
+  resolveRepairPolicyVoiceOggPath,
+} from "./repair-policy-voice";
 import {
   baghdadDateString,
   buildDailyRevenueWhatsAppMessage,
@@ -4738,6 +4743,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
               formattedTo: whatsappResult.formattedTo,
               deliveryMethod: whatsappResult.deliveryMethod,
               templateName: whatsappResult.templateName,
+              policyTerms: whatsappResult.policyTerms
+                ? {
+                    success: whatsappResult.policyTerms.success,
+                    messageId: whatsappResult.policyTerms.messageId,
+                    error: whatsappResult.policyTerms.error,
+                    errorCode: whatsappResult.policyTerms.errorCode,
+                  }
+                : undefined,
               policyVoice: whatsappResult.policyVoice
                 ? {
                     success: whatsappResult.policyVoice.success,
@@ -4760,6 +4773,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(500).json({ error: "Failed to create repair ticket" });
     }
   }
+
+  /** Public audio for WhatsApp Cloud API link-based policy voice messages. */
+  app.get("/api/public/repair-policy-voice.ogg", (req, res) => {
+    const filePath = resolveRepairPolicyVoiceOggPath();
+    if (!filePath) return res.status(404).send("Not found");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.type("audio/ogg");
+    return res.sendFile(path.resolve(filePath));
+  });
+
+  app.get("/api/public/repair-policy-voice.mp3", (req, res) => {
+    const filePath = resolveRepairPolicyVoiceMp3Path();
+    if (!filePath) return res.status(404).send("Not found");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.type("audio/mpeg");
+    return res.sendFile(path.resolve(filePath));
+  });
 
   /** Public website repair form — always tagged as online regardless of session cookies. */
   app.post("/api/public/repair-requests", async (req, res) => {
@@ -10578,9 +10608,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           error: templateResult.error,
           errorCode: templateResult.errorCode,
         },
+        policyTerms: templateResult.policyTerms ?? null,
         policyVoice: templateResult.policyVoice ?? null,
         recentDeliveryEvents: whatsappDeliveryEvents.slice(0, 10),
-        hint: 'Check customer WhatsApp for template then voice/audio. In Admin «تشخيص واتساب» confirm oggFound: true.',
+        hint: 'Expect 2-3 messages: ticket created, policy template, voice. If voice missing, reply to WhatsApp from test phone — voice sends when customer opens chat.',
       });
     } catch (err: any) {
       return res.status(500).json({ error: err.message });
@@ -11182,6 +11213,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (msg.type === 'reaction') continue;
 
             const from = msg.from; // phone in international format e.g. 9647850006977
+
+            const queuedVoice = await deliverQueuedRepairPolicyVoice(from);
+            if (queuedVoice?.success) {
+              console.log(
+                `Repair policy voice note delivered after customer message from ${from} (msgId=${queuedVoice.messageId ?? 'n/a'})`,
+              );
+            } else if (queuedVoice && !queuedVoice.success) {
+              console.warn(
+                `Queued repair policy voice failed for ${from} (code=${queuedVoice.errorCode ?? 'n/a'}): ${queuedVoice.error}`,
+              );
+            }
 
             const autoReply =
               'عذراً، هذا الخط مخصص للرسائل الصادرة فقط. للتواصل معنا يرجى الاتصال على: 07850006977. ' +

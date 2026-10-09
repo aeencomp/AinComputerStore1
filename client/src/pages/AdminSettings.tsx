@@ -607,6 +607,37 @@ export default function AdminSettings() {
                       >
                         {whatsappTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : (language === 'ar' ? 'اختبار' : 'Test')}
                       </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        disabled={whatsappTesting || !whatsappTestPhone.trim()}
+                        onClick={async () => {
+                          setWhatsappTesting(true);
+                          setWhatsappTestResult(null);
+                          try {
+                            const res = await apiRequest('POST', '/api/admin/whatsapp/test-repair-policy-voice', { to: whatsappTestPhone.trim() });
+                            const data = await res.json();
+                            const voice = data.policyVoice;
+                            const terms = data.template;
+                            if (data.ok) {
+                              setWhatsappTestResult({
+                                ok: true,
+                                message: language === 'ar'
+                                  ? `تم إرسال إنشاء التذكرة. سياسة: ${terms?.success ? 'نعم' : 'لا'} | صوت: ${voice?.success ? 'قبل Meta' : voice?.deliveryWarning || voice?.error || 'فشل'} — ردّ على واتساب من نفس الرقم لتسليم الصوت إن لم يصل.`
+                                  : `Ticket flow sent. Policy template: ${terms?.success ? 'yes' : 'no'} | Voice: ${voice?.success ? 'accepted' : voice?.deliveryWarning || voice?.error || 'failed'} — reply on WhatsApp from that number if voice missing.`,
+                              });
+                            } else {
+                              setWhatsappTestResult({ ok: false, message: data.error || terms?.error || 'Failed' });
+                            }
+                          } catch (e: any) {
+                            setWhatsappTestResult({ ok: false, message: e.message });
+                          } finally {
+                            setWhatsappTesting(false);
+                          }
+                        }}
+                      >
+                        {language === 'ar' ? 'اختبار صوت السياسة' : 'Test policy voice'}
+                      </Button>
                     </div>
                     {whatsappTestResult && (
                       <p className={`text-sm font-medium ${whatsappTestResult.ok ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`} data-testid="text-whatsapp-test-result">

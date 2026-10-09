@@ -11,6 +11,10 @@ export const REPAIR_POLICY_VOICE_SCRIPT_AR =
   "الأجهزة غير المستلمة خلال ثلاثين يوماً لا نتحمل مسؤوليتها. " +
   "شكراً لزيارتكم.";
 
+/** For approved WhatsApp templates (param 4 / notes — no newlines). */
+export const REPAIR_POLICY_WHATSAPP_TEXT =
+  "سياسة الصيانة: أقل من 25000 د.ع بدون اتصال. رفض بعد التشخيص 10000 د.ع. المدة 24-48 ساعة. احتفظ بالإيصال. غير المستلم خلال 30 يوماً على مسؤوليتكم. شكراً لزيارتكم.";
+
 const VOICE_OGG_REL = path.join("data", "whatsapp", "repair-policy-ar.ogg");
 const VOICE_MP3_REL = path.join("data", "whatsapp", "repair-policy-ar.mp3");
 
