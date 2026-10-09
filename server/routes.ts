@@ -421,7 +421,10 @@ async function getOnlineInventoryMatches(product: any) {
 
 function onlineStockInfoFromMatches(product: any, matches: Awaited<ReturnType<typeof getOnlineInventoryMatches>>) {
   if (matches.length === 0) {
-    const fallbackQty = product?.stockQuantity || 0;
+    let fallbackQty = product?.stockQuantity || 0;
+    if (fallbackQty <= 0 && (product.inStock === 1 || product.inStock === true)) {
+      fallbackQty = 1;
+    }
     return {
       hasLocationStock: false,
       totalStock: fallbackQty,

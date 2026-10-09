@@ -85,7 +85,13 @@ interface ShopifyProduct {
 
 const GLOBAL_LAPTOP_TYPES = ["Gaming Laptop", "Office Laptop"];
 
-const GLOBAL_DESKTOP_TYPES = ["All in One", "all in one", "Desktop System"];
+const GLOBAL_DESKTOP_TYPES = [
+  "All in One",
+  "all in one",
+  "Desktop System",
+  "Desktop Computers",
+  "Barebone Computers",
+];
 
 export interface SyncProductEntry {
   id: string;
@@ -580,8 +586,48 @@ function mapGlobalProductToCategory(product: ShopifyProduct): string {
   if (isGlobalIraqLaptop(product)) {
     return globalLaptopCategory(type);
   }
-  if (isGlobalIraqDesktop(product)) {
+  if (
+    isGlobalIraqDesktop(product) ||
+    /desktop system|desktop computers|barebone computers|server/i.test(typeL)
+  ) {
     return globalDesktopCategory(product);
+  }
+
+  const typeRules: Array<[RegExp, string]> = [
+    [/gaming monitors/i, "gaming-monitors"],
+    [/office monitors|auxiliary monitors/i, "office-monitors"],
+    [/designer monitors|extender monitor/i, "monitors"],
+    [/gaming laptop/i, "gaming-laptops"],
+    [/office laptop/i, "business-laptops"],
+    [/inkjet printer/i, "inkjet-printers"],
+    [/laser printer/i, "laser-printers"],
+    [/^printer$/i, "printers"],
+    [/mechanical keyboard|office keyboard|magnetic keyboard|keyboards/i, "keyboards"],
+    [/gaming mouse|wireless mouse|wired mouse|wireless office mouse|wired office mouse/i, "mice"],
+    [/wireless headset|wired headset|airpods|speakers/i, "headphones"],
+    [/microphones|neck microphones/i, "headphones"],
+    [/webcams?|security camera|dash cam|camera$/i, "webcams"],
+    [/backpack|bag/i, "bags"],
+    [/charger|power bank|adapters|adapter/i, "chargers"],
+    [/cables|ethernet cable|hub switch|wi-fi/i, "cables"],
+    [/nvme|external ssd|ssd sata/i, "ssd"],
+    [/internal hdd|external hdd/i, "hdd"],
+    [/desktop memory|laptop memory|^memory$/i, "ram"],
+    [/liquid coolers|air coolers|water coolers|fan kit|coolers|thermal paste|thermal pad|gas coolers/i, "cooling"],
+    [/mid-tower|full-tower|m-atx|atx/i, "cases"],
+    [/graphics cards|geforce|^5070|^5080|^5090|^5060|^5050|^3050|quadro|9070/i, "gpu"],
+    [/ryzen|intel \d|processors|^cpu/i, "processors"],
+    [/motherboards|^z890|^b760|^b860|^x870|^h610|^b650|^b550|^b450|^z790|^z490|^trx40/i, "motherboards"],
+    [/850w|1000w|1200w|650w|750w|1100w|1250w|psu|power supply|power strip/i, "psu"],
+    [/printing filament|3d printers/i, "miscellaneous"],
+    [/toner|cartridge|drum|ink/i, "printer-accessories"],
+    [/scanner|signature pad|paper shredder/i, "printers"],
+    [/tablet|television|tv box|ipad keyboard/i, "miscellaneous"],
+    [/ups|battery|nano dc ups/i, "miscellaneous"],
+    [/software|operating systems/i, "programs"],
+  ];
+  for (const [re, cat] of typeRules) {
+    if (re.test(type) || re.test(typeL)) return cat;
   }
 
   if (/monitor|display|شاش/i.test(typeL)) return "monitors";
@@ -831,6 +877,7 @@ async function applyGlobalPriceToExisting(
   variant: ShopifyVariant,
   markedUpPrice: number,
   log: SyncLog,
+  options?: { category?: string; stableSku?: string },
 ): Promise<"updated" | "matched"> {
   const rawStoredPrice = parseFloat(existing.price?.toString() || "0");
   const currentPrice = normalizeOurStoredPrice(existing.price);
@@ -850,19 +897,42 @@ async function applyGlobalPriceToExisting(
   const nextInStock = globalVariantInStock(variant, globalProduct) ? 1 : 0;
   const currentInStock = existing.inStock === 0 ? 0 : 1;
   const needsStockUpdate = currentInStock !== nextInStock;
+  const nextCategory = options?.category;
+  const needsCategoryUpdate =
+    !!nextCategory && nextCategory !== existing.category;
+  const stableSku = options?.stableSku;
+  const needsStableSku =
+    !!stableSku &&
+    existing.sku?.trim().toLowerCase() !== stableSku.toLowerCase();
 
-  if (needsPriceUpdate || needsSku || needsOldPriceUpdate || needsStockUpdate) {
+  if (
+    needsPriceUpdate ||
+    needsSku ||
+    needsOldPriceUpdate ||
+    needsStockUpdate ||
+    needsCategoryUpdate ||
+    needsStableSku
+  ) {
     await db
       .update(products)
       .set({
         price: markedUpPrice.toString(),
         oldPrice: nextOldPrice,
         inStock: nextInStock,
-        ...(needsSku && { sku }),
+        stockQuantity: nextInStock ? 1 : 0,
+        ...(needsCategoryUpdate && { category: nextCategory }),
+        ...((needsStableSku || needsSku) &&
+          stableSku && { sku: stableSku }),
       })
       .where(eq(products.id, existing.id));
 
-    if (needsPriceUpdate || needsOldPriceUpdate || needsStockUpdate) {
+    if (
+      needsPriceUpdate ||
+      needsOldPriceUpdate ||
+      needsStockUpdate ||
+      needsCategoryUpdate ||
+      needsStableSku
+    ) {
       log.updatedProducts.push(
         toSyncProductEntry(
           {
@@ -905,26 +975,66 @@ function toSyncProductEntry(
   };
 }
 
+function globalIraqStableSku(
+  globalProduct: ShopifyProduct,
+  variant: ShopifyVariant | null,
+): string {
+  const variantSku = variant?.sku?.trim();
+  if (variantSku) return variantSku;
+  if (globalProduct.handle?.trim()) {
+    return `globaliraq:${globalProduct.handle.trim()}`;
+  }
+  return `globaliraq:title-${normalizeGenericTitle(globalProduct.title).slice(0, 80)}`;
+}
+
 function findOurProductForGlobal(
   globalProduct: ShopifyProduct,
   ourProducts: { id: string; nameEn: string; sku: string | null; category?: string; price?: string | null }[],
   ourSkuIndex: Map<string, (typeof ourProducts)[number]>,
-  matcher: (ourName: string, globals: ShopifyProduct[]) => ShopifyProduct | null = matchProducts,
+  _matcher: (ourName: string, globals: ShopifyProduct[]) => ShopifyProduct | null = matchProducts,
 ): (typeof ourProducts)[number] | null {
   const variant = getPrimaryVariant(globalProduct);
-  const sku = variant?.sku?.trim().toLowerCase();
-  if (sku) {
-    const bySku = ourSkuIndex.get(sku);
-    if (bySku) return bySku;
+  const stableSku = globalIraqStableSku(globalProduct, variant).toLowerCase();
+  const byStable = ourSkuIndex.get(stableSku);
+  if (byStable) return byStable;
+
+  if (globalProduct.handle) {
+    const handle = globalProduct.handle.trim().toLowerCase();
+    const byHandle = ourSkuIndex.get(handle);
+    if (byHandle) return byHandle;
+    const byGiq = ourSkuIndex.get(`globaliraq:${handle}`);
+    if (byGiq) return byGiq;
   }
 
+  const variantSku = variant?.sku?.trim().toLowerCase();
+  if (variantSku) {
+    const byVariant = ourSkuIndex.get(variantSku);
+    if (byVariant) return byVariant;
+  }
+
+  const titleKey = normalizeGenericTitle(globalProduct.title);
   for (const ourProduct of ourProducts) {
-    if (!ourProduct.nameEn) continue;
-    const match = matcher(ourProduct.nameEn, [globalProduct]);
-    if (match) return ourProduct;
+    if (ourProduct.nameEn && normalizeGenericTitle(ourProduct.nameEn) === titleKey) {
+      return ourProduct;
+    }
   }
 
   return null;
+}
+
+function sameGlobalListing(
+  existing: { sku: string | null },
+  globalProduct: ShopifyProduct,
+  variant: ShopifyVariant | null,
+): boolean {
+  const stable = globalIraqStableSku(globalProduct, variant).toLowerCase();
+  const existingSku = existing.sku?.trim().toLowerCase() || "";
+  if (existingSku === stable) return true;
+  if (globalProduct.handle) {
+    const h = globalProduct.handle.trim().toLowerCase();
+    if (existingSku === h || existingSku === `globaliraq:${h}`) return true;
+  }
+  return false;
 }
 
 function extractFullModelCode(name: string): string | null {
@@ -1568,9 +1678,12 @@ export async function syncAllCatalogPrices(options?: {
       return globalPriceToStorePrice(variant.price || "") != null;
     });
 
-    syncLog.fetchedCount = syncableGlobal.length;
+    syncLog.fetchedCount = allGlobalProducts.filter((product) => {
+      const variant = getPrimaryVariant(product);
+      return variant && globalPriceToStorePrice(variant.price || "") != null;
+    }).length;
     console.log(
-      `[Catalog Sync] Fetched ${allGlobalProducts.length} products (${syncableGlobal.length} with valid prices)`,
+      `[Catalog Sync] Importing ${syncableGlobal.length} catalog rows (+ software/programs pass) from ${allGlobalProducts.length} Global Iraq products`,
     );
 
     if (syncableGlobal.length === 0) {
@@ -1620,7 +1733,8 @@ export async function syncAllCatalogPrices(options?: {
 
         const categoryForNew = mapGlobalProductToCategory(globalProduct);
         const matcher = resolveMatcherForCategory(categoryForNew);
-        const existing = findOurProductForGlobal(
+        const stableSku = globalIraqStableSku(globalProduct, variant);
+        let existing = findOurProductForGlobal(
           globalProduct,
           ourPool,
           ourSkuIndex,
@@ -1629,19 +1743,16 @@ export async function syncAllCatalogPrices(options?: {
 
         if (existing) {
           if (matchedOurIds.has(existing.id)) {
-            continue;
+            if (sameGlobalListing(existing, globalProduct, variant)) {
+              continue;
+            }
+            existing = null;
           }
+        }
+
+        if (existing) {
           matchedOurIds.add(existing.id);
           matched++;
-          if (
-            categoryForNew === "programs" &&
-            existing.category !== "programs"
-          ) {
-            await db
-              .update(products)
-              .set({ category: "programs" })
-              .where(eq(products.id, existing.id));
-          }
           const result = await applyGlobalPriceToExisting(
             {
               id: existing.id,
@@ -1656,6 +1767,7 @@ export async function syncAllCatalogPrices(options?: {
             variant,
             markedUpPrice,
             syncLog,
+            { category: categoryForNew, stableSku },
           );
           if (result === "updated") updated++;
           continue;
@@ -1671,7 +1783,7 @@ export async function syncAllCatalogPrices(options?: {
 
         const description =
           stripHtml(globalProduct.body_html || "") || globalProduct.title;
-        const sku = variant.sku?.trim() || null;
+        const inStockVal = globalVariantInStock(variant, globalProduct) ? 1 : 0;
 
         const [inserted] = await db
           .insert(products)
@@ -1687,13 +1799,17 @@ export async function syncAllCatalogPrices(options?: {
             images: imageUrls.slice(1),
             specs: specsFromTitle(globalProduct.title),
             badge: "جديد",
-            sku,
-            inStock: globalVariantInStock(variant, globalProduct) ? 1 : 0,
+            sku: stableSku,
+            inStock: inStockVal,
+            stockQuantity: inStockVal ? 1 : 0,
           })
           .returning();
 
         ourPool.push(inserted);
-        if (sku) ourSkuIndex.set(sku.toLowerCase(), inserted);
+        ourSkuIndex.set(stableSku.toLowerCase(), inserted);
+        if (globalProduct.handle) {
+          ourSkuIndex.set(globalProduct.handle.toLowerCase(), inserted);
+        }
 
         syncLog.createdProducts.push(toSyncProductEntry(inserted));
         console.log(
