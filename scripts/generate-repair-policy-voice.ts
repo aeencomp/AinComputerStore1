@@ -14,7 +14,7 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const tts = new MsEdgeTTS();
   await tts.setMetadata(
-    "ar-IQ-BasselNeural",
+    "ar-IQ-RanaNeural",
     OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3,
   );
   const { audioStream } = tts.toStream(REPAIR_POLICY_VOICE_SCRIPT_AR);
