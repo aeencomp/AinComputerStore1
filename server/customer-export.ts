@@ -1,5 +1,6 @@
 import type { Order } from "@shared/schema";
 import { orderIncludedInSalesReport } from "@shared/order-sales";
+import { baghdadDayFromInstant } from "@shared/baghdadDateRange";
 import {
   type AdminCustomerRow,
   formatCustomerExportDate,
@@ -7,10 +8,6 @@ import {
   normalizeContactPhone,
   prepareContactsList,
 } from "./admin-customers";
-
-function baghdadDayFromOrder(iso: string | Date): string {
-  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
-}
 
 export type SalesCustomerOrderFilter = {
   from?: string;
@@ -44,7 +41,7 @@ export function filterOrdersForSalesCustomerList(
       }
     }
     if (filter.from && filter.to) {
-      const day = baghdadDayFromOrder(order.createdAt);
+      const day = baghdadDayFromInstant(order.createdAt);
       if (day < filter.from || day > filter.to) return false;
     }
     return true;

@@ -1,5 +1,29 @@
+const BAGHDAD_TZ = "Asia/Baghdad" as const;
+
 export function baghdadDateKey(d: Date | string = new Date()): string {
-  return new Date(d).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
+  return new Date(d).toLocaleDateString("en-CA", { timeZone: BAGHDAD_TZ });
+}
+
+/** Calendar date in Baghdad for reports, filters, and invoice headers. */
+export function baghdadDayFromInstant(iso: string | Date): string {
+  return baghdadDateKey(iso);
+}
+
+export function formatBaghdadDate(
+  iso: string | Date,
+  locale: string = "ar-IQ",
+): string {
+  return new Date(iso).toLocaleDateString(locale, { timeZone: BAGHDAD_TZ });
+}
+
+export function formatBaghdadTime(
+  iso: string | Date,
+  options: Intl.DateTimeFormatOptions = { hour: "2-digit", minute: "2-digit" },
+): string {
+  return new Date(iso).toLocaleTimeString("ar-IQ", {
+    ...options,
+    timeZone: BAGHDAD_TZ,
+  });
 }
 
 export function baghdadMonthStartKey(): string {

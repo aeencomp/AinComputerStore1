@@ -1,6 +1,7 @@
 /** A4 sales invoice HTML — styled after store invoice template */
 
 import storeLogoSrc from "@assets/aeen-receipt-logo.png";
+import { baghdadDateKey } from "@shared/baghdadDateRange";
 
 export const STORE_WEBSITE = "https://Aeen-Iq.com";
 export const STORE_BRAND_RED = "#c83233";
@@ -199,12 +200,13 @@ export function buildA4InvoiceHtml(
   const discountNum = parseFloat(String(order.discount ?? 0)) || 0;
   const totalNum = parseFloat(String(order.total ?? 0)) || 0;
   const saleDate = new Date(order.createdAt);
-  const dateStr = saleDate.toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" }).replace(/-/g, "/");
+  const baghdadTz = "Asia/Baghdad" as const;
+  const dateStr = baghdadDateKey(order.createdAt).replace(/-/g, "/");
   const timeStr = saleDate.toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     hour12: true,
-    timeZone: "Asia/Baghdad",
+    timeZone: baghdadTz,
   });
   const footerDate = saleDate.toLocaleString("en-US", {
     weekday: "long",
@@ -214,14 +216,14 @@ export function buildA4InvoiceHtml(
     hour: "numeric",
     minute: "2-digit",
     hour12: true,
-    timeZone: "Asia/Baghdad",
+    timeZone: baghdadTz,
   });
   const footerShort = `${dateStr} ${saleDate.toLocaleTimeString("en-GB", {
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
     hour12: false,
-    timeZone: "Asia/Baghdad",
+    timeZone: baghdadTz,
   })}`;
 
   const received =

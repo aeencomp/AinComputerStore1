@@ -41,15 +41,14 @@ import { openA4InvoicePrint, type A4InvoiceOrder } from "@/lib/a4InvoicePrint";
 import {
   addBaghdadDays,
   baghdadDateKey,
+  baghdadDayFromInstant,
   baghdadMonthStartKey,
+  formatBaghdadDate,
+  formatBaghdadTime,
   normalizeBaghdadDateRange,
 } from "@shared/baghdadDateRange";
 import { resolveOrderSalesOwner } from "@shared/salesOrderAttribution";
 import type { SalesShift } from "@shared/schema";
-
-function baghdadDayFromIso(iso: string | Date): string {
-  return new Date(iso).toLocaleDateString("en-CA", { timeZone: "Asia/Baghdad" });
-}
 
 function salesCustomerPhoneKey(raw: string): string {
   const digits = raw.replace(/\D/g, "");
@@ -312,7 +311,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   const revenueByUser = useMemo(() => {
     const totals = new Map<string, { revenue: number; count: number }>();
     for (const order of orders) {
-      const day = baghdadDayFromIso(order.createdAt);
+      const day = baghdadDayFromInstant(order.createdAt);
       if (!dayInBaghdadRange(day, salesRange.from, salesRange.to)) continue;
       if (!orderIncludedInSalesReport(order)) continue;
       const orderType = order.orderType || "online";
@@ -532,7 +531,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     if ((order.salesLocationId ?? 1) !== effectiveSalesLocationId) return false;
 
     if (opts.includeDateRange) {
-      const day = baghdadDayFromIso(order.createdAt);
+      const day = baghdadDayFromInstant(order.createdAt);
       if (!dayInBaghdadRange(day, salesRange.from, salesRange.to)) return false;
     }
 
@@ -560,9 +559,9 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     orderMatchesSharedFilters(order, { includeDateRange: true, restrictToSalesperson: true }),
   );
 
-  /** All customers at this location (any employee); not limited to the logged-in user. */
-  const ordersForCustomerDirectory = orders.filter((order) =>
-    orderMatchesSharedFilters(order, { includeDateRange: false, restrictToSalesperson: false }),
+  /** Period orders at this location for all staff (same date range as the report). */
+  const ordersInPeriodAllStaff = orders.filter((order) =>
+    orderMatchesSharedFilters(order, { includeDateRange: true, restrictToSalesperson: false }),
   );
 
   const activeOrders = filteredOrders.filter(order => orderIncludedInSalesReport(order));
@@ -576,7 +575,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     latestOrder: Order;
   };
   const periodCustomerMap = new Map<string, PeriodCustomerRow>();
-  for (const order of ordersForCustomerDirectory) {
+  for (const order of ordersInPeriodAllStaff) {
     const phone = (order.customerPhone || "").trim();
     const key = phone ? salesCustomerPhoneKey(phone) : `__no_phone__:${order.id}`;
     const orderTotal = parseFloat(order.total || "0") || 0;
@@ -623,7 +622,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     if (!repairTicketEligibleForSalesReport(t as RepairTicket)) return false;
     const ticketDate = repairTicketSalesAt(t as RepairTicket);
     if (!ticketDate) return false;
-    const day = baghdadDayFromIso(ticketDate);
+    const day = baghdadDayFromInstant(ticketDate);
     return dayInBaghdadRange(day, salesRange.from, salesRange.to);
   }) : [];
 
@@ -680,8 +679,6 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       : '\u0639\u0646\u062f \u0627\u0644\u0627\u0633\u062a\u0644\u0627\u0645';
 
     const parsedItems: any[] = parseOrderItems(order);
-
-    const saleDate = new Date(order.createdAt);
 
     const itemRowsHtml = parsedItems.map((item: any) => {
       const unitPrice = parseFloat(item.price || item.unitPrice || '0') || 0;
@@ -754,11 +751,11 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px 12px;border-bottom:1px solid #d1d5db;font-size:12px;">
     <div>
       <div style="font-weight:700;">\u0627\u0644\u062a\u0627\u0631\u064a\u062e</div>
-      <div style="font-weight:800;">${saleDate.toLocaleDateString('ar-IQ')}</div>
+      <div style="font-weight:800;">${formatBaghdadDate(order.createdAt)}</div>
     </div>
     <div style="text-align:left;">
       <div style="font-weight:700;">\u0627\u0644\u0648\u0642\u062a</div>
-      <div style="font-weight:800;">${saleDate.toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' })}</div>
+      <div style="font-weight:800;">${formatBaghdadTime(order.createdAt)}</div>
     </div>
   </div>
 
@@ -847,8 +844,8 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
     }
   };
 
-  const formatDate = (value: string) => new Date(value).toLocaleDateString('ar-IQ');
-  const formatTime = (value: string) => new Date(value).toLocaleTimeString('ar-IQ', { hour: '2-digit', minute: '2-digit' });
+  const formatDate = (value: string) => formatBaghdadDate(value);
+  const formatTime = (value: string) => formatBaghdadTime(value);
 
   const applyQuickCashflowRange = (preset: 'today' | 'last7' | 'thisMonth') => {
     const baghdadNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Baghdad' }));
@@ -1422,13 +1419,13 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
       <Card>
         <CardHeader className="pb-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>{language === "ar" ? "كل زبائن الموقع" : "All customers at location"}</CardTitle>
+            <CardTitle>{language === "ar" ? "زبائن الفترة" : "Customers in period"}</CardTitle>
             <Badge variant="secondary">{periodCustomers.length}</Badge>
           </div>
           <p className="text-xs text-muted-foreground font-normal mt-1">
             {language === "ar"
-              ? `زبائن الموقع ${effectiveSalesLocationId} فقط (كل الوقت، كل الموظفين) — لا يقتصر على مبيعاتك أنت.`
-              : `Location ${effectiveSalesLocationId} only (all time, all staff) — not limited to your own sales.`}
+              ? `زبائن الموقع ${effectiveSalesLocationId} في الفترة المحددة (كل الموظفين) — «فاتورة» تطبع آخر طلب للزبون ضمن هذه الفترة.`
+              : `Location ${effectiveSalesLocationId} customers in the selected date range (all staff) — Invoice prints their latest order in this period.`}
           </p>
         </CardHeader>
         <CardContent>
@@ -1610,7 +1607,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                       <td className="p-3">{getPaymentMethodLabel(order)}</td>
                       <td className="p-3 text-end font-bold">{formatPrice(parseFloat(order.total))} IQD</td>
                       <td className="p-3 text-muted-foreground">
-                        {new Date(order.createdAt).toLocaleDateString('ar-IQ')}
+                        {formatBaghdadDate(order.createdAt)}
                       </td>
                       <td className="p-3">
                         <div className="flex flex-wrap items-center gap-1">
@@ -1778,7 +1775,7 @@ export default function SalesReports({ user, salesLocationId = 1 }: SalesReports
                           </div>
                         </td>
                         <td className="py-2 px-4 text-muted-foreground text-xs">
-                          {ticketDate.toLocaleDateString('ar-IQ')}
+                          {formatBaghdadDate(ticketDate)}
                         </td>
                         <td className={`py-2 px-4 text-end font-semibold ${isDeferred ? 'text-orange-600' : ''}`}>
                           {formatPrice(amount)} IQD
