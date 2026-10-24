@@ -42,6 +42,7 @@ export default function ShopCustomerProfile() {
     switch (status) {
       case 'pending': return 'bg-yellow-500/20 text-yellow-700 dark:text-yellow-400';
       case 'in-progress': return 'bg-blue-500/20 text-blue-700 dark:text-blue-400';
+      case 'awaiting-customer-reply': return 'bg-purple-500/20 text-purple-700 dark:text-purple-400';
       case 'waiting-parts': return 'bg-orange-500/20 text-orange-700 dark:text-orange-400';
       case 'completed': return 'bg-green-500/20 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/20 text-gray-700 dark:text-gray-400';

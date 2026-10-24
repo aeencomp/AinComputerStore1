@@ -8,23 +8,24 @@ import { Label } from '@/components/ui/label';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { useLocation } from 'wouter';
 import type { RepairTicket } from '@shared/schema';
-import { Search, Clock, Wrench, Package, CheckCircle, Truck, Circle } from 'lucide-react';
+import { Search, Clock, Wrench, Package, CheckCircle, Truck, Circle, MessageCircle } from 'lucide-react';
 import JsBarcode from 'jsbarcode';
+
+const optionalTimelineSteps = new Set(['waiting-parts', 'awaiting-customer-reply']);
 
 const allRepairSteps = [
   { id: 'pending', icon: Clock },
   { id: 'in-progress', icon: Wrench },
+  { id: 'awaiting-customer-reply', icon: MessageCircle },
   { id: 'waiting-parts', icon: Package },
   { id: 'completed', icon: CheckCircle },
   { id: 'delivered', icon: Truck },
 ];
 
 function RepairTimeline({ currentStatus, t, language }: { currentStatus: string; t: (key: string) => string; language: string }) {
-  const showWaitingParts = currentStatus === 'waiting-parts';
-  
-  const repairSteps = showWaitingParts 
-    ? allRepairSteps 
-    : allRepairSteps.filter(step => step.id !== 'waiting-parts');
+  const repairSteps = allRepairSteps.filter(
+    (step) => !optionalTimelineSteps.has(step.id) || step.id === currentStatus,
+  );
   
   const currentIndex = repairSteps.findIndex(step => step.id === currentStatus);
   const progressPercent = currentIndex >= 0 ? (currentIndex / (repairSteps.length - 1)) * 100 : 0;
@@ -179,6 +180,7 @@ export default function TrackRepair() {
     switch (status) {
       case 'pending': return 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400';
       case 'in-progress': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
+      case 'awaiting-customer-reply': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400';
       case 'waiting-parts': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400';
       case 'completed': return 'bg-green-500/10 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';

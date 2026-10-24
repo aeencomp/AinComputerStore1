@@ -545,6 +545,7 @@ export default function NewRepairRequest() {
     const statusMap: Record<string,string> = {
       pending: isRTL ? 'قيد الانتظار' : 'Pending',
       'in-progress': isRTL ? 'جاري العمل' : 'In Progress',
+      'awaiting-customer-reply': isRTL ? 'بانتظار رد الزبون' : 'Awaiting Customer Reply',
       'waiting-parts': isRTL ? 'انتظار قطع' : 'Waiting Parts',
       completed: isRTL ? 'مكتمل' : 'Completed',
       delivered: isRTL ? 'مسلم' : 'Delivered',

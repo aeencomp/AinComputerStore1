@@ -703,6 +703,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     'repair.status.pending': 'قيد الانتظار',
     'repair.status.in-progress': 'قيد الصيانة',
+    'repair.status.awaiting-customer-reply': 'بانتظار رد الزبون',
     'repair.status.waiting-parts': 'بانتظار القطع',
     'repair.status.completed': 'مكتمل',
     'repair.status.delivered': 'تم التسليم',
@@ -1581,6 +1582,7 @@ const translations: Record<Language, Record<string, string>> = {
     
     'repair.status.pending': 'Pending',
     'repair.status.in-progress': 'In Progress',
+    'repair.status.awaiting-customer-reply': 'Awaiting Customer Reply',
     'repair.status.waiting-parts': 'Waiting for Parts',
     'repair.status.completed': 'Completed',
     'repair.status.delivered': 'Delivered',

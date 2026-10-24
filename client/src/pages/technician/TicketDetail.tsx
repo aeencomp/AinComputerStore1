@@ -393,6 +393,7 @@ export default function TicketDetail() {
     const statusMap: Record<string, string> = {
       pending: isRTL ? 'قيد الانتظار' : 'Pending',
       'in-progress': isRTL ? 'جاري العمل' : 'In Progress',
+      'awaiting-customer-reply': isRTL ? 'بانتظار رد الزبون' : 'Awaiting Customer Reply',
       'waiting-parts': isRTL ? 'انتظار قطع' : 'Waiting Parts',
       completed: isRTL ? 'مكتمل' : 'Completed',
       delivered: isRTL ? 'مُسلَّم' : 'Delivered',
@@ -685,6 +686,7 @@ export default function TicketDetail() {
                           <SelectContent>
                             <SelectItem value="pending">{t('repair.status.pending')}</SelectItem>
                             <SelectItem value="in-progress">{t('repair.status.in-progress')}</SelectItem>
+                            <SelectItem value="awaiting-customer-reply">{t('repair.status.awaiting-customer-reply')}</SelectItem>
                             <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                             <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                             <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>

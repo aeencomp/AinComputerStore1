@@ -532,6 +532,7 @@ export default function TechnicianDashboard() {
     switch (status) {
       case 'pending': return 'bg-yellow-500/10 text-yellow-700 dark:text-yellow-400';
       case 'in-progress': return 'bg-blue-500/10 text-blue-700 dark:text-blue-400';
+      case 'awaiting-customer-reply': return 'bg-purple-500/10 text-purple-700 dark:text-purple-400';
       case 'waiting-parts': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400';
       case 'completed': return 'bg-green-500/10 text-green-700 dark:text-green-400';
       case 'delivered': return 'bg-gray-500/10 text-gray-700 dark:text-gray-400';
@@ -1040,6 +1041,7 @@ export default function TechnicianDashboard() {
               <SelectItem value="all">{t('repair.technician.dashboard.allTickets')}</SelectItem>
               <SelectItem value="pending">{t('repair.status.pending')}</SelectItem>
               <SelectItem value="in-progress">{t('repair.status.in-progress')}</SelectItem>
+              <SelectItem value="awaiting-customer-reply">{t('repair.status.awaiting-customer-reply')}</SelectItem>
               <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
               <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
               <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>
@@ -1215,6 +1217,7 @@ export default function TechnicianDashboard() {
                       <SelectContent>
                         <SelectItem value="pending">{t('repair.status.pending')}</SelectItem>
                         <SelectItem value="in-progress">{t('repair.status.in-progress')}</SelectItem>
+                        <SelectItem value="awaiting-customer-reply">{t('repair.status.awaiting-customer-reply')}</SelectItem>
                         <SelectItem value="waiting-parts">{t('repair.status.waiting-parts')}</SelectItem>
                         <SelectItem value="completed">{t('repair.status.completed')}</SelectItem>
                         <SelectItem value="delivered">{t('repair.status.delivered')}</SelectItem>

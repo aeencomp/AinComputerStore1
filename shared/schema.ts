@@ -457,7 +457,7 @@ export const repairTickets = pgTable("repair_tickets", {
   deviceModel: text("device_model").notNull(),
   issueDescriptionAr: text("issue_description_ar").notNull(),
   issueDescriptionEn: text("issue_description_en"),
-  status: text("status").notNull().default("pending"), // pending, in-progress, waiting-parts, completed, delivered
+  status: text("status").notNull().default("pending"), // pending, in-progress, awaiting-customer-reply, waiting-parts, completed, delivered, ...
   priority: text("priority").notNull().default("normal"), // low, normal, high, urgent
   technicianNotes: text("technician_notes").default(""),
   /** Visible to technicians only; never sent on WhatsApp or public track page. */

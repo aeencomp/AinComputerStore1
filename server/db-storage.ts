@@ -1525,7 +1525,9 @@ export class DrizzleStorage implements IStorage {
   async getSaasStats(shopId: number): Promise<{ pending: number; inProgress: number; completed: number; totalRevenue: number; completedRevenue: number }> {
     const tickets = await db.select().from(saasRepairTickets).where(and(eq(saasRepairTickets.shopId, shopId), eq(saasRepairTickets.isArchived, 0)));
     const pending = tickets.filter(t => t.status === 'pending').length;
-    const inProgress = tickets.filter(t => ['in-progress', 'waiting-parts'].includes(t.status)).length;
+    const inProgress = tickets.filter(t =>
+      ['in-progress', 'awaiting-customer-reply', 'waiting-parts'].includes(t.status),
+    ).length;
     const completed = tickets.filter(t => ['completed', 'delivered'].includes(t.status)).length;
     const totalRevenue = tickets.reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);
     const completedRevenue = tickets.filter(t => ['completed', 'delivered'].includes(t.status)).reduce((sum, t) => sum + parseFloat(t.finalCost || t.costEstimate || '0'), 0);

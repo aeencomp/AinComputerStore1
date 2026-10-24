@@ -986,6 +986,7 @@ export async function sendTicketUpdatedMessage(
     'received':        'تم استلام الجهاز',
     'pending':         'قيد الانتظار',
     'in-progress':     'جاري العمل عليه',
+    'awaiting-customer-reply': 'بانتظار رد الزبون',
     'waiting-parts':   'بانتظار قطع الغيار',
     'completed':       'تم الإصلاح - جاهز للاستلام',
     'delivered':       'تم التسليم',
