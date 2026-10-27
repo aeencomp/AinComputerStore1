@@ -9,7 +9,7 @@ import "dotenv/config";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { inStoreProducts, orders } from "@shared/schema";
+import { batterySales, inStoreProducts, laptopSaleItems, orders } from "@shared/schema";
 import { and, gte, lt, sql, ilike, or, eq, inArray, isNull } from "drizzle-orm";
 
 const LOCATION_IDS = [1, 2] as const;
@@ -79,22 +79,81 @@ function parseOrderItem(raw: unknown): Record<string, unknown> | null {
   return null;
 }
 
-function isLaptopLine(item: Record<string, unknown>): boolean {
+type CatalogMaps = {
+  laptopIds: Set<string>;
+  dell5400Ids: Set<string>;
+};
+
+function itemInStoreProductId(item: Record<string, unknown>): string | null {
+  const raw = item.productId ?? item.instoreProductId;
+  if (raw == null || raw === "") return null;
+  return String(raw);
+}
+
+function isLaptopLine(item: Record<string, unknown>, maps: CatalogMaps): boolean {
+  const pid = itemInStoreProductId(item);
+  if (pid && maps.laptopIds.has(pid)) return true;
+
   const type = String(item.productType ?? item.type ?? "").toLowerCase();
   if (type === "laptop") return true;
   const src = String(item.productSource ?? "").toLowerCase();
   if (src === "laptop") return true;
   const cat = String(item.category ?? "").toLowerCase();
   if (cat.includes("laptop") || cat === "laptops") return true;
+
+  const names = [item.name, item.nameAr, item.nameEn].filter(Boolean).join(" ").toLowerCase();
+  if (names.includes("laptop") || names.includes("لابتوب")) return true;
+
+  if (Array.isArray(item.specs)) {
+    const specText = item.specs.map(String).join(" ").toLowerCase();
+    if (specText.includes("الموديل") || specText.includes("المعالج") || specText.includes("cpu")) {
+      return true;
+    }
+  }
   return false;
 }
 
-function isDell5400Line(item: Record<string, unknown>): boolean {
+function isDell5400Line(item: Record<string, unknown>, maps: CatalogMaps): boolean {
+  const pid = itemInStoreProductId(item);
+  if (pid && maps.dell5400Ids.has(pid)) return true;
+
   const hay = [item.name, item.nameAr, item.nameEn, item.model, item.brand, item.title]
     .filter(Boolean)
     .join(" ")
     .toLowerCase();
-  return hay.includes("5400");
+  if (hay.includes("5400")) return true;
+  if (Array.isArray(item.specs) && item.specs.join(" ").includes("5400")) return true;
+  return false;
+}
+
+function dell5400ProductWhereAnyLocation() {
+  return and(
+    eq(inStoreProducts.productType, "laptop"),
+    or(
+      and(
+        sql`coalesce(${inStoreProducts.specs}->>'brand', '') ILIKE '%dell%'`,
+        sql`coalesce(${inStoreProducts.specs}->>'model', '') ILIKE '%5400%'`,
+      ),
+      sql`(${inStoreProducts.nameAr} ILIKE '%dell%' AND ${inStoreProducts.nameAr} ILIKE '%5400%')`,
+      ilike(inStoreProducts.nameAr, "%5400%"),
+    ),
+  );
+}
+
+async function loadCatalogMaps(db: NodePgDatabase): Promise<CatalogMaps> {
+  const laptopRows = await db
+    .select({ id: inStoreProducts.id })
+    .from(inStoreProducts)
+    .where(eq(inStoreProducts.productType, "laptop"));
+  const dell5400Rows = await db
+    .select({ id: inStoreProducts.id })
+    .from(inStoreProducts)
+    .where(dell5400ProductWhereAnyLocation());
+
+  return {
+    laptopIds: new Set(laptopRows.map((r) => String(r.id))),
+    dell5400Ids: new Set(dell5400Rows.map((r) => String(r.id))),
+  };
 }
 
 function dell5400ProductWhere(locationId: number) {
@@ -125,6 +184,7 @@ async function reportLocation(
   start: Date,
   end: Date,
   fromKey: string,
+  catalog: CatalogMaps,
 ): Promise<LocStats> {
   const stats = emptyStats();
 
@@ -226,10 +286,10 @@ async function reportLocation(
   for (const o of posOrders) {
     for (const raw of o.items || []) {
       const item = parseOrderItem(raw);
-      if (!item || !isLaptopLine(item)) continue;
+      if (!item || !isLaptopLine(item, catalog)) continue;
       const qty = Math.max(1, parseInt(String(item.quantity ?? 1), 10) || 1);
       stats.soldLaptops += qty;
-      if (isDell5400Line(item)) {
+      if (isDell5400Line(item, catalog)) {
         stats.sold5400 += qty;
         sold5400Lines.push(
           `    • ${o.orderNumber} x${qty} ${item.name ?? item.nameAr ?? ""} | ${o.createdAt}`,
@@ -292,12 +352,30 @@ async function runReport(label: string, connectionString: string, fromKey: strin
   console.log("=".repeat(60));
 
   try {
+    const catalog = await loadCatalogMaps(db);
+    console.log(
+      `Catalog: ${catalog.laptopIds.size} in-store laptop SKU(s), ${catalog.dell5400Ids.size} Dell 5400 SKU(s)`,
+    );
+
     let combined = emptyStats();
     for (const locationId of LOCATION_IDS) {
-      const stats = await reportLocation(db, locationId, start, end, fromKey);
+      const stats = await reportLocation(db, locationId, start, end, fromKey, catalog);
       combined = addStats(combined, stats);
     }
     printCombined(fromKey, combined);
+
+    const legacyLaptopSales = await db
+      .select({
+        qty: sql<number>`coalesce(sum(${laptopSaleItems.quantity}),0)::int`,
+        dell5400: sql<number>`coalesce(sum(case when coalesce(${laptopSaleItems.model}, '') ilike '%5400%' or coalesce(${laptopSaleItems.brand}, '') ilike '%dell%' and coalesce(${laptopSaleItems.model}, '') ilike '%5400%' then ${laptopSaleItems.quantity} else 0 end),0)::int`,
+      })
+      .from(laptopSaleItems)
+      .innerJoin(batterySales, eq(laptopSaleItems.saleId, batterySales.id))
+      .where(and(gte(batterySales.createdAt, start), lt(batterySales.createdAt, end)));
+
+    console.log(
+      `\n[F] Battery-POS laptop sales (all locations, no loc field in DB): ${legacyLaptopSales[0]?.qty ?? 0} unit(s); Dell 5400-ish: ${legacyLaptopSales[0]?.dell5400 ?? 0}`,
+    );
   } catch (e: unknown) {
     const err = e as { message?: string };
     console.error("Report failed:", err.message || e);
@@ -325,9 +403,10 @@ async function main() {
     await runReport(label, url, fromKey, toKey);
   }
 
-  if (!process.env.REMOTE_DATABASE_URL) {
+  const url = process.env.REMOTE_DATABASE_URL || process.env.DATABASE_URL || "";
+  if (/localhost|127\.0\.0\.1/.test(url) && !process.env.REMOTE_DATABASE_URL) {
     console.log(
-      "\n⚠ Production data: add REMOTE_DATABASE_URL (Neon URL from VPS .env) and re-run, or npm run db:copy-remote.",
+      "\nNote: DATABASE_URL is localhost — on your PC this is not the VPS DB. Run on the server or set REMOTE_DATABASE_URL.",
     );
   }
 }
