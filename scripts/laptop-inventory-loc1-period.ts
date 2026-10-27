@@ -9,7 +9,7 @@ import "dotenv/config";
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { batterySales, inStoreProducts, laptopSaleItems, orders } from "@shared/schema";
+import { batterySales, inStoreProducts, laptopSaleItems, laptops, orders } from "@shared/schema";
 import { and, gte, lt, sql, ilike, or, eq, inArray, isNull } from "drizzle-orm";
 
 const LOCATION_IDS = [1, 2] as const;
@@ -113,31 +113,39 @@ function isLaptopLine(item: Record<string, unknown>, maps: CatalogMaps): boolean
   return false;
 }
 
-function isDell5400Line(item: Record<string, unknown>, maps: CatalogMaps): boolean {
+/** Any in-store row whose name, SKU, description, or specs JSON contains "5400". */
+function match5400InStore(locationId?: number) {
+  const textMatch = sql`(
+    ${inStoreProducts.nameAr} ILIKE '%5400%'
+    OR coalesce(${inStoreProducts.nameEn}, '') ILIKE '%5400%'
+    OR coalesce(${inStoreProducts.sku}, '') ILIKE '%5400%'
+    OR coalesce(${inStoreProducts.description}, '') ILIKE '%5400%'
+    OR coalesce(${inStoreProducts.specs}::text, '') ILIKE '%5400%'
+  )`;
+  if (locationId != null) {
+    return and(eq(inStoreProducts.salesLocationId, locationId), textMatch);
+  }
+  return textMatch;
+}
+
+function orderLineMentions5400(raw: unknown, item: Record<string, unknown> | null): boolean {
+  const blob = (typeof raw === "string" ? raw : JSON.stringify(item ?? raw)).toLowerCase();
+  return blob.includes("5400");
+}
+
+function isDell5400Line(
+  raw: unknown,
+  item: Record<string, unknown>,
+  maps: CatalogMaps,
+): boolean {
+  if (orderLineMentions5400(raw, item)) return true;
   const pid = itemInStoreProductId(item);
   if (pid && maps.dell5400Ids.has(pid)) return true;
-
-  const hay = [item.name, item.nameAr, item.nameEn, item.model, item.brand, item.title]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-  if (hay.includes("5400")) return true;
-  if (Array.isArray(item.specs) && item.specs.join(" ").includes("5400")) return true;
   return false;
 }
 
 function dell5400ProductWhereAnyLocation() {
-  return and(
-    eq(inStoreProducts.productType, "laptop"),
-    or(
-      and(
-        sql`coalesce(${inStoreProducts.specs}->>'brand', '') ILIKE '%dell%'`,
-        sql`coalesce(${inStoreProducts.specs}->>'model', '') ILIKE '%5400%'`,
-      ),
-      sql`(${inStoreProducts.nameAr} ILIKE '%dell%' AND ${inStoreProducts.nameAr} ILIKE '%5400%')`,
-      ilike(inStoreProducts.nameAr, "%5400%"),
-    ),
-  );
+  return match5400InStore();
 }
 
 async function loadCatalogMaps(db: NodePgDatabase): Promise<CatalogMaps> {
@@ -157,18 +165,7 @@ async function loadCatalogMaps(db: NodePgDatabase): Promise<CatalogMaps> {
 }
 
 function dell5400ProductWhere(locationId: number) {
-  return and(
-    eq(inStoreProducts.productType, "laptop"),
-    eq(inStoreProducts.salesLocationId, locationId),
-    or(
-      and(
-        sql`coalesce(${inStoreProducts.specs}->>'brand', '') ILIKE '%dell%'`,
-        sql`coalesce(${inStoreProducts.specs}->>'model', '') ILIKE '%5400%'`,
-      ),
-      sql`(${inStoreProducts.nameAr} ILIKE '%dell%' AND ${inStoreProducts.nameAr} ILIKE '%5400%')`,
-      ilike(inStoreProducts.nameAr, "%5400%"),
-    ),
-  );
+  return match5400InStore(locationId);
 }
 
 function allLaptopsWhere(locationId: number) {
@@ -189,6 +186,7 @@ async function reportLocation(
   const stats = emptyStats();
 
   console.log(`\n--- ${LOCATION_LABEL[locationId] ?? `Location ${locationId}`} ---`);
+  console.log("    (Dell 5400 = any inventory/sale line containing \"5400\" in name, SKU, or specs)");
 
   const intakeAll = await db
     .select({
@@ -259,8 +257,35 @@ async function reportLocation(
   stats.onHand5400Rows = onHand5400[0]?.rows ?? 0;
   stats.onHand5400Units = onHand5400[0]?.units ?? 0;
 
+  let legacy5400Units = 0;
+  let legacy5400Rows = 0;
+  try {
+    const legacyOnHand = await db
+      .select({
+        rows: sql<number>`count(*)::int`,
+        units: sql<number>`coalesce(sum(${laptops.stockQuantity}),0)::int`,
+      })
+      .from(laptops)
+      .where(
+        and(
+          eq(laptops.salesLocationId, locationId),
+          eq(laptops.isActive, 1),
+          or(
+            ilike(laptops.model, "%5400%"),
+            ilike(laptops.brand, "%5400%"),
+            sql`coalesce(${laptops.notes}, '') ILIKE '%5400%'`,
+            sql`coalesce(${laptops.serialNumber}, '') ILIKE '%5400%'`,
+          ),
+        ),
+      );
+    legacy5400Rows = legacyOnHand[0]?.rows ?? 0;
+    legacy5400Units = legacyOnHand[0]?.units ?? 0;
+  } catch {
+    /* legacy table optional */
+  }
+
   console.log(
-    `[C] On-hand now: all laptops ${stats.onHandAllUnits} unit(s) (${stats.onHandAllRows} rows); Dell 5400 ${stats.onHand5400Units} unit(s) (${stats.onHand5400Rows} rows)`,
+    `[C] On-hand now: all laptops ${stats.onHandAllUnits} unit(s) (${stats.onHandAllRows} rows); 5400-match ${stats.onHand5400Units} in-store + ${legacy5400Units} legacy (${stats.onHand5400Rows}+${legacy5400Rows} rows)`,
   );
 
   const posOrders = await db
@@ -286,10 +311,12 @@ async function reportLocation(
   for (const o of posOrders) {
     for (const raw of o.items || []) {
       const item = parseOrderItem(raw);
-      if (!item || !isLaptopLine(item, catalog)) continue;
+      if (!item) continue;
       const qty = Math.max(1, parseInt(String(item.quantity ?? 1), 10) || 1);
-      stats.soldLaptops += qty;
-      if (isDell5400Line(item, catalog)) {
+      if (isLaptopLine(item, catalog)) {
+        stats.soldLaptops += qty;
+      }
+      if (isDell5400Line(raw, item, catalog)) {
         stats.sold5400 += qty;
         sold5400Lines.push(
           `    • ${o.orderNumber} x${qty} ${item.name ?? item.nameAr ?? ""} | ${o.createdAt}`,
@@ -354,7 +381,7 @@ async function runReport(label: string, connectionString: string, fromKey: strin
   try {
     const catalog = await loadCatalogMaps(db);
     console.log(
-      `Catalog: ${catalog.laptopIds.size} in-store laptop SKU(s), ${catalog.dell5400Ids.size} Dell 5400 SKU(s)`,
+      `Catalog: ${catalog.laptopIds.size} in-store laptop SKU(s), ${catalog.dell5400Ids.size} SKU(s) with "5400" in name/specs`,
     );
 
     let combined = emptyStats();
